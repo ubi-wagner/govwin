@@ -12,116 +12,69 @@
   },
   {
    "flow": "studio",
-   "label": "requested",
-   "file": "studio__002-requested.jpg",
-   "note": "immediately after firing"
-  },
-  {
-   "flow": "studio",
-   "label": "after-polling",
-   "file": "studio__003-after-polling.jpg",
-   "note": "reloaded once the engine settled"
+   "label": "NO-DRAFT-CONTROL",
+   "file": "studio__002-NO-DRAFT-CONTROL.jpg"
   },
   {
    "flow": "ai-actions",
    "label": "panel",
-   "file": "ai-actions__004-panel.jpg"
+   "file": "ai-actions__003-panel.jpg"
   },
   {
    "flow": "automation",
    "label": "policy-at-rest",
-   "file": "automation__005-policy-at-rest.jpg"
+   "file": "automation__004-policy-at-rest.jpg"
   },
   {
    "flow": "admin-agents",
    "label": "roster",
-   "file": "admin-agents__006-roster.jpg",
+   "file": "admin-agents__005-roster.jpg",
    "route": "/admin/agents"
   },
   {
    "flow": "admin-agents",
    "label": "workflow-monitor",
-   "file": "admin-agents__007-workflow-monitor.jpg",
+   "file": "admin-agents__006-workflow-monitor.jpg",
    "route": "/admin/workflows"
   },
   {
    "flow": "admin-agents",
    "label": "process-monitor",
-   "file": "admin-agents__008-process-monitor.jpg",
+   "file": "admin-agents__007-process-monitor.jpg",
    "route": "/admin/process"
   }
  ],
  "timeline": [
   {
    "at": "at-rest",
-   "instances": 179,
-   "openTasks": 16,
-   "events": 3900,
-   "invocations": 16,
-   "versions": 3,
-   "aiRevisions": 0
-  },
-  {
-   "at": "requested",
-   "instances": 179,
-   "openTasks": 16,
-   "events": 3902,
-   "invocations": 16,
-   "versions": 3,
-   "aiRevisions": 0
-  },
-  {
-   "at": "+4000ms",
-   "instances": 179,
-   "openTasks": 16,
-   "events": 3902,
-   "invocations": 16,
-   "versions": 3,
-   "aiRevisions": 0
-  },
-  {
-   "at": "+6000ms",
-   "instances": 180,
-   "openTasks": 16,
-   "events": 3917,
-   "invocations": 16,
-   "versions": 3,
-   "aiRevisions": 0
-  },
-  {
-   "at": "+8000ms",
-   "instances": 180,
-   "openTasks": 16,
-   "events": 3922,
-   "invocations": 16,
-   "versions": 3,
-   "aiRevisions": 0
-  },
-  {
-   "at": "+10000ms",
-   "instances": 180,
-   "openTasks": 16,
-   "events": 3922,
-   "invocations": 16,
+   "instances": 676,
+   "openTasks": 179,
+   "events": 19904,
+   "invocations": 72,
    "versions": 3,
    "aiRevisions": 0
   }
  ],
  "before": {
-  "instances": 179,
-  "openTasks": 16,
-  "events": 3899,
-  "invocations": 16,
+  "instances": 676,
+  "openTasks": 179,
+  "events": 19903,
+  "invocations": 72,
   "versions": 3,
   "aiRevisions": 0
  },
  "after": {
-  "instances": 180,
-  "openTasks": 16,
-  "events": 3923,
-  "invocations": 16,
+  "instances": 676,
+  "openTasks": 179,
+  "events": 19905,
+  "invocations": 72,
   "versions": 3,
   "aiRevisions": 0
  },
- "findings": []
+ "findings": [
+  {
+   "flow": "studio",
+   "what": "no Draft-loop control offered on an unlocked build — the Studio card may be gated differently than expected"
+  }
+ ]
 }

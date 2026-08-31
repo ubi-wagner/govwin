@@ -30,6 +30,27 @@ const CONN = process.env.DATABASE_URL;
 const CHECK_ONLY = process.argv.includes('--check');
 const STRICT = process.env.MIGRATE_STRICT === 'true';
 
+/**
+ * `--accept-drift=221_foo.sql[,…]` — restamp the stored checksum for files NAMED explicitly.
+ *
+ * The narrow, legitimate case: a file was applied, then edited in ways that changed no DDL —
+ * comments, whitespace, a corrected header. The DDL genuinely did run; only the bytes moved.
+ *
+ * It takes an explicit list and never a wildcard, because the reason to have it at all is that a
+ * drift warning nobody can clear is a warning everybody learns to scroll past — and the next one
+ * will be real. Clearing it has to be a deliberate, named act, and one that leaves a record.
+ *
+ * ⚠️ It does NOT inspect the DDL. Only pass a file after checking that what it declares is actually
+ * present in the database — the objects, the constraints, the policies, the triggers.
+ */
+const ACCEPT_DRIFT = new Set(
+  (process.argv.find(a => a.startsWith('--accept-drift=')) ?? '')
+    .replace('--accept-drift=', '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean),
+);
+
 if (!CONN) {
   console.error('[migrate] FATAL: DATABASE_URL not set — cannot run migrations');
   process.exit(1);
@@ -83,11 +104,31 @@ async function run() {
     if (!stored) unverifiable.push(file);
     else if (stored !== current) drift.push(file);
   }
-  if (drift.length) {
+  // Restamp the ones named on the command line, before reporting — so an accepted file is not
+  // also listed as drift in the same run, which would read as though the flag had not worked.
+  const accepted = drift.filter(f => ACCEPT_DRIFT.has(f));
+  for (const f of accepted) {
+    const current = sha256(await readFile(join(__dirname, f), 'utf-8'));
+    await sql`UPDATE _migration_history SET checksum = ${current} WHERE filename = ${f}`;
+    console.log(`[migrate] drift ACCEPTED for ${f} — checksum restamped. The DDL was verified `
+      + 'present by hand; only the file bytes had moved.');
+  }
+  const unaccepted = drift.filter(f => !ACCEPT_DRIFT.has(f));
+  // A name passed to --accept-drift that is NOT in drift is reported rather than ignored: it means
+  // the file was already clean, was never applied here, or the name was mistyped — and silently
+  // accepting nothing looks identical to accepting something.
+  for (const f of ACCEPT_DRIFT) {
+    if (!drift.includes(f)) console.error(`[migrate] note: --accept-drift named '${f}', which is not drifting here — nothing done.`);
+  }
+  if (unaccepted.length) {
     console.error('[migrate] ⚠️  DRIFT: these applied migrations differ from their files on disk.');
     console.error('[migrate]     The edited DDL never ran on THIS database. Fix forward with a NEW migration.');
-    for (const f of drift) console.error(`[migrate]     • ${f}`);
+    console.error('[migrate]     If the edit changed NO DDL (comments, whitespace), verify the objects');
+    console.error('[migrate]     exist and then restamp: --accept-drift=<file>');
+    for (const f of unaccepted) console.error(`[migrate]     • ${f}`);
   }
+  drift.length = 0;
+  drift.push(...unaccepted);
   if (unverifiable.length && CHECK_ONLY) {
     console.error(`[migrate] note: ${unverifiable.length} applied migration(s) have no stored checksum (pre-dating checksum tracking) — cannot verify.`);
   }
@@ -154,6 +195,19 @@ async function run() {
       console.log(`[migrate] ✓ ${file}`);
     } catch (err) {
       console.error(`[migrate] ✗ ${file} FAILED:`, err.message);
+      // 42501 here almost always means the runner is connected as the APPLICATION role, not the
+      // owner. It is the easiest mistake to make in the sandbox: `scripts/sandbox-env.sh` sets
+      // DATABASE_URL to `govtech_app` (correct — that is what the app runs as, and what any test of
+      // RLS must use) and the owner to DATABASE_URL_OWNER, while this runner reads DATABASE_URL.
+      // Most migrations then apply fine, because they only touch tables the app role can write, and
+      // the first one that needs an owner privilege fails with a message about the wrong table.
+      if (err.code === '42501') {
+        console.error('[migrate]');
+        console.error('[migrate] That is a PRIVILEGE error, and the usual cause is the connection:');
+        console.error(`[migrate]   connected as: ${(CONN.match(/\/\/([^:]+)/) || [, '?'])[1]}`);
+        console.error('[migrate] Migrations run as the OWNER. In the sandbox:');
+        console.error('[migrate]   DATABASE_URL="$DATABASE_URL_OWNER" node db/migrations/migrate.mjs');
+      }
       await sql.end();
       process.exit(1);
     }

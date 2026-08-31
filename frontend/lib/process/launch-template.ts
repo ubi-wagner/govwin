@@ -20,6 +20,7 @@
  */
 import { sql } from '@/lib/db';
 import { type Role } from '@/lib/rbac';
+import { emitEventSingleStrict } from '@/lib/events';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -160,22 +161,25 @@ export async function launchTemplate(opts: {
   }
 
   // ── Emit the trigger event with the overlay as payload ─────────────
-  // The launch IS this event (not instrumentation), so a failed insert fails the
-  // launch — we do not swallow it the way emitEventSingle does. actor_type='user'
-  // + actor_id record who launched it; the payload becomes the frozen instance
-  // overlay when the pipeline picks it up.
+  // The launch IS this event (not instrumentation), so a failed insert fails the launch — which
+  // is why this uses the STRICT emit rather than the fire-and-forget one. actor_type='user' +
+  // actor_id record who launched it; the payload becomes the frozen instance overlay when the
+  // pipeline picks it up.
+  //
+  // It used to be a hand-written `INSERT INTO system_events` here, for exactly that reason. The
+  // throw was the justification and the divergence was elsewhere: the copy also skipped
+  // `evaluateAutomationRules`, so a manually launched workflow's trigger event was invisible to
+  // the tenant automation-rule layer while the identical event from any other source was not.
+  // Through the seam, an event means the same thing wherever it came from.
   let eventId: string;
   try {
-    const [row] = await sql<{ id: string }[]>`
-      INSERT INTO system_events (
-        namespace, type, phase, actor_type, actor_id, actor_email, tenant_id, payload
-      ) VALUES (
-        ${namespace}, ${type}, 'single', ${actorType}, ${actor.id}, ${actor.email ?? null},
-        ${tenantId}, ${sql.json((overlay ?? {}) as Parameters<typeof sql.json>[0])}
-      )
-      RETURNING id
-    `;
-    eventId = row.id;
+    eventId = await emitEventSingleStrict({
+      namespace,
+      type,
+      actor: { type: actorType, id: actor.id, email: actor.email ?? undefined },
+      tenantId,
+      payload: (overlay ?? {}) as Record<string, unknown>,
+    });
   } catch (err) {
     console.error('[launchTemplate] trigger emit failed:', err);
     return { ok: false, status: 500, error: 'Failed to emit launch event', code: 'EMIT_FAILED' };

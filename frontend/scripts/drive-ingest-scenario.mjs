@@ -17,7 +17,11 @@ import postgres from 'postgres';
 import path from 'node:path';
 import fs from 'node:fs';
 
-const BASE = 'http://localhost:3000';
+// One base URL, three historic spellings — and this file used the worst of them: a LITERAL, which
+// ignores both env names silently. A drive pinned to :3000 runs against whatever build happens to
+// be serving there, so it can report a stale product as broken, or a fixed one as still broken.
+// (That is exactly how the release-gate change looked like a product failure for two runs.)
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const REPO = path.resolve(process.cwd(), '..');
 

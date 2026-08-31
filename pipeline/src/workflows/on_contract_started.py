@@ -1,0 +1,129 @@
+"""
+================================================================================
+Workflow: OnContractStarted
+================================================================================
+
+TRIGGER:    capture:contract.started:single
+            Condition: payload.contractId is present (a contract entity exists).
+
+PURPOSE:    The ONE bridge from the proposal spine into post-award projects.
+
+            When a proposal's outcome is recorded as awarded, the outcome route
+            creates a `contracts` row and emits `capture:contract.started`. This
+            workflow turns that into a human ToDo — "Set up project"
+            — and routes the tenant admin to it.
+
+            It does NOT create the project.
+
+WHY NOT AUTO-CREATE, WHICH IS THE OBVIOUS THING TO DO:
+    A project is ANCHORED to two uploaded artifacts — the executed
+    contract and the as-submitted proposal (docs/PROJECT_MANAGEMENT_DESIGN.md).
+    Not a pointer to `proposals`, even though we authored it: what lives there
+    is a working copy that stayed editable after submission, so a deliverable
+    tracing to it traces to something that can still change.
+
+    A workspace created the instant an outcome is recorded would be anchored to
+    NOTHING, which is precisely what the provenance model forbids. So the bridge
+    raises work for a person, and `readiness()` refuses to baseline until both
+    artifacts are actually there.
+
+    This is the same shape as the ingest-provenance rule one domain over: *a
+    value the product did not read from the source must never look like one it
+    did.* An auto-created project would look exactly like a sourced one.
+
+STEPS:
+    1. notify_project_setup (NOTIFY)
+       template=project_setup_ready. FIRST, deliberately: step 2 PARKS the
+       instance, and the engine runs steps in order — so a notification placed
+       after the gate is queued behind the gate it announces. Tell them, then
+       park.
+
+    2. todo_setup_project (TODO)
+       Raises a `project_setup` task for tenant_admin against the contract, and
+       parks the instance until a human completes it. 10-day timeout:
+       award-to-kickoff is measured in weeks, not hours, and a gate that expires
+       before the work is plausible is a gate that trains people to ignore it.
+
+HITL GATES:
+    - The whole workflow IS the gate. Nothing downstream advances until a human
+      opens the workspace and uploads the two artifacts.
+
+ERROR HANDLING:
+    - ToDo failure: the notification still fires (independent), and the contract
+      row already exists — the customer can reach Projects from the portal.
+    - Notification failure: the ToDo still stands in the work-item ledger with
+      its own nudge schedule.
+    - Neither dead-ends: there is no downstream step waiting on either.
+
+FAULT TOLERANCE:
+    - Idempotent: YES for the ToDo (closeTasksForEntity/dedup by entity ref);
+      the notification uses CRM dedup by trigger_event_id.
+    - A re-recorded outcome does not create a second contract (the route
+      upserts), so this trigger does not fan out.
+
+SAFETY:
+    - No agent, no AI, no tenant descent. This workflow reads nothing and writes
+      one task.
+
+INSTANCES:
+    - Customer Portal: fires on proposal outcome = awarded.
+    - Admin Pipeline: N/A.
+
+CHANGE LOG:
+    D6 — Initial implementation: the award bridge into project management.
+================================================================================
+"""
+from workflows.base import Workflow, Step, StepType, EventTrigger
+
+
+class OnContractStarted(Workflow):
+    description = "Raise the project setup ToDo when a proposal is awarded"
+
+    trigger = EventTrigger(
+        namespace="capture",
+        type="contract.started",
+        phase="single",
+        condition=lambda p: bool(p.get("contractId")),
+    )
+
+    steps = [
+        # FIRST, and that ordering is the whole point.
+        #
+        # A TODO step PARKS the instance (manager.py: status='paused' until a human completes it),
+        # and the engine runs steps in order — so a NOTIFY placed after the gate is queued BEHIND
+        # the gate it announces. This file used to claim the two were "INDEPENDENT"; they were not,
+        # and the end-to-end drive caught it: the instance reached `paused` with the notification
+        # never attempted, so the customer would have been told they had won only after they had
+        # already found out and done the setup themselves.
+        #
+        # Tell them, then park.
+        Step(
+            name="notify_project_setup",
+            step_type=StepType.NOTIFY,
+            action="system.notify",
+            input_map={
+                "channel": '"email"',
+                "template": '"project_setup_ready"',
+                "tenant_id": "payload.tenantId",
+                "contract_id": "payload.contractId",
+                "proposal_id": "payload.proposalId",
+                "title": "payload.title",
+            },
+        ),
+        # THEN the gate, which parks the instance until a person acts. They open the project and
+        # upload the executed contract and the as-submitted proposal; nothing about the project is
+        # real until they do.
+        Step(
+            name="todo_setup_project",
+            step_type=StepType.TODO,
+            action="todo",
+            task_type='"project_setup"',
+            task_title='"Set up project"',
+            assignee_role='"tenant_admin"',
+            entity_type='"contract"',
+            entity_ref="payload.contractId",
+            # Ten days. Award-to-kickoff is measured in weeks; a gate that expires before the work
+            # is plausible is a gate people learn to ignore.
+            timeout_minutes=14400,
+        ),
+    ]

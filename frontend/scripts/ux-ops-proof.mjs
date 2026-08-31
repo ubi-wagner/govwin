@@ -1,7 +1,11 @@
 /** Proof re-drive (390×844): confirm the polished operational surfaces now work on mobile. */
 import { chromium } from 'playwright';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const BASE = 'http://localhost:3000';
+// One base URL, three historic spellings — and this file used the worst of them: a LITERAL, which
+// ignores both env names silently. A drive pinned to :3000 runs against whatever build happens to
+// be serving there, so it can report a stale product as broken, or a fixed one as still broken.
+// (That is exactly how the release-gate change looked like a product failure for two runs.)
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const OUT = '/tmp/claude-0/-home-user-govwin/34d597b2-183f-5787-9057-fc7251e3f9ff/scratchpad/ux/proof';
 import fs from 'fs'; fs.mkdirSync(OUT, { recursive: true });
 const S = 'foundation', PROP = 'c3db60b1-2f0e-4bc8-903c-1ec098906c58';

@@ -111,7 +111,7 @@ export function TemplifyPastProposals({ tenantSlug, canTemplify = false }: { ten
             <li key={p.id} className="rounded-md border border-gray-200 bg-white p-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-800">{p.name || 'Untitled proposal'}</p>
+                  <p className="truncate text-sm font-medium text-gray-800" title={p.name || 'Untitled proposal'}>{p.name || 'Untitled proposal'}</p>
                   <p className="mt-0.5 text-[11px] text-gray-500">
                     {p.sectionCount} section{p.sectionCount === 1 ? '' : 's'}
                     {p.programType ? <> · <span className="uppercase">{p.programType}</span></> : null}

@@ -12,6 +12,7 @@
  * Off by default (summon chip) → summoned overlay. Read-only advisory posture throughout.
  */
 import { useState, type ReactNode } from 'react';
+import { fmtDateTime } from '@/lib/fmt';
 
 export interface AdvisoryOverlayProps {
   /** Overlay title, e.g. "Ingest coordination plan". */
@@ -89,7 +90,7 @@ export function AdvisoryOverlay({
       <div className="mt-2">{children}</div>
 
       <p className="mt-3 text-[11px] text-gray-400">
-        {generatedAt ? `Generated ${new Date(generatedAt).toLocaleString()} — ` : ''}advisory; it never advances a gate — you decide what runs.
+        {generatedAt ? `Generated ${fmtDateTime(generatedAt)} — ` : ''}advisory; it never advances a gate — you decide what runs.
       </p>
     </div>
   );

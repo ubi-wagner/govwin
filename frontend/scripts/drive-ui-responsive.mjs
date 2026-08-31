@@ -24,6 +24,7 @@
  *   cd frontend && node scripts/drive-ui-responsive.mjs
  */
 import { chromium } from 'playwright';
+import postgres from 'postgres';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -44,12 +45,33 @@ const WIDTHS = [
 /** A page per surface class, not every page — the chrome is what changes, and it is shared. */
 const LANES = [
   {
+    // ── ONE DENSE PAGE PER PIPELINE, not four pages that happen to be nearby ────────────────
+    // The route list used to be four admin pages and five tenant ones, which covered three of
+    // the ten pipelines this product runs. The dense page of the OTHERS — the workflow map, the
+    // agent roster, the template catalogue, the bucket editor, and most of all the proposal
+    // WORKSPACE — had never been photographed below `lg`, which is the exact gap the project
+    // workspace was in before it was added here. A pipeline no viewport pass reaches is
+    // uncovered, not passing, and the answer to "is the UI mobile-friendly" cannot be given for
+    // a page nobody has looked at.
     id: 'admin', email: 'eric@rfppipeline.com', pw: ADMIN_PW,
-    routes: ['/admin/dashboard', '/admin/tenants', '/admin/rfp-curation', '/admin/events'],
+    routes: ['/admin/dashboard', '/admin/tenants', '/admin/rfp-curation', '/admin/events',
+             '/admin/workflows', '/admin/agents', '/admin/templates', '/admin/site'],
   },
   {
     id: 'tenant', email: 'kate.ulepic@foundation3dp.com', pw: TENANT_PW,
-    routes: ['/portal/foundation/dashboard', '/portal/foundation/cards', '/portal/foundation/atoms', '/portal/foundation/proposals'],
+    // The PROJECT workspace is the densest page a tenant has — a plan, a checklist with inline
+    // edit rows, deliverables and comment threads — and it had never been photographed below `lg`
+    // at all, because this lane did not list it. A surface no viewport pass reaches is uncovered,
+    // not passing. `PROJECT_ROUTE` is resolved from the database at run time (below), because a
+    // hard-coded project id rots the first time the sandbox is reseeded.
+    routes: ['/portal/foundation/dashboard', '/portal/foundation/cards', '/portal/foundation/atoms',
+             '/portal/foundation/proposals', '/portal/foundation/projects', 'PROJECT_ROUTE',
+             // The BUILD workspace is the densest page in the product and the one the customer
+             // spends the most hours in — sections, the canvas, the compliance rail, the AI bar.
+             // It was represented here only by its INDEX, which is a list of cards and tells you
+             // nothing about the page behind them.
+             'PROPOSAL_ROUTE',
+             '/portal/foundation/buckets', '/portal/foundation/library', '/portal/foundation/documents'],
   },
   { id: 'anon', email: null, routes: ['/', '/pricing', '/login', '/federal-rd-101'] },
 ];
@@ -90,6 +112,50 @@ async function horizontalOverflow(page, viewportWidth) {
     }
     return { over: Math.round(over), worst };
   }, viewportWidth);
+}
+
+/**
+ * Resolve the placeholder routes from the live database.
+ *
+ * A hard-coded project id rots the first time the sandbox is reseeded, and a route that 404s
+ * photographs an empty page that looks like a clean pass. If the row is not there the placeholder
+ * is DROPPED and said so out loud — an unreachable route is uncovered, not passing.
+ */
+const DB = process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
+if (DB) {
+  const sql = postgres(DB, { max: 2, onnotice: () => {} });
+  try {
+    const [proj] = await sql`
+      SELECT p.id, t.slug FROM projects p JOIN tenants t ON t.id = p.tenant_id
+       WHERE t.slug = 'foundation' ORDER BY p.created_at LIMIT 1`;
+    // ORDER BY created_at, not by slug or by "whatever is nearest" — the stable seeded proposal,
+    // not one a drive created minutes ago and will delete (B146/B147). And it must have SECTIONS:
+    // an empty build workspace photographs as a clean page while telling you nothing about the
+    // page a customer actually sees.
+    const [prop] = await sql`
+      SELECT p.id, t.slug FROM proposals p
+        JOIN tenants t ON t.id = p.tenant_id
+       WHERE t.slug = 'foundation'
+         AND EXISTS (SELECT 1 FROM proposal_sections s WHERE s.proposal_id = p.id)
+       ORDER BY p.created_at LIMIT 1`;
+    const bind = (placeholder, row, make, what) => {
+      for (const lane of LANES) {
+        const i = lane.routes.indexOf(placeholder);
+        if (i < 0) continue;
+        if (row) lane.routes[i] = make(row);
+        else { lane.routes.splice(i, 1); console.log(`  · no row — ${what} is UNPHOTOGRAPHED this run`); }
+      }
+    };
+    bind('PROJECT_ROUTE', proj, (r) => `/portal/${r.slug}/projects/${r.id}`, 'the project workspace');
+    bind('PROPOSAL_ROUTE', prop, (r) => `/portal/${r.slug}/proposals/${r.id}`, 'the build workspace');
+  } finally { await sql.end(); }
+} else {
+  for (const lane of LANES) {
+    for (const ph of ['PROJECT_ROUTE', 'PROPOSAL_ROUTE']) {
+      const i = lane.routes.indexOf(ph);
+      if (i >= 0) { lane.routes.splice(i, 1); console.log(`  · no DATABASE_URL — ${ph} is UNPHOTOGRAPHED this run`); }
+    }
+  }
 }
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });

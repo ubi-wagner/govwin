@@ -134,7 +134,7 @@ reachable; pipeline `GET :8080/health` returns ok; `SELECT max(filename) FROM _m
     ⚠ *The `/cards` page does not yet render the numeric rank inline (data is there; ToDo); check per-bucket
     ranks on the Buckets page. Attaching library atoms as bucket "context" is a ToDo.*
 14. On a card, **Pin (copy docs)**. → **Expect:** the solicitation docs are copied into the tenant's S3
-    space (`customers/<slug>/pinned/<oppId>/…`) + a `pinned_docs` manifest. `[PASS/FAIL]`
+    space (`customers/<slug>/pinned/<oppId>/…`) + a `copied_docs` manifest. `[PASS/FAIL]`
     ⚠ *Pinned-opp push **nudges** to the user are a ToDo (the amber "Update available" badge works).*
 
 ### T5 — Provision → release → build → lock → download  *(role: rfp_admin → tenant_admin)*

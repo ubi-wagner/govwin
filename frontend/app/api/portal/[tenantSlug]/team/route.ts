@@ -279,9 +279,10 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // Send invite email with credentials
-    let teamEmailResult: { provider: string; error?: string } = { provider: 'skipped' };
+    let teamEmailResult: { provider: string; accepted: boolean; error?: string | null } =
+      { provider: 'skipped', accepted: false };
     try {
-      const { sendEmail } = await import('@/lib/email');
+      const { send } = await import('@/lib/email');
       const { collaboratorInviteEmail } = await import('@/lib/email-templates');
       const loginUrl = `${(process.env.NEXTAUTH_URL || process.env.AUTH_URL) || ''}/login`;
       const emailContent = collaboratorInviteEmail({
@@ -295,10 +296,16 @@ export async function POST(request: Request, ctx: RouteContext) {
         tempPassword,
         loginUrl,
       });
-      teamEmailResult = await sendEmail({ to: email, subject: emailContent.subject, html: emailContent.html });
+      teamEmailResult = await send({
+        to: email, subject: emailContent.subject, html: emailContent.html,
+        kind: 'transactional', tenantId, template: 'collaborator_invite',
+        // No natural key: re-inviting a team member who never received the first mail is a
+        // thing an admin legitimately does, and refusing it silently would look like a bug.
+        tags: ['invite'],
+      });
     } catch (e) {
       console.error('[api/portal/team] invite email failed:', e);
-      teamEmailResult = { provider: 'skipped', error: e instanceof Error ? e.message : String(e) };
+      teamEmailResult = { provider: 'skipped', accepted: false, error: e instanceof Error ? e.message : String(e) };
     }
 
     // Emit email delivery completion event (closed-loop)
@@ -311,7 +318,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         payload: {
           recipientEmail: email,
           userId,
-          status: teamEmailResult.provider !== 'skipped' && !teamEmailResult.error ? 'sent' : 'failed',
+          status: teamEmailResult.accepted ? 'sent' : 'failed',
           provider: teamEmailResult.provider,
           error: teamEmailResult.error ?? null,
         },

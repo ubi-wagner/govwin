@@ -20,7 +20,7 @@
  * logic that it's instrumenting.
  */
 
-import { sql } from './db';
+import { sql, sqlBypass } from './db';
 import { createLogger } from './logger';
 
 const log = createLogger('events');
@@ -29,7 +29,21 @@ const log = createLogger('events');
 // event-contract guard enforces this for LITERAL call sites; this runtime set catches DYNAMIC
 // namespaces (computed at call time) the static check can't see. Non-fatal by contract — emitters
 // never throw — so an unregistered namespace only logs a warning (drift signal, not a break).
-const KNOWN_NAMESPACES = new Set(['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool']);
+/**
+ * The registry lives in `lib/event-namespaces.ts` — a module with NO imports, so a CLIENT component
+ * can use it without dragging `postgres` and `node:async_hooks` into the browser bundle. That is not
+ * hypothetical: it happened, and only `next build` caught it. See that file's header.
+ *
+ * Re-exported here so `import { EVENT_NAMESPACES } from '@/lib/events'` keeps working for server
+ * code that is already importing the emitters.
+ */
+export { EVENT_NAMESPACES, FORBIDDEN_NAMESPACES } from '@/lib/event-namespaces';
+export type { EventNamespace } from '@/lib/event-namespaces';
+import { EVENT_NAMESPACES } from '@/lib/event-namespaces';
+
+// This set only WARNS on an unknown namespace. The ENFORCEMENT is
+// `system_events_namespace_chk` (migration 217), which raises 23514 at the insert.
+const KNOWN_NAMESPACES = new Set<string>(EVENT_NAMESPACES);
 function warnUnknownNamespace(namespace: string, type: string): void {
   if (!KNOWN_NAMESPACES.has(namespace)) {
     log.warn({ namespace, type }, 'event uses an unregistered namespace (see docs/EVENT_CONTRACT.md)');
@@ -266,6 +280,153 @@ export async function emitEventSingle(params: EmitSingleParams): Promise<void> {
       'emitEventSingle failed',
     );
   }
+}
+
+/**
+ * Close the brackets a crashed process left open.
+ *
+ * ── THE GAP THIS FILLS, AND WHY THE CODE AUDIT COULD NOT SEE IT ──────────────────────────────
+ * `withEventBracket` guarantees an `end` on every code path — that is the whole reason it exists
+ * (B139, 31 handlers that returned from a `catch` without one). What it cannot guarantee is an end
+ * when the PROCESS DIES: a SIGKILL mid-request, an OOM, a container reclaimed under it. The start
+ * row is already committed; nothing is left running to write the end.
+ *
+ * `audit-automation-spine` reports 0 open brackets and is correct — it reads the SOURCE. The
+ * database disagreed: 1,384 starts, 1,377 ends, seven `proposal:proposal.created` starts with no
+ * end, timestamped to the minutes a server was killed mid-request. Both statements are true, and
+ * the gap between them is exactly this function.
+ *
+ * ── WHY THAT MATTERS FOR MORE THAN TIDINESS ──────────────────────────────────────────────────
+ * The workflow engine's `EventTrigger` is built on the guarantee that a failed operation still
+ * emits a terminal `end` carrying `error` — it inspects that field to avoid spawning instances off
+ * failures. A start with no end gives the engine no terminal event at all, so anything waiting on
+ * that operation waits forever with no signal that it never will arrive. An abandoned bracket is
+ * indistinguishable, to every reader, from an operation still in flight.
+ *
+ * ── THE SHAPE OF THE ANSWER ──────────────────────────────────────────────────────────────────
+ * ABANDONED is not a synonym for FAILED and is not recorded as one. The operation may well have
+ * succeeded and died before saying so — writing `error: {code:'FAILED'}` would assert something
+ * nobody knows. The end carries `ABANDONED`, names the age, and says plainly that the outcome is
+ * unknown, which is the only honest terminal state for an operation nobody watched finish.
+ *
+ * `olderThanMinutes` must exceed the longest legitimate operation, or this closes brackets that
+ * are still running. 60 is the default because the workflow engine's own instance deadline is one
+ * hour; anything the app does inside a single request is orders of magnitude shorter.
+ */
+export async function closeAbandonedBrackets(
+  { olderThanMinutes = 60, limit = 500 }: { olderThanMinutes?: number; limit?: number } = {},
+): Promise<{ scanned: number; closed: number; types: Record<string, number> }> {
+  const types: Record<string, number> = {};
+  let closed = 0;
+  try {
+    // sqlBypass: this is a PLATFORM sweep across every tenant's rows, and the app role is
+    // tenant-scoped. Reading one tenant's abandoned brackets would silently leave the rest open.
+    const orphans = await sqlBypass<{
+      id: string; namespace: string; type: string; actorType: ActorType;
+      actorId: string; actorEmail: string | null; tenantId: string | null; createdAt: Date;
+    }[]>`
+      SELECT s.id, s.namespace, s.type, s.actor_type, s.actor_id, s.actor_email,
+             s.tenant_id, s.created_at
+        FROM system_events s
+       WHERE s.phase = 'start'
+         AND s.created_at < now() - (${olderThanMinutes} * interval '1 minute')
+         AND NOT EXISTS (
+           SELECT 1 FROM system_events e
+            WHERE e.phase = 'end' AND e.parent_event_id = s.id)
+       ORDER BY s.created_at
+       LIMIT ${limit}`;
+
+    for (const o of orphans) {
+      const ageMin = Math.round((Date.now() - o.createdAt.getTime()) / 60000);
+      await sqlBypass`
+        INSERT INTO system_events (
+          namespace, type, phase, actor_type, actor_id, actor_email, tenant_id,
+          parent_event_id, payload, error, duration_ms
+        ) VALUES (
+          ${o.namespace}, ${o.type}, 'end', ${o.actorType}, ${o.actorId}, ${o.actorEmail},
+          ${o.tenantId}, ${o.id}::uuid,
+          ${jsonParam({ abandoned: true, ageMinutes: ageMin, sweptAt: new Date().toISOString() })},
+          ${jsonParam({
+            code: 'ABANDONED',
+            message: `No end was recorded within ${olderThanMinutes} minutes. The process that `
+              + 'opened this bracket did not survive to close it; the operation\'s outcome is '
+              + 'UNKNOWN — it may have succeeded.',
+          })},
+          ${ageMin * 60_000}
+        )`;
+      types[`${o.namespace}:${o.type}`] = (types[`${o.namespace}:${o.type}`] ?? 0) + 1;
+      closed += 1;
+    }
+    if (closed > 0) {
+      log.warn({ closed, types, olderThanMinutes }, 'closed abandoned event brackets');
+    }
+    return { scanned: orphans.length, closed, types };
+  } catch (err) {
+    log.error({ err: serializeError(err) }, 'closeAbandonedBrackets failed');
+    return { scanned: 0, closed, types };
+  }
+}
+
+/**
+ * The same emit, for a caller whose operation IS the event.
+ *
+ * ── WHY THIS EXISTS RATHER THAN A SECOND INSERT ──────────────────────────────────────────────
+ * `emitEventSingle` swallows its own failure by design: an event is usually instrumentation, and
+ * losing a record must not fail the work it describes. But `launchTemplate` is the inverse — the
+ * event IS the launch, the pipeline picks it up as the trigger, and a swallowed insert would
+ * report a workflow started that never will. It also needs the row id back, which the
+ * fire-and-forget signature cannot give.
+ *
+ * So it had its own `INSERT INTO system_events`, with a comment explaining the throw. The comment
+ * was right about the throw and silent about the rest: the copy also skipped
+ * `evaluateAutomationRules`, so an event that launched a workflow was **invisible to the
+ * tenant automation-rule layer** while the identical event from any other source was not. That is
+ * the cost of a second writer — it diverges in the part nobody was thinking about, not the part
+ * the comment justifies.
+ *
+ * Two behaviours, one implementation. `throwOnFailure` and the returned id are the only
+ * differences, and they are the only ones there have ever been meant to be.
+ */
+export async function emitEventSingleStrict(params: EmitSingleParams): Promise<string> {
+  warnUnknownNamespace(params.namespace, params.type);
+  const [row] = await sql<{ id: string }[]>`
+    INSERT INTO system_events (
+      namespace, type, phase, actor_type, actor_id, actor_email,
+      tenant_id, payload
+    ) VALUES (
+      ${params.namespace},
+      ${params.type},
+      'single',
+      ${params.actor.type},
+      ${params.actor.id},
+      ${params.actor.email ?? null},
+      ${params.tenantId ?? null},
+      ${jsonParam(params.payload ?? {})}
+    )
+    RETURNING id
+  `;
+  if (!row?.id) throw new Error('system_events insert returned no id');
+
+  // Best-effort, and separately caught: the automation-rule layer reacting badly must not undo a
+  // launch that has already been recorded. The row is the commitment; the rules are downstream.
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      const { evaluateAutomationRules } = await import('@/lib/automation/triggers');
+      await evaluateAutomationRules({
+        eventId: row.id,
+        namespace: params.namespace,
+        type: params.type,
+        tenantId: params.tenantId ?? null,
+        payload: (params.payload ?? {}) as Record<string, unknown>,
+      });
+    } catch (err) {
+      log.error(
+        { err: serializeError(err), namespace: params.namespace, type: params.type },
+        'emitEventSingleStrict: automation rules failed after the event was written',
+      );
+    }
+  }
+  return row.id;
 }
 
 /**

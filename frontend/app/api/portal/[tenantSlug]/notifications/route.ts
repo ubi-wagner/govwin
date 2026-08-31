@@ -112,6 +112,12 @@ export async function GET(request: Request, ctx: RouteContext) {
             SELECT id, type, namespace, phase, payload, created_at, actor_type
             FROM system_events
             WHERE tenant_id = ${tenantId}::uuid
+              -- NO 'project' here, and the omission is LOAD-BEARING. A partner_user is refused
+              -- the project capability outright (lib/projects/access.ts), so a collaborator must
+              -- not see post-award activity. Today the proposalId predicate below would exclude it
+              -- anyway, because project payloads carry projectId instead -- but that is an
+              -- accident of payload shape, and the first project event to carry a proposal id
+              -- would quietly undo it. The namespace list is where the decision belongs.
               AND namespace IN ('proposal', 'capture', 'library', 'system')
               AND phase IN ('single', 'end')
               AND actor_id IS DISTINCT FROM ${sessionUser.id}
@@ -127,7 +133,10 @@ export async function GET(request: Request, ctx: RouteContext) {
             SELECT id, type, namespace, phase, payload, created_at, actor_type
             FROM system_events
             WHERE tenant_id = ${tenantId}::uuid
-              AND namespace IN ('proposal', 'capture', 'library', 'system')
+              -- The project namespace (migs 216-223) belongs here: post-award work is half of a
+              -- customer's life with this product, and until it was added, all 29 of its event
+              -- types reached nobody -- the bell simply did not select them.
+              AND namespace IN ('proposal', 'capture', 'library', 'system', 'project')
               AND phase IN ('single', 'end')
               AND actor_id IS DISTINCT FROM ${sessionUser.id}
             ORDER BY created_at DESC
@@ -146,6 +155,12 @@ export async function GET(request: Request, ctx: RouteContext) {
       // "your turn" signal — instead of the tenant-wide firehose.) Best-effort: a routing-query
       // failure just leaves the for-you flags off; it never breaks the feed.
       let assignedSections = new Set<string>();
+      // The project half of "for you". A proposal event is yours when it touches a section you
+      // were assigned; a PROJECT event is yours when it happens on a project you are on — the
+      // roster IS the access mechanism there (lib/projects/access.ts), so it is also the right
+      // routing key. Without this every project row would arrive flagged for nobody, which reads
+      // as "none of this concerns you" on the half of the product that concerns you most.
+      let myProjects = new Set<string>();
       try {
         const assignedRows = await sql<{ id: string }[]>`
           SELECT ps.id FROM proposal_sections ps
@@ -153,6 +168,12 @@ export async function GET(request: Request, ctx: RouteContext) {
           WHERE ps.assigned_to = ${sessionUser.id}::uuid AND p.tenant_id = ${tenantId}::uuid
         `;
         assignedSections = new Set(assignedRows.map((r) => r.id));
+      } catch { /* routing is advisory */ }
+      try {
+        const mine = await sql<{ projectId: string }[]>`
+          SELECT project_id FROM project_assignments
+           WHERE user_id = ${sessionUser.id}::uuid AND tenant_id = ${tenantId}::uuid`;
+        myProjects = new Set(mine.map((r) => r.projectId));
       } catch { /* routing is advisory */ }
 
       const items = notifications.map((n) => {
@@ -170,6 +191,11 @@ export async function GET(request: Request, ctx: RouteContext) {
           : ((p.summary as string) ?? null);
 
         const sid = (p.sectionId ?? p.section_id) as string | undefined;
+        const pid = (p.projectId ?? p.project_id) as string | undefined;
+        // A mention names you outright, which is stronger than "on a project you are on" — it is
+        // the one row in the feed somebody wrote FOR you.
+        const mentionsMe = Array.isArray(p.mentions)
+          && (p.mentions as unknown[]).includes(sessionUser.id);
         return {
           id: n.id,
           type: n.type,
@@ -179,7 +205,9 @@ export async function GET(request: Request, ctx: RouteContext) {
           payload: p, // returned so the bell can deep-link to the source entity
           created_at: n.createdAt,
           is_read: new Date(n.createdAt).getTime() <= lastReadMs,
-          is_for_you: sid ? assignedSections.has(sid) : false,
+          is_for_you: mentionsMe
+            || (sid ? assignedSections.has(sid) : false)
+            || (pid ? myProjects.has(pid) : false),
         };
       });
 

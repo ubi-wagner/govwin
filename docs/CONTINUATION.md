@@ -1,10 +1,69 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-24 (migration head **213** — see "The isolation pass" immediately below: migs
+**Last updated:** 2026-08-28 (migration head **237** — see "The post-award build-out + doc-currency
+pass" immediately below. Earlier context from 2026-08-24 at head **213** follows.) (migration head **213** — see "The isolation pass" immediately below: migs
 212/213 closed a live cross-tenant read leak across eleven proposal-spine tables, the agent workforce
 was found 100% inert and fixed, and five instruments were found reporting green over a scope smaller
 than their claim. Earlier context from 2026-08-23 at head **205** follows.) (migration head **205** — see "Most recent work" below for B68–B74: the page ruler measured against four instruments, the node vocabulary locked against every exporter, and `schema-check` fixed after it was found clearing SQL it had never read. Earlier context from 2026-08-16 follows.) (migration head **185** — Command Center · bucket/ranking scoring · provisioning cockpit · tenant Workflow Setup · section-editing spine · cross-tenant isolation hardening (migs 184–185 per-command RLS on `document_templates` then `tasks`/`process_instances`) · four launch fast-follows (honest region proposer · retired Paste Topics modal · mig 185 · `amendment_monitor` WOKEN); a retrospective + doc-currency pass, docs/LAUNCH_READINESS_2026-08.md. The PR #205 workflow-viz/compliance work was MERGED to `main` + DEPLOYED at head 162; everything since is the current unmerged arc.)
 **Branch:** `claude/nice-hamilton-kBqtD` — carries the **current unmerged arc** (heads 163–185: Command Center + migs 179–185 + the launch fast-follows). PR #205 was merged to `main` at head 162; everything since is unmerged and lives on this branch. **Do NOT restart it from `origin/main`** — that would discard the unmerged arc. Continue on it and push (fetch first — a laptop may also push here).
+
+---
+
+## 📍 Post-award build-out + doc-currency pass (2026-08-28, migration head **237**)
+
+**What shipped.** The contract half of Projects: modifications (mig 230 — the only write path to a
+CLIN, frozen once executed), invoicing (231), the CDRL register (232) and its third state
+*submitted*, the CLIN child-cascade correction (233/234, where 233 asserted ordering as fact and
+measuring proved it wrong), the per-project notification policy (235), the AI-manager gate closer
+(236). Mig 228 collapsed `project_wbs_nodes` into `project_milestones`; **229 caught what that
+silently dropped — the cost baseline**, which would have made cost variance read zero forever.
+Two archetypes added (36 → 38): `project_manager` and `status_narrator`.
+
+**One production-relevant defect, mig 237.** `trg_project_modification_change_frozen` is
+`BEFORE DELETE OR UPDATE` and returned `NEW`. On a DELETE, `NEW` is NULL, and **a BEFORE row trigger
+returning NULL silently cancels the operation** — no raise, statement reports success, row stays. FK
+`ON DELETE CASCADE` fires row triggers, so a project cascade left CHILDREN WITHOUT PARENTS. Found
+only because `drive-ui-states.mjs` mutates, the honest way to run it is dump-then-restore, and
+`pg_restore` refuses to add a constraint the data violates. **If a production database has run
+mig 230, it may hold orphaned `project_modification_changes` rows; 237 cleans them and fixes the
+trigger.**
+
+**Four documents were materially wrong**, all now corrected and, where possible, made
+self-checking:
+
+| Document | Was | Now |
+|---|---|---|
+| `SCHEMA_MAP.md` | head 214 — missing 22 tables, 93 FKs | head 237 · 135 tables · 305 FKs |
+| `RAILWAY.md` | *"run migrations manually"* | migrations run IN the deployment, fail-closed; `migrate.yml` is break-glass |
+| `DATA_FLOW.md` | 5 traces, zero mention of Projects | Trace F; namespaces 7 → 8; archetypes 36 → 38 |
+| `SECRETS_INVENTORY.md` | 5 env vars the services read were absent | complete, and `audit-env-inventory.mjs` keeps it so |
+
+`RAILWAY.md` was the serious one: it told an operator to do by hand the thing `migrate.yml`'s own
+header warns is *"the race the in-deployment path exists to avoid"*.
+
+**Three instruments were reporting green over the wrong thing.**
+`verify-api-contract` bound a *lighthouse* portal and called it as *foundation*, then reported the
+product's correct cross-tenant refusal as a defect (third occurrence of B146/B147 — a resolver must
+select for what its CONSUMER needs). `audit-automation-spine` skipped every file that adopted
+`withEventBracket`, because a pre-filter matched the literal string `emitEvent` — so it punished
+exactly the code that took its advice, and called two live workflows dead. `write-ui-docs.mjs` did
+not read the new probe's index, so `--prune` would have deleted its screenshots.
+
+**Two new instruments.** `probe-interaction-mobile.mts` — "the page does not scroll sideways" and
+"you can reach everything" are different claims, and a clipped overflow keeps the first answering
+*no* precisely because the content is unreachable. It found the documents page's primary action cut
+off at the viewport edge, and 63% of every `/admin/opportunities` row unreachable. Overflowing
+routes 11 → 4, all admin-only. `audit-env-inventory.mjs` — per the table above.
+
+**Verified at the end of the pass:** `tsc` 0 · `vitest` 2484 · branch drives 41 passed · 0 failed ·
+surfaces 82/82 · api-contract 133 graded, 0 violations · write-contract 255/255 · db-crud and
+ui-vs-db green with fixtures restored · spine 0 dead triggers / 0 dead waits / 0 open brackets ·
+coherence findings 0 · row types read as a string 0 · UI atlas 155 shots, states 287 across 128
+routes.
+
+**Uncovered, and said so:** 27 routes the phone probe measured nothing on (18 need an id it cannot
+bind, 9 expose no disclosure it can reach); 6 unsurfaced API routes (unchanged, pre-existing); the
+four remaining admin overflow routes, three of them ≤16px.
 
 ---
 
@@ -292,6 +351,20 @@ the emulator, so the sandbox stays active + the DB stays hydrated and a mid-driv
 Status: `<scratchpad>/health-status.txt` (one line) + `health.log`. It can't prevent a full VM reclaim
 (platform inactivity, no pin) — on one it writes `needs-rehydrate`; recovery is
 `bash frontend/scripts/rehydrate-sandbox.sh`.
+
+> ⚠️ **`login?error=invalid` has a SECOND cause, and it is not the rotated admin hashes below.**
+> `sandbox-heartbeat.sh` used to carry its own `DATABASE_URL` literal with the OWNER's password
+> (`changeme`) for the `govtech_app` role, whose password in `scripts/sandbox-env.sh` is `apppass`.
+> It therefore started the app server with credentials that cannot authenticate, and **every** sign-in
+> — admin and tenant alike — answered `login?error=invalid`, so every lens died at its first login.
+> `sandbox-reset-passwords.mjs` does not help: the user hash was never the problem.
+>
+> Only the server log says what it is: `[auth.findUserByEmail] db error PostgresError: password
+> authentication failed for user "govtech_app"`. If sign-in fails EVERYWHERE, read
+> `/proc/<server-pid>/environ` and compare its `DATABASE_URL` to `sandbox-env.sh` before believing
+> anything else. The heartbeat now sources `sandbox-env.sh` (occurrence FIVE of one credential in two
+> places — B146/B147), and note the pool caches credentials at connect time, so fixing the role
+> password requires a server RESTART, not just an `ALTER ROLE`.
 
 **2. Verify dispatched agents.** ALWAYS re-derive a sub-agent's finding against the actual code/schema before
 acting on it — agents have returned stale/incomplete generation (this session: a "readiness uses the cheap

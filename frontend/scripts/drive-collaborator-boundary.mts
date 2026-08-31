@@ -13,7 +13,10 @@ import { clientHeaders } from './lib/client-ip.mjs';
 
 const BASE = process.env.BASE || 'http://localhost:3000';
 const sql = postgres('postgresql://govtech:changeme@localhost:5432/govtech_intel', { max: 2 });
-let ok = true; const A = (l: string, c: boolean, x = '') => { console.log(`${c ? '✓' : '✗'} ${l}${x ? ` — ${x}` : ''}`); ok = ok && c; };
+let ok = true;
+/** True when the failure was environmental — the box, not the boundary. */
+let cannotRun = false;
+const A = (l: string, c: boolean, x = '') => { console.log(`${c ? '✓' : '✗'} ${l}${x ? ` — ${x}` : ''}`); ok = ok && c; };
 const TEMP_EMAIL = 'zz.collab.boundary@foundation3dp.com';
 let tempId = '';
 
@@ -74,7 +77,23 @@ try {
   // 2) Real tenant_user (conor): the SAME reads must be 200 — the floor is tenant_user, not higher.
   const staff = await loginAndProbe('conor.atkins@foundation3dp.com', 'DemoPass123!', READS);
   for (const r of READS) A(`tenant_user ALLOWED: GET ${r.split('?')[0]} → 200`, staff[r].status === 200, `status=${staff[r].status}`);
-} catch (e) { console.error('FAILED:', e); ok = false; }
+} catch (e) {
+  /*
+   * ⚠️ "COULD NOT RUN" IS NOT "LEAKED", AND SAYING SO IS WORSE THAN SAYING NOTHING.
+   *
+   * This branch used to set `ok = false`, and the verdict below then printed
+   * "FAIL — the collaborator boundary leaked". On the suite run that prompted this, the actual
+   * error was `ERR_CONNECTION_REFUSED at http://localhost:3000/login` — the app was not serving —
+   * and the table reported a SECURITY FINDING the drive had not measured. Anyone reading it would
+   * have believed tenant isolation was broken.
+   *
+   * A drive that cannot run is still a failure (uncovered, not passing — the suite's own rule), so
+   * the exit code stays non-zero. What changes is the CLAIM: it now says what actually happened.
+   */
+  console.error('FAILED:', e);
+  ok = false;
+  cannotRun = /ERR_CONNECTION_REFUSED|ECONNREFUSED|net::ERR|Timeout|timeout exceeded/i.test(String(e));
+}
 finally {
   if (tempId) {
     try {
@@ -85,6 +104,10 @@ finally {
   }
   await sql.end({ timeout: 5 });
 }
-console.log(ok ? '\nPASS — collaborators cannot read the tenant library (403); tenant_user staff can (200); collaborators still contribute'
-              : '\nFAIL — the collaborator boundary leaked');
+console.log(ok
+  ? '\nPASS — collaborators cannot read the tenant library (403); tenant_user staff can (200); collaborators still contribute'
+  : cannotRun
+    ? '\nCANNOT RUN — the app was not reachable, so the boundary was never probed. Uncovered, not passing,\n'
+      + 'and NOT a finding: bring the sandbox up (scripts/sandbox-up.sh) and run it again.'
+    : '\nFAIL — the collaborator boundary leaked');
 process.exit(ok ? 0 : 1);

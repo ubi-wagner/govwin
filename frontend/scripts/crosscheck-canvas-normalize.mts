@@ -48,7 +48,7 @@ console.log(`· reading ${DB.replace(/:[^:@/]*@/, ':***@')} · normalizer called
 try {
   // 1 · every canvas rule-set stored on a real document
   const docs = await sql<Array<{ id: string; title: string | null; canvas: unknown }>>`
-    SELECT id, title, canvas FROM tenant_documents WHERE canvas IS NOT NULL`;
+    SELECT id, title, canvas FROM tenant_documents WHERE canvas <> '{}'::jsonb`;
   console.log(`\n══ ${docs.length} stored document canvas rule-set(s) ══`);
   let bad = 0;
   for (const d of docs) {

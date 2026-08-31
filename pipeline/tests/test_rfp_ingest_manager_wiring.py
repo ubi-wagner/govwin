@@ -35,8 +35,8 @@ def test_registered_and_action_mapped():
     fabric = AgentFabric()
     assert "rfp_ingest_manager" in fabric._archetypes
     assert TOOL_ACTION_TO_ARCHETYPE.get("tool.ingest.assess") == "rfp_ingest_manager"
-    # the manager grew the roster by one (was 35)
-    assert len(_ARCHETYPE_CLASSES) == 36
+    # the manager grew the roster by one (was 35); A1's project_manager then made it 37
+    assert len(_ARCHETYPE_CLASSES) == 38
 
 
 # ── Tenant isolation: platform-scope, model can't reference a tenant ──────────

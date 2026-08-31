@@ -12,6 +12,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { EVENT_NAMESPACES } from '@/lib/events';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
@@ -155,11 +156,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Namespace must be one of the 7 canonical values (enforced at the DB by the
-    // system_events_namespace_chk CHECK from migration 069). Validate here so a bad
-    // value returns a clean 422 instead of a raw CHECK violation surfacing as a 500.
-    const ALLOWED_NAMESPACES = ['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool'];
-    if (!ALLOWED_NAMESPACES.includes(body.namespace)) {
+    // Namespace must be in the registry (enforced at the DB by system_events_namespace_chk,
+    // migrations 069 → 217). Validated here so a bad value returns a clean 422 instead of a raw
+    // CHECK violation surfacing as a 500.
+    //
+    // IMPORTED, not re-declared. This line used to be its own copy of the list, and when `project`
+    // was added it was one of five copies left on the old seven — so this endpoint would have
+    // answered 422 to every project event while the database happily accepted them from every
+    // other path.
+    if (!(EVENT_NAMESPACES as readonly string[]).includes(body.namespace)) {
       return NextResponse.json(
         { error: 'Invalid namespace', code: 'VALIDATION_ERROR' },
         { status: 422 },

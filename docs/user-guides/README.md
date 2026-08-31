@@ -41,6 +41,8 @@ Screenshots are **real captures of the running app** (retina PNGs under
 | [Team & collaborators](./team-collaborators.md) | tenant_admin, partner_user | ✅ written |
 | [RFP admin — ingest, curate, release](./admin-rfp.md) | master_admin, rfp_admin | ✅ written |
 | [Admin observability — dashboard, ToDos & event stream](./admin-observability.md) | master_admin, rfp_admin | ✅ written |
+| [Projects — after you win](./projects.md) | tenant_admin, tenant_user | ✅ written |
+| [On a phone — web and mobile](./mobile.md) | all roles | ✅ written |
 
 Legend: ✅ written · 📝 in progress · 🔲 planned (todo below).
 
@@ -66,6 +68,44 @@ implies it exists).
 - [x] ✅ **Unified ToDo queue on the landing** — every ToDo is a step in a defined workflow (step trail); broadcast notes acknowledge-on-read → [getting-started](./getting-started.md#your-to-dos-are-steps-in-defined-workflows)
 - [x] ✅ **View / edit profile** (`/portal/[t]/profile`) — all customer roles
 - [ ] ⚠ **Self-serve signup / Stripe checkout** — *descoped; the comp code stands in* (do NOT document as available)
+
+### A1. Web and mobile
+
+Every guide in this set is illustrated at desktop width. This one says what changes when the screen
+is narrow — measured at 390 × 844, not assumed. → [mobile](./mobile.md)
+
+- [x] ✅ **Every core surface works on a phone** — 12 measured, **0 overflow the screen**
+- [x] ✅ **The sidebar becomes a ☰ drawer** below laptop width; the sign-in page has no nav at all
+- [x] ✅ **Customer-facing rows stack** into columns rather than being squeezed
+- [x] ✅ **Admin tables scroll inside their own frame** — the page itself never scrolls sideways
+- [x] ✅ **Truncated names keep their full text** and reveal it on long-press; truncation with nothing behind it is treated as a bug
+- [x] ✅ **A tablet in landscape is a small desktop** — sidebar back, no inner scrolling, editor side panel returns
+- [ ] ⚠ **Canvas authoring on a phone** — works, but a one-column screen for a two-column tool; *the toolbox at 390px was NOT measured* (every fixture section is locked, so it renders read-only at any width) — do not document it as verified
+
+### A2. After the award (post-award Projects)
+
+Every guide in this set used to stop at the download, which left the half of the customer's life the
+product spends the most code on undocumented for the customer. → [projects](./projects.md)
+
+- [x] ✅ **`project_setup` ToDo raised on award** — the engine deliberately does NOT create the project; it needs two uploaded files a person has → [projects](./projects.md#1--the-award-raises-a-todo--it-does-not-create-the-project)
+- [x] ✅ **Open a project** from the executed contract + the proposal as submitted — tenant_admin
+- [x] ✅ **See only projects you are ASSIGNED to** — app-enforced, on top of the tenant boundary; `partner_user` is refused the capability outright
+- [x] ✅ **Staff the project** (`…/assignees`) — assigning work to someone not on the project is refused, not granted as a side effect
+- [x] ✅ **CLINs with provenance** — every field shows whether the value was read from the contract or is unverified
+- [x] ✅ **Baseline once** — dates AND cost, frozen by the database; `rebaseline` moves the plan and never the baseline
+- [x] ✅ **Milestones** — dated segments with a task checklist, serial dates, dependency-aware rescheduling
+- [x] ✅ **Tick a task off** — open to anyone on the project; adding tasks and closing a milestone are tenant_admin
+- [x] ✅ **Assigned work appears in the same `/todos` queue, bell and nudge sweep** as everything else
+- [x] ✅ **Deliverables** — attach a file *or* author a document in the same editor; **uploading is not accepting**
+- [x] ✅ **Review gate** — approve/reject with a required reason; only the latest review counts
+- [x] ✅ **Accept** (tenant_admin only) — replacing the file REVOKES acceptance
+- [x] ✅ **Contract modifications** — the only write path to a CLIN; frozen once executed
+- [x] ✅ **Invoicing** — bounded by the CLIN's funded ceiling
+- [x] ✅ **CDRL register** — submitted is not accepted, and accepted is not submitted
+- [x] ✅ **Three progress measures, never blended**; a measure with no denominator reads "not measured"
+- [x] ✅ **Close-out** — three separate refusals; reopening KEEPS the note
+- [x] ✅ **Advisory agents** — milestone health and a drafted narrative whose every figure is checked against what the system computed
+- [x] ✅ **Opt-in AI phase gate** — per milestone; can only ever BLOCK a close, never enable one
 
 ### B. Discover opportunities (Spotlight)
 

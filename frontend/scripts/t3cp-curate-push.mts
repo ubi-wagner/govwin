@@ -9,7 +9,11 @@
  *  cd frontend && node --import tsx scripts/t3cp-curate-push.mts <solicitationId> [opportunityId] */
 import { chromium, type Browser, type APIRequestContext } from 'playwright';
 
-const BASE = 'http://localhost:3000';
+// One base URL, three historic spellings — and this file used the worst of them: a LITERAL, which
+// ignores both env names silently. A drive pinned to :3000 runs against whatever build happens to
+// be serving there, so it can report a stale product as broken, or a fixed one as still broken.
+// (That is exactly how the release-gate change looked like a product failure for two runs.)
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 // Take the solicitation from argv like every sibling t3cp-* script — the intake mints fresh ids per
 // run, so a baked-in constant is stale the moment the master is re-ingested. The landing opportunity
 // is READ OFF the curation detail route below unless it is passed explicitly.

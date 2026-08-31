@@ -35,13 +35,29 @@ SCR="${SCR:-/tmp/govwin-sandbox}"
 # superuser instead (the old behaviour) silently bypasses every policy, which hides the entire
 # missing-enterTenant bug class from tsc/vitest/live testing — a class that then only shows up in
 # production as 0 rows / 404 / RLS-violation. Set RLS_FAITHFUL=0 to fall back to the superuser.
-DBURL_OWNER='postgresql://govtech:changeme@localhost:5432/govtech_intel'
-DBURL_APP='postgresql://govtech_app:changeme@localhost:5432/govtech_intel'
+#
+# ── ONE CREDENTIAL, ONE PLACE — occurrence FIVE ──────────────────────────────────────────────
+# These two URLs used to be literals here, and `DBURL_APP` carried `changeme` (the OWNER's
+# password) for the `govtech_app` role, whose password in scripts/sandbox-env.sh is `apppass`.
+# The heartbeat therefore started the app server with a DATABASE_URL that cannot authenticate,
+# and every sign-in answered `login?error=invalid` — which reads as a broken product flow and is
+# two files disagreeing about one value. The server log said so plainly
+# (`password authentication failed for user "govtech_app"`); nothing else did, and every lens
+# died at its first login. That is B146/B147 for the fifth time, so: RESOLVE FROM sandbox-env.sh,
+# which is the one place that owns these, and keep the literals only as a fallback for a caller
+# that has no repo checkout.
+if [ -f "$ROOT/scripts/sandbox-env.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$ROOT/scripts/sandbox-env.sh" >/dev/null 2>&1 || true
+fi
+DBURL_OWNER="${DATABASE_URL_OWNER:-postgresql://govtech:changeme@localhost:5432/govtech_intel}"
+DBURL_APP="${DATABASE_URL:-postgresql://govtech_app:apppass@localhost:5432/govtech_intel}"
 if [ "${RLS_FAITHFUL:-1}" = "1" ]; then DBURL="$DBURL_APP"; else DBURL="$DBURL_OWNER"; fi
 INTERVAL="${INTERVAL:-20}"
 EMULATE="${EMULATE:-0}"
 EMU_PORT="${EMU_PORT:-8787}"
-export PGPASSWORD=changeme
+# Derived from DBURL_OWNER for the same reason as above.
+export PGPASSWORD="$(printf '%s' "$DBURL_OWNER" | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|')"
 mkdir -p "$SCR"
 LOG="$SCR/health.log"; STATUS="$SCR/health-status.txt"; HEART="$SCR/.heartbeat"; EMU_LOG="$SCR/emulated-claude.log.jsonl"
 

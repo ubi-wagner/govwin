@@ -9,7 +9,7 @@
 import { sqlBypass } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { createTask } from '@/lib/tasks/tasks';
-import { sendEmail } from '@/lib/email';
+import { send } from '@/lib/email';
 import { managerRequestEmail } from '@/lib/email-templates';
 
 export type MRError = { ok: false; status: number; error: string; code: string };
@@ -76,7 +76,14 @@ export async function createManagerRequest(opts: {
       const base = (process.env.NEXTAUTH_URL || process.env.AUTH_URL) || process.env.NEXT_PUBLIC_APP_URL || '';
       const reviewUrl = `${base}/api/enter?slug=${encodeURIComponent(t.slug)}&next=${encodeURIComponent(`/portal/${t.slug}/team`)}`;
       const content = managerRequestEmail({ adminName: admin.name, companyName: t.name, partnerOrg, reviewUrl });
-      await sendEmail({ to: admin.email, subject: content.subject, html: content.html });
+      await send({
+        to: admin.email, subject: content.subject, html: content.html,
+        kind: 'transactional', tenantId, template: 'manager_request',
+        // Keyed on the ToDo this nudge is about. The caller already refuses a duplicate open
+        // request, so a second mail under the same key would be a replay, not a new ask.
+        idempotencyKey: `manager_request:${res.data.taskId}`,
+        tags: ['partner'],
+      });
     } catch (e) { console.error('[partner/manager-request] admin email failed:', e); }
   }
 

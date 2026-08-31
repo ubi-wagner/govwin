@@ -60,9 +60,9 @@
    "/portal/[tenantSlug]/billing",
    "/portal/[tenantSlug]/buckets",
    "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
    "/portal/[tenantSlug]/command",
-   "/portal/[tenantSlug]/contracts",
-   "/portal/[tenantSlug]/contracts/[contractId]"
+   "/portal/[tenantSlug]/contracts"
   ]
  },
  {
@@ -71,10 +71,13 @@
   "parts": 3,
   "file": "sheet-tenant-2.png",
   "routes": [
+   "/portal/[tenantSlug]/contracts/[contractId]",
    "/portal/[tenantSlug]/dashboard",
    "/portal/[tenantSlug]/documents",
+   "/portal/[tenantSlug]/documents/[documentId]",
    "/portal/[tenantSlug]/documents/new",
    "/portal/[tenantSlug]/library",
+   "/portal/[tenantSlug]/library/foundation/[foundationId]",
    "/portal/[tenantSlug]/library/review",
    "/portal/[tenantSlug]/library/upload",
    "/portal/[tenantSlug]/manage",
@@ -83,10 +86,7 @@
    "/portal/[tenantSlug]/portals/[portalId]",
    "/portal/[tenantSlug]/processes",
    "/portal/[tenantSlug]/profile",
-   "/portal/[tenantSlug]/proposals",
-   "/portal/[tenantSlug]/proposals/[proposalId]",
-   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
-   "/portal/[tenantSlug]/spotlights"
+   "/portal/[tenantSlug]/projects"
   ]
  },
  {
@@ -95,6 +95,11 @@
   "parts": 3,
   "file": "sheet-tenant-3.png",
   "routes": [
+   "/portal/[tenantSlug]/projects/[projectId]",
+   "/portal/[tenantSlug]/proposals",
+   "/portal/[tenantSlug]/proposals/[proposalId]",
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/spotlights",
    "/portal/[tenantSlug]/spotlights/[spotlightId]",
    "/portal/[tenantSlug]/team",
    "/portal/[tenantSlug]/templates",
@@ -122,9 +127,9 @@
    "/portal/[tenantSlug]/billing",
    "/portal/[tenantSlug]/buckets",
    "/portal/[tenantSlug]/cards",
+   "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
    "/portal/[tenantSlug]/command",
-   "/portal/[tenantSlug]/contracts",
-   "/portal/[tenantSlug]/contracts/[contractId]"
+   "/portal/[tenantSlug]/contracts"
   ]
  },
  {
@@ -133,6 +138,7 @@
   "parts": 3,
   "file": "sheet-tenant2-2.png",
   "routes": [
+   "/portal/[tenantSlug]/contracts/[contractId]",
    "/portal/[tenantSlug]/dashboard",
    "/portal/[tenantSlug]/documents",
    "/portal/[tenantSlug]/documents/new",
@@ -145,10 +151,9 @@
    "/portal/[tenantSlug]/portals",
    "/portal/[tenantSlug]/processes",
    "/portal/[tenantSlug]/profile",
+   "/portal/[tenantSlug]/projects",
    "/portal/[tenantSlug]/proposals",
-   "/portal/[tenantSlug]/proposals/[proposalId]",
-   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
-   "/portal/[tenantSlug]/spotlights"
+   "/portal/[tenantSlug]/proposals/[proposalId]"
   ]
  },
  {
@@ -157,6 +162,8 @@
   "parts": 3,
   "file": "sheet-tenant2-3.png",
   "routes": [
+   "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "/portal/[tenantSlug]/spotlights",
    "/portal/[tenantSlug]/spotlights/[spotlightId]",
    "/portal/[tenantSlug]/team",
    "/portal/[tenantSlug]/templates",
@@ -185,9 +192,9 @@
    "/admin/crm",
    "/admin/dashboard",
    "/admin/documents",
+   "/admin/documents/[documentId]",
    "/admin/events",
-   "/admin/expert-time",
-   "/admin/guardrail-defaults"
+   "/admin/expert-time"
   ]
  },
  {
@@ -196,6 +203,7 @@
   "parts": 3,
   "file": "sheet-admin-2.png",
   "routes": [
+   "/admin/guardrail-defaults",
    "/admin/intake",
    "/admin/opportunities",
    "/admin/pipeline",
@@ -210,8 +218,7 @@
    "/admin/rfp-curation/[solId]/topic/[topicId]",
    "/admin/rfp-curation/upload",
    "/admin/scouts",
-   "/admin/site",
-   "/admin/site/[pageKey]"
+   "/admin/site"
   ]
  },
  {
@@ -220,6 +227,7 @@
   "parts": 3,
   "file": "sheet-admin-3.png",
   "routes": [
+   "/admin/site/[pageKey]",
    "/admin/site/docs/[type]/[slug]",
    "/admin/sources",
    "/admin/sources/[profileId]",

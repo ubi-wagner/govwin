@@ -25,7 +25,7 @@ export interface FontSpec {
 
 // ─── Canvas rules (from volume_required_items) ──────────────────────
 
-export type CanvasFormat = 'letter' | 'slide_16_9' | 'slide_4_3' | 'custom' | 'spreadsheet';
+export type CanvasFormat = 'letter' | 'slide_16_9' | 'slide_4_3' | 'custom' | 'spreadsheet' | 'workplan';
 
 export interface CanvasRules {
   format: CanvasFormat;
@@ -183,6 +183,30 @@ export const CANVAS_PRESETS: Record<string, CanvasRules> = {
   spreadsheet: {
     format: 'spreadsheet' as CanvasFormat,
     width: 1200, height: 800,
+    margins: { top: 0, right: 0, bottom: 0, left: 0 },
+    header: null, footer: null,
+    font_default: { family: 'Calibri', size: 11 },
+    line_spacing: 1.0,
+    max_pages: null, max_slides: null,
+  },
+  /**
+   * The delivery WORKPLAN — a WBS grid whose cells are bound to `project_milestones` rows rather
+   * than to a document blob (docs/PROJECT_MANAGEMENT_DESIGN.md).
+   *
+   * ── WHY IT HAS NO PAGE OR SLIDE CAP, AND WHY THAT IS NOT A HOLE ─────────────────────────────
+   * The compliance floor exists because an agency page limit is a HARD constraint: a volume one
+   * page over is non-compliant, and an under-counting ruler clears it silently. A workplan is
+   * measured against nothing — no agency reads it, it is not submitted, and it grows a row per task
+   * by design. A 400-line WBS is a large project, not a violation.
+   *
+   * So the caps are null, the same way `spreadsheet`'s are, and the floor then has nothing to
+   * enforce rather than being skipped by a special case. The narrow guard in
+   * `validateCanvasAgainstSpec` covers the one remaining way a page cap could reach a workplan —
+   * a spec supplied from somewhere else — and it states the same reason there.
+   */
+  workplan: {
+    format: 'workplan' as CanvasFormat,
+    width: 1400, height: 900,
     margins: { top: 0, right: 0, bottom: 0, left: 0 },
     header: null, footer: null,
     font_default: { family: 'Calibri', size: 11 },
@@ -1809,6 +1833,20 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
   const out: ComplianceViolation[] = [];
   const defaultSize = doc.canvas?.font_default?.size ?? 12;
 
+  /**
+   * A WORKPLAN IS NOT PAGE-MEASURED, and this is the only exemption in this function.
+   *
+   * The size caps exist because an agency page limit is hard: a volume one page over is
+   * non-compliant. A workplan is submitted to nobody, is measured against nothing, and grows a row
+   * per task by design — a 400-line WBS is a large project, not a violation.
+   *
+   * Its own rules already declare null caps, so in the normal path there is nothing to check. This
+   * guard covers the one remaining way a page cap reaches one: a spec supplied from somewhere else
+   * — a proposal's, applied by a caller that did not look at the format. The font floor and the
+   * image rule still apply below, because those are not size limits and a workplan can honour them.
+   */
+  const isWorkplan = doc.canvas?.format === 'workplan';
+
   // Font floor — the smallest font on any text-bearing node (else the doc default).
   if (spec.min_font_size != null) {
     let smallest = defaultSize;
@@ -1827,8 +1865,8 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
     }
   }
 
-  // Page cap — the same estimator the editor gauge uses.
-  if (spec.max_pages != null) {
+  // Page cap — the same estimator the editor gauge uses. Exempt for a workplan; see `isWorkplan`.
+  if (spec.max_pages != null && !isWorkplan) {
     const pages = estimatePageCount(doc);
     if (pages > spec.max_pages) {
       out.push({
@@ -1841,7 +1879,7 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
   }
 
   // Slide cap — a deck is measured in SLIDES, not pages (the analog of the page cap).
-  if (spec.max_slides != null) {
+  if (spec.max_slides != null && !isWorkplan) {
     const slides = estimateSlideCount(doc);
     if (slides > spec.max_slides) {
       out.push({
@@ -1908,7 +1946,10 @@ export function validateCanvasAgainstSpec(doc: CanvasDocument, spec: ComplianceS
   // is when the number does its real job: saying WHICH section to cut.
   const volumeFits = doc.canvas?.max_pages != null && doc.canvas.max_pages > 0
     && estimatePageCount(doc) <= doc.canvas.max_pages;
-  if (doc.sections?.length && doc.canvas && !volumeFits) {
+  // `volumeFits` is false when max_pages is null, which is a workplan's case — so without the
+  // guard a workplan section carrying a page_budget would be measured against a ruler that does
+  // not apply to it. Same reason as the caps above.
+  if (doc.sections?.length && doc.canvas && !volumeFits && !isWorkplan) {
     for (const s of doc.sections) {
       const budget = s.layout?.page_budget;
       if (budget == null || budget <= 0) continue;

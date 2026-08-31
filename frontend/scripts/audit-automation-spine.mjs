@@ -45,6 +45,7 @@ import ts from 'typescript';
 import postgres from 'postgres';
 
 const REPO = '/home/user/govwin';
+const FRONTEND = path.join(REPO, 'frontend');
 const DB = process.env.GUIDE_DB || process.env.DATABASE_URL_OWNER || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 
 // ── the declared side: every registered workflow trigger and step wait_for ───
@@ -142,7 +143,11 @@ const openBrackets = [];
 
 for (const file of tsFiles) {
   const src = fs.readFileSync(file, 'utf8');
-  if (!src.includes('emitEvent')) continue;
+  // `withEventBracket` does NOT contain the substring "emitEvent", so this cheap pre-filter — an
+  // optimisation, not a rule — silently skipped every file that adopted the safe wrapper. The
+  // parse below was correct all along; it was simply never reached. A filter that decides what to
+  // look at is part of the instrument, and this one made two live workflows invisible.
+  if (!/emitEvent|withEventBracket/.test(src)) continue;
   const rel = path.relative(REPO, file);
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true);
 
@@ -189,7 +194,20 @@ for (const file of tsFiles) {
       if (nss && types) {
         for (const n1 of nss) for (const t1 of types) {
           if (fn === 'emitEventSingle') addEmit(n1, t1, 'single', rel);
+          // `emitEventSingleStrict` is the same INSERT with a throw and a returned id — the
+          // launch-template path. Its rows are indistinguishable from `emitEventSingle`'s in
+          // `system_events`, so a scan that knew only one of the two would call a live single
+          // event unemittable.
+          if (fn === 'emitEventSingleStrict') addEmit(n1, t1, 'single', rel);
           if (fn === 'emitEventStart') { addEmit(n1, t1, 'start', rel); addEmit(n1, t1, 'end', rel); }
+          // `withEventBracket` IS a start and an end — that is the whole point of it (B139): it
+          // exists so the `end` cannot be lost on a throw. Reading only `emitEventStart` meant
+          // every handler that adopted the safe wrapper vanished from the emitter side, and two
+          // live agent workflows (OnProjectHealthRequested, OnStatusNarrativeRequested) were
+          // reported as triggers "nothing can emit" — while the audit's own DB cross-check said,
+          // in the same line, that the database HAS such a row. The tool was arguing with itself,
+          // and the honest annotation is what made the parser gap findable rather than believed.
+          if (fn === 'withEventBracket') { addEmit(n1, t1, 'start', rel); addEmit(n1, t1, 'end', rel); }
         }
       }
 
@@ -496,6 +514,53 @@ const dynamicNotify = notifySteps.filter((n) => n.template.startsWith('payload.'
 const missingTemplates = notifySteps
   .filter((n) => n.template && !dynamicNotify.includes(n) && !crmTemplates.has(n.template));
 
+/**
+ * JOIN 7b · the FRONTEND'S notification templates ↔ the same renderers.
+ *
+ * A NOTIFY step is not the only thing that names a template any more. The frontend emits
+ * `system:notification.requested` with a `template` in the payload — the Projects capability sends
+ * every one of its mails that way, deliberately, so the digest and the ledger see them like any
+ * other. The CRM renders those by exactly the same lookup, and misses them exactly the same way:
+ * `render_template()` returns None and the listener emits `notification.failed` instead of an
+ * email.
+ *
+ * JOIN 7 walked only the Python step registry, so this whole second population of template names
+ * was outside it — which is how B141 could recur in a place the audit that exists to prevent B141
+ * does not look. Uncovered is not passing.
+ */
+function frontendTemplateNames() {
+  const out = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir)) {
+      if (e === 'node_modules' || e === '.next' || e.startsWith('.')) continue;
+      const p = path.join(dir, e);
+      if (fs.statSync(p).isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(e)) {
+        const text = fs.readFileSync(p, 'utf8');
+        if (!/notification\.requested/.test(text)) continue;
+        // ANY string, not `[a-z0-9_]+`. The first version used the narrow class, and when the
+        // red test renamed a template to `project_review_decidedX` the match failed outright —
+        // so the site DISAPPEARED from the count instead of being flagged, and the audit
+        // reported "0 with NO renderer" while looking at a broken one. A scanner that silently
+        // drops what it cannot parse reports a clean run, which is worse than not scanning.
+        for (const m of text.matchAll(/\btemplate\s*:\s*'([^']*)'/g)) {
+          out.push({ file: path.relative(FRONTEND, p), template: m[1] });
+        }
+        // A template resolved from a variable cannot be checked here. Reported, not assumed.
+        for (const m of text.matchAll(/\btemplate\s*:\s*([A-Za-z_$][\w$.]*)\s*[,}]/g)) {
+          out.push({ file: path.relative(FRONTEND, p), template: null, dynamic: m[1] });
+        }
+      }
+    }
+  };
+  for (const d of ['lib', 'app']) walk(path.join(FRONTEND, d));
+  return out;
+}
+const frontendTemplates = frontendTemplateNames();
+const dynamicFrontendTemplates = frontendTemplates.filter((t) => t.template === null);
+const missingFrontendTemplates = frontendTemplates
+  .filter((t) => t.template !== null && !crmTemplates.has(t.template));
+
 // JOIN 6 · results, computed in the registry loader where the engine's own imports are available.
 const unresolvableSteps = registry.flatMap((w) => w.steps
   .filter((s) => s.resolves !== true)
@@ -515,6 +580,11 @@ const T = [
   ['a known frontend emit is found', emitters.has(key('capture', 'application.accepted', 'single'))
     || emitters.has(key('capture', 'application.accepted', 'end'))],
   // emitEventStart implies an end of the same type — the pairing the end call site cannot name.
+  // The wrapper that exists so an `end` is never lost must itself register an `end`, or the audit
+  // punishes exactly the handlers that adopted it.
+  ['withEventBracket registers BOTH phases',
+    emitters.has(key('project', 'status_narrative.requested', 'start'))
+    && emitters.has(key('project', 'status_narrative.requested', 'end'))],
   ['emitEventStart registers BOTH phases', emitters.has(key('proposal', 'proposal.created', 'start'))
     && emitters.has(key('proposal', 'proposal.created', 'end'))],
   /**
@@ -586,6 +656,10 @@ console.log(`   ${notifySteps.length} notify steps · ${crmTemplates.size} templ
 console.log(`   ${dynamicNotify.length} resolve their template from the payload (not statically checkable)`);
 console.log(`   ${missingTemplates.length} name a template with NO renderer — these emit notification.failed, not email:`);
 for (const m of missingTemplates) console.log(`   · ${m.wf}.${m.step} → ${m.template}`);
+console.log(`   ── and the FRONTEND's own notification.requested payloads, same renderers ──`);
+console.log(`   ${frontendTemplates.length - dynamicFrontendTemplates.length} literal · ${dynamicFrontendTemplates.length} resolved from a variable (unchecked) · ${missingFrontendTemplates.length} with NO renderer:`);
+for (const m of missingFrontendTemplates) console.log(`   ✗ ${m.file} → ${m.template}`);
+for (const m of dynamicFrontendTemplates) console.log(`   ? ${m.file} → ${m.dynamic} (dynamic)`);
 
 console.log(`\n══ 4 · declared ↔ exercised ══`);
 const neverSeen = [...emitters.keys()].filter((k) => !observed.has(k));
@@ -602,6 +676,7 @@ console.log(`   ${unconsumedEnds.length} 'end' events nothing consumes — where
 fs.writeFileSync(path.join(REPO, 'docs/automation-spine-audit.json'), JSON.stringify({
   workflows: registry.length, steps, deadTriggers, deadWaits, openBrackets,
   unresolvableSteps, missingTemplates, dynamicNotify, pyOpenBrackets,
+  frontendTemplates, missingFrontendTemplates,
   unterminated, emittable: [...emitters.keys()].sort(),
   observed: Object.fromEntries(observed), unconsumedEnds: unconsumedEnds.sort(),
 }, null, 1));

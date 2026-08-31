@@ -77,7 +77,8 @@ done. None are performed automatically.
    (add `gmail.readonly` / `gmail.modify` later for the inbound sweep).
 3. **DNS authentication** for `rfppipeline.com` so mail from these boxes is not
    spam-filtered:
-   - **SPF**: include Google — `v=spf1 include:_spf.google.com ~all`.
+   - **SPF**: include Google **and Postmark** — `v=spf1 include:_spf.google.com include:spf.mtasv.net ~all`.
+     One include is the pre-Postmark record; with the transactional mail on Postmark it fails SPF.
    - **DKIM**: generate the key in Admin console → Apps → Google Workspace → Gmail →
      Authenticate email, publish the provided `google._domainkey` TXT record.
    - **DMARC**: `v=DMARC1; p=quarantine; rua=mailto:dmarc@rfppipeline.com`.

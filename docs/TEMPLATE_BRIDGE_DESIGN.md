@@ -97,7 +97,7 @@ anchor count — grouped DoD/NSF/DoE · Marketing · Tech · Company · Investor
 **read-only canvas preview** (reuse `CanvasRenderer readOnly` / the fluid view) so you see the skeleton before
 committing. RLS read route over `tenant_template_cards`. Card actions: **"New doc from this →"** (instantiate
 = copy-create-add to the working workspace, §4) + an **"Update available · Resync"** banner (mirror the
-pinned-card `pin_update_available`→resync loop). This becomes the single "start from a template" surface (§6).
+pinned-card `docs_update_available`→resync loop). This becomes the single "start from a template" surface (§6).
 
 ## 4. Instance-is-the-artifact + version semantics (the cleanest part)
 

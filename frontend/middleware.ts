@@ -72,6 +72,9 @@ const PUBLIC_PATHS = [
   '/api/content',
   '/api/analytics',
   '/api/stripe/webhook',
+  // Delivery outcomes from Postmark. No session by construction — the request arrives from the
+  // provider — and POSTMARK_WEBHOOK_SECRET is the authorization, checked inside the route.
+  '/api/webhooks/postmark',
   '/invite',
 ];
 
@@ -148,6 +151,11 @@ const STATIC_ASSET_RE =
 const CRON_EXACT_PATHS = [
   '/api/admin/reconcile-cards',
   '/api/admin/agent-gates/sweep',
+  // Third occurrence of the trap the comment above describes. The bracket sweep was written with
+  // the same handler-side bearer check and the same omission here, and produced the same tell:
+  // `{"error":"unauthenticated"}` in lowercase, which is the middleware's wording and not the
+  // route's. A comment explaining a trap does not prevent the trap; the LIST is the mechanism.
+  '/api/admin/event-brackets/sweep',
 ];
 
 function isAuthorizedCron(pathname: string, authorization: string | null): boolean {

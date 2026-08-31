@@ -34,7 +34,7 @@ test('C6 purchase + C7 release → provisioned UNLOCKED build', async ({ browser
   const cust = await browser.newContext({ baseURL: BASE });
   const cp = await cust.newPage();
   await login(cp, ADMIN!);
-  const pin = await cp.request.post(`/api/portal/${SLUG}/cards/${OPP}/pin`, { data: {} });
+  const pin = await cp.request.post(`/api/portal/${SLUG}/cards/${OPP}/documents`, { data: {} });
   log('C6a · pin card', { status: pin.status() });
   const buy = await cp.request.post(`/api/portal/${SLUG}/purchase`, {
     data: { opportunityId: OPP, promoCode: 'rfppipelinetest' },

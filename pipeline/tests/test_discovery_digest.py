@@ -32,7 +32,7 @@ async def test_discovery_digest_emits_for_tenant_with_new_matches():
         await conn.execute(
             """
             INSERT INTO tenant_opportunity_cards
-              (tenant_id, opportunity_id, card, lifecycle_status, is_pinned, pursuit_status, created_at)
+              (tenant_id, opportunity_id, card, lifecycle_status, docs_copied, pursuit_status, created_at)
             VALUES ($1, $2, '{"title":"ZZTEST digest opportunity"}'::jsonb, 'open', false, 'unreviewed', now())
             """,
             tid, oppid,

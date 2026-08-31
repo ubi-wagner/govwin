@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import { fmtDate } from '@/lib/fmt';
 
 type AutomationRule = {
   id: string;
@@ -145,7 +146,7 @@ export function AutomationClient({
                         </button>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                        {new Date(rule.createdAt).toLocaleDateString()}
+                        {fmtDate(rule.createdAt)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">

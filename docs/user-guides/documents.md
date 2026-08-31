@@ -136,3 +136,7 @@ volumes), not print-to-PDF. Download and send.
   page setup. Templates that say **N blocks** come pre-filled.
 - **I don't see New Document.** You need at least `tenant_user` access. Ask your
   tenant admin.
+
+## Related
+
+- [On a phone — web and mobile](./mobile.md) — the document list scrolls inside its own frame

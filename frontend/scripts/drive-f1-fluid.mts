@@ -12,7 +12,10 @@ import { chromium, type Page } from 'playwright';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
+// One base URL, two historic names: the lenses read GUIDE_BASE, the drives read BASE_URL, and
+// a harness that silently ignores the one you passed fails with a connection error that reads
+// like the app is down. Accept both everywhere; the family's own name still wins.
+const BASE = process.env.BASE_URL ?? process.env.GUIDE_BASE ?? 'http://localhost:3000';
 const OUT = process.env.OUT ?? '/tmp/claude-0/-home-user-govwin/34d597b2-183f-5787-9057-fc7251e3f9ff/scratchpad/f1-shots';
 mkdirSync(OUT, { recursive: true });
 

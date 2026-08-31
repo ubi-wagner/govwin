@@ -21,6 +21,7 @@ import { AmendmentsPanel } from './amendments-panel';
 import { CurationNotesPanel } from './curation-notes-panel';
 import { IngestPlanPanel } from './ingest-plan-panel';
 import { IngestStudio } from './ingest-studio';
+import { fmtDate, fmtDateTime } from '@/lib/fmt';
 
 interface Solicitation {
   id: string;
@@ -145,8 +146,8 @@ interface CustomerInterestItem {
   tenantSlug: string;
   topicNumber: string | null;
   topicTitle: string;
-  isPinned: boolean;
-  pinnedAt: string;
+  docsCopied: boolean;
+  docsCopiedAt: string;
   proposalId: string | null;
   proposalStage: string | null;
   proposalCreatedAt: string | null;
@@ -432,6 +433,10 @@ export function CurationWorkspace({
         {
           solicitationId: sol.id,
           kind: 'compliance_tag',
+          // The selected passage, explicitly. It also rides inside the anchor, and the tool falls
+          // back to that — but a curator's highlight is the ranking signal now (mig 239), so the
+          // field that carries it should be stated rather than inferred from a nested key.
+          text: args.sourceExcerpt,
           sourceLocation: {
             ...fullAnchor,
             // Keep the flat fields the tool expects
@@ -1289,7 +1294,7 @@ export function CurationWorkspace({
                               {t.topicNumber}
                             </span>
                           )}
-                          <span className="font-medium text-sm text-gray-800 truncate">
+                          <span className="font-medium text-sm text-gray-800 truncate" title={t.title}>
                             {t.title}
                           </span>
                         </div>
@@ -1545,11 +1550,11 @@ export function CurationWorkspace({
               </div>
               <div>
                 <dt className="text-gray-500">Close Date</dt>
-                <dd>{sol.closeDate ? new Date(sol.closeDate).toLocaleDateString() : '—'}</dd>
+                <dd>{sol.closeDate ? fmtDate(sol.closeDate) : '—'}</dd>
               </div>
               <div>
                 <dt className="text-gray-500">Posted Date</dt>
-                <dd>{sol.postedDate ? new Date(sol.postedDate).toLocaleDateString() : '—'}</dd>
+                <dd>{sol.postedDate ? fmtDate(sol.postedDate) : '—'}</dd>
               </div>
               <div>
                 <dt className="text-gray-500">Claimed By</dt>
@@ -1624,7 +1629,7 @@ export function CurationWorkspace({
                       )}
                     </td>
                     <td className="py-2 pr-4 text-gray-500">
-                      {new Date(ci.pinnedAt).toLocaleDateString()}
+                      {fmtDate(ci.docsCopiedAt)}
                     </td>
                     <td className="py-2 pr-4">
                       {ci.proposalId ? (
@@ -2158,7 +2163,7 @@ function renderCombinedActivity(
           <div className="text-gray-500 text-xs mt-0.5 italic">&ldquo;{u.notes}&rdquo;</div>
         )}
         <div className="text-gray-400 text-xs mt-0.5">
-          {when.toLocaleString()}
+          {fmtDateTime(when)}
         </div>
       </div>
     );
@@ -2533,7 +2538,7 @@ function VolumesPanel({
                     <span className="font-mono text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
                       Vol {vol.volumeNumber}
                     </span>
-                    <span className="font-medium text-sm text-gray-800 truncate">
+                    <span className="font-medium text-sm text-gray-800 truncate" title={vol.volumeName}>
                       {vol.volumeName}
                     </span>
                     <span className="text-xs text-gray-500">

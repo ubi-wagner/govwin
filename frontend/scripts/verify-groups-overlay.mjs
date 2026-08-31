@@ -27,7 +27,10 @@ import { chromium } from 'playwright';
 import postgres from 'postgres';
 import { randomUUID } from 'node:crypto';
 
-const BASE = process.env.GUIDE_BASE || 'http://localhost:3001';
+// One base URL, two historic names: the lenses read GUIDE_BASE, the drives read BASE_URL, and
+// a harness that silently ignores the one you passed fails with a connection error that reads
+// like the app is down. Accept both everywhere; the family's own name still wins.
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3001';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const DB = process.env.GUIDE_DB || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 const sql = postgres(DB, { max: 2, transform: { column: { from: (c) => c } } });

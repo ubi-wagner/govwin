@@ -20,6 +20,7 @@
 import { useMemo, useState } from 'react';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
 import { resolveScope, focusOf, type Scope, type ScopeLevel, type Selection } from '@/lib/canvas/scope';
+import { fmtNum } from '@/lib/fmt';
 
 /** What the caller can do at a given rung. Filtered per level below. */
 export interface ScopeAction {
@@ -133,7 +134,7 @@ export function ScopeBar({
         </div>
         <div className="bg-white px-2 py-2">
           <dt className="text-[10px] uppercase tracking-wide text-gray-400">Characters</dt>
-          <dd className="text-sm font-semibold tabular-nums text-gray-800">{focus.characters.toLocaleString()}</dd>
+          <dd className="text-sm font-semibold tabular-nums text-gray-800">{fmtNum(focus.characters)}</dd>
         </div>
       </dl>
 

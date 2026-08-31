@@ -677,7 +677,7 @@ TOOL names, not event namespaces — never emit events under them.)
 docs (now archived) but is **never emitted at runtime**
 (confirmed by grep across all 3 services). It is a stale schema/doc artifact.
 Agent/tool activity emits under `tool` (e.g. `tool:tool.invoked`). The canonical
-set is the 7 listed above — do NOT emit `agent.*` events.
+set is the 8 listed above — do NOT emit `agent.*` events.
 
 Event type format: `entity.verb_past_tense` (snake_case)
 Examples: `rfp.uploaded`, `subscription.started`, `section.saved`
@@ -1577,7 +1577,7 @@ the audit never diverges. `/admin/agents` "Recent Tool Invocations" (namespace='
   unique). Carries `origin_card` forward. CHECK status `active|closed|terminated`.
 - **`v_opportunity_rollup`**: `GROUP BY opportunity_id` over `opportunities ⋈ tenant_opportunity_cards ⋈ proposals ⋈ contracts`
   — all `count(DISTINCT …)` (no fan-out). ⚠️ **Rebuilt by mig 125** — `ranked_tenants`/`pinned_tenants` now count
-  `tenant_opportunity_cards` rows (`lifecycle_status <> 'archived'`, `FILTER (WHERE is_pinned)`), NOT the dropped
+  `tenant_opportunity_cards` rows (`lifecycle_status <> 'archived'`, `FILTER (WHERE docs_copied)`), NOT the dropped
   `tenant_pipeline_items`. Counts are bigint → cast `::int` when consumed.
 - **`tasks`** (mig 053): now also written by HUMAN delegation (`createTask`, `process_instance_id` NULL → completeTask
   closes without resume) + date-anchored generation (`_sweep_date_anchored_tasks`, `task_type='final_due'`). `params.kind`
@@ -1655,7 +1655,7 @@ tenant_opportunity_cards  (L1 per-tenant denormalized card — RLS FORCE; NO FK 
   lifecycle_status CHECK IN ('open','closed','archived'),   -- coarse projection the feed/ranking filter on
   submission_stage CHECK IN ('nofo','pre_release','open','updated','closed','archived'),  -- canonical 6-state (mig 100)
   pursuit_status   CHECK IN ('unreviewed','pursuing','monitoring','passed'),
-  is_pinned, pin_update_available, pinned_at, created_at, updated_at
+  docs_copied, docs_update_available, docs_copied_at, created_at, updated_at
   UNIQUE (tenant_id, opportunity_id)
 
 tenant_bridge_cursor  (system fan-out cursor — NOT tenant-RLS)
@@ -1751,7 +1751,7 @@ outcome-feedback table; new-library atoms carry their own `outcome` / `outcome_s
 - **Bridge → card.** `publishToBridge` writes the next `version`; `fanOutBridgeEvent` replicates to
   every `status IN ('active','trial')` tenant via `applyToTenant` (upsert on
   `(tenant_id, opportunity_id)`; a pinned card whose `bridge_version` advanced flips
-  `pin_update_available`). `buildCardSnapshot` joins the solicitation for BOTH umbrella
+  `docs_update_available`). `buildCardSnapshot` joins the solicitation for BOTH umbrella
   (`cs.opportunity_id = o.id`) AND topics (`o.solicitation_id = cs.id`) — without the topic arm a topic
   card loses namespace / compliance / volume_count. `backfillTenant` applies each opp's latest version
   to a new customer.
@@ -1760,7 +1760,7 @@ outcome-feedback table; new-library atoms carry their own `outcome` / `outcome_s
   automated scoring producer for the new spine (best-effort; a scoring failure must not fail the
   fan-out). Manual re-rank of one bucket over the local pipeline: `rankBucket`. `/cards`
   (`GET /api/portal/[tenantSlug]/cards`) LEFT JOIN LATERALs the top `tenant_bucket_scores.score` and
-  orders `is_pinned DESC, top_score DESC NULLS LAST, updated_at DESC`.
+  orders `docs_copied DESC, top_score DESC NULLS LAST, updated_at DESC`.
 - **Compliance matrix lifecycle.** `proposal_compliance_matrix` is now POPULATED at provision (proposals
   create route: one `not_addressed` row per required item / required-section, ≥1 row so the card burden
   is not an empty 0% shell) and advanced to `'satisfied'` on section lock
@@ -1843,7 +1843,7 @@ Comp-code purchase `POST /api/portal/[slug]/purchase` (code `rfppipelinetest`) �
 - **Version model:** V0 (skeleton instantiated) → V0.5 (library plug-and-play, ~15 min) → V1
   (draft/finalize; Force-advance available). The 72h SLA covers **skeletoning only**, NOT V0.5→V1.
 - **Two releases of the spine:** (a) **Spotlight** = basic ingest minimums + `spotlight_summary` →
-  push→rank→mirror; a customer pin **copies the OPP's files into the tenant** (`tenant_opportunity_cards.pinned_docs`,
+  push→rank→mirror; a customer pin **copies the OPP's files into the tenant** (`tenant_opportunity_cards.copied_docs`,
   mig 095 — see STORAGE_LAYOUT). (b) **Proposal-portal** = full compliance matrix + blank templated molds
   built ONCE on the master solicitation (`solicitation_volumes` / `volume_required_items` /
   `solicitation_compliance` / `document_templates`), reused per tenant at provision.
@@ -1867,13 +1867,13 @@ Comp-code purchase `POST /api/portal/[slug]/purchase` (code `rfppipelinetest`) �
   but does NOT yet. Retiring the god-view is on the gap register below.
 
 ### Events — new types this cycle
-Namespaces unchanged (`finder`, `capture`, `identity`, `proposal`, `library`, `system`, `tool`; still NEVER
+Namespaces (`finder`, `capture`, `identity`, `proposal`, `library`, `system`, `tool`, `project`; still NEVER
 `admin`/`cms`/`spotlight`). New: `capture:purchase.completed`, `capture:workspace.released`,
 `content.document_archived`, `content.document_restored`, `proposal:proposal.ready_for_customer`.
 
 ### Events — additions (2026-07-22 auditability sweep)
 The both-sides emission sweep raised path coverage to **97/97**. New/fixed types, all valid
-`entity.action_past_tense` under the 7 allowed namespaces:
+`entity.action_past_tense` under the 8 allowed namespaces:
 - `library:atom.created` — now emitted by **all three** atom producers: `POST /atoms` (manual),
   `atoms/upload` (upload→reference), and `atomize-node` (annotate→atomize). Any new atom-creating path
   must emit it too.

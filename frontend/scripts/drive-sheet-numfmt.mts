@@ -3,7 +3,11 @@
  *  Usage: DOC_ID=<uuid> node --import tsx scripts/drive-sheet-numfmt.mts */
 import { chromium, type Page } from 'playwright';
 import { mkdirSync } from 'fs';
-const BASE = 'http://localhost:3000';
+// One base URL, three historic spellings — and this file used the worst of them: a LITERAL, which
+// ignores both env names silently. A drive pinned to :3000 runs against whatever build happens to
+// be serving there, so it can report a stale product as broken, or a fixed one as still broken.
+// (That is exactly how the release-gate change looked like a product failure for two runs.)
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const DOC = process.env.DOC_ID!;
 const OUT = '/tmp/claude-0/-home-user-govwin/34d597b2-183f-5787-9057-fc7251e3f9ff/scratchpad/sheet-shots';
 mkdirSync(OUT, { recursive: true });

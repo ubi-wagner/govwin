@@ -522,7 +522,10 @@ export default async function ProposalWorkspacePage({ params }: Props) {
       <div className="mb-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-gray-900 truncate">
+            {/* A solicitation title is long by nature and the heading truncates it on a phone.
+                `title` keeps the whole thing reachable — the probe's rule: a deliberate truncation
+                with a way to recover the text is not a defect; clipped text with no way back is. */}
+            <h1 className="text-2xl font-bold text-gray-900 truncate" title={proposal.title}>
               {proposal.title}
             </h1>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-gray-500">

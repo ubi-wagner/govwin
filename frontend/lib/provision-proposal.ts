@@ -17,6 +17,7 @@ import { authoredItems, elsewhereRequirements, isAuthoredVolume, type ScopedVolu
 import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { runInTenant } from '@/lib/tenant-context';
+import { resolveSourceBucket } from '@/lib/bucket-ranking';
 import { emitEventStart, emitEventEnd } from '@/lib/events';
 import { preStageProposalReviewTodos } from '@/lib/automation/prestage-todos';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
@@ -121,9 +122,14 @@ export async function provisionProposalForPortal(opts: {
   let sectionStandards: SectionStandard[] = [];
   try { sectionStandards = await sql<SectionStandard[]>`SELECT key, label FROM section_standards WHERE is_active = true`; } catch { /* untagged */ }
 
+  // Which lens surfaced this opportunity (F13). Resolved BEFORE the transaction so the freeze is
+  // atomic in the INSERT — no post-insert UPDATE window in which the audit says "no bucket".
+  // Both fields written from the same value: `source_bucket` is the queryable column, the
+  // `origin_card.bucket` object is the frozen snapshot that also carries the score.
+  const sourceBucket = await resolveSourceBucket(tenantId, opportunityId);
   const originCard = {
     opportunity: { id: opportunityId, title: t.title, agency: t.agency, programType: t.programType, topicNumber: t.topicNumber, solicitationNumber: t.solicitationNumber },
-    bucket: null, frozenAt: new Date().toISOString(),
+    bucket: sourceBucket, frozenAt: new Date().toISOString(),
   };
   const gateConfig = ['draft', 'final'];
 
@@ -139,7 +145,7 @@ export async function provisionProposalForPortal(opts: {
     const out = await withTenant(tenantId, async (tx: any) => {
       const [p] = await tx<{ id: string }[]>`
         INSERT INTO proposals (tenant_id, opportunity_id, solicitation_id, title, stage, gate_config, is_locked, origin_card, source_bucket)
-        VALUES (${tenantId}, ${opportunityId}, ${t.solicitationId}, ${proposalTitle}, 'draft', ${sql.json(gateConfig)}, false, ${sql.json(originCard)}, ${null})
+        VALUES (${tenantId}, ${opportunityId}, ${t.solicitationId}, ${proposalTitle}, 'draft', ${sql.json(gateConfig)}, false, ${sql.json(originCard)}, ${sourceBucket?.key ?? null})
         RETURNING id
       `;
       let count = 0;

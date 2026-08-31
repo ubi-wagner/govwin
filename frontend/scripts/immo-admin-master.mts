@@ -6,7 +6,11 @@
  *  cd frontend && node --import tsx scripts/immo-admin-master.mts */
 import { chromium } from 'playwright';
 
-const BASE = 'http://localhost:3000';
+// One base URL, three historic spellings — and this file used the worst of them: a LITERAL, which
+// ignores both env names silently. A drive pinned to :3000 runs against whatever build happens to
+// be serving there, so it can report a stale product as broken, or a fixed one as still broken.
+// (That is exactly how the release-gate change looked like a product failure for two runs.)
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const SOL = 'f26005c6-8dd0-49a5-a665-e5cab42425e0';
 const OPP = 'e84c5bd2-0a7e-487a-a1fd-c7dc76027f4c';
 const NEW_CLOSE = '2026-09-24T21:00:00.000Z'; // 17:00 ET

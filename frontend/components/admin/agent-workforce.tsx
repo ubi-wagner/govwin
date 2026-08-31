@@ -10,6 +10,7 @@
  * admin uses to watch throughput/errors and decide where tuning is needed.
  */
 import { useEffect, useState } from 'react';
+import { fmtDate } from '@/lib/fmt';
 
 type Status = 'live' | 'wired' | 'dormant';
 type Pod =
@@ -104,7 +105,7 @@ export function AgentWorkforce() {
       .finally(() => setLoaded(true));
   }, []);
 
-  const fmt = (s?: string | null) => (s ? new Date(s).toLocaleDateString() : '—');
+  const fmt = (s?: string | null) => (s ? fmtDate(s) : '—');
 
   return (
     <div>

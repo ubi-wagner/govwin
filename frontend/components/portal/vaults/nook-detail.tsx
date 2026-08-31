@@ -176,7 +176,7 @@ export function NookDetail({ apiBase, side, rights, partnerName, partnerOrg }: {
               <li key={a.id} className="rounded border p-3 hover:border-gray-300">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-gray-800">{a.title || 'Untitled'}</div>
+                    <div className="truncate text-sm font-medium text-gray-800" title={a.title || 'Untitled'}>{a.title || 'Untitled'}</div>
                     <span className="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">{a.grain}</span>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">

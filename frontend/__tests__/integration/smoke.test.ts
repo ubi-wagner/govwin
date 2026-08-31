@@ -9,6 +9,7 @@
  * 5. Event emission shape validation (events)
  */
 
+import { EVENT_NAMESPACES } from '@/lib/events';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 // ─── Mocks (same pattern as tools-registry.test.ts) ─────────────────
@@ -63,7 +64,8 @@ const UUID_2 = '22222222-2222-4222-8222-222222222222';
 const UUID_3 = '33333333-3333-4333-8333-333333333333';
 const PROP_UUID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
-const ALLOWED_NAMESPACES = ['finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool'];
+// IMPORTED, not re-declared — this was one of nine literal copies of the registry.
+const ALLOWED_NAMESPACES: readonly string[] = EVENT_NAMESPACES;
 
 // =====================================================================
 // Test 1: Auth session shape validation

@@ -17,6 +17,7 @@ import type { CanvasDocument } from '@/lib/types/canvas-document';
 import type { PageVersion } from '@/lib/content-admin';
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
+import { fmtDate } from '@/lib/fmt';
 
 // Public detail path per doc type (matches the publish route). Only blog_post/resource/guide have a
 // detail page; testimonial/team_member surface on a list page, so "View live" targets the list there.
@@ -34,7 +35,7 @@ function shortActor(s: string | null): string {
 function fmtWhen(d: Date | string | null): string {
   if (!d) return '—';
   const dt = new Date(d);
-  return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return Number.isNaN(dt.getTime()) ? '—' : fmtDate(dt);
 }
 function slugify(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
@@ -153,7 +154,9 @@ export function SiteDocCanvasEditor({
   return (
     <div className="h-screen flex flex-col">
       {/* Top ribbon — identity + lifecycle actions */}
-      <div className="bg-white border-b px-4 py-2 flex items-center gap-3 shrink-0">
+      {/* Wraps at narrow widths: the identity block and the lifecycle verbs together need more
+          than 390px, and `ml-auto` on a non-wrapping row pushes the verbs off the screen. */}
+      <div className="bg-white border-b px-4 py-2 flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
         <Link href="/admin/site" className="text-sm text-blue-600 hover:text-blue-800 whitespace-nowrap">&larr; Site Content</Link>
         <div className="min-w-0">
           <div className="text-sm font-medium truncate">{title || slug || `New ${typeLabel}`}</div>
@@ -164,7 +167,7 @@ export function SiteDocCanvasEditor({
             {!active && !isNew && <span>not live</span>}
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <button onClick={() => setPanelOpen((v) => !v)} className="text-xs px-3 py-1.5 rounded-lg border hover:bg-gray-50" title="Title, slug, excerpt, tags, featured image">
             {panelOpen ? 'Hide details' : 'Post details'}
           </button>

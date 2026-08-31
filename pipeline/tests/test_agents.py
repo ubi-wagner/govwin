@@ -79,7 +79,9 @@ EXPECTED_ARCHETYPES = {
     "continuity_manager",
     # Proposal Draft Manager cohort (P1) — greenfielded DORMANT (registered + AI_INVOKE-mapped,
     # no firing hook wired): the draft PLANNER + requirement-coverage / redaction / market gates.
+    "project_manager",
     "proposal_manager",
+    "status_narrator",
     "traceability_auditor",
     "redaction_guard",
     "market_analyst",

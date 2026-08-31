@@ -112,7 +112,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      CMS_DATABASE_URL: postgresql://${CMS_POSTGRES_USER:-govtech_cms}:${CMS_POSTGRES_PASSWORD:-cms_dev_password}@cms-db:5432/${CMS_POSTGRES_DB:-govtech_cms}
+      CRM_DATABASE: postgresql://${CMS_POSTGRES_USER:-govtech_cms}:${CMS_POSTGRES_PASSWORD:-cms_dev_password}@cms-db:5432/${CMS_POSTGRES_DB:-govtech_cms}
       SHARED_DATABASE_URL: postgresql://${POSTGRES_USER:-govtech}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-govtech_intel}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CMS_STORAGE_ROOT: /data/cms

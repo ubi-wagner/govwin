@@ -16,6 +16,37 @@ cosine similarity** off a per-atom pgvector index (`atom_embeddings`, mig 171, t
 when a **gated** engine is on — Voyage in prod (`VOYAGE_API_KEY`) or a dependency-free local-hash
 embedder (`ATOM_EMBED=local`); **inert by default** → byte-for-byte the pre-vector selector, zero
 regression. Isolation proven at rest · RLS · app-layer (docs/SEMANTIC_RETRIEVAL.md; `lib/embeddings.ts`).
+**The solicitation itself is COPIED INWARD (mig 238) — the mirror is now self-sufficient in fact,
+not just in the comment.** `tenant_opportunity_documents` holds each source document per tenant
+(FORCE-RLS, `text_tsv` GENERATED + GIN), copied by the bridge fan-out **before** the cursor, the
+`card.applied` emit and the synchronous score — ordering is load-bearing, or a card's first sighting
+ranks on the blurb. The alternative — a mirror-anchored JOIN out to `curated_solicitations` — works
+and is safe, and was rejected because **the master is MUTABLE**: an amendment re-shreds `full_text`,
+so a tenant ranking against a joined master would see stored scores move with no bridge version, no
+card update and no audit. The copy makes the corpus **versioned with the card**, so a score is
+reproducible from the row that produced it. **Per document, never one concatenation** — which
+dissolves the "does the topic land at char 20,000 or 1,040,000" question entirely, since a consumer
+selects by `document_type` rather than by offset. The bytes are NOT on the card: `opportunity_bridge`
+is append-only, so corpus-in-card would rewrite a megabyte per republish forever, and the card jsonb
+is TOASTed as a unit so every feed query would pull it — the bridge carries a MANIFEST, the tenant
+row carries the bytes. The card also finally carries `techFocusAreas` · `phaseType` · topic identity ·
+POC, plus `card_tsv` (GENERATED over the payload, and the only index containing `spotlight_summary`,
+which lives on `curated_solicitations` and so is structurally absent from `opportunities.full_text_tsv`
+— a trigger over five identity columns, mean 25 lexemes, that is NOT a document index despite its
+name). Ranking reads **no master table at all**. Measured on the real 433-page DoW 2026 SBIR set:
+296 chars → 660,425 per document (2,231×), 35 → 11,409 lexemes, 9.2M chars → 21 MB stored, and **4
+scores that exist only because the solicitation matched where the card's own text did not**.
+`drive-corpus-copy-inward.mts` (16 checks, red first) · `measure-ranking-change.mts`.
+**The two scorers are now ASSERTED to be a mirror pair**, not asserted-by-comment: `scoreCard`
+(`lib/bucket-scoring.ts` — a zero-import LEAF, split out so a pure function needs no DATABASE_URL to
+be tested) ↔ `score_card` (`rescore.py`), diffed over 37 shared fixtures by
+`verify-scorer-parity.mjs`, wired into `run-branch-drives.sh` where a divergence **fails the run**.
+It found a live divergence before the comparator ran: `new Date('Fri Aug 28')` is VALID in JS (2001,
+a year V8 invented) and raises in Python, so the same card got different denominators — `closeMs()`
+now requires ISO and assumes UTC when no zone is given. **Absent is not zero**: all five factors
+guard both sides, so a card is never charged for what ingest failed to capture, while a
+*non-matching* value still scores a real 0. A `corpus` factor (default weight 0.75, below keyword's
+1) comes from one SQL pre-pass over the tenant's own documents and **abstains when null**.
 The legacy Spotlight/Pipeline surface (`tenant_pipeline_items`) is RETIRED and now **DROPPED**
 (mig 125, alongside 11 other superseded tables; the `library_units` family went in mig 121) —
 `/spotlights` + `/pipeline` redirect to `/cards`, and the last live reads were repointed to
@@ -26,7 +57,7 @@ at provision and advances on section lock. A locked/submitted proposal downloads
 assembly; zip is per-volume-native), with figures as native `chart` nodes and sections ordered by the
 integer `sort_index` (mig 143 — never string-sort `section_number`, which scrambles numbering). Verified
 end-to-end (Playwright + the live Python workflow engine creating `process_instances` that carry
-`opportunity_id`; `tsc` 0 · `vitest` 1977 · `next build`).
+`opportunity_id`; `tsc` 0 · `vitest` 2512 · `next build`).
 
 Customers buy a proposal portal with a **comp-code purchase** (`rfppipelinetest` → `proposal_portals`
 `curation_pending`, 72h SLA); an RFP admin then **releases** it from the shadow account, provisioning
@@ -58,7 +89,11 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **213** — migs 212/213 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **238** — mig 237 the freeze trigger that returned NEW on a DELETE and so
+cancelled it silently, leaving children without parents through a CASCADE; migs 228–236 the post-award build-out: 229 the milestone cost
+baseline after 228 collapsed `project_wbs_nodes` into `project_milestones`, 230 contract
+modifications, 231 invoicing, 232 the CDRL register, 233/234 the CLIN child-cascade correction,
+235 the per-project notification policy, 236 the AI-manager gate closer; mig 219 project close-out; mig 218 the milestone construct (checklist · serial dates · completion record); migs 215–217 the outbound-email ledger + the post-award Projects spine + the `project` namespace; mig 214 closed a committed demo credential; migs 212/213 the
 proposal-spine RLS close, B113; migs 186–188 the
 **ingest-provenance** spine — canonical **docs/INGEST_PROVENANCE.md**, and the non-negotiable rule behind it:
 *a value the product did not read from the solicitation must never look like one it did*. Ingest Assist now
@@ -123,7 +158,7 @@ A build can also be **RFP-Admin-approved as a free (comped) portal** — that re
 exactly as a purchase (the free self-serve bypass is closed). Self-serve Stripe checkout is still
 descoped — the comp code stands in.
 
-The pipeline agent workforce (`AgentFabric`, **36 archetypes, all auto-registered — dormant ≠ dead**)
+The pipeline agent workforce (`AgentFabric`, **38 archetypes, all auto-registered — dormant ≠ dead**)
 is woken into live flows one at a time — **canonical plan + safety contract in `docs/AGENT_WORKFORCE.md`
 (read it before touching agents)**. Live today: `section_drafter` (`draft_v0` → `markdown_to_canvas` →
 `publish_section_draft`, on release/provision, gated on the pipeline `ANTHROPIC_API_KEY` — in the sandbox the committed emulator stands in for Claude:
@@ -196,6 +231,163 @@ trigger+step templates, the start→end event gate, and the two stateless reconc
 `docs/AUTOMATION_SPINE_MAP.md`**; docs/AGENT_FABRIC_DESIGN.md + docs/V1_REFACTOR_DESIGN.md have the
 orchestration pattern.
 
+**Post-award PROJECTS are the second half of the customer's life** (mig 216 · 8 tables · the `project`
+event namespace, mig 217; canonical **docs/PROJECT_MANAGEMENT_DESIGN.md**, as-built
+**docs/PROJECT_BUILD_LOG.md**). It anchors on **two UPLOADED files** — the executed contract and the
+proposal *as submitted* — never on `proposals`/`proposal_sections`, because what lives in the proposal
+spine is a working copy that stayed editable after submission; `projects.contract_id` is
+navigation, not truth. From there: CLINs (every field carrying a `project_provenance` badge on the
+ingest-provenance trust order — a value with no source reads **Unverified**, a citation with no value
+reads **Set elsewhere**), a WBS whose children inherit their CLIN, and milestones + deliverables where
+**uploading is not accepting** (any assigned employee attaches a file; only a tenant_admin accepts, and
+a replaced file REVOKES acceptance). The **baseline freezes once** — enforced by a trigger (`23001`),
+not a convention — and `rebaseline` moves the *current plan* and never the baseline, which is the one
+number that cannot be recomputed. Progress is **three measures side by side and never blended**
+(`lib/projects/rollup.ts`): cost, duration-weighted schedule, deliverables — and a measure with no
+denominator is `null` → **"not measured"**, never a confident `0%`. Access is two layers: RLS scopes by
+tenant, and **assignment is app-enforced** in one predicate (`lib/projects/access.ts`) because the
+request context carries a tenant, not a user — `partner_user` is refused the capability outright, which
+is what removes cross-tenant from it entirely. `contract:started` raises a ToDo; it deliberately does
+NOT create the project. **Staffing is a real route** (`…/projects/[id]/assignees`) — it had to be
+built, because `project_assignments` was only ever written by `createProject` for its creator, so no
+employee could be let in at all; no lens saw it, since a route nobody wrote has no row on either
+side of the capability join. Assigning work to someone not on the project is refused
+(`NOT_ON_PROJECT`) rather than granting access as a side effect of a task form, and the last
+assignee cannot be removed. **Close-out** (mig 219) is milestone completion one scale up — a note +
+jsonb metrics, a CHECK binding `status='closed'` to `closed_at`, three separate refusals
+(`MILESTONES_OUTSTANDING` · `TASKS_OUTSTANDING` · `DELIVERABLES_OUTSTANDING`), and a reopen that
+KEEPS the note. The whole arc — award → engine → ToDo → project → plan → staffing → work → phase
+completion → close-out → reopen, each act by the actor who performs it, with a DB→UI→DB
+reconciliation on the rendered page — is `scripts/drive-project-lifecycle.mts`.
+
+**The MILESTONE is the project-management construct** (mig 218): a dated segment — `starts_on →
+forecast_date` — with an owner, a **task checklist** (`project_milestone_tasks`: person *or* role,
+due date, open|done|blocked-with-a-reason) and a **completion record** (`completion_note` + open
+jsonb `completion_metrics`). One shape, two cases: **one milestone is a dated ToDo list with nudges;
+N milestones are that in series.** There is no "simple mode" — the small case is the large one with
+a length of one. Serial dates are a DEFAULT (`resequence` fills a start from the previous end + 1
+day; a pinned start is respected, overlap is legal); `reschedule` moves the end and, by default,
+everything LATER by the same delta — the current plan only, never `baseline_date`, because variance
+is the distance between the two. Completion is gated twice with separate messages:
+`TASKS_OUTSTANDING` (the work) then `DELIVERABLES_OUTSTANDING` (the customer's signature). **Adding
+tasks and closing a milestone are tenant_admin; ticking one off is open to any member who can reach
+the project** — a checklist only a manager may tick is a status report. `_run_project_nudges`
+(lifecycle scheduler, daily) emits `project:milestone.due_soon|overdue` / `task.due_soon|overdue`
+plus one grouped `project_nudge` mail, hard-bounded by per-row `nudges_sent` + `last_nudged_at`;
+blocked tasks are not nudged. Proven by `scripts/drive-milestone-construct.mts`.
+
+**The task spine (mig 221)** keeps the table name `project_milestone_tasks` while holding rows that
+belong to no milestone: `scope` ∈ (`milestone`,`project`) with a paired CHECK — redundant with
+`milestone_id IS NULL`, which is *why* the guard exists — plus `COMMENT ON TABLE`, since SCHEMA_MAP.md
+is generated from the live DB. It is `scope`, not `task_type`: the platform `tasks` table already has
+that name with a different vocabulary and project tasks are PROJECTED onto it. Both gates were already
+right — `markMilestoneMet` is milestone-scoped so standing work never blocks a phase; `closeProject` is
+project-scoped so it **does** block close-out. **Dependencies are milestone-to-milestone only** (one
+predecessor; same-project `23002` + acyclic `23003` by trigger) — no task-level graph, no critical path
+— and they make the reschedule cascade *precise* (declared successors, not everything later), falling
+back to serial order when none is declared. A milestone-scoped task's `due_date` must not fall after its
+milestone's **forecast** date (`23004`, `<=` so same-day is legal), and **pulling a milestone in refuses
+and NAMES the stranded tasks** (`23005`) rather than dragging committed dates. All by TRIGGER, because
+two paths write those dates. **`estimated_completion` is deliberately exempt** — the assignee's own
+forecast may run past the milestone, and the due↔estimate gap is the early warning; refusing it would
+only teach people to enter the date that is accepted. Editing a task (owner · dates · note) is open to
+**anyone on the project** and emits `task.reassigned`/`task.rescheduled` — open means visible, not
+untracked — with the ToDo projection following (old holder's ToDo closed, new one raised, `nudges_sent`
+reset). Creating stays tenant_admin. `project_task_attachments` carries references that **never touch
+status**, the same separation that keeps uploading a deliverable from accepting it.
+
+**The CONVERSATION (mig 222)** — `project_comments`, threaded one level, anchored polymorphically
+(`entity_type`+`entity_id`, the `tasks` idiom) to the project · a milestone · a task · a deliverable.
+Before it, a project carried exactly ONE human decision (a tenant_admin accepting a deliverable):
+everything else was a fact with no discussion attached, which is why this came before more automation.
+`entity_id` has **no FK** — it points at four tables — so the domain layer's scoped lookup is the only
+thing between a comment and another customer's contract. Resolution is `resolved_at`+`resolved_by`, not
+a bare boolean: six months on, "who answered this" is the question. **A mention is `@`+email, anchored
+to a token boundary** (an address in prose is NOT a mention) and **resolved against the project ROSTER,
+never the tenant directory** — notifying someone about a project they'd be refused is worse than not
+notifying them. An unmatched token stays plain text and the API returns `notified`/`unmatched` so the UI
+can say who was reached; the silent version lets an author believe they were heard. It raises a real
+platform ToDo (no due date, no nudges — a mention is a request to look) plus one email through the one
+seam. **`retireProjectedTodos` (`lib/projects/todos.ts`) closes projected ToDos directly, NOT via
+`completeTask`** — that asks "may this person complete this task" and refuses a non-assignee, so the
+sweeps failed silently; a milestone closing is the thing the ToDo pointed at ceasing to exist, not a
+person finishing someone else's work.
+
+**The project portal reuses the build portal's infrastructure rather than growing a parallel one.**
+*ToDos / email / nudges:* assigned checklist work is **PROJECTED** onto the platform `tasks` spine
+(`lib/projects/todos.ts`) — the same queue `/todos`, the bell, the Command Center and the shared
+nudge sweeper already serve — exactly as `editPortalWorkflow` re-projects a proposal's guardrail plan
+onto live `tasks` rows. **The checklist is the source of truth and the ToDo follows it**; the
+projection never writes back (a mirror that can move what it mirrors is a second writer). Assignment
+emits `system:notification.requested` (`project_task_assigned`) through the one email seam, with the
+renderer shipped in the same change — and `_run_project_nudges` therefore skips *assigned* tasks,
+because two reminders for one task teaches people to filter both. *Deliverables:* mig 220's
+`project_deliverables.document_id` points at a `tenant_documents` CanvasDocument, so a report, deck,
+workbook or PDF is authored in the **same editor**, measured by the **same compliance floor** and
+rendered by the **same** docx·pptx·xlsx·pdf exporters as a proposal volume — `ON DELETE SET NULL`,
+because losing the draft must not delete the obligation. Attaching widened to *file **or** document*
+(`NOTHING_ATTACHED`, an `OR` in the accept CAS); **acceptance did not** — `accepted_at` is still the
+separate tenant_admin act. The authored starter carries **only facts read off a row** (title ·
+project · milestone · *Required by* date, stamped `source:'template'`) — scaffolding plausible
+headings would put structure into a contract deliverable nobody asked for. It shipped BLANK first:
+`starterFromPreset` builds an empty canvas (right for the "New document" chooser), and a 200 plus a
+`%PDF` magic number passed an 865-byte nothing. `scripts/probe-deliverable-artifacts.mts` is the
+check that can see it — LibreOffice opens what our exporters wrote, pdf.js reads the text layer back
+(B121: **an artifact is not verified until an engine that did not write it has opened it**), and it
+refuses a verdict it cannot earn: a blank-canvas **self-test** must read as blank, and a plain `.txt`
+**control** must convert, or it exits 2.
+
+**The REVIEW GATE (mig 223)** — `project_reviews`, polymorphic over deliverable · document ·
+milestone. **Approving is NOT accepting**, closing the same separation from a third direction: a
+review says an internal reader is satisfied, `accepted_at` says the obligation is met. What it does
+is GATE that act — an open review refuses acceptance `REVIEW_PENDING`, a rejected one refuses
+`REVIEW_REJECTED` **repeating the reason**, and only the LATEST review counts, which is what makes
+reject → fix → re-request → approve a loop rather than a wall. A deliverable never sent for review
+accepts exactly as before. **A rejection MUST carry a reason** (CHECK, whitespace included) — "not
+yet accepted" and "rejected, for these reasons" are different states and only one tells the next
+person what to do. Requesting is open to anyone on the project; DECIDING is the named reviewer or a
+tenant_admin (a gate anyone can open is not a gate); WITHDRAWING is whoever asked. One pending review
+per entity by partial unique index. `blockingReview` returns a BLOCKER on a database error — a gate
+that cannot read its own state must never fail open.
+
+**THE CONTRACT ITSELF — modifications, invoicing, CDRLs (migs 228–236).** Mig 228 collapsed
+`project_wbs_nodes` into `project_milestones` (one dated segment, not two parallel trees) and mig
+229 caught what that silently dropped: the cost BASELINE. The grid had been aliasing `planned_cost`
+as "Baseline cost", so cost variance would have read zero forever — a number that is confidently
+wrong, which is the failure mode this capability is built against. `setBaseline` now freezes both,
+by the same trigger. **A CLIN is written ONE way** (mig 230): a `project_modifications` row with its
+changes, `draft`→`executed`, frozen by trigger once executed — because a contract value that can be
+edited in place is a contract nobody can reconstruct. Invoicing (mig 231) bounds a claim by the
+CLIN's funded ceiling and settles against `amount_paid`; `numeric` columns are declared `string` and
+converted through `money()`, which is the mirror of the date trap and got right what the dates got
+wrong. The CDRL register (mig 232) adds the THIRD state — **submitted is not accepted, and accepted
+is not submitted**: a deliverable accepted internally but never sent to the customer is exactly what
+the AI-manager gate closer (mig 236) refuses to close a phase over. Mig 233 asserted cascade
+ordering as fact and was WRONG; mig 234 settled both child FKs on CASCADE after measuring. Mig 235
+puts the notification policy on the project, on the open `tenant_automation_policies` scope.
+
+**Two more archetypes (38 total): `project_manager` and `status_narrator`.** Both advisory, both
+tenant-bound. The gate closer's safety argument is structural rather than careful — it calls
+`markMilestoneMet`, the only thing that has ever closed a milestone, so **the agent's reach is a
+strict subset of a person's**: it can close only what a tenant_admin could have closed at that
+moment, and it additionally requires its own preconditions. What the agent contributes is not
+permission but A REASON TO STOP. EAC/ETC is arithmetic, not an agent (`lib/projects/forecast.ts`) —
+computed once per measure and reported side by side, never blended, and `null` rather than a number
+when a measure has no denominator. `status_narrator` writes prose, and the route CHECKS every figure
+in it against what the system computed before offering it: a prompt asking a model not to invent
+figures is also in place and is deliberately the weaker of the two, because an instruction is not an
+invariant.
+
+**EVERY outbound email goes through ONE seam** — `frontend/lib/email` (TS) and
+`services/cms/src/mailer` (Python), both writing the same `email_send_ledger` and honouring the same
+`email_suppressions` (mig 215; docs/EMAIL_INTERFACE_DESIGN.md, as-built docs/EMAIL_BUILD_LOG.md). Never
+call a transport (nodemailer, the Postmark API, `smtplib`) directly. The order is the contract:
+validate → resolve sender identity → check suppression → **RESERVE a ledger row** → dispatch → confirm;
+reserving *before* dispatch is what makes a crash mid-send visible instead of invisible. Bounces and
+complaints arrive at `POST /api/webhooks/postmark` (Basic auth — **Postmark does not sign webhooks**)
+and write suppressions; a *soft* bounce does not suppress. `EMAIL_DRIVER` selects gmail | postmark |
+the committed emulator, so every path is drivable with no live key.
+
 ## Services
 1. **Frontend** (Next.js 15): Portal UI + API routes + **all front-facing content** → `frontend/`.
    Front-facing content is **frontend-owned in the main DB**: the unified versioned `content_pages`
@@ -253,10 +445,12 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Portal routes MUST verify tenant access — never query by ID alone
 - **Before running or reviving a harness script, check docs/SCRIPT_INVENTORY.md** — generated from
   the tree + the live DB (`frontend/scripts/inventory-scripts.mjs`). It says who references each of
-  the 271 scripts and whether it still drives identifiers that exist. 37 classify as branch suite, 4 the
+  the 325 scripts and whether it still drives identifiers that exist. 52 classify as branch suite, 4 the
   lenses, 2 the cross-checks, 7 the canvas rulers — note the SUITE column counts *scripts*, and
-  `run-branch-drives.sh` registers **39 drives**, because two of them are filed elsewhere (RULER,
-  and the deck probe under DOCUMENTED); both
+  `run-branch-drives.sh` registers **58 drives**, because two of them are filed elsewhere (RULER,
+  and the deck probe under DOCUMENTED) and one is the first **Python** entry the runner has ever
+  had (`spend-guardrails`, dispatched by extension — never via the `pytest` on PATH, which is a uv
+  tool that cannot see asyncpg); both
   numbers are right and they measure different things. **41 cannot run** (unreferenced + rotted) and
   **16 are documented-but-rotted** — a doc points at them and they will fail confusingly. Nothing is
   marked deprecated there: that is a decision, and the doc collects candidates rather than making it.
@@ -266,9 +460,32 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (1977 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (2512 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
+- **`npx tsc --noEmit` DOES NOT CHECK THE DRIVES.** `tsconfig.json` includes `**/*.ts` and
+  `**/*.tsx`; **`.mts` matches neither**, so only the 66 harnesses pulled in transitively as imports
+  are seen. Verified both ways: `tsc --listFiles` does not load `drive-project-lifecycle.mts`, and a
+  duplicate `const` injected into it produces zero errors — which is how the same defect reached run
+  time twice in one sitting after a full rebuild each time. Adding `.mts` to the include surfaces
+  **121 pre-existing type errors**, and a check that fails 121 times on its first run gets turned
+  off, so that is a decision, not a quick fix. `node scripts/check-harness-syntax.mjs` is the part
+  that pays now: 269 files parsed and BOUND in a second, catching syntax and declared-twice, making
+  **no claim about types**. Its first version used `esbuild.transformSync` and, red-tested against
+  the exact defect, reported a clean run — a per-file transform does no cross-scope binding. Rebuilt
+  on the TypeScript binder. *An instrument that cannot detect the thing it exists for is worse than
+  none, because it reports a clean run.*
+- **The project workspace is the densest tenant page, and it was never photographed below `lg`.**
+  `drive-ui-responsive.mjs` shoots 390/820/1440 but its tenant lane did not list it (now it does,
+  with the project id resolved from the DB — a hard-coded id rots on reseed and a 404 photographs
+  as a clean page). Even that is not enough: the responsive pass shoots each route AT REST, and
+  every dense thing on that page is behind a click. `probe-project-mobile.mts` OPENS them — the
+  task edit row, the comment composer, the file input — then measures overflow, tap size and
+  clipping. Its rule on clipping is the one worth carrying: **a deliberate `truncate` with a
+  `title` is not a defect; clipped text with no way to recover it is.** The naive version fired on
+  five chips truncated on purpose, which only teaches a reader to skip the line. It writes its own
+  `project-mobile.json` — `responsive.json` is rewritten whole each run, so a second writer's
+  entries would vanish and its images would read as orphans.
 - **A page at REST is not the UI.** `docs/UI_STATES.md` (`drive-ui-states.mjs`,
   `drive-ui-responsive.mjs`) opens every overlay and walks it — open → validation → filled → close —
   intercepts every native `confirm()`/`prompt()` (recording the message, always DISMISSING), catches
@@ -277,9 +494,31 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   outright: the page body never scrolls sideways. ⚠️ It is **not read-only** — it prints its
   mutation footprint, and the honest way to run it is `pg_dump` before, restore after. Sheets group
   by KIND, not route: twenty validation messages side by side is what makes the odd one visible.
+- **"The page does not scroll sideways" and "you can reach everything" are DIFFERENT claims, and
+  only the second one matters.** `probe-interaction-mobile.mts` measures every element against the
+  390px viewport with the overlays OPEN, and additionally sweeps width over every addressable page
+  route. It exists because a clipped overflow keeps the body-scroll invariant answering "no"
+  **precisely because the content is unreachable** — so every check the tree had was structurally
+  incapable of seeing it. It found the `+ New Document` button, the primary action of the documents
+  page, cut off at the viewport edge and untappable; and `/admin/opportunities` laying out 1058px of
+  table row into 390px with 63% of every row unreachable, because eight admin tables shared one
+  `border … rounded-lg overflow-hidden` wrapper whose clip was for the rounded corners. Overflowing
+  routes 11 → 4, all four admin-only. It shares `scripts/lib/mobile-measure.mts` with
+  `probe-project-mobile.mts` — two probes with two definitions of overflow produce two numbers
+  nobody can reconcile. **It refuses a verdict when the app is serving no CSS**: a stale
+  `next-server` with a mismatched BUILD_ID once made it report 75 phantom findings across the whole
+  tree, because an unstyled page always overflows.
+- **The deployment docs are hand-maintained, which is the same shape of problem SCHEMA_MAP is
+  generated to avoid.** `frontend/scripts/audit-env-inventory.mjs` sweeps every `process.env` /
+  `os.environ` read across the three services and reconciles it against `docs/SECRETS_INVENTORY.md`,
+  `docs/RAILWAY_ENV_VARS.md` and `RAILWAY.md`, both directions. A missing row is a variable nobody
+  sets in Railway, a capability that silently does nothing in production, and a debugging session
+  that starts from a document asserting the variable does not exist. **Run it after adding any env
+  read.** Platform-injected and harness-only names are EXEMPT with a stated reason each — an
+  unexplained exclusion is how a real variable leaves an operator's checklist.
 - **The UI has its own two documents, and a route sweep is not a UI sweep.** `docs/UI_CATALOG.md`
-  (`node frontend/scripts/catalog-ui.mjs`) counts what a person can DO — 116 routes, 184 components,
-  **1,479 event handlers**, 328 fetch sites — with the render graph both ways so an orphan is
+  (`node frontend/scripts/catalog-ui.mjs`) counts what a person can DO — 119 routes, 200 components,
+  **1,608 event handlers** (1,367 bound to a DOM element, 241 passed as a prop), 354 fetch sites — with the render graph both ways so an orphan is
   visible. `docs/UI_ATLAS.md` (`capture-ui-atlas.mjs` + `build-ui-contact-sheets.mjs`) PHOTOGRAPHS
   every route as the actor who owns it: 150 shots, 6 lanes, 13 contact sheets, each caption carrying
   the live DOM's button/link/input counts. **Look at the sheets.** A page can answer 200, return a
@@ -305,7 +544,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   because the first three were all green while the dashboard told a customer with 8 builds they had
   6 (B80). Its rule: the expectation must be the page's **own query, copied from its source** — a
   predicate you believe is equivalent manufactures confident, wrong findings.
-  `verify-write-contract` — the 213 POST/PATCH/PUT/DELETE verbs NO lens walked, because calling
+  `verify-write-contract` — the 256 POST/PATCH/PUT/DELETE verbs NO lens walked, because calling
   every write mutates the box being measured. It binds every `[param]` to a fresh UUID owning
   nothing and asserts the one property needing no successful write: **a client error answers 4xx
   with both `error` and `code`, never 500** (a 500 on bad input means validation ran after the DB
@@ -346,6 +585,13 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   select for what its consumer NEEDS**, not for what is merely nearest: `ORDER BY created_at` picks
   the stable seeded tenant, `ORDER BY slug` picks whatever a fixture just named. And **one
   credential, one place** — `scripts/sandbox-reset-passwords.mjs` is that place.
+- **One credential, ONE export — and check that the second one is not already shadowed.**
+  `scripts/sandbox-reset-passwords.mjs` writes the passwords; `scripts/sandbox-env.sh` resolves
+  them. That file exported `LIGHTHOUSE_PW` TWICE — the first to a literal, which pinned it, so the
+  second (`${LIGHTHOUSE_PW:-$TENANT_PW}`, whose comment says it exists to stop two suites
+  disagreeing) never fired. And `BUYER_PW` was exported only by `run-branch-drives.sh`, so a
+  drive run the way its own header documents fell back to a literal no account has. Both surface
+  as `login?error=invalid`, which reads as a broken product flow. Fourth occurrence (B146/B147).
 - **A preflight that finds a violation must FAIL the run.** `run-branch-drives.sh` printed
   `✗ CROSS-TENANT REFERENCES FOUND — 18 row(s)` and then `39 passed · 0 failed`, exiting 0 (B145).
   Its own header already says a drive that cannot run "is still a FAILURE here — it is uncovered,
@@ -362,6 +608,63 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   the titles (B135), and a customer's audit trail reading "Shadow descended" (B136). Canonical:
   **docs/CAPABILITY_RECONCILIATION.md**, which also records the fifteen ways the join was wrong —
   most importantly that **a source-literal scan against a dynamically-fetched list cannot pass**.
+- **No lens compares one pipeline to ANOTHER.** Each measures a surface against its own
+  expectation, so ten pipelines can each be green while solving the same problem ten ways.
+  `frontend/scripts/audit-pipeline-coherence.mjs` asks the join question — per shared seam (events ·
+  email · ToDos · canvas · the compliance floor · tenant authority · audit · agents · dates ·
+  toast), which files do the seam's **job**, and which of those **reach the shared implementation**.
+  A pipeline that never needed a seam prints `—`, never `0`: "did not need it" and "reimplemented
+  it" are opposite findings. Canonical: **docs/PIPELINE_COHERENCE_REVIEW.md**. Its companion
+  `audit-row-type-truth.mjs` closes the half of the `sql<T>` trap nothing guarded — the inventory
+  catches a snake_case NAME, and this catches a wrong TYPE by asking the live DB what each column
+  is. A wrong name is `undefined`, which throws; **a wrong type is a value of the wrong shape that
+  RENDERS** — it put `Fri Aug 28`, no year, on the project workspace and blanked an invoice-ageing
+  column. 817 typed sites · 248 lying row types · ranked by whether the value is then read as a
+  string, because a `Date` that only reaches `NextResponse.json` serialises to ISO and harms
+  nobody.
+- **AI SPEND: the caps are proven, and the emulated dollar figure is ~11× LOW.** Two instruments,
+  both in the branch suite; canonical **docs/AGENT_SPEND_AND_CAPS.md**.
+  `pipeline/tests/verify_spend_guardrails.py` asserts all six caps (kill switch · platform cap ·
+  framework ceiling · tenant budget · hourly rate · per-call) in BOTH directions — 11 passed — because
+  *a guard that refuses everything passes a refusal-only test*. It snapshots every value FIRST and
+  asserts the restore, written that way after a hand-run left a tenant on a $9999 budget and the
+  ceiling at $0.39. `frontend/scripts/estimate-full-build-cost.mts` then asks what a build costs, and
+  the answer needs care: **the emulator returns a CONSTANT usage block** (`input_tokens: 64`), so
+  `agent_task_log.cost_usd` after an emulated run measures the CALL COUNT and the rate table, never
+  spend. It reports two numbers and never blends them — LEDGER ($0.15/build) and LIVE-RATE
+  ($1.22–$1.63 for 18 sections, ≈$0.08–$0.11/section; **Phase I $1.00–$1.40, Phase II $1.20–$2.30**,
+  and the driver is SECTION COUNT not page count — input is 93–95% of cost and holds at 62–66k chars
+  per agent call while the proposal's own prose varies 7×, so context assembly is dominated by the
+  SOLICITATION). The live figure's INPUT side is measured from the real bytes the product sent (the
+  emulator now logs untruncated `chars`); its OUTPUT side is measured in SIZE — `countDocCharacters`,
+  never `length(content)`, which is canvas JSON and ran 2.3× the prose — and assumed in reuse. A $50
+  budget buys **30–40 builds, not 341**, or 7–16 whole proposals once the Studio's three gated loops
+  are counted. Two traps it exists to stop: **every proposal on the box is `approved`, and `draft_v0` only
+  drafts `empty`/`ai_drafted`** — so a full draft fired at any of them returns
+  `no_authorable_sections`, the review cohort runs and bills, and the run reads like a full build
+  while `section_drafter` never fires (it had run **once, ever**). So the script clones its own
+  fixture and **refuses a verdict (exit 2) if zero sections were drafted.** Red-tested by forcing the
+  budget to 0 — which also proved the stop is clean: ten refusals audited at $0.00 with the reason,
+  and `section_drafter` refused **once, not fifteen times**.
+- **Three instruments were wrong the same way in one sitting: a text search for a bug pattern finds
+  the CHANGELOG of that bug.** This repo documents each defect at its own site, so scanning for
+  `String(d).slice(0,10)` finds the comment explaining why the line below does *not* do that —
+  which means an instrument that reads prose as code reports the most defects exactly where the
+  most care was taken. Strip comments before asking what a file **does**; read the full text to ask
+  what it is **about**. And a SQL `--` comment inside a template literal is invisible to a JS
+  comment stripper, so never quote a bug pattern there either.
+- **A scanner that silently drops what it cannot parse reports a clean run** — worse than not
+  scanning. `audit-automation-spine.mjs`'s new JOIN 7b matched `[a-z0-9_]+` for a template name, so
+  the red test's `project_review_decidedX` failed to match at all and the site VANISHED from the
+  count while the audit printed "0 with NO renderer". Take any string, and report what cannot be
+  resolved as UNCHECKED. (JOIN 7b exists because JOIN 7 walked only the Python step registry, while
+  the frontend now names email templates too in `system:notification.requested` payloads — B141's
+  gap, in a place the audit built to prevent B141 did not look.)
+- **In a coherence audit the FALSE NEGATIVE is the dangerous direction.** Three "this pipeline does
+  not use the seam" cells were predicates matching import SPELLING (`./todos` vs
+  `@/lib/projects/todos`) or knowing only one of two legitimate mail paths. A false positive gets
+  contradicted by the code; a false negative invents work and nothing argues back. Match on
+  RESOLVED modules, and pin each corrected class in the self-test.
 - **Run all five on BACKWARD review too**, not just on new changes. A retrospective audit is exactly
   where "it's shipped, it's been fine for months" substitutes for evidence — B80 had shipped and
   survived every prior sweep. A surface a lens has no expectation for is **uncovered, not passing**.
@@ -426,6 +729,45 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   → "Invalid time value" 500; `proposals/[p]/document` → `r.volume_name` undefined → every section's
   volume grouping silently dropped from the assembled doc). Declare the `sql<typeof rows>` field names
   **camelCase**, matching the runtime, and read them camelCase.
+- **`enterTenant()` does NOT survive an `await` boundary back to its caller — and an unscoped route
+  answers a TEXTBOOK envelope.** `AsyncLocalStorage.enterWith` sets the store for the remainder of
+  the CURRENT execution; a route that `await`s a gate resumes in a different microtask, in the
+  context captured *before* the await, so a helper that enters on the caller's behalf has already
+  lost it. (Calling it synchronously immediately before the consumer, no await between, DOES work —
+  it is the await that loses it.) Symptom: RLS matches nothing, every read is empty, and the route
+  answers `200 {"data":{"items":[]}}` or `404 {"error":…,"code":…}` — which `verify-api-contract`
+  and `verify-write-contract` both grade GREEN, because both only ask about SHAPE. That is how all
+  20 project handlers ran unscoped behind perfect envelopes. **Scope the handler, don't enter for
+  it**: `runInTenant(tenantId, () => handler())` (`store.run()`), as `lib/projects/gate.ts`
+  `withProject` does — or call `enterTenant` in the route's OWN frame. `verify-api-contract` now
+  fails a tenant-lane 404 at an id bound from a row that tenant owns.
+- **A `date`/`timestamptz` column arrives as a JavaScript `Date`, not a string — the #2 crash
+  class, and the one no lens can see.** `String(d).slice(0, 10)` is `"Tue Apr 28"`, so
+  `Date.parse(that + 'T00:00:00Z')` is **NaN** — and NaN survives a `!== 0` check, then picks a
+  branch: a milestone variance rendered live as `NaN days early against baseline`, cheerful because
+  `NaN > 0` is false. In an event payload it is worse: `JSON.stringify(NaN)` is `null`, so the
+  record reads "no baseline" forever, with nothing to notice. It has shipped **three times** — a
+  page, an event payload, and a 409 message that told a person their project was baselined on
+  `Tue Apr 28`, no year. Use `isoDate()` / `daysBetween()` (`lib/projects/dates.ts`) or
+  `d.toISOString().slice(0,10)`; never slice the *string form*. `__tests__/projects-dates.test.ts`
+  guards the idiom across the Projects tree, and any fixture for date code must be a real `Date` —
+  a test fed ISO strings passes against the broken code.
+- **A nested ``sql`…` `` inside a value is a PROMISE, not a fragment — the THIRD Proxy trap.**
+  `completed_at = ${x ? sql`now()` : null}` makes postgres.js throw `RangeError: Invalid time
+  value` serialising it, and the route answers a textbook 500 — every task in a checklist failed to
+  tick off this way. Only the tagged-template CALL is routed; fragment-composing needs an explicit
+  client. Compute plain values in JS instead.
+  `__tests__/projects-tenant-transactions.test.ts` guards all three Proxy traps.
+- **`sql.begin` FORWARDS PAST the tenant context — the second way to lose `app.tenant_id`.**
+  `lib/db.ts`'s `sql` is a Proxy and only the tagged-template CALL is routed; `sql.begin` (and
+  `sql.json/array/…`) go straight to the raw pool. A tenant-scoped transaction written as
+  `sql.begin` therefore runs with the GUC unset, RLS matches nothing, and **every statement updates
+  zero rows** — which a compare-and-swap reads as a lost race. That is how `setBaseline` answered
+  `409 "baselined by someone else a moment ago"` on the FIRST call, for a project nobody had
+  baselined, invisibly to five lenses (mocked units · owner-client isolation drive · envelope
+  graders that see a textbook 409). Use `withTenant(tenantId, tx => …)` (`lib/rls.ts`) for a
+  tenant transaction, `sqlBypass` for an admin one. `__tests__/projects-tenant-transactions.test.ts`
+  guards the Projects tree and the portal API.
 - **jsonb writes:** write via `${sql.json(x)}`, NOT `${JSON.stringify(x)}::jsonb`, when the column
   is read back as an object/array. The latter reads back as a STRING (silent char-iteration bug).
   On READ, coerce with `coerceJsonb<T>(v, fallback)` (`lib/jsonb.ts`).
@@ -435,6 +777,16 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - **CHECK columns:** confirm a literal is in the column's CHECK (`\d table`) before writing it.
 - **Workflow status writes:** force-fail a paused instance only with `… WHERE id=$1 AND status='paused'`
   (compare-and-swap) and expire its sibling task; resume HITL only after entity correlation.
+- **A `'use client'` component must NEVER read the clock during render — the intermittent that reads
+  as noise.** `Date.now()` in render makes the output a function of WHEN it rendered: the server
+  writes "just now", the client hydrates a beat later and writes "1m ago", React throws **#418**, and
+  **hydration fails for the whole subtree while the route answers HTTP 200** — so nothing gating on a
+  status code can see it. It usually agrees and disagrees only when the gap crosses a rounding
+  boundary, which is why it surfaced twice on two unrelated routes during a 153-page atlas sweep and
+  never on a single local load. **Eight occurrences.** Use `<TimeAgo iso={x}/>` or
+  `relativeFrom(x, useClientNow())` (`components/ui/time-ago.tsx`): `now` is null until mounted, so
+  the first paint is a deterministic UTC stamp on both sides. `__tests__/client-clock-in-render.test.ts`
+  guards the shape.
 - **`next/dynamic({ssr:false})` drops `ref`** (Next 15 sets `ref.current={retry}`, a truthy non-handle):
   pass an imperative handle via a normal prop (`innerRef`), not `ref`. And load browser-only libs
   (react-pdf / pdfjs) via `next/dynamic({ssr:false})` — a static import into a `'use client'` component
@@ -453,7 +805,15 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 
 ## SOP: Events
 - Namespaces: finder (admin), capture (customer), identity (auth only),
-  proposal (workspace), library (content), system (infra), tool (invocations)
+  proposal (pre-award workspace), library (content), system (infra), tool (invocations),
+  project (post-award Projects — baselines, milestone gates, deliverables; mig 217)
+- The registry lives in THREE runtimes and cannot be consolidated further — `EVENT_NAMESPACES`
+  in `frontend/lib/event-namespaces.ts` (a **zero-import leaf**, re-exported by `lib/events.ts`;
+  it is a leaf because a client component importing `lib/events` pulls `node:async_hooks` into the
+  browser bundle and only `next build` catches it), the same in `pipeline/src/events.py`, and
+  `system_events_namespace_chk` in Postgres (the only one that FAILS rather than warns).
+  Everything else imports one of them; `__tests__/event-namespace-registry.test.ts` reconciles
+  all three plus the migration SQL and every doc that writes the list out.
 - NEVER use: admin, cms, spotlight as namespaces
 - Type format: entity.action_past_tense (snake_case)
 - Admin events: tenantId = null

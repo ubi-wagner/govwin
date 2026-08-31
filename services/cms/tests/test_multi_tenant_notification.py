@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 def _patches(*, sends, pref_allows=None, dedup=None, resolve=None):
     """Common patch set for _handle_multi_tenant_notification."""
-    async def fake_send(to, subject, html, sender=None):
+    async def fake_send(to, subject, html, sender=None, **contract):
         sends.append(to)
         return {'provider': 'gmail', 'message_id': 'm'}
 
@@ -110,7 +110,7 @@ class TestMultiTenantNotification:
         from src.event_listener import _handle_multi_tenant_notification
         log_mock = AsyncMock()
 
-        async def failing_send(to, subject, html, sender=None):
+        async def failing_send(to, subject, html, sender=None, **contract):
             return {'provider': 'gmail', 'error': 'rate limited'}
 
         with patch('src.event_listener.get_event_pool', return_value=AsyncMock()), \

@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/toast';
+import { fmtDateTime } from '@/lib/fmt';
 
 export interface Overlay { id: string; name: string; description: string | null; isDefault: boolean; scope: string }
 
@@ -108,7 +109,7 @@ export function SlaCountdown({ dueAt }: { dueAt: string }) {
   }, []);
 
   const due = new Date(dueAt).getTime();
-  const dueLabel = new Date(dueAt).toLocaleString();
+  const dueLabel = fmtDateTime(dueAt);
   if (now == null) {
     // SSR / first paint — show the deadline without the live delta (avoids hydration drift).
     // suppressHydrationWarning: toLocaleString renders in the SERVER's TZ in the initial HTML

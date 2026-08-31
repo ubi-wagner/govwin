@@ -54,9 +54,105 @@ Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` ser
 
 Not part of the alpha customer path; its variables live on the `rfp-crm` service + `cms-postgres`.
 Reconcile against Railway when the CRM is built out — the code-read set (see `docs/SECRETS_INVENTORY.md`):
-`CMS_DATABASE_URL` (→ `cms-postgres`), `SHARED_DATABASE_URL` (→ main DB `system_events` bridge),
+`CRM_DATABASE` (→ the CRM's own Postgres — see below), `SHARED_DATABASE_URL` (→ main DB bridge),
 `ANTHROPIC_API_KEY`, `CMS_STORAGE_ROOT`/R2, `ALLOWED_ORIGINS`, `CMS_API_KEY`, `CMS_JWT_SECRET`,
 `GOOGLE_SERVICE_ACCOUNT_JSON` (the email-unlock key) + `GOOGLE_WORKSPACE_EMAIL`, `LOG_LEVEL`.
+
+---
+
+## Email (Postmark + Gmail) — set on BOTH `govtech-frontend` and `rfp-crm`
+
+The send seam is implemented twice, once per language, and both halves read the same names and write
+the same `email_send_ledger` table in the main DB. A variable set on one service and not the other
+produces mail that goes out under two different configurations — which is exactly the class of thing
+the seam exists to prevent.
+
+| Variable | Purpose | Status |
+|---|---|---|
+| `EMAIL_DRIVER` | `postmark` \| `gmail`. Selects the transport for **transactional** mail only; `correspondence` is pinned to Gmail whatever this says. Absent ⇒ `gmail`, which is today's behaviour | **➕ ADD** (`postmark`, at cutover) |
+| `POSTMARK_SERVER_TOKEN` | **Server API Token, NOT the Account token.** The account token manages domains and cannot send; using it returns a 401 that reads exactly like a wrong key | **➕ ADD** |
+| `POSTMARK_MESSAGE_STREAM` | Postmark's transactional stream | ○ (defaults to `outbound`) |
+| `POSTMARK_WEBHOOK_SECRET` | shared secret on `POST /api/webhooks/postmark`. Postmark does **not** sign webhooks — the mechanism is HTTP Basic auth on the webhook URL, so configure the URL in Postmark as `https://postmark:<secret>@<host>/api/webhooks/postmark` | **➕ ADD** (frontend only — the route lives there) |
+| `POSTMARK_API_BASE` | endpoint override. **Sandbox only** — points the drivers at `scripts/test-harness/emulated-postmark.mjs`, the same way `ANTHROPIC_BASE_URL` points the AI flows at the emulated model. Leave UNSET in production | 💤 (never set in prod) |
+| `EMAIL_FROM_ADDRESS` | `notifications@rfppipeline.com`. Must be on the Postmark-verified domain | **➕ ADD** at cutover |
+| `EMAIL_FROM_NAME` | `RFP Pipeline` — the fallback display name when no tenant persona resolves | ○ |
+
+**DNS, once:** verify the DOMAIN in Postmark (not individual sender signatures) — DKIM plus a custom
+Return-Path. Then update SPF so **both** senders appear in ONE record:
+
+```
+v=spf1 include:_spf.google.com include:spf.mtasv.net ~all
+```
+
+A domain may have exactly one SPF record. Publishing a second is a `permerror` that fails **both**
+senders — the classic way adding an email provider breaks the mail that already worked.
+
+**⚠️ One open item, and it is a real blocker for the CRM half.** Migration 215 gives
+`email_send_ledger` no write policy, so the NOBYPASSRLS `govtech_app` role is refused by design. The
+frontend writes it through `DATABASE_URL_OWNER`. Nothing in the repo records which role the CRM's
+`SHARED_DATABASE_URL` carries — it has only ever written `system_events` and `cms_content`, neither
+of which has RLS. **If it is not the owner, every CRM send runs DEGRADED** (mail goes, no idempotency
+reservation) and logs a 42501 naming the remedy once per process. Check it before the cutover.
+
+---
+
+## The CRM database
+
+**Renamed: `CMS_DATABASE_URL` → `CRM_DATABASE`.** The service reads it through ONE resolver
+(`services/cms/src/models/database.py::crm_database_url()`), which honours
+`CRM_DATABASE` → `CRM_DATABASE_URL` → `CMS_DATABASE_URL` in that order and logs a deprecation
+warning on the last. That chain exists because **a rename crosses a deploy boundary**: the platform
+variable and the code that reads it do not change in the same instant, and `init_db()` raises at
+startup — so a single-name reader turns the gap into an outage. Retire the legacy entry once
+Railway, the GitHub secrets and staging all carry the new name; the warning is what tells you when
+that is true.
+
+**It is INTERNAL to the Railway private network.** No public TCP proxy. Reference it by the private
+hostname (`*.railway.internal`) or by a Railway service variable reference, and leave the public
+endpoint off. Only `rfp-crm` connects to it — the platform frontend and the pipeline do not, and the
+sweep in docs/CRM_ANALYSIS.md confirms that is already true in code: the only platform-side mention
+of the CRM is a link-out card.
+
+### Migrations run inside the deployment — decided, and already the mechanism
+
+**Both services already migrate at boot, and both fail closed.** This was the design before the
+question was asked; what was missing was one thing that would have broken it.
+
+| service | when | how it fails |
+|---|---|---|
+| `govtech-frontend` | `entrypoint.sh`, before `node server.js` | `set -e` — the boot stops |
+| `rfp-crm` | Dockerfile `CMD`, before `uvicorn` | `exit 1` — *"refusing to boot on an unmigrated schema"* |
+
+That makes the internal-only posture free: nothing outside the deployment needs to reach either
+database to migrate it, so the CRM's Postgres can stay on the private network with no public proxy.
+
+**⚠️ The defect this decision surfaced, which was live.** `migrate.mjs` reads `DATABASE_URL`, and on
+the frontend service that is `govtech_app` — the NOBYPASSRLS application role. Reproduced against a
+live database:
+
+```
+psql "$DATABASE_URL" -c "CREATE TABLE probe (id uuid REFERENCES tenants(id))"
+ERROR:  permission denied for table tenants
+```
+
+Migrations **215, 216 and 217 all carry `REFERENCES tenants(id)`**, so with `set -e` the next deploy
+would not have come up — and the error names `tenants`, which sends the hunt to the wrong place.
+
+`entrypoint.sh` now migrates as `DATABASE_URL_OWNER` and serves as `DATABASE_URL`, warning loudly
+when the owner variable is absent. **`DATABASE_URL_OWNER` on `govtech-frontend` is therefore a
+hard requirement, not an optimisation** — it was already on the outstanding list; this promotes it.
+
+`__tests__/deployment-migrations.test.ts` locks all of it: migrations before the server, failing
+closed, the owner connection, the image actually carrying what the entrypoint runs, and psql
+present in the CRM image.
+
+`migrate.yml` stays as a **manual break-glass path** and now says in its own header that it cannot
+reach a database with no public endpoint. Its CRM step used to `::warning::` and `exit 0` — a silent
+skip that left the database un-migrated while the run stayed green, which is B145's shape and
+precisely how a rename of the GitHub secret would have gone unnoticed. It fails now.
+
+`tests/test_crm_database_var.py` reconciles the Python resolver, the bash chain in `db/run.sh`
+(which cannot import it) and both workflows, and asserts the skip has not come back.
 
 ---
 

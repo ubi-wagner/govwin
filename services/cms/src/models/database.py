@@ -1,8 +1,13 @@
 """
-Database connection module for CMS service.
+Database connection for the CRM service.
 
-Uses asyncpg for async PostgreSQL access.
-Connects to CMS_DATABASE_URL (separate from the main app DATABASE_URL).
+Two connections, and they are not interchangeable:
+
+  CRM_DATABASE     the service's OWN Postgres. Internal to the Railway private network — no public
+                   proxy — so nothing outside the deployment can reach it. See `crm_database_url()`.
+  SHARED_DATABASE_URL  the bridge to the MAIN database (`system_events`, `email_send_ledger`).
+
+Uses asyncpg for async access.
 """
 import os
 import logging
@@ -13,15 +18,53 @@ logger = logging.getLogger('cms.db')
 
 _pool: asyncpg.Pool | None = None
 
+#: The variable names for the CRM database, newest FIRST.
+#:
+#: ── WHY THIS IS A CHAIN AND NOT A CONSTANT ───────────────────────────────────────────────────
+#: The variable was renamed from `CMS_DATABASE_URL` to `CRM_DATABASE`, and a rename crosses a
+#: deploy boundary: the platform variable and the code that reads it do not change in the same
+#: instant. Whichever moves first, a single-name reader is a service that will not boot in the gap
+#: — and this one raises RuntimeError at startup, so the gap is an outage rather than a degradation.
+#:
+#: The chain closes the gap in both directions. It is TEMPORARY: once Railway, the GitHub secrets
+#: and staging all carry the new name, the legacy entry can go, and the deprecation warning below
+#: is what will tell you when that is true.
+_CRM_URL_VARS = ('CRM_DATABASE', 'CRM_DATABASE_URL', 'CMS_DATABASE_URL')
+
+#: Names kept only for the transition, warned about on every resolve.
+_LEGACY_CRM_URL_VARS = ('CMS_DATABASE_URL',)
+
+
+def crm_database_url() -> str | None:
+    """The CRM database URL, from whichever variable currently carries it.
+
+    ONE resolver, imported everywhere. The name used to be read directly by
+    `os.getenv('CMS_DATABASE_URL')` in three Python files, a bash migration runner, two CI
+    workflows and a compose file — which is how a rename becomes eight independent chances to
+    strand something. `tests/test_crm_database_var.py` asserts nothing reads the raw variable again.
+    """
+    for var in _CRM_URL_VARS:
+        value = os.getenv(var)
+        if value:
+            if var in _LEGACY_CRM_URL_VARS:
+                logger.warning(
+                    "%s is DEPRECATED — the CRM database variable is now CRM_DATABASE. Still "
+                    "honoured so a rename cannot strand this service mid-deploy; set the new name "
+                    "and this line goes away.", var,
+                )
+            return value
+    return None
+
 
 async def init_db() -> None:
     """Initialize the connection pool. Called at startup."""
     global _pool
-    db_url = os.getenv('CMS_DATABASE_URL')
+    db_url = crm_database_url()
     if not db_url:
         raise RuntimeError(
-            'CMS_DATABASE_URL is not set. The CMS service requires its own database. '
-            'Create a separate PostgreSQL plugin in Railway and set CMS_DATABASE_URL.'
+            'CRM_DATABASE is not set. The CRM service requires its own database — a separate '
+            'Postgres in Railway, reachable only on the private network. '
+            f'Looked for: {", ".join(_CRM_URL_VARS)}.'
         )
     _pool = await asyncpg.create_pool(
         db_url,

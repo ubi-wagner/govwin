@@ -23,6 +23,20 @@
 export DATABASE_URL="postgresql://govtech_app:apppass@localhost:5432/govtech_intel"
 export DATABASE_URL_OWNER="postgresql://govtech:changeme@localhost:5432/govtech_intel"
 
+# The CRM's own database. It was ABSENT from every sandbox until 2026-08-26, which is why no
+# instrument in this repo had ever measured the CRM — a lens that cannot connect reports
+# nothing, and nothing reads exactly like a pass (docs/CRM_ANALYSIS.md §0).
+#
+#   createdb -O govtech cms_postgres && bash services/cms/db/run.sh
+export CRM_DATABASE="postgresql://govtech:changeme@localhost:5432/cms_postgres"
+# Legacy name, still honoured by the resolver during the rename. Remove once Railway,
+# the GitHub secrets and staging all carry CRM_DATABASE.
+export CMS_DATABASE_URL="$CRM_DATABASE"
+# The bridge the CRM uses to reach the MAIN database. Note the role: migration 215 denies
+# writes to email_send_ledger on the app role, so a non-owner here makes every CRM send run
+# degraded (docs/CRM_MIGRATION_PLAN.md, last section).
+export SHARED_DATABASE_URL="$DATABASE_URL_OWNER"
+
 # The admin password, in ONE place. sandbox-reset-passwords.mjs WRITES $SANDBOX_PASSWORD; eighteen
 # driver scripts READ $RFP_ADMIN_PW / $ADMIN_PW / $DRIVE_ADMIN_PW, each with its own hardcoded
 # default of 'RFPAdmin2026!' — a value nothing sets any more. On a fresh sandbox that mismatch
@@ -64,8 +78,19 @@ export AUTH_URL="http://localhost:3000"
 # like a broken box rather than an unrunnable check. Exporting it here gives the value one
 # definition that every harness reads, instead of six defaults to keep in agreement.
 #
-# Override for a box serving elsewhere: GUIDE_BASE=http://localhost:3001 <cmd>
-export GUIDE_BASE="${GUIDE_BASE:-http://localhost:3000}"
+# ONE BASE URL, ONE PLACE — the same rule as the passwords above, for the same reason.
+#
+# GUIDE_BASE (the verify-* lenses) and BASE_URL (the drive-* harnesses) are two historic names for
+# one value. Because this file always EXPORTS GUIDE_BASE, a harness cannot tell "the caller chose
+# 3000" from "nobody said" — so `source sandbox-env.sh && BASE_URL=…:3101 node scripts/verify-x.mjs`
+# silently reads 3000 and fails with ERR_CONNECTION_REFUSED, which reads like the app is down.
+# Deriving both from whichever the caller set removes the trap; a per-command override must use
+# GUIDE_BASE (or set BASE_URL *before* sourcing this file).
+#
+#   GUIDE_BASE=http://localhost:3101 node frontend/scripts/verify-surfaces.mjs
+#   BASE_URL=http://localhost:3101 source scripts/sandbox-env.sh && node …/drive-x.mts
+export GUIDE_BASE="${GUIDE_BASE:-${BASE_URL:-http://localhost:3000}}"
+export BASE_URL="${BASE_URL:-$GUIDE_BASE}"
 
 # Emulated Claude: EMULATE=1 points the SDK at the local test harness so every AI-gated flow runs
 # end to end with no live key, mirroring the production wiring exactly (docs/AI_FLOWS_PROOF.md).
@@ -111,8 +136,9 @@ export GOVWIN_RUN_DIR="/home/user/.govwin/run"
 # a last-resort default for anyone running a script without sourcing this file.
 export SANDBOX_PASSWORD="${SANDBOX_PASSWORD:-SandboxDrive2026!}"
 export RFP_ADMIN_PW="${RFP_ADMIN_PW:-$SANDBOX_PASSWORD}"
-# lighthouse is NOT in the reset script's target list, so it keeps its seeded password.
-export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-LighthouseAdmin}"
+# (LIGHTHOUSE_PW is set ONCE, below, next to TENANT_PW. It used to be exported HERE first, to a
+# literal `LighthouseAdmin`, which pinned it — so the later `${LIGHTHOUSE_PW:-$TENANT_PW}` was a
+# no-op and the comment above it described an intent the code did not implement. See there.)
 # …and LIGHTHOUSE_PW belongs to `eric@lighthouse.com` ONLY. The lighthouse COLLABORATOR is a
 # different account with a different seeded password (`seed_dev_accounts.mjs`: COLLAB_PW), and this
 # file exported the first without the second — so a harness reaching for "the lighthouse password"
@@ -123,7 +149,23 @@ export TENANT_PW="${TENANT_PW:-DemoPass123!}"
 # The lighthouse tenant_admin is driven by BOTH suites and they resolved its password differently —
 # the branch drives via passwordFor()/TENANT_PW, e2e/auth.setup.ts via LIGHTHOUSE_PW. Pointing the
 # second at the first means running one suite cannot silently break the other.
+#
+# ⚠️ THIS LINE WAS DEAD. An earlier `export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-LighthouseAdmin}"` ~10
+# lines above pinned the variable first, so `:-` here never fired and the file shipped
+# `LIGHTHOUSE_PW=LighthouseAdmin` against an account whose password is TENANT_PW. That is why
+# `drive-end-to-end.mjs` — which passes the password POSITIONALLY to drive-buy-and-build — died at
+# stage 3 on `login?error=invalid`, twice, reading as a broken purchase flow. Fourth occurrence of
+# one-account-two-passwords (B146/B147). One export, one place.
 export LIGHTHOUSE_PW="${LIGHTHOUSE_PW:-$TENANT_PW}"
+# ONE CREDENTIAL, ONE PLACE — and `BUYER_PW` was the third spelling of it.
+#
+# `run-branch-drives.sh` exports `BUYER_PW="${BUYER_PW:-$TENANT_PW}"`, so inside the SUITE the buy
+# drive authenticates. Run standalone — which is exactly how `drive-end-to-end.mjs` documents
+# itself — nothing set it, and `drive-buy-and-build.mjs` fell back to a private literal
+# (`Passw0rd!2026`) that no account has. The arc died at stage 3 on `login?error=invalid`, which
+# reads as a broken purchase flow and is two files disagreeing about one value. B146/B147, third
+# occurrence. The runner's line still wins if it is set first; this makes the plain invocation work.
+export BUYER_PW="${BUYER_PW:-$TENANT_PW}"
 
 mkdir -p "$LOCAL_STORAGE_DIR" "$GOVWIN_RUN_DIR" 2>/dev/null || true
 

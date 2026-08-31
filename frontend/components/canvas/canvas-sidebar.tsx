@@ -17,6 +17,7 @@ import { toolboxFromCapabilities } from '@/lib/canvas/toolbox';
 import type { CanvasCapabilities } from '@/lib/canvas/capabilities';
 import { canReplaceFromLibrary } from '@/lib/canvas/format-controls';
 import { NodeFormatControls } from './node-format-controls';
+import { fmtDateTime, fmtNum } from '@/lib/fmt';
 
 /** Every insertable node type, categorized — the single insert surface (the Add tab).
  *  All 22 types are reachable here (was 12; the extended elements were toolbar-only). */
@@ -397,7 +398,7 @@ function VersionHistorySection({
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
-                    {v.char_count != null && ` -- ${v.char_count.toLocaleString()} chars`}
+                    {v.char_count != null && ` -- ${fmtNum(v.char_count)} chars`}
                   </div>
                   {v.edit_summary && (
                     <div className="text-[10px] text-gray-500 italic mt-0.5 truncate">
@@ -921,7 +922,7 @@ export function CanvasSidebar({
                       <span className="font-medium">{edit.actor_name}</span> {edit.action}
                     </div>
                     {edit.comment && <div className="text-gray-400 italic">{edit.comment}</div>}
-                    <div className="text-gray-400">{new Date(edit.timestamp).toLocaleString()}</div>
+                    <div className="text-gray-400">{fmtDateTime(edit.timestamp)}</div>
                   </div>
                 ))}
               </div>

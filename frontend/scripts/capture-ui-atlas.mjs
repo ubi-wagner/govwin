@@ -44,6 +44,48 @@ const sql = postgres(DB, { max: 2, transform: { column: { from: (c) => c } } });
 fs.mkdirSync(OUT, { recursive: true });
 
 const catalog = JSON.parse(fs.readFileSync(path.join(REPO, 'docs/ui-catalog.json'), 'utf8'));
+
+/**
+ * THE CATALOG IS GENERATED, AND NOTHING FORCES IT TO BE CURRENT.
+ *
+ * This whole sweep photographs the routes `docs/ui-catalog.json` lists. That is the right design —
+ * the catalog is the manifest of what a person can DO — but it makes every screenshot only as fresh
+ * as the last `catalog-ui.mjs` run, and nobody adding a page thinks to run it first.
+ *
+ * It has already happened: two project pages were added, this atlas ran, wrote 111 screenshots and
+ * reported them all clean — and photographed NEITHER of the new pages, because a day-old catalog
+ * did not contain them. The only reason it surfaced at all is the accounting check at the bottom of
+ * this file, which noticed its own arithmetic was off.
+ *
+ * A visual sweep that cannot see a page does not report it missing. It reports 111 clean shots.
+ *
+ * So: count the page files on disk, compare, and exit 2 as a HARNESS DEFECT rather than
+ * photographing an out-of-date product. Same rule `verify-api-contract`, `verify-surfaces` and
+ * `reconcile-capability` follow.
+ */
+{
+  const walkPages = (dir, out = []) => {
+    if (!fs.existsSync(dir)) return out;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const p2 = path.join(dir, e.name);
+      if (e.isDirectory()) walkPages(p2, out);
+      else if (e.name === 'page.tsx') out.push(p2.replace(path.join(REPO, 'frontend') + '/', ''));
+    }
+    return out;
+  };
+  const onDisk = walkPages(path.join(REPO, 'frontend', 'app'));
+  const inCatalog = new Set(catalog.records.filter((r) => r.kind === 'page').map((r) => r.file));
+  const missing = onDisk.filter((f) => !inCatalog.has(f));
+  if (missing.length) {
+    console.error(`✗ HARNESS DEFECT — ${missing.length} page(s) exist on disk and are ABSENT from`);
+    console.error('  docs/ui-catalog.json, which is where this sweep gets its route list. They would');
+    console.error('  simply not be photographed, and the run would report every other page clean.');
+    console.error('  Regenerate first:  node frontend/scripts/catalog-ui.mjs');
+    for (const f of missing.slice(0, 10)) console.error(`    · ${f}`);
+    process.exit(2);
+  }
+}
 const ROUTES = catalog.records.filter((r) => r.kind === 'page').map((r) => ({ route: r.route, file: r.file, declared: { buttons: r.buttons, inputs: r.inputs, links: r.links, forms: r.forms, handlers: r.handlers.length } }));
 
 /**
@@ -124,13 +166,16 @@ async function bindings(slug) {
   const [post] = await sql`SELECT page_key FROM content_pages WHERE content_type='blog_post' LIMIT 1`;
   const [res] = await sql`SELECT page_key FROM content_pages WHERE content_type='resource' LIMIT 1`;
   const [collab] = await sql`SELECT id FROM proposal_collaborators LIMIT 1`;
+  // Delivery (migration 216). Scoped to the lane's own tenant like every binding here — a project
+  // from another tenant drives the page's correct 404 and photographs a not-found as the feature.
+  const [project] = await sql`SELECT d.id FROM projects d JOIN tenants t ON t.id=d.tenant_id WHERE t.slug=${slug} ORDER BY d.created_at DESC LIMIT 1`;
   return {
     tenantSlug: slug, proposalId: prop?.id, sectionId: sect?.id, opportunityId: prop?.opportunity_id,
     solId: sol?.id, topicId: topic?.id, spotlightId: topic?.id, portalId: portal?.id, tenantId: tenant?.id,
     templateId: tmpl?.id, profileId: src?.id, contractId: contract?.id, vaultId: vault?.id,
     documentId: tdoc?.id, foundationId: found?.id, pageKey: pageRow?.page_key,
     slug: post?.page_key ?? res?.page_key ?? docPage?.page_key, type: docPage?.content_type,
-    token: collab?.id,
+    token: collab?.id, projectId: project?.id,
   };
 }
 
@@ -205,14 +250,47 @@ const capturedRoutes = new Set();
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
 try {
+  /*
+   * The admin document index lives in OBJECT STORAGE, not Postgres, so it cannot be bound by the
+   * SQL block above. Read through the product's own helper — the same one the route uses — so the
+   * id is real or the route is honestly reported unbound.
+   */
+  let adminDocId;
+  try {
+    const { getObjectBuffer } = await import('../lib/storage/s3-client.ts');
+    const buf = await getObjectBuffer('reference/documents/_index.json');
+    const idx = buf ? JSON.parse(buf.toString('utf8')) : [];
+    adminDocId = Array.isArray(idx) && idx.length > 0 ? idx[idx.length - 1].id : undefined;
+  } catch (e) {
+    console.log(`  · admin document index unreadable (${String(e.message).slice(0, 50)}) — that route will report as unbound`);
+  }
+
   for (const [laneId, lane] of Object.entries(LANES)) {
     if (onlyLane && onlyLane !== laneId) continue;
     const mine = ROUTES.filter((r) => lanesFor(r.route).includes(laneId));
     if (!mine.length) continue;
     // Bindings are per LANE, from the tenant that lane signs in as — see the note on bindings().
     const B = await bindings(lane.slug ?? 'foundation');
-    const bind = (r) => r.replace(/\[(\.\.\.)?(\w+)\]/g, (_, __, k) => B[k] ?? `[${k}]`);
-    const addressable = (r) => (r.match(/\[(\w+)\]/g) ?? []).every((s) => !!B[s.slice(1, -1)]);
+    /*
+     * ⚠️ ONE PARAM NAME, TWO STORES.
+     *
+     * `[documentId]` means a `tenant_documents` ROW under /portal, and an OBJECT-STORAGE index
+     * entry (reference/documents/_index.json) under /admin. They are different stores with
+     * different ids, and this file bound one value for both — so /admin/documents/[documentId] was
+     * driven with a tenant document's id, got the page's perfectly correct "Failed to load
+     * document", and was filed as BROKEN on every run.
+     *
+     * The sibling lens already knew: verify-surfaces declines that route with "addressed by the
+     * object-storage document index, not a table row". The knowledge never reached here, and the
+     * atlas has been reporting a false failure ever since.
+     *
+     * Resolved per ROUTE, not per param, because the collision is real and no single value is
+     * right for both.
+     */
+    const PER_ROUTE = { '/admin/documents/[documentId]': { documentId: adminDocId } };
+    const bindFor = (r, k) => PER_ROUTE[r]?.[k] ?? B[k];
+    const bind = (r) => r.replace(/\[(\.\.\.)?(\w+)\]/g, (_, __, k) => bindFor(r, k) ?? `[${k}]`);
+    const addressable = (r) => (r.match(/\[(\w+)\]/g) ?? []).every((s) => !!bindFor(r, s.slice(1, -1)));
 
     console.log(`\n── ${laneId} · ${lane.label} · ${mine.length} route(s) ──`);
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
@@ -265,8 +343,45 @@ if (redirects.length) {
 }
 if (broken.length) { console.log('\n✗ broken:'); for (const s of broken) console.log(`  · ${s.route} — ${s.errors?.join(' | ') || 'boundary'}`); }
 
-fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify({ base: BASE, considered, reached: capturedRoutes.size, shots, unbound: Object.fromEntries(unbound), noLane }, null, 1));
-console.log(`\nwrote ${shots.length} screenshot(s) + index.json to docs/ui-atlas/`);
+/**
+ * ── A `--lane` CAPTURE MERGES INTO THE INDEX; IT DOES NOT REPLACE IT ─────────────────────────
+ * `index.json` is not just this run's report — `drive-ui-states.mjs` reads it to decide what to
+ * drive. A lane-scoped capture that overwrote it silently narrowed that drive's scope to one lane,
+ * and the drive then reported a clean run over 29 routes while five lanes went unvisited. Nothing
+ * failed; the coverage simply shrank, which is the shape of every defect this repo's guards exist
+ * to stop.
+ *
+ * So a lane run replaces ONLY its own lane's shots and keeps the rest. The index always describes
+ * every lane, and `partialLanes` records which ones this run actually refreshed.
+ */
+const indexPath = path.join(OUT, 'index.json');
+let merged = shots;
+let carried = 0;
+// `considered`/`reached` describe the WHOLE catalog. A lane run considers only its own lane's
+// routes, so writing its numbers into the merged index would say "1 route considered" next to 153
+// shots — a coverage claim three orders of magnitude wrong, in the file every consumer reads.
+// Carry the full-run scalars and record the lane run's own under `laneRun`.
+let scalars = { considered, reached: capturedRoutes.size };
+let laneRun;
+if (onlyLane) {
+  try {
+    const prev = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+    const others = (prev.shots ?? []).filter((s) => s.lane !== onlyLane);
+    carried = others.length;
+    merged = [...others, ...shots];
+    if (carried) {
+      laneRun = { lane: onlyLane, considered, reached: capturedRoutes.size };
+      scalars = { considered: prev.considered ?? considered, reached: prev.reached ?? capturedRoutes.size };
+    }
+  } catch { /* no prior index — this run is all there is */ }
+}
+fs.writeFileSync(indexPath, JSON.stringify({
+  base: BASE, ...scalars, shots: merged,
+  unbound: Object.fromEntries(unbound), noLane,
+  ...(onlyLane ? { partialLanes: [onlyLane], ...(laneRun ? { laneRun } : {}) } : {}),
+}, null, 1));
+console.log(`\nwrote ${shots.length} screenshot(s) + index.json to docs/ui-atlas/`
+  + (onlyLane ? ` (lane '${onlyLane}' refreshed; ${carried} shot(s) from other lanes carried forward)` : ''));
 
 if (accounted !== considered) {
   console.log(`\n✗ HARNESS DEFECT — ${considered - accounted} route(s) neither captured nor reported.`);

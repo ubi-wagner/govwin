@@ -26,10 +26,10 @@ durable row (plane 04), then the write loops sideways-and-up through planes 05�
 | 01 | **UI** | Next.js App Router | `app/**/page.tsx` (server components read the DB directly) · `components/**` client components (`fetch()` the API) · `lib/rbac.ts` gates every surface before render · `toast()` for transient feedback |
 | 02 | **API** | The route contract | `app/api/**/route.ts` — a fixed order: `auth()` → validate (`isValidUUID`) → verify tenant access (`verifyProposalAccess` / `getTenantBySlug`) → business logic → return `{ data }` \| `{ error, code }`. Never query by id alone. |
 | 03 | **Domain** | Business logic (`lib/**`) | `lib/provision-proposal.ts` · `lib/proposal-advance.ts` · `lib/opportunity-bridge.ts` · `lib/events.ts` · `lib/amendments.ts` · `lib/tools/*`. Routes stay thin; the domain carries the invariants. |
-| 04 | **Data** | Postgres `govtech_intel` (shared) | postgres.js tagged templates, parameterized. Frontend + pipeline share the main DB (`govtech_intel`); the `rfp-crm` CRM service keeps its own (`cms-postgres`), bridged via `system_events`. Front-facing content lives in `govtech_intel` (frontend-owned). RLS is force-enabled and **live** app-side — the app connects as `NOBYPASSRLS govtech_app` and scopes every request with `SET app.tenant_id`. Core tables: `proposals`, `proposal_sections`, `canvas_versions`, `tenant_opportunity_cards`, `opportunity_bridge`, `proposal_compliance_matrix`, `process_instances`, `system_events`. |
-| 05 | **Events** | The bus (`system_events`) | Every significant action posts here — the seam between frontend, pipeline, and CMS. Seven namespaces (`finder · capture · identity · proposal · library · system · tool`), each event a start/end pair, admin actions carry `tenantId = null`. Emit via `lib/events.ts`. |
+| 04 | **Data** | Postgres `govtech_intel` (shared) | postgres.js tagged templates, parameterized. Frontend + pipeline share the main DB (`govtech_intel`); the `rfp-crm` CRM service keeps its own (`cms-postgres`), bridged via `system_events`. Front-facing content lives in `govtech_intel` (frontend-owned). RLS is force-enabled and **live** app-side — the app connects as `NOBYPASSRLS govtech_app` and scopes every request with `SET app.tenant_id`. Core tables: `proposals`, `proposal_sections`, `canvas_versions`, `tenant_opportunity_cards`, `opportunity_bridge`, `proposal_compliance_matrix`, `process_instances`, `system_events` — and, post-award, `projects`, `project_milestones`, `project_milestone_tasks`, `project_deliverables`, `project_clins`, `project_modifications`, `project_invoices`. |
+| 05 | **Events** | The bus (`system_events`) | Every significant action posts here — the seam between frontend, pipeline, and CMS. Eight namespaces (`finder · capture · identity · proposal · library · system · tool · project`), each event a start/end pair, admin actions carry `tenantId = null`. The registry lives in THREE runtimes — `lib/event-namespaces.ts`, `pipeline/src/events.py`, and a CHECK constraint in Postgres, which is the only one that fails rather than warns. Emit via `lib/events.ts`. |
 | 06 | **Engine** | Python workflow engine (pipeline) | An `EventTrigger` matches a bus event and spawns a `process_instances` row — a step DAG (`step_status` / `step_results`). Hard steps call `module.function`; AI steps map through `TOOL_ACTION_TO_ARCHETYPE`. Two invariants make it impossible for a pipeline step to consume an agent's output (see below). |
-| 07 | **Agents** | Agent fabric (36 archetypes) | `AgentFabric` — tenant-bound, injection-fenced, runaway-bounded. Output is **advisory** → guardrail → land-or-review; it never auto-writes a business table. The loop returns to the surface as *proposed* revisions a builder restores. |
+| 07 | **Agents** | Agent fabric (38 archetypes) | `AgentFabric` — tenant-bound, injection-fenced, runaway-bounded. Output is **advisory** → guardrail → land-or-review; it never auto-writes a business table. The loop returns to the surface as *proposed* revisions a builder restores. |
 
 ---
 
@@ -114,6 +114,38 @@ admin detects an amendment (UI)
 
 Fan-out targets are guaranteed to exist: `proposal_id` / `tenant_id` come from `proposals` itself, the
 `amendment_id` from the just-confirmed row (FK-safe ordering). Migration 146.
+
+### Trace F — an award becomes a delivered milestone  *(post-award · the second half of the customer's life)*
+
+```
+proposal outcome = awarded (UI)
+  → contracts row + emit contract.started                        [Data · Event]  (lib/proposal-advance.ts)
+  → engine raises a `project_setup` ToDo                          [Engine]  (deliberately does NOT create the project)
+  ↩ a person opens the project, uploading TWO files              [UI → API]  (.../projects, executed contract + proposal as submitted)
+  → CLINs, milestones, deliverables                               [Domain · Data]  (lib/projects/*)
+  → setBaseline freezes date AND cost, once                       [Data]  (trigger 23001 — a convention would not have held)
+  → assigned checklist work PROJECTS onto `tasks`                 [Domain]  (lib/projects/todos.ts → the same /todos queue, bell, sweeper)
+  → emit system:notification.requested                            [Event]  (the CRM renders it; same ledger, same suppressions)
+  ↩ the assignee ticks a task; a tenant_admin accepts a deliverable [UI → API]
+  → markMilestoneMet — TASKS_OUTSTANDING, then DELIVERABLES_OUTSTANDING [Domain]
+  ↩ project:milestone.met carries the variance, computed once      [Event]
+```
+
+**What this trace exercises that A–E do not.** Access is TWO layers here, not one: RLS scopes by
+tenant, and **assignment is app-enforced** in a single predicate (`lib/projects/access.ts`), because
+the request context carries a tenant and not a user — `partner_user` is refused the capability
+outright, which is what removes cross-tenant from it entirely. The ToDo projection is
+one-directional by design: the checklist is the source of truth and the ToDo follows it, because a
+mirror that can move what it mirrors is a second writer.
+
+**The baseline is the one number that cannot be recomputed**, so it is frozen by a TRIGGER rather
+than by a convention, and `rebaseline` moves the current plan and never the baseline — variance is
+the distance between the two. Progress is three measures side by side and never blended, and a
+measure with no denominator is `null` → "not measured", never a confident `0%`.
+
+Migrations 216–236. Full design: **docs/PROJECT_MANAGEMENT_DESIGN.md**; as-built:
+**docs/PROJECT_BUILD_LOG.md**; the whole arc driven by one script:
+`frontend/scripts/drive-project-lifecycle.mts`.
 
 ---
 

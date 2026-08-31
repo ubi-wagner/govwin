@@ -34,7 +34,10 @@ import { chromium } from 'playwright';
 import postgres from 'postgres';
 import { randomUUID } from 'node:crypto';
 
-const BASE = process.env.GUIDE_BASE || 'http://localhost:3001';
+// One base URL, two historic names: the lenses read GUIDE_BASE, the drives read BASE_URL, and
+// a harness that silently ignores the one you passed fails with a connection error that reads
+// like the app is down. Accept both everywhere; the family's own name still wins.
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3001';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const DB = process.env.GUIDE_DB || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 const sql = postgres(DB, { max: 2, transform: { column: { from: (c) => c } } });
@@ -106,7 +109,10 @@ try {
   // ── What the library actually holds — reported, not asserted ────────────────────────────────
   const [lib] = await sql`
     SELECT count(*)::int AS total,
-           count(*) FILTER (WHERE canvas_nodes IS NOT NULL)::int AS structured
+           -- "structured" means it HAS nodes. An empty '[]' is non-null, so IS NOT NULL counted
+          -- unstructured atoms as structured — a metric overstating the thing it measures.
+          count(*) FILTER (WHERE jsonb_typeof(canvas_nodes) = 'array'
+                             AND jsonb_array_length(canvas_nodes) > 0)::int AS structured
     FROM library_atoms WHERE tenant_id = ${foundation.id}::uuid AND archived_at IS NULL`;
   console.log(`· Foundation library: ${lib.total} atom(s), ${lib.structured} carrying canvas nodes`);
   if (lib.total === 0) {

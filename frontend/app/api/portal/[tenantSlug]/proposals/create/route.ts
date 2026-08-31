@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
+import { resolveSourceBucket } from '@/lib/bucket-ranking';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
 import { resolveTemplateKey, getTemplate, interpolateTemplate } from '@/lib/templates';
@@ -298,26 +299,12 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     // ── R0.3: resolve the source spotlight bucket for the IMMUTABLE origin card ─
-    // Best-effort — an admin-granted opportunity that was never spotlighted simply
-    // has no bucket (source_bucket stays null). Read before the txn so the freeze
-    // is atomic in the INSERT (no post-insert UPDATE window).
-    let topBucket: { bucket: string; score: number } | null = null;
-    try {
-      // Greenfield spine: read the card's best bucket score from tenant_bucket_scores
-      // (auto-populated on fan-out), joined to the bucket for its name — not the
-      // legacy spotlight_bucket_scores, which the new spine never writes.
-      const [b] = await sql<{ bucket: string; score: number }[]>`
-        SELECT tsb.name AS bucket, s.score
-        FROM tenant_bucket_scores s
-        JOIN tenant_spotlight_buckets tsb ON tsb.id = s.bucket_id
-        WHERE s.tenant_id = ${tenantId}::uuid AND s.opportunity_id = ${topicId}::uuid
-        ORDER BY s.score DESC NULLS LAST
-        LIMIT 1
-      `;
-      topBucket = b ?? null;
-    } catch (bucketErr) {
-      console.error('[api/portal/proposals/create] source bucket lookup failed (non-fatal):', bucketErr);
-    }
+    // ONE helper, shared with lib/provision-proposal.ts — which is the path the product
+    // actually runs (this route is the future billing hook, per the comment above). The
+    // lookup used to live only HERE, so `source_bucket` read as "nothing writes it" while
+    // the code to write it sat in a file that never executes. Read before the txn so the
+    // freeze is atomic in the INSERT (no post-insert UPDATE window).
+    const topBucket = await resolveSourceBucket(tenantId, topicId);
 
     // The IMMUTABLE origin layer of the card: the L0 opportunity summary + the L1
     // source bucket, frozen at purchase so a later master edit / close / amendment
@@ -333,7 +320,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         topicNumber: topic.topicNumber,
         solicitationNumber: topic.solicitationNumber,
       },
-      bucket: topBucket ? { key: topBucket.bucket, score: topBucket.score } : null,
+      bucket: topBucket,
       frozenAt: new Date().toISOString(),
     };
 
@@ -349,7 +336,7 @@ export async function POST(request: Request, ctx: RouteContext) {
           ${sql.json(gateConfig)},
           true,
           ${sql.json(originCard)},
-          ${topBucket?.bucket ?? null}
+          ${topBucket?.key ?? null}
         )
         RETURNING id
       `;
@@ -694,14 +681,23 @@ export async function POST(request: Request, ctx: RouteContext) {
       `;
 
       if (admins.length > 0) {
-        const { sendEmail } = await import('@/lib/email');
+        const { send } = await import('@/lib/email');
         const tenantRow = await sql<{ name: string }[]>`SELECT name FROM tenants WHERE id = ${tenantId}::uuid`;
         const tenantName = tenantRow[0]?.name || tenantSlug;
 
         for (const admin of admins) {
           try {
-            await sendEmail({
+            await send({
               to: admin.email,
+              kind: 'transactional',
+              // PLATFORM scope. This alert goes to rfp_admins about a tenant, not to the tenant;
+              // filing it under the tenant would put platform staffing traffic in that customer's
+              // own send history.
+              tenantId: null,
+              template: 'admin_proposal_locked',
+              idempotencyKey: `admin_proposal_locked:${proposal.id}:${admin.email.toLowerCase()}`,
+              tags: ['admin-alert'],
+              metadata: { proposal_id: proposal.id, tenant_id: tenantId },
               subject: `ACTION REQUIRED — New Proposal Locked for Admin Review — ${tenantName}`,
               html: `
                 <p>Hi ${admin.name || 'Admin'},</p>

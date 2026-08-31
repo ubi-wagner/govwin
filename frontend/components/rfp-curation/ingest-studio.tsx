@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/toast';
+import { fmtNum } from '@/lib/fmt';
 
 type Phase = 'not_started' | 'extract' | 'matrix' | 'review' | 'landed' | 'molds' | 'complete';
 
@@ -317,7 +318,7 @@ export function IngestStudio({ solId }: { solId: string }) {
                               • {sec.section}
                               {sec.pageBudget != null && <span className="text-gray-500"> — {sec.pageBudget}pp</span>}
                               {sec.characterBudget != null && (
-                                <span className="text-gray-500"> — {sec.characterBudget.toLocaleString()} characters</span>
+                                <span className="text-gray-500"> — {fmtNum(sec.characterBudget)} characters</span>
                               )}
                             </li>
                           ))}

@@ -259,7 +259,7 @@ export function AtomLibrary({ tenantSlug, canArchive = false }: { tenantSlug: st
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${grainColor[a.grain] ?? 'bg-gray-100'}`}>{a.grain === 'reference' ? 'foundational' : a.grain}</span>
-                  <button onClick={() => openDetail(a.id)} className="text-sm font-medium text-gray-800 truncate hover:text-blue-600 hover:underline text-left">{a.title || 'Untitled atom'}</button>
+                  <button onClick={() => openDetail(a.id)} title={a.title || 'Untitled atom'} className="text-sm font-medium text-gray-800 truncate hover:text-blue-600 hover:underline text-left">{a.title || 'Untitled atom'}</button>
                   <span className="text-[11px] text-gray-400">{a.wordCount} words</span>
                   {a.usageCount > 0 && <span className="text-[11px] text-amber-600" title="reused in this many drafts (non-destructive)">↺ used {a.usageCount}×</span>}
                   {a.memberCount > 0 && <span className="text-[11px] text-purple-500">{a.memberCount} members</span>}
@@ -271,7 +271,7 @@ export function AtomLibrary({ tenantSlug, canArchive = false }: { tenantSlug: st
                     <span className="text-[10px] text-gray-400" title={a.ownerEmail ?? undefined}>{a.ownerName || a.creatorKind}</span>
                   </span>
                 </div>
-                {a.summary && <p className="text-xs text-gray-500 truncate mt-0.5">{a.summary}</p>}
+                {a.summary && <p className="text-xs text-gray-500 truncate mt-0.5" title={a.summary}>{a.summary}</p>}
                 {a.tags?.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-1">
                     {a.tags.slice(0, 10).map((t) => (

@@ -100,8 +100,12 @@ def test_timeline_decay_bands():
 
 def test_custom_weights():
     # keyword v=1 weight 3, naics v=0 weight 1 → 100*3/4 = 75.
+    # The card carries a NAICS that does not MATCH — a real zero, which stays in the denominator.
+    # It used to carry `[]`, giving the same 75 for the wrong reason: absent data scoring 0. Since
+    # mig 238 an absent field ABSTAINS, so an empty list here would take naics out of the
+    # denominator and this weights test would silently stop testing weights.
     r = score_card(
-        {"title": "quantum", "naicsCodes": []},
+        {"title": "quantum", "naicsCodes": ["999999"]},
         {"keywords": ["quantum"], "naics": ["541715"], "weights": {"keyword": 3, "naics": 1}},
         NOW_MS,
     )

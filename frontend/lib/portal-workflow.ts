@@ -600,7 +600,11 @@ export async function sweepAutoAdvanceGates(): Promise<{
     rows = await sqlBypass<typeof rows>`
       SELECT id, tenant_id AS "tenantId", current_stage_index AS "currentStageIndex", guardrail_config AS "guardrailConfig"
       FROM proposal_portals
-      WHERE guardrail_config IS NOT NULL AND status NOT IN ('closeout', 'curation_pending')`;
+      -- A portal with an EMPTY guardrail_config has no stages, so the loop below can never advance
+      -- it: stages[currentStageIndex] is undefined and it is skipped. IS NOT NULL admitted those
+      -- rows anyway, because an empty jsonb object is not null — the predicate stated an intent it
+      -- did not enforce. Harmless today (0 such rows) and free to make honest.
+      WHERE guardrail_config <> '{}'::jsonb AND status NOT IN ('closeout', 'curation_pending')`;
   } catch (e) {
     console.error('[sweepAutoAdvanceGates] scan failed', e);
     return { scanned: 0, eligible: 0, advanced: 0, results: [] };

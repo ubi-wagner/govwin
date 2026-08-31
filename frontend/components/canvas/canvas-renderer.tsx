@@ -44,6 +44,7 @@ import { WatermarkOverlay, statusToWatermark, ChangeIndicator } from './collabor
 import { MeasureGridOverlay, MeasureRulers } from './measure-grid-overlay';
 import { BoundingBox, measureBox, runsFromGroupMap } from './bounding-box-overlay';
 import { defaultGridStep, isGridStep, type GridStepPt } from '@/lib/canvas/measure-grid';
+import { fmtNum } from '@/lib/fmt';
 
 interface Props {
   document: CanvasDocument;
@@ -577,7 +578,7 @@ export function CanvasRenderer({
               <>
                 <span>&middot;</span>
                 <span className={over ? 'text-rose-600 font-semibold' : undefined}>
-                  {chars.toLocaleString()} of {canvas.max_characters.toLocaleString()} characters{over ? ' — over' : ''}
+                  {fmtNum(chars)} of {fmtNum(canvas.max_characters)} characters{over ? ' — over' : ''}
                 </span>
               </>
             );

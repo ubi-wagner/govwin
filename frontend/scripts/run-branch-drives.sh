@@ -178,6 +178,42 @@ else
 fi
 echo
 
+# The two scorers are a deliberate mirror pair — frontend/lib/bucket-scoring.ts::scoreCard and
+# pipeline/.../rescore.py::score_card — and until this check the only thing asserting it was each
+# file's comment about the other. They have already been observed mirroring each other INCLUDING a
+# bug, which is precisely the failure a comment cannot catch. A DIVERGENCE FAILS THE RUN: a
+# preflight that finds a violation and lets the suite report green is worse than no preflight
+# (B145), and here a divergence means every ranking number below was produced by whichever runtime
+# happened to touch the card last.
+if node scripts/verify-scorer-parity.mjs > "$OUT/scorer-parity.log" 2>&1; then
+  echo "Scorer parity: TS and Python agree on every fixture (rankings mean the same thing either side)"
+else
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ SCORER PARITY BROKEN — the TS and Python scorers disagree.                            ║"
+  echo "║ A card's score now depends on WHICH RUNTIME scored it last. Every ranking result      ║"
+  echo "║ below is unreliable. Fix before reading anything else.                                ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/scorer-parity.log" | head -20
+  # A COUNTER, not the FAILED array — that is declared 180 lines below this point, so an append
+  # here would be wiped by its `declare -a FAILED=()` and the run would exit 0 with the banner
+  # printed. Exactly the shape of B145.
+  PARITY_VIOLATION=1
+fi
+echo
+
+# Every OPP card field and mirror column: written? read? A field declared and written by nothing
+# has shipped three times in this tree, each found by hand. A divergence FAILS the run.
+if node scripts/audit-card-fields.mjs > "$OUT/card-fields.log" 2>&1; then
+  echo "Card fields: nothing declared-and-unwritten"
+else
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ A CARD FIELD IS DECLARED AND WRITTEN BY NOTHING — see $OUT/card-fields.log            ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/card-fields.log" | tail -12
+  PARITY_VIOLATION=1
+fi
+echo
+
 RLS_OK=1
 if node scripts/check-rls-posture.mjs > "$OUT/rls-posture.log" 2>&1; then
   echo "RLS posture: correct (isolation results from this box mean what they say)"
@@ -233,7 +269,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo"
+SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -243,12 +279,24 @@ DRIVES=(
   # under every future run. Its self-test counts the world, builds, asserts each piece is real and
   # usable, disposes, and asserts the world is identical again. Validate the instrument, then use it.
   "scenario-factory|scripts/drive-scenario-factory.mts"
+  # The PRE-AWARD arc — a government PDF nobody wrote for us through ingest · curate · push ·
+  # discover · buy · provision · author · lock · package · download. The header at the top of
+  # this file has always named it as the thing these branch drives complement, and it was
+  # never actually in the list: run by hand or not at all, which is how a drive quietly stops
+  # being run. Paired with `project-lifecycle` below it is one continuous artifact, because
+  # that drive reads this one's journal and continues from the build it authored.
+  "end-to-end|scripts/drive-end-to-end.mjs"
   # Needs a real Office engine (see OFFICE_DRIVES). Measures the deck writer's declared node
   # heights against what LibreOffice actually renders — the gap that hid B121, where delivered
   # decks were missing table rows and bullets because the bytes were complete and only the
   # rendered page was not.
   "deck-overlap|scripts/probe-deck-overlap.mts"
   "award-to-contract|scripts/drive-award-to-contract.mts"
+  # The post-award branch, all the way through: award → the engine raises a ToDo → a human
+  # opens the project → CLINs/WBS/milestones → the baseline freezes ONCE → upload is not
+  # acceptance → the milestone closes and its variance survives into the event record. It is
+  # the drive that caught a baseline nobody could set, behind five green lenses.
+  "project-lifecycle|scripts/drive-project-lifecycle.mts"
   # `amendment` takes a <solicitationId>. Passing none made it print usage and exit 1, which the
   # table reported as a failing amendment flow rather than a missing argument. Resolved below.
   "amendment|scripts/drive-amendment.mjs|SOLICITATION"
@@ -256,6 +304,62 @@ DRIVES=(
   "tenant-workflow-setup|scripts/drive-tenant-workflow-setup.mts"
   "scout-intake|scripts/drive-scout-intake.mts"
   "opp-scout|scripts/drive-opp-scout.mts"
+  # mig 238 — the solicitation copied inward, on the REAL DoW 2026 SBIR set (433 pages, 1.32M
+  # chars). Red first: it refuses a verdict (exit 2) if the corpus already exists, because a green
+  # that was already green measures nothing. It stages documents and republishes, so it prints its
+  # mutation footprint and restores what it staged.
+  "corpus-copy-inward|scripts/drive-corpus-copy-inward.mts"
+  # The tenant side of the ranking spine as the THREE actors canManageBuckets admits: tenant_admin,
+  # a delegated member, and an rfp_admin (or above) descending. It GRANTS can_manage_buckets to a
+  # candidate for the run and reverts it, because no seeded account carries the column and the path
+  # would otherwise report uncovered forever — and it checks the refusal as well as the grant.
+  "bucket-authoring|scripts/drive-bucket-authoring.mts"
+  # The invariant binding the two halves of the mirrorable row: a pointer to a local copy exists
+  # only when that copy does. It exists because the opposite shipped — a pin whose objects were
+  # missing returned {pinned:true, docs:[]} and stamped pinned_at. Also asserts the pair a
+  # withdrawal and a failed copy make: identical from outside, opposite handling.
+  "pin-honesty|scripts/drive-pin-honesty.mts"
+  # The whole curated-ranking claim in one pass, red first: a lens scores an opportunity ZERO, an
+  # admin highlights one sentence containing the lens's keyword, and the same lens then scores it
+  # 100 — through the real tool, the real bridge and the real scorer. It is the claim that replaced
+  # "rank the whole solicitation", and none of it had ever carried a real highlight.
+  "curated-ranking|scripts/drive-curated-ranking.mts"
+  # A REAL government solicitation through the REAL product: 3 MB PDF uploaded via the multipart
+  # route as a signed-in rfp_admin, shredded by the workflow processor, curated, highlighted from
+  # the extracted text, released. Needs the worker and the Claude emulator up (scripts/sandbox-up.sh)
+  # and leaves the solicitation on the box; --cleanup removes it.
+  "real-solicitation|scripts/drive-real-solicitation.mts"
+  # The curator's pass on that solicitation: count the boilerplate, mark the passages that govern
+  # every bid, segment the 66 topics into their own opportunities, release all 67. Requires
+  # real-solicitation to have run first; --cleanup removes the topics and annotations.
+  "curate-baa|scripts/drive-curate-baa.mts"
+  # The two questions the expanded card did NOT answer, driven with both halves: does the card say
+  # how much work the solicitation is (complianceSummary + provisionReady — both carried by the
+  # bridge and read by no code until now), and does a bucket criterion reach any opportunity at all
+  # (naics_codes is an empty array on every master row, so a lens naming it scored on nothing while
+  # the page reported it at 29%). Pins and unpins one card; sandbox only.
+  "card-decision|scripts/drive-card-decision.mts"
+  # The verdict/transfer split (mig 240) end to end: the thumb writes an opinion and copies nothing,
+  # the up-vote REVEALS "View Solicitation", the transfer lands in a reading view that leads with the
+  # analyst's note and marked passages, and a thumbs-down sorts and filters while removing nothing —
+  # the mirror invariant checked as row counts and document counts before and after. Seeds a note and
+  # one annotation through the real bridge when the box has none, and removes them after.
+  "verdict-transfer|scripts/drive-verdict-and-transfer.mts"
+  # The UPWARD half of the signal: a customer's thumb reaching the RFP admin who decides what to
+  # build out next. Red half first — the admin row must show NO demand before any vote — then two
+  # tenants vote and the row must state the count, the drop-off between saying yes and opening the
+  # documents, and the narrow "interest · no build-out" case. Votes and restores; sandbox only.
+  "admin-demand|scripts/drive-admin-demand.mts"
+  # Every SQL predicate that mistakes an EMPTY container for a missing one — the class named by
+  # naics_codes being NOT NULL on 22 of 22 opportunities and NON-EMPTY on zero. Reads the live
+  # schema for the 146 array/jsonb columns, self-tests against 7 hand-verified cases before reading
+  # a file, and separates applied migrations from actionable code. Read-only.
+  "empty-not-null|scripts/audit-empty-not-null.mjs"
+  # Two routes verify-surfaces reported UNCOVERED, closed by USING the capabilities behind them
+  # rather than seeding rows: the tenant copies the shared starter set into its own library, and
+  # creates a blank document. Deliberately leaves both behind — a tenant that has done either is a
+  # normal state, and the leftovers are what let the lens bind those routes on the next run.
+  "library-starter-copy|scripts/drive-library-starter-copy.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
   "full-draft|scripts/drive-full-draft.mts"
@@ -309,6 +413,39 @@ DRIVES=(
   # stored-artifact ruler had never measured a deck out of the database. Carries a deliberate
   # over-stuffed deck so the overflow check has a case that fails when the product is wrong.
   "deck-ruler|scripts/verify-deck-ruler-live.mts"
+
+  # ── THE STATIC AUDITS ───────────────────────────────────────────────────────────────────────
+  #
+  # Not drives — they open no browser and mutate nothing — but registered here for the reason this
+  # file exists at all, stated in its own header: an instrument run by hand is one that quietly
+  # stops being run. All four were written in a single session and none of them was wired in, which
+  # would have made them exactly the "documented but never executed" scripts the inventory keeps
+  # counting. They are cheap (seconds, no browser) and each answers a question no drive above does.
+  #
+  # `audit-env-inventory` also needs no database, so it is the one check here that still means
+  # something on a box with nothing running.
+  "coherence|scripts/audit-pipeline-coherence.mjs"
+  "row-types|scripts/audit-row-type-truth.mjs"
+  "env-inventory|scripts/audit-env-inventory.mjs"
+
+  # The phone probe belongs with the drives rather than the audits: it opens a browser, signs in as
+  # two actors and needs the app serving. It refuses a verdict when the app is serving no CSS,
+  # which is the failure that once made it report 75 phantom findings across the whole tree.
+  "mobile-interaction|scripts/probe-interaction-mobile.mts"
+  # THE SPEND GUARDRAILS, both directions. Eleven cases: the tenant budget refuses and allows, a
+  # monthly_budget of 0 disables, the platform cap refuses even when the tenant has headroom, the
+  # kill switch stops everything, the hourly rate limit refuses and allows, and the framework
+  # ceiling beats a tenant's own inflated figure. Every case asserts the ALLOW as well as the
+  # REFUSE, because a guard that refuses everything passes a refusal-only test. It snapshots every
+  # value it touches FIRST and restores in a `finally`, and asserts the restore — written that way
+  # after an earlier hand-run left a tenant on a $9999 budget and a $0.39 ceiling.
+  "spend-guardrails|../pipeline/tests/verify_spend_guardrails.py"
+  # WHAT A FULL BUILD COSTS, and whether the caps see it. Clones a real proposal's structure into a
+  # throwaway with authorable sections — because every proposal on this box is `approved`, so a
+  # full-draft fired at any of them drafts NOTHING and reports the review cohort's cost under the
+  # heading "full build". It refuses a verdict (exit 2) if the run drafts zero sections, prints its
+  # mutation footprint, and re-counts the tables afterwards. Needs the emulator on :8787.
+  "full-build-cost|scripts/estimate-full-build-cost.mts"
 )
 
 pass=0; fail=0; missing=0; cantrun=0
@@ -372,6 +509,14 @@ for entry in "${DRIVES[@]}"; do
   if [[ " $SCENARIO_DRIVES " == *" $label "* ]]; then drive_db="$DATABASE_URL_OWNER"; fi
   if [[ "$script" == *.mts ]]; then
     DATABASE_URL="$drive_db" timeout 900 node --import tsx "$script" $drive_args > "$log" 2>&1
+  elif [[ "$script" == *.py ]]; then
+    # The pipeline's own guards live in Python and were therefore run by hand — the exact failure
+    # mode this file's header names. `python3` directly, never the `pytest` on PATH: that is a uv
+    # tool that cannot see asyncpg and collapses into 66 collection errors that read as a broken
+    # suite (CLAUDE.md, the pipeline-test note). The DRIVES entry carries the `../` itself so the
+    # existence check above sees the same path this line runs.
+    DATABASE_URL="$drive_db" PYTHONPATH="$(pwd)/../pipeline/src" \
+      timeout 900 python3 "$script" $drive_args > "$log" 2>&1
   else
     DATABASE_URL="$drive_db" timeout 900 node "$script" $drive_args > "$log" 2>&1
   fi
@@ -405,9 +550,13 @@ if [ "${INVARIANT_VIOLATION:-0}" -ne 0 ]; then
   echo "   ✗ CROSS-TENANT REFERENCES were found by the preflight — see $OUT/tenant-invariant.log"
   echo "     Every drive above may be green and the box is still in violation. This fails the run."
 fi
+if [ "${PARITY_VIOLATION:-0}" -ne 0 ]; then
+  echo "   ✗ SCORER PARITY BROKEN — see $OUT/scorer-parity.log"
+  echo "     A card's score depends on which runtime scored it last. This fails the run."
+fi
 # Decide on the COUNTERS, not on the array — an empty array expansion is exactly what tripped
 # `set -u` here and made a fully green run exit with a shell error.
-if [ $((fail + cantrun + missing + ${INVARIANT_VIOLATION:-0})) -gt 0 ]; then
+if [ $((fail + cantrun + missing + ${INVARIANT_VIOLATION:-0} + ${PARITY_VIOLATION:-0})) -gt 0 ]; then
   echo "logs for the failures:"
   for f in ${FAILED[@]+"${FAILED[@]}"}; do echo "  $OUT/${f%% *}.log"; done
   exit 1

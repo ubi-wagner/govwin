@@ -1,0 +1,1078 @@
+{
+  "schemaSource": "live catalog",
+  "tables": [
+    {
+      "table": "_cms_migrations",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 2,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [],
+      "verdict": "ORPHAN — no code reads or writes it"
+    },
+    {
+      "table": "_crm_metadata",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 3,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [],
+      "verdict": "ORPHAN — no code reads or writes it"
+    },
+    {
+      "table": "admin_todos",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 16,
+      "hasTenantId": true,
+      "source": "catalog",
+      "readers": [],
+      "writers": [
+        "services/cms/src/event_listener.py",
+        "services/cms/src/routers/todos.py"
+      ],
+      "verdict": "write-only — nothing reads it"
+    },
+    {
+      "table": "campaign_execution_log",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 10,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [
+        "services/cms/src/workers/campaign_executor.py",
+        "services/cms/src/workers/drip_engine.py"
+      ],
+      "verdict": "write-only — nothing reads it"
+    },
+    {
+      "table": "cms_config",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 4,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [],
+      "verdict": "superseded"
+    },
+    {
+      "table": "cms_events",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 11,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [
+        "services/cms/src/models/events.py"
+      ],
+      "verdict": "superseded"
+    },
+    {
+      "table": "cms_generations",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 27,
+      "hasTenantId": true,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/routers/health.py"
+      ],
+      "writers": [
+        "services/cms/src/routers/content.py",
+        "services/cms/src/workers/content_generator.py",
+        "services/cms/src/workers/email_sweep.py"
+      ],
+      "verdict": "superseded"
+    },
+    {
+      "table": "cms_media",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 14,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/workers/content_generator.py"
+      ],
+      "writers": [
+        "services/cms/src/routers/media.py"
+      ],
+      "verdict": "superseded"
+    },
+    {
+      "table": "cms_posts",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 34,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/event_listener.py"
+      ],
+      "writers": [
+        "services/cms/src/routers/content.py",
+        "services/cms/src/routers/media.py",
+        "services/cms/src/routers/page_blocks.py"
+      ],
+      "verdict": "superseded"
+    },
+    {
+      "table": "cms_reviews",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 10,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [
+        "services/cms/src/routers/content.py"
+      ],
+      "verdict": "superseded"
+    },
+    {
+      "table": "deploy_baseline",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 3,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [],
+      "verdict": "ORPHAN — no code reads or writes it"
+    },
+    {
+      "table": "drip_enrollments",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 13,
+      "hasTenantId": true,
+      "source": "catalog",
+      "readers": [],
+      "writers": [
+        "services/cms/src/event_listener.py",
+        "services/cms/src/routers/drip.py",
+        "services/cms/src/workers/drip_engine.py"
+      ],
+      "verdict": "write-only — nothing reads it"
+    },
+    {
+      "table": "drip_sequences",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 10,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/event_listener.py",
+        "services/cms/src/workers/drip_engine.py"
+      ],
+      "writers": [
+        "services/cms/src/routers/drip.py"
+      ],
+      "verdict": "live"
+    },
+    {
+      "table": "email_accounts",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 18,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/workers/campaign_executor.py",
+        "services/cms/src/workers/drip_engine.py"
+      ],
+      "writers": [
+        "services/cms/src/routers/email.py",
+        "services/cms/src/workers/email_queue.py",
+        "services/cms/src/workers/email_sweep.py"
+      ],
+      "verdict": "live"
+    },
+    {
+      "table": "email_campaigns",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 26,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/event_listener.py",
+        "services/cms/src/routers/drip.py",
+        "services/cms/src/workers/drip_engine.py"
+      ],
+      "writers": [
+        "services/cms/src/routers/email.py",
+        "services/cms/src/workers/campaign_executor.py",
+        "services/cms/src/workers/email_queue.py",
+        "services/cms/src/workers/email_sweep.py"
+      ],
+      "verdict": "live"
+    },
+    {
+      "table": "email_engagement",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 13,
+      "hasTenantId": true,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/routers/email.py"
+      ],
+      "writers": [
+        "services/cms/src/workers/email_sweep.py"
+      ],
+      "verdict": "live"
+    },
+    {
+      "table": "email_outbox",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 17,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [
+        "services/cms/src/routers/email.py",
+        "services/cms/src/workers/campaign_executor.py",
+        "services/cms/src/workers/drip_engine.py",
+        "services/cms/src/workers/email_sweep.py"
+      ],
+      "verdict": "write-only — nothing reads it"
+    },
+    {
+      "table": "email_queue",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 9,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [
+        "services/cms/src/routers/email.py",
+        "services/cms/src/workers/campaign_executor.py",
+        "services/cms/src/workers/drip_engine.py",
+        "services/cms/src/workers/email_queue.py"
+      ],
+      "verdict": "write-only — nothing reads it"
+    },
+    {
+      "table": "email_sends",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 33,
+      "hasTenantId": true,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/routers/content.py",
+        "services/cms/src/workers/content_generator.py"
+      ],
+      "writers": [
+        "services/cms/src/event_listener.py",
+        "services/cms/src/routers/email.py",
+        "services/cms/src/workers/campaign_executor.py",
+        "services/cms/src/workers/drip_engine.py",
+        "services/cms/src/workers/email_queue.py",
+        "services/cms/src/workers/email_sweep.py"
+      ],
+      "verdict": "live"
+    },
+    {
+      "table": "email_templates",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 22,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/event_listener.py",
+        "services/cms/src/templates.py",
+        "services/cms/src/workers/campaign_executor.py",
+        "services/cms/src/workers/drip_engine.py",
+        "services/cms/src/workers/email_sweep.py"
+      ],
+      "writers": [
+        "services/cms/src/routers/email.py"
+      ],
+      "verdict": "live"
+    },
+    {
+      "table": "email_threads",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 15,
+      "hasTenantId": true,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/routers/email.py"
+      ],
+      "writers": [
+        "services/cms/src/workers/email_queue.py",
+        "services/cms/src/workers/email_sweep.py"
+      ],
+      "verdict": "live"
+    },
+    {
+      "table": "sender_identities",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 7,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/sender_identity.py"
+      ],
+      "writers": [],
+      "verdict": "read-only — nothing writes it"
+    },
+    {
+      "table": "social_accounts",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 12,
+      "hasTenantId": true,
+      "source": "catalog",
+      "readers": [
+        "services/cms/src/event_listener.py",
+        "services/cms/src/workers/social_poster.py"
+      ],
+      "writers": [
+        "services/cms/src/routers/social.py"
+      ],
+      "verdict": "live"
+    },
+    {
+      "table": "social_posts",
+      "rlsOn": false,
+      "policies": 0,
+      "columns": 17,
+      "hasTenantId": false,
+      "source": "catalog",
+      "readers": [],
+      "writers": [
+        "services/cms/src/event_listener.py",
+        "services/cms/src/routers/social.py",
+        "services/cms/src/workers/social_poster.py"
+      ],
+      "verdict": "write-only — nothing reads it"
+    }
+  ],
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "router": "auth",
+      "file": "services/cms/src/routers/auth.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "router": "auth",
+      "file": "services/cms/src/routers/auth.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "router": "auth",
+      "file": "services/cms/src/routers/auth.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/generations/{gen_id}/action",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/content/generations/{gen_id}",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/generations/from-email/{send_id}",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/generations/from-url",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/content/generations",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/generations",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/posts/{post_id}/action",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/content/posts/{post_id}/reviews",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/posts/{post_id}/revise",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/content/posts/{post_id}",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/content/posts/{post_id}",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/content/posts",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/content/posts",
+      "router": "content",
+      "file": "services/cms/src/routers/content.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drip/campaigns/{campaign_id}/enrollments",
+      "router": "drip",
+      "file": "services/cms/src/routers/drip.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/drip/campaigns/{campaign_id}/enroll",
+      "router": "drip",
+      "file": "services/cms/src/routers/drip.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/drip/campaigns/{campaign_id}/sequences",
+      "router": "drip",
+      "file": "services/cms/src/routers/drip.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/drip/campaigns/{campaign_id}/sequences",
+      "router": "drip",
+      "file": "services/cms/src/routers/drip.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/drip/enrollments/{enrollment_id}/cancel",
+      "router": "drip",
+      "file": "services/cms/src/routers/drip.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/drip/enrollments/{enrollment_id}/pause",
+      "router": "drip",
+      "file": "services/cms/src/routers/drip.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/drip/enrollments/{enrollment_id}/resume",
+      "router": "drip",
+      "file": "services/cms/src/routers/drip.py",
+      "called": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/drip/sequences/{sequence_id}",
+      "router": "drip",
+      "file": "services/cms/src/routers/drip.py",
+      "called": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/drip/sequences/{sequence_id}",
+      "router": "drip",
+      "file": "services/cms/src/routers/drip.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/accounts/{account_id}",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/email/accounts/{account_id}",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/accounts",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/accounts",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/campaigns/{campaign_id}/action",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/campaigns/{campaign_id}/stats",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/campaigns/{campaign_id}",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/email/campaigns/{campaign_id}",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/campaigns",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/campaigns",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/engagement",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/outbox/{outbox_id}/approve",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/outbox/{outbox_id}/claim",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/email/outbox/{outbox_id}/modify",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/outbox/{outbox_id}/reject",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/outbox/{outbox_id}/unclaim",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/outbox/{outbox_id}",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/outbox/bulk-approve",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/outbox/stats",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/outbox",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/sends/{send_id}",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/sends",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/sends",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/templates/{template_id}/preview",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/templates/{template_id}/test-send",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/templates/{template_id}",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/email/templates/{template_id}",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/templates/categories",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/templates/draft",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/templates",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/email/templates",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/threads/{thread_id}",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/email/threads",
+      "router": "email",
+      "file": "services/cms/src/routers/email.py",
+      "called": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/media/{media_id}",
+      "router": "media",
+      "file": "services/cms/src/routers/media.py",
+      "called": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/media/{media_id}",
+      "router": "media",
+      "file": "services/cms/src/routers/media.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/media/file/{path:path}",
+      "router": "media",
+      "file": "services/cms/src/routers/media.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/media/list",
+      "router": "media",
+      "file": "services/cms/src/routers/media.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/media/stats",
+      "router": "media",
+      "file": "services/cms/src/routers/media.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/media/upload",
+      "router": "media",
+      "file": "services/cms/src/routers/media.py",
+      "called": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/page-blocks/{block_id}",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/add-blank",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/ai/from-url",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/ai/generate",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/ai/revise",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/approve",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/publish",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/reject",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/reorder",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/revalidate",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/page-blocks/submit-review",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/page-blocks",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/page-blocks",
+      "router": "page_blocks",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "called": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/social/accounts/{account_id}",
+      "router": "social",
+      "file": "services/cms/src/routers/social.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/social/accounts",
+      "router": "social",
+      "file": "services/cms/src/routers/social.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/social/accounts",
+      "router": "social",
+      "file": "services/cms/src/routers/social.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/social/posts/{post_id}/publish",
+      "router": "social",
+      "file": "services/cms/src/routers/social.py",
+      "called": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/social/posts/{post_id}",
+      "router": "social",
+      "file": "services/cms/src/routers/social.py",
+      "called": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/social/posts",
+      "router": "social",
+      "file": "services/cms/src/routers/social.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/social/posts",
+      "router": "social",
+      "file": "services/cms/src/routers/social.py",
+      "called": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/todos/{todo_id}",
+      "router": "todos",
+      "file": "services/cms/src/routers/todos.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/todos",
+      "router": "todos",
+      "file": "services/cms/src/routers/todos.py",
+      "called": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/todos",
+      "router": "todos",
+      "file": "services/cms/src/routers/todos.py",
+      "called": true
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "router": "health",
+      "file": "services/cms/src/routers/health.py",
+      "called": false
+    }
+  ],
+  "seams": [
+    {
+      "kind": "shared-database",
+      "file": "services/cms/src/event_listener.py",
+      "tables": [
+        "automation_rules",
+        "system_events",
+        "tenants",
+        "users"
+      ]
+    },
+    {
+      "kind": "event-emit",
+      "file": "services/cms/src/event_listener.py",
+      "detail": "writes system_events on the main DB"
+    },
+    {
+      "kind": "shared-database",
+      "file": "services/cms/src/mailer/ledger.py",
+      "tables": [
+        "email_suppressions",
+        "email_send_ledger"
+      ]
+    },
+    {
+      "kind": "shared-database",
+      "file": "services/cms/src/models/events.py",
+      "tables": [
+        "system_events"
+      ]
+    },
+    {
+      "kind": "event-emit",
+      "file": "services/cms/src/models/events.py",
+      "detail": "writes system_events on the main DB"
+    },
+    {
+      "kind": "shared-database",
+      "file": "services/cms/src/routers/auth.py",
+      "tables": [
+        "users"
+      ]
+    },
+    {
+      "kind": "event-emit",
+      "file": "services/cms/src/routers/auth.py",
+      "detail": "writes system_events on the main DB"
+    },
+    {
+      "kind": "http-callback",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "detail": "frontend /api/cms/revalidate"
+    },
+    {
+      "kind": "event-emit",
+      "file": "services/cms/src/routers/page_blocks.py",
+      "detail": "writes system_events on the main DB"
+    },
+    {
+      "kind": "shared-database",
+      "file": "services/cms/src/workers/campaign_executor.py",
+      "tables": [
+        "tenants",
+        "users"
+      ]
+    },
+    {
+      "kind": "event-emit",
+      "file": "services/cms/src/workers/campaign_executor.py",
+      "detail": "writes system_events on the main DB"
+    },
+    {
+      "kind": "event-emit",
+      "file": "services/cms/src/workers/content_generator.py",
+      "detail": "writes system_events on the main DB"
+    },
+    {
+      "kind": "event-emit",
+      "file": "services/cms/src/workers/drip_engine.py",
+      "detail": "writes system_events on the main DB"
+    },
+    {
+      "kind": "event-emit",
+      "file": "services/cms/src/workers/email_queue.py",
+      "detail": "writes system_events on the main DB"
+    },
+    {
+      "kind": "platform→crm",
+      "file": "frontend/app/admin/crm/page.tsx",
+      "detail": "reads a CRM env var"
+    }
+  ]
+}

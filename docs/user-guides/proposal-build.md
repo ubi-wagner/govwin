@@ -140,3 +140,7 @@ These are real Office files, assembled by the same engines throughout — a loss
   already-drafted ones are left alone so your edits are never overwritten.
 - **PDF export unavailable.** The PDF renderer needs the headless-browser service;
   use **.docx**, or grab the volume PDF once the service is back.
+
+## Related
+
+- [On a phone — web and mobile](./mobile.md) — why authoring is better at a desk

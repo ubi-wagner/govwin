@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { describeEvent as describeEventLabel } from '@/lib/event-labels';
+import { fmtDateTime } from '@/lib/fmt';
 
 export type SerializedActivityEvent = {
   id: string;
@@ -92,7 +93,7 @@ function describeEvent(
 /* ------------------------------------------------------------------ */
 
 function absoluteTime(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return fmtDateTime(iso);
 }
 
 function PhaseBadge({ phase }: { phase: string | null }) {
@@ -388,8 +389,12 @@ export function ActivityStreamClient({
               return (
                 <div key={ev.id} className="relative flex gap-4 py-2 group">
                   {/* Left gutter: timestamp */}
+                  {/* The gutter narrows on a phone. A fixed 120px column plus a 16px gap leaves
+                      254px for the whole event card at 390px, which is what pushed the row past
+                      the viewport — and MAIN clips, so the overflow was unreachable rather than
+                      scrollable. The absolute time stays in the `title` either way. */}
                   <div
-                    className="w-[120px] flex-shrink-0 text-right pr-4 pt-1"
+                    className="w-16 flex-shrink-0 text-right pr-2 pt-1 sm:w-[120px] sm:pr-4"
                     title={absoluteTime(ev.createdAt)}
                   >
                     <span className="text-xs text-gray-400">
@@ -418,9 +423,14 @@ export function ActivityStreamClient({
                       }`}
                     >
                       {/* Header row */}
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-sm text-gray-800">
+                      {/* `min-w-0` on both, and the description allowed to BREAK. `flex-wrap` on
+                          the row was already here and did nothing: a flex item's default
+                          `min-width: auto` refuses to shrink below its content, so a long event
+                          description pushed the row to 430px in a 390px viewport and the overflow
+                          was then clipped — unreachable, on the tenant's own activity feed. */}
+                      <div className="flex items-start justify-between gap-2 min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="min-w-0 break-words font-medium text-sm text-gray-800">
                             {description}
                           </span>
                           <PhaseBadge phase={ev.phase} />

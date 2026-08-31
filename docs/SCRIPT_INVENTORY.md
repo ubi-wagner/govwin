@@ -24,35 +24,47 @@ a stale green nobody re-checks. The live answer is `bash scripts/run-branch-driv
 table is the record. Everything in **SUITE** below ran in that suite; everything else did not.
 
 
-## SUITE — 37
+## SUITE — 52
 
 Runs on every `run-branch-drives.sh`. This is the regression net.
 
 | script | rot | touched |
 |---|---|---|
+| `audit-env-inventory.mjs` | — | 2026-08-28 |
+| `audit-pipeline-coherence.mjs` | — | 2026-08-28 |
+| `audit-row-type-truth.mjs` | — | 2026-08-28 |
 | `close-e2e-cms.mjs` | — | 2026-08-24 |
 | `demo-canvas-capabilities.mts` | — | 2026-08-24 |
 | `drive-atomization.mts` | — | 2026-08-24 |
 | `drive-award-to-contract.mts` | — | 2026-08-24 |
-| `drive-bridge-buckets.mjs` | — | 2026-08-24 |
+| `drive-bridge-buckets.mjs` | — | 2026-08-26 |
+| `drive-bucket-authoring.mts` | — | 2026-08-29 |
 | `drive-canvas-authoring.mts` | — | 2026-08-24 |
+| `drive-card-decision.mts` | — | — |
 | `drive-cms-generate.mts` | — | 2026-08-24 |
 | `drive-collaborator-boundary.mts` | — | 2026-08-24 |
 | `drive-copy-starter.mts` | — | 2026-08-23 |
+| `drive-corpus-copy-inward.mts` | — | 2026-08-30 |
+| `drive-curate-baa.mts` | — | 2026-08-30 |
+| `drive-curated-ranking.mts` | — | 2026-08-30 |
+| `drive-end-to-end.mjs` | — | 2026-08-28 |
 | `drive-full-draft.mts` | — | 2026-08-24 |
 | `drive-identity-deeplink.mts` | — | 2026-08-24 |
 | `drive-opp-scout.mts` | — | 2026-08-24 |
 | `drive-p3-invite.mts` | — | 2026-08-24 |
 | `drive-p3-lifecycle.mts` | — | 2026-08-24 |
+| `drive-pin-honesty.mts` | — | 2026-08-30 |
 | `drive-pin.mts` | — | 2026-08-24 |
+| `drive-project-lifecycle.mts` | 2 | 2026-08-28 |
 | `drive-provisioning-cockpit.mts` | — | 2026-08-24 |
+| `drive-real-solicitation.mts` | — | 2026-08-30 |
 | `drive-review-gate.mts` | — | 2026-08-15 |
 | `drive-rls-admin.mjs` | — | 2026-08-24 |
 | `drive-rls-app.mjs` | — | 2026-08-24 |
 | `drive-rls-pages.mjs` | — | 2026-08-24 |
 | `drive-rls-portal.mjs` | — | 2026-08-24 |
 | `drive-ruler-overlays.mts` | — | 2026-08-24 |
-| `drive-scenario-factory.mts` | — | 2026-08-24 |
+| `drive-scenario-factory.mts` | — | 2026-08-27 |
 | `drive-scout-intake.mts` | — | 2026-08-23 |
 | `drive-shadow-tenant-admin.mts` | — | 2026-08-24 |
 | `drive-spine-t1-section-todo.mts` | — | 2026-08-24 |
@@ -63,9 +75,12 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `drive-tenant-workflow-setup.mts` | — | 2026-08-15 |
 | `drive-uncovered-triggers.mts` | — | 2026-08-24 |
 | `drive-vault-isolation.mts` | — | 2026-08-24 |
+| `estimate-full-build-cost.mts` | — | 2026-08-28 |
+| `probe-deck-overlap.mts` | — | 2026-08-25 |
+| `probe-interaction-mobile.mts` | — | 2026-08-28 |
 | `probe-measure-grid.mts` | — | 2026-08-24 |
-| `probe-page-scale.mts` | — | 2026-08-24 |
-| `probe-structural-nodes.mts` | — | 2026-08-24 |
+| `probe-page-scale.mts` | — | 2026-08-26 |
+| `probe-structural-nodes.mts` | — | 2026-08-25 |
 | `verify-deck-ruler-live.mts` | — | 2026-08-24 |
 
 ## LENS — 4
@@ -74,10 +89,10 @@ One of the four lenses. Run after a UI change or a deploy.
 
 | script | rot | touched |
 |---|---|---|
-| `verify-api-contract.mjs` | — | 2026-08-24 |
+| `verify-api-contract.mjs` | — | 2026-08-28 |
 | `verify-db-crud.mjs` | — | 2026-08-24 |
-| `verify-surfaces.mjs` | — | 2026-08-24 |
-| `verify-ui-vs-db.mjs` | — | 2026-08-24 |
+| `verify-surfaces.mjs` | — | 2026-08-27 |
+| `verify-ui-vs-db.mjs` | — | 2026-08-28 |
 
 ## CROSS-CHECK — 2
 
@@ -102,7 +117,7 @@ Canvas measurement + calibration. Anything touching layout or export runs these.
 | `verify-ruler-on-proposals.mts` | — | 2026-08-23 |
 | `verify-ruler-on-stored-artifacts.mts` | — | 2026-08-23 |
 
-## LIBRARY — 6
+## LIBRARY — 7
 
 Imported by other scripts; never run directly.
 
@@ -111,18 +126,24 @@ Imported by other scripts; never run directly.
 | `lib/client-ip.mjs` | — | 2026-08-24 |
 | `lib/cross-company.mts` | — | 2026-08-24 |
 | `lib/drive-actor.mjs` | — | 2026-08-23 |
-| `lib/error-surface.mjs` | — | 2026-08-23 |
+| `lib/error-surface.mjs` | — | 2026-08-25 |
 | `lib/harness-residue.mts` | — | 2026-08-24 |
+| `lib/mobile-measure.mts` | — | 2026-08-28 |
 | `lib/scenario.mts` | — | 2026-08-24 |
 
-## CALLED-BY-ANOTHER — 17
+## CALLED-BY-ANOTHER — 26
 
 Invoked by another script rather than by a person.
 
 | script | rot | touched | called by |
 |---|---|---|---|
 | `analyze-node-demand.mjs` | — | 2026-08-23 | verify-ruler-composition.mts |
-| `audit-pinned-fixtures.mjs` | — | 2026-08-24 | run-branch-drives.sh |
+| `audit-card-fields.mjs` | — | 2026-08-30 | run-branch-drives.sh |
+| `audit-pinned-fixtures.mjs` | — | 2026-08-28 | run-branch-drives.sh |
+| `build-ui-contact-sheets.mjs` | — | 2026-08-25 | write-ui-docs.mjs |
+| `capture-ui-atlas.mjs` | — | 2026-08-27 | drive-ui-states.mjs, write-ui-docs.mjs |
+| `catalog-ui.mjs` | — | 2026-08-25 | capture-ui-atlas.mjs |
+| `check-office-filters.mjs` | — | 2026-08-25 | run-branch-drives.sh |
 | `check-rig-hydration.mjs` | — | 2026-08-24 | run-branch-drives.sh |
 | `check-rls-posture.mjs` | — | 2026-08-24 | run-branch-drives.sh |
 | `check-tenant-isolation-invariant.mjs` | — | 2026-08-23 | run-branch-drives.sh |
@@ -133,11 +154,15 @@ Invoked by another script rather than by a person.
 | `drive-ingest-scenario.mjs` | — | 2026-08-21 | drive-end-to-end.mjs, drive-full-journey.mts |
 | `health-manager.sh` | — | 2026-08-11 | rehydrate-sandbox.sh |
 | `immo-content.mts` | — | 2026-08-19 | immo-author.mts |
+| `inventory-frontend.mjs` | — | 2026-08-28 | audit-pipeline-coherence.mjs, reconcile-capability.mjs |
 | `measure-char-width.mts` | — | 2026-08-23 | calibrate-page-ruler.mts |
 | `probe-node-vocabulary.mts` | — | 2026-08-23 | drive-canvas-authoring.mts |
 | `probe-temp-password.mjs` | — | 2026-08-20 | j1b-new-customer.mjs |
-| `rehydrate-sandbox.sh` | — | 2026-08-23 | health-manager.sh, sandbox-heartbeat.sh |
-| `run-branch-drives.sh` | — | 2026-08-24 | audit-pinned-fixtures.mjs, inventory-scripts.mjs |
+| `rehydrate-sandbox.sh` | — | 2026-08-25 | health-manager.sh, sandbox-heartbeat.sh |
+| `run-branch-drives.sh` | — | 2026-08-30 | audit-pinned-fixtures.mjs, inventory-scripts.mjs |
+| `seed-isolation-fixture.mts` | 1 | 2026-08-24 | drive-agent-flows.mjs |
+| `seed-project-scenario.mjs` | — | 2026-08-28 | verify-ui-vs-db.mjs |
+| `verify-scorer-parity.mjs` | — | 2026-08-29 | run-branch-drives.sh |
 
 ## NPM-WIRED — 1
 
@@ -147,25 +172,35 @@ Reachable via `npm run` — package.json names it.
 |---|---|---|
 | `sync-pdf-worker.mjs` | — | 2026-08-18 |
 
-## DOCUMENTED — 72
+## DOCUMENTED — 94
 
 No code references it, but a document tells someone to run it.
 
 | script | rot | touched |
 |---|---|---|
+| `audit-automation-spine.mjs` | — | 2026-08-28 |
+| `audit-env-parity.mjs` | — | 2026-08-29 |
 | `backfill-buckets.mts` | — | 2026-08-15 |
 | `bug-log-status.mjs` | — | 2026-08-24 |
-| `capture-guides.mjs` | — | 2026-08-23 |
+| `capture-guides.mjs` | — | 2026-08-28 |
+| `capture-mobile-guide.mts` | — | 2026-08-28 |
+| `capture-projects-guide.mjs` | — | 2026-08-28 |
 | `capture-shots.mts` | 14 | 2026-07-19 |
 | `capture-templates.mts` | — | 2026-08-24 |
 | `capture-vaults.mjs` | 2 | 2026-07-25 |
+| `check-harness-syntax.mjs` | — | 2026-08-27 |
+| `classify-migrations.mjs` | — | 2026-08-29 |
 | `close-e2e-marketing.mjs` | — | 2026-08-13 |
 | `close-e2e-proposal.mjs` | — | 2026-08-13 |
+| `drive-agent-flows.mjs` | — | 2026-08-26 |
+| `drive-canvas-overlays.mjs` | — | 2026-08-25 |
 | `drive-control-reachability.mts` | — | 2026-08-24 |
 | `drive-corpus-verbatim.mts` | — | 2026-08-19 |
-| `drive-end-to-end.mjs` | — | 2026-08-23 |
+| `drive-dormant-surface.mjs` | — | 2026-08-26 |
+| `drive-email-spine.mts` | — | 2026-08-26 |
 | `drive-foundation-tvsf.mts` | — | 2026-08-19 |
 | `drive-item-template-picker.mts` | 1 | 2026-07-19 |
+| `drive-milestone-construct.mts` | — | 2026-08-27 |
 | `drive-navair-build.mts` | — | 2026-08-19 |
 | `drive-past-proposal-templify.mts` | 1 | 2026-07-19 |
 | `drive-remaining-cohorts.mts` | 1 | 2026-08-15 |
@@ -176,34 +211,40 @@ No code references it, but a document tells someone to run it.
 | `drive-scenario-matrix.mts` | — | 2026-08-24 |
 | `drive-scout.mjs` | — | 2026-08-21 |
 | `drive-starter-bulk.mts` | — | 2026-07-25 |
+| `drive-ui-responsive.mjs` | — | 2026-08-28 |
+| `drive-ui-states.mjs` | — | 2026-08-26 |
 | `embed-atoms.mts` | — | 2026-08-11 |
 | `fire-uncovered-lib-triggers.mts` | — | 2026-08-23 |
 | `fire-uncovered-triggers.mjs` | — | 2026-08-23 |
+| `fix-open-event-brackets.mjs` | — | 2026-08-25 |
 | `gen-guide-queue-seed.mts` | — | 2026-08-24 |
 | `gen-navy-sttr-proposal.mts` | — | 2026-07-19 |
 | `gen-sample-proposal.mts` | — | 2026-07-19 |
 | `gen-starter-set-seed.mts` | — | 2026-08-04 |
 | `hitl-setup.mts` | 1 | 2026-07-19 |
 | `ingest-assist-e2e.mts` | — | 2026-07-19 |
+| `inventory-crm.mjs` | — | 2026-08-26 |
 | `inventory-scripts.mjs` | — | 2026-08-24 |
 | `measure-canvas-flow.mts` | — | 2026-07-19 |
 | `measure-image-placeholder.mts` | — | 2026-08-23 |
+| `measure-ranking-change.mts` | — | 2026-08-29 |
 | `measure-table-row-height.mts` | — | 2026-08-22 |
 | `monday-journey-e2e.mts` | 1 | 2026-07-19 |
 | `navy-sttr-e2e.mts` | 2 | 2026-07-19 |
 | `probe-bucket-rerank.mjs` | — | 2026-08-20 |
 | `probe-build-or-mark.mjs` | 1 | 2026-08-20 |
-| `probe-deck-overlap.mts` | — | 2026-08-24 |
+| `probe-deliverable-artifacts.mts` | 1 | 2026-08-27 |
 | `probe-pattern-extract.mts` | — | 2026-08-22 |
+| `probe-project-mobile.mts` | — | 2026-08-28 |
 | `probe-style-matrix.mts` | — | 2026-08-24 |
 | `prove-pdf-export.mts` | — | 2026-08-15 |
+| `reconcile-capability.mjs` | — | 2026-08-26 |
 | `render-artifact-pages.mts` | — | 2026-08-24 |
 | `render-tv-preview.mjs` | — | 2026-07-20 |
 | `sandbox-heartbeat.sh` | — | 2026-08-19 |
 | `seed-cuas-immobileyes.mts` | 1 | 2026-08-18 |
 | `seed-dsip-opps.mts` | — | 2026-07-19 |
 | `seed-followon-guides.mts` | 1 | 2026-08-24 |
-| `seed-isolation-fixture.mts` | 1 | 2026-08-24 |
 | `seed-practice-guides.mts` | 1 | 2026-08-24 |
 | `seed-program-guides.mts` | 1 | 2026-08-24 |
 | `seed-template-masters.mts` | — | 2026-08-14 |
@@ -214,32 +255,43 @@ No code references it, but a document tells someone to run it.
 | `verify-assemble-from-library.mjs` | — | 2026-08-23 |
 | `verify-collaborator-blast-radius.mjs` | — | 2026-08-23 |
 | `verify-compliance-matrix.mts` | — | 2026-08-23 |
+| `verify-email-ledger-rls.mjs` | 2 | 2026-08-26 |
 | `verify-embeddings.mts` | — | 2026-08-11 |
 | `verify-groups-overlay.mjs` | — | 2026-08-23 |
 | `verify-ingest-coverage.mts` | — | 2026-08-18 |
 | `verify-keep-copy.mts` | — | 2026-08-04 |
 | `verify-local-storage.mts` | — | 2026-08-11 |
+| `verify-project-isolation.mjs` | — | 2026-08-28 |
+| `verify-project-rollup.mjs` | — | 2026-08-28 |
 | `verify-scope-bar.mjs` | — | 2026-08-23 |
 | `verify-scope-end-to-end.mjs` | — | 2026-08-23 |
 | `verify-scoped-gates.mjs` | — | 2026-08-23 |
 | `verify-scoped-review.mjs` | — | 2026-08-23 |
 | `verify-storage-server.mts` | — | 2026-08-11 |
 | `verify-studio-voice.mts` | — | 2026-08-23 |
+| `verify-surfaced-capability.mjs` | — | 2026-08-25 |
+| `verify-write-contract.mjs` | — | 2026-08-25 |
+| `write-ui-docs.mjs` | — | 2026-08-28 |
 
-## UNREFERENCED — 84
+## UNREFERENCED — 91
 
 Nothing references it and it holds no dead identifier. It may still work — nobody knows. **Needs a call.**
 
 | script | rot | touched |
 |---|---|---|
+| `audit-ranking-readiness.mjs` | — | 2026-08-30 |
+| `audit-wipe-impact.mjs` | — | 2026-08-29 |
 | `backfill-corpus-verbatim.mts` | — | 2026-08-19 |
 | `build-doc-guide.mjs` | — | 2026-08-11 |
+| `capture-stage-walk.mjs` | — | 2026-08-30 |
 | `demo-atoms-ui.mjs` | — | 2026-07-21 |
+| `derive-capability-map.mjs` | — | 2026-08-30 |
 | `drive-b1-auto-advance.mts` | — | 2026-08-15 |
 | `drive-box-pdf.mts` | — | 2026-08-11 |
 | `drive-box-upload.mts` | — | 2026-08-11 |
 | `drive-box2-suggest.mts` | — | 2026-08-11 |
 | `drive-box3-nudge.mts` | — | 2026-08-11 |
+| `drive-capability-deck.mts` | — | 2026-08-25 |
 | `drive-enrich-prod.mts` | — | 2026-08-11 |
 | `drive-f1-fluid.mts` | — | 2026-08-11 |
 | `drive-f2-annotate.mts` | — | 2026-08-11 |
@@ -263,6 +315,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `make-dsip-fixture.mts` | — | 2026-08-18 |
 | `measure-volumes.mts` | — | 2026-08-19 |
 | `mirage-ingest.mts` | — | 2026-08-19 |
+| `parity-score-ts.mts` | — | 2026-08-30 |
 | `probe-bucket-merge.mjs` | — | 2026-08-20 |
 | `probe-comp-codes.mjs` | — | 2026-08-20 |
 | `probe-disposition-ui.mjs` | — | 2026-08-20 |
@@ -313,6 +366,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `verify-media-export.mts` | — | 2026-08-11 |
 | `verify-mt1-compliance.mts` | — | 2026-08-22 |
 | `verify-pptx-tables.mts` | — | 2026-08-11 |
+| `verify-public-links.mjs` | — | 2026-08-25 |
 | `verify-ruler-composition.mts` | — | 2026-08-23 |
 | `verify-studio-voice-route.mjs` | — | 2026-08-23 |
 | `verify-unextractable.mts` | — | 2026-08-11 |
@@ -367,7 +421,7 @@ Nothing references it AND it drives an identifier the database no longer has. It
 
 ---
 
-## ⚠ Documented but rotted — 16
+## ⚠ Documented but rotted — 17
 
 A document tells someone to run these, and each drives at least one identifier the database no
 longer has. They will fail confusingly rather than loudly. Either the script needs the
@@ -380,15 +434,16 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 | `capture-vaults.mjs` | 2 | 2026-07-25 |
 | `navy-sttr-e2e.mts` | 2 | 2026-07-19 |
 | `usaf-cso-e2e.mts` | 2 | 2026-07-19 |
+| `verify-email-ledger-rls.mjs` | 2 | 2026-08-26 |
 | `drive-item-template-picker.mts` | 1 | 2026-07-19 |
 | `drive-past-proposal-templify.mts` | 1 | 2026-07-19 |
 | `drive-remaining-cohorts.mts` | 1 | 2026-08-15 |
 | `hitl-setup.mts` | 1 | 2026-07-19 |
 | `monday-journey-e2e.mts` | 1 | 2026-07-19 |
 | `probe-build-or-mark.mjs` | 1 | 2026-08-20 |
+| `probe-deliverable-artifacts.mts` | 1 | 2026-08-27 |
 | `seed-cuas-immobileyes.mts` | 1 | 2026-08-18 |
 | `seed-followon-guides.mts` | 1 | 2026-08-24 |
-| `seed-isolation-fixture.mts` | 1 | 2026-08-24 |
 | `seed-practice-guides.mts` | 1 | 2026-08-24 |
 | `seed-program-guides.mts` | 1 | 2026-08-24 |
 
@@ -398,14 +453,14 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 
 | class | count |
 |---|---|
-| SUITE | 37 |
+| SUITE | 52 |
 | LENS | 4 |
 | CROSS-CHECK | 2 |
 | RULER | 7 |
-| LIBRARY | 6 |
-| CALLED-BY-ANOTHER | 17 |
+| LIBRARY | 7 |
+| CALLED-BY-ANOTHER | 26 |
 | NPM-WIRED | 1 |
-| DOCUMENTED | 72 |
-| UNREFERENCED | 84 |
+| DOCUMENTED | 94 |
+| UNREFERENCED | 91 |
 | CANNOT-RUN | 41 |
-| **total** | **271** |
+| **total** | **325** |

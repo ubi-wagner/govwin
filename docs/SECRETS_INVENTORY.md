@@ -68,7 +68,9 @@ two-voice sender model. It needs **one credential** to switch on.
    `platform@`, `eric@`, `automation@`, etc. — **the mechanism that "sweeps both mailboxes."**
 3. **Provision the mailboxes**: `automation@`, `eric@` (have), `platform@` (have), optionally `heather@`.
 4. **DNS for rfppipeline.com** (not a secret, but required or mail is spam-filtered): SPF
-   `v=spf1 include:_spf.google.com ~all`, DKIM (Workspace-generated), DMARC.
+   `v=spf1 include:_spf.google.com include:spf.mtasv.net ~all` — **BOTH includes**: Google sends the correspondence, Postmark sends the
+   transactional, and a record naming only one silently fails SPF for the other. DKIM twice too
+   (Workspace-generated AND Postmark's), plus DMARC.
 
 > Alternative single-mailbox send-only path (already used by the frontend welcome email):
 > `GOOGLE_CLIENT_ID` · `GOOGLE_CLIENT_SECRET` · `GOOGLE_REFRESH_TOKEN` · `GOOGLE_WORKSPACE_EMAIL`
@@ -83,12 +85,14 @@ two-voice sender model. It needs **one credential** to switch on.
 
 | Var | Purpose |
 |-----|---------|
-| `CMS_DATABASE_URL` | the `rfp-crm` service's own Postgres (`cms-postgres`) |
+| `CRM_DATABASE` | the `rfp-crm` service's own Postgres. **Internal to the Railway private network — no public proxy.** Was `CMS_DATABASE_URL`; the old name is still honoured with a deprecation warning during the rename |
 | `SHARED_DATABASE_URL` | the shared `system_events` bridge back to the main DB |
 | `CMS_API_KEY` | service-to-service auth (frontend → CMS) |
 | `CMS_JWT_SECRET`, `CMS_AUTH_MODE`, `CMS_BASIC_USER`, `CMS_BASIC_PASS` | CMS admin auth |
 | `REVALIDATE_SECRET` | frontend↔CMS ISR revalidation (same value both sides) |
 | `CMS_STORAGE_ROOT` | CMS media volume (default `/data/cms`) |
+| `POSTMARK_SERVER_TOKEN` | the transactional transport — **Server** token, not the Account token |
+| `POSTMARK_WEBHOOK_SECRET` | shared secret on the delivery webhook (frontend route; Basic auth on the URL) |
 | `ALLOWED_ORIGINS`, `CMS_PUBLIC_URL`, `FRONTEND_URL` | CORS + cross-service URLs |
 
 ---
@@ -106,6 +110,27 @@ enrichment) · `SOFFICE_PATH` / `SOFFICE_TIMEOUT` (LibreOffice doc conversion) �
 `HEALTH_PORT` · `EVENT_POLL_INTERVAL` / `GENERATION_POLL_INTERVAL` · `USE_STUB_DATA` (dev only) ·
 `RAILWAY_*` (auto-injected) · `AGENT_DATABASE_URL` (the NOBYPASSRLS `rfp_agent` agent role — for the
 post-launch RLS cutover).
+
+**Storage driver** — `STORAGE_DRIVER=local` swaps the S3/R2 client for a filesystem one (sandbox
+and CI; production leaves it unset and uses R2). `LOCAL_STORAGE_DIR` is where that driver writes,
+default `/tmp/govwin-storage` in both the frontend and the pipeline. `AWS_REGION` is accepted as a
+fallback for `AWS_DEFAULT_REGION` — the code reads `AWS_DEFAULT_REGION || AWS_REGION || 'auto'`,
+the same both-names tolerance already applied to the bucket.
+
+**Two more capability gates**, alongside `ATOM_OCR` / `ATOM_VISION` above —
+`VISUAL_REVIEW=off` disables the Claude visual page review (otherwise on whenever a real
+`ANTHROPIC_API_KEY` is present; `sk-noop` counts as absent) · `REGION_PROPOSER=demo` turns on the
+demo region proposer for atom boxing (anything else, including unset, leaves it off).
+
+**One tuning knob** — `PARTNER_NAME_MATCH_THRESHOLD` is the pg_trgm similarity floor for matching a
+partner-managed company by name, default `0.45`; a value outside `(0, 1]` falls back to the default
+rather than being trusted.
+
+> These seven rows were added after `frontend/scripts/audit-env-inventory.mjs` found them read by
+> the services and named in no deployment document. **Run that audit after adding any
+> `process.env` / `os.environ` read** — a variable an operator cannot know to set is a capability
+> that silently does nothing in production, and the document asserting it does not exist is where
+> the debugging starts.
 
 ## F. Descoped — do NOT need for launch
 

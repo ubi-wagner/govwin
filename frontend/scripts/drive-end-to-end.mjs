@@ -77,11 +77,27 @@ function prove(plane, claim, ok, detail = '') {
  *  system_events stores them split: namespace='finder', type='rfp.shredding.start'. A verifier
  *  that reports a passing system as broken is worse than no verifier, because it spends the
  *  reader's trust on a false alarm. */
-async function provedEvent(types, sinceIso, label) {
-  const rows = await sql`
-    SELECT namespace, type, count(*)::int AS n FROM system_events
-     WHERE type = ANY(${types}) AND created_at >= ${sinceIso}
-     GROUP BY namespace, type`;
+async function provedEvent(types, sinceIso, label, { proposalId = null } = {}) {
+  // WINDOW *or* ENTITY, and the choice is not cosmetic. A check inside a stage guard runs only
+  // when that stage did the work, so "since this run started" is the right scope. Stage 5 runs on
+  // EVERY invocation, including a resumed one where stage 4 printed "already proven" and did
+  // nothing — and there the window asks whether events were posted by work that deliberately did
+  // not happen. It answered `none`, correctly, and failed a drive whose product was fine: the
+  // export and lock events were on the row, stamped 27 minutes earlier.
+  //
+  // So a stage-5 check names the PROPOSAL instead, exactly like the database and filesystem planes
+  // beside it. The claim being made there is "this proposal has an auditable trail", which is true
+  // regardless of which run wrote it — and unlike the window, it cannot be satisfied by a
+  // coincidental event from some other proposal in the same seconds.
+  const rows = proposalId
+    ? await sql`
+        SELECT namespace, type, count(*)::int AS n FROM system_events
+         WHERE type = ANY(${types}) AND payload->>'proposalId' = ${proposalId}
+         GROUP BY namespace, type`
+    : await sql`
+        SELECT namespace, type, count(*)::int AS n FROM system_events
+         WHERE type = ANY(${types}) AND created_at >= ${sinceIso}
+         GROUP BY namespace, type`;
   const total = rows.reduce((s, r) => s + r.n, 0);
   return prove('events', label, total > 0,
                rows.map((r) => `${r.namespace}·${r.type}×${r.n}`).join(', ') || 'none');
@@ -348,7 +364,8 @@ const [locked] = await sql`
     FROM proposal_sections WHERE proposal_id = ${journal.ids.proposal}::uuid`;
 prove('database', 'sections reached a locked state', (locked?.locked ?? 0) >= 1,
       `${locked?.locked}/${locked?.total} have locked_at (status: ${locked?.statuses})`);
-await provedEvent(['artifact.exported', 'section.locked', 'section.saved'], t0, 'authoring + export posted');
+await provedEvent(['artifact.exported', 'section.locked', 'section.saved'], t0,
+                  'authoring + export posted', { proposalId: journal.ids.proposal });
 
 // Storage plane: the shredded artifacts B42 used to silently drop.
 try {

@@ -17,7 +17,7 @@ must re-publish the bridge.** Editability without propagation is silent divergen
 catalog. The window has both, and one primitive carries the second half:
 `republishIfReleased` → new `opportunity_bridge` version → `applyToTenant` per tenant —
 which automatically brings **rescore** (sync fallback + `capture:card.applied` → pipeline),
-**`pin_update_available`** for pinned holders, and the **watched-opp holder notification**
+**`docs_update_available`** for pinned holders, and the **watched-opp holder notification**
 (RANK-8). A never-released opp is a structural no-op, so pre-push edits stay private.
 
 ---
@@ -29,7 +29,7 @@ which automatically brings **rescore** (sync fallback + `capture:card.applied` �
 | B1 · Forward-only: `opportunity_bridge` is `SELECT, INSERT` only — no row ever mutates | mig 094:45 grant |
 | B2 · Full-snapshot versions: every publish writes the WHOLE card JSONB at `max(version)+1` (race-safe retry loop) | `opportunity-bridge.ts` publishToBridge |
 | B3 · Forward-only apply: a mirror card only advances (`EXCLUDED.bridge_version > current`); stale applies are silent no-ops with no cursor bump and no rescore | applyToTenant |
-| B4 · Safe-refresh split: an apply touches ONLY master-derived columns (`card`, `bridge_version`, `lifecycle_status`, `submission_stage`, `updated_at`, conditional `pin_update_available`). Tenant-owned state — pins, pinned_docs, pursuit, archive, bucket scores, nudge watermarks — is never clobbered | applyToTenant `DO UPDATE SET` list |
+| B4 · Safe-refresh split: an apply touches ONLY master-derived columns (`card`, `bridge_version`, `lifecycle_status`, `submission_stage`, `updated_at`, conditional `docs_update_available`). Tenant-owned state — pins, copied_docs, pursuit, archive, bucket scores, nudge watermarks — is never clobbered | applyToTenant `DO UPDATE SET` list |
 | B5 · **Every card-visible master edit republishes** (NEW): summary + expert note, compliance (baseline, topic override set/clear, preset), volumes + required items (all 5 tools), topic title/description, attach-to-existing, Ingest Studio LAND, amendment confirm, and the explicit Broadcast button — all call `republishSolicitationCards` (best-effort: a propagation failure never fails the admin's edit). **Change-gated:** a fresh snapshot equal to the bridge head (frozenAt ignored) publishes NOTHING — no junk version, no pin-nudge re-arm, no rescore storm (`unchanged` in the result). Snapshots are (re)built inside the version-retry loop, so a concurrent-publish loser can never land stale content at the head | `lib/curation/republish.ts` + `publishToBridge` |
 | B6 · **Late-topic release** (NEW): a topic added after push has no bridge version, so republish can never reach it. `activateLateTopicIfReady` releases it — keyed on the BRIDGE (not `is_active`), mirroring push's W2 activation write — the moment it is date-complete. No close date → parked (`needs_close_date`), invisible to customers (the mig-128 date guard extends to late additions). A CLOSED/ARCHIVED topic is REFUSED (`not_open`, guard + CAS): retraction is a lifecycle decision a close-date edit may never undo. Wired into add_topic, bulk_add_topics, topic-file drop, topic update, and the lifecycle close-date change | `lib/curation/republish.ts` |
 | B7 · Backflow stays navigational-only: nothing in the window carries tenant content up. The up-signals remain the purchase ToDo, notifications, and shadow-descent audit | docs/MASTER_MIRROR_OPP_DESIGN.md §4 |

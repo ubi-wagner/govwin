@@ -1,7 +1,7 @@
 {
- "base": "http://localhost:3000",
- "considered": 116,
- "reached": 113,
+ "base": "http://localhost:3109",
+ "considered": 119,
+ "reached": 118,
  "shots": [
   {
    "lane": "anon",
@@ -770,10 +770,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 24,
+    "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 917,
+    "text": 930,
     "h1": "Foundation"
    },
    "declared": {
@@ -797,10 +797,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 24,
+    "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 917,
+    "text": 930,
     "h1": "Foundation"
    },
    "declared": {
@@ -823,11 +823,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 184,
-    "links": 21,
+    "buttons": 156,
+    "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 17489,
+    "text": 16291,
     "h1": "Foundation"
    },
    "declared": {
@@ -851,10 +851,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 6,
-    "links": 20,
+    "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 1841,
+    "text": 2221,
     "h1": "Foundation"
    },
    "declared": {
@@ -877,11 +877,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 170,
-    "links": 20,
-    "inputs": 27,
+    "buttons": 1782,
+    "links": 69,
+    "inputs": 204,
     "forms": 0,
-    "text": 5056,
+    "text": 47699,
     "h1": "Foundation"
    },
    "declared": {
@@ -905,10 +905,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 21,
-    "links": 20,
+    "links": 21,
     "inputs": 12,
     "forms": 0,
-    "text": 3228,
+    "text": 5419,
     "h1": "Foundation"
    },
    "declared": {
@@ -932,10 +932,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 5,
-    "links": 20,
+    "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 996,
+    "text": 1246,
     "h1": "Foundation"
    },
    "declared": {
@@ -958,17 +958,44 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 19,
-    "links": 20,
+    "buttons": 20,
+    "links": 21,
     "inputs": 6,
     "forms": 0,
-    "text": 662,
+    "text": 768,
     "h1": "Foundation"
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
+   "url": "/portal/foundation/cards/7f3a1c9e-2b64-4d15-9e83-0a1b2c3d4e5f/solicitation",
+   "file": "tenant__portal-tenantSlug-cards-opportunityId-solicitation.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/cards/7f3a1c9e-2b64-4d15-9e83-0a1b2c3d4e5f/solicitation",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 467,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
     "forms": 0,
     "handlers": 0
    },
@@ -985,11 +1012,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 27,
+    "buttons": 239,
+    "links": 101,
     "inputs": 3,
     "forms": 0,
-    "text": 2930,
+    "text": 49401,
     "h1": "Foundation"
    },
    "declared": {
@@ -1012,17 +1039,17 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 22,
-    "links": 30,
+    "buttons": 244,
+    "links": 104,
     "inputs": 3,
     "forms": 0,
-    "text": 3124,
+    "text": 49549,
     "h1": "Foundation"
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
-    "links": 2,
+    "links": 3,
     "forms": 0,
     "handlers": 0
    },
@@ -1040,10 +1067,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 22,
+    "links": 23,
     "inputs": 0,
     "forms": 0,
-    "text": 528,
+    "text": 536,
     "h1": "Foundation"
    },
    "declared": {
@@ -1067,10 +1094,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 462,
+    "text": 470,
     "h1": "Foundation"
    },
    "declared": {
@@ -1094,16 +1121,43 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 24,
+    "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 917,
+    "text": 930,
     "h1": "Foundation"
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 6,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/documents/[documentId]",
+   "url": "/portal/foundation/documents/402598fc-5520-4ad1-920c-db96e6dd547d",
+   "file": "tenant__portal-tenantSlug-documents-documentId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/documents/402598fc-5520-4ad1-920c-db96e6dd547d",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 59,
+    "links": 22,
+    "inputs": 2,
+    "forms": 0,
+    "text": 1242,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
     "forms": 0,
     "handlers": 0
    },
@@ -1121,10 +1175,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 7,
-    "links": 22,
+    "links": 23,
     "inputs": 2,
     "forms": 0,
-    "text": 938,
+    "text": 946,
     "h1": "Foundation"
    },
    "declared": {
@@ -1148,16 +1202,43 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 185,
+    "links": 188,
     "inputs": 0,
     "forms": 0,
-    "text": 14518,
+    "text": 14709,
     "h1": "Foundation"
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 12,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "url": "/portal/foundation/library/foundation/f679a401-f41c-40ec-8a26-29d9a2c275b4",
+   "file": "tenant__portal-tenantSlug-library-foundation-foundationId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/library/foundation/f679a401-f41c-40ec-8a26-29d9a2c275b4",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 58,
+    "links": 22,
+    "inputs": 2,
+    "forms": 0,
+    "text": 1194,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 0,
     "forms": 0,
     "handlers": 0
    },
@@ -1174,11 +1255,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 170,
-    "links": 20,
-    "inputs": 27,
+    "buttons": 1782,
+    "links": 69,
+    "inputs": 204,
     "forms": 0,
-    "text": 5056,
+    "text": 47699,
     "h1": "Foundation"
    },
    "declared": {
@@ -1201,11 +1282,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 170,
-    "links": 20,
-    "inputs": 27,
+    "buttons": 1782,
+    "links": 69,
+    "inputs": 204,
     "forms": 0,
-    "text": 5056,
+    "text": 47699,
     "h1": "Foundation"
    },
    "declared": {
@@ -1228,11 +1309,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 170,
-    "links": 20,
-    "inputs": 27,
+    "buttons": 1782,
+    "links": 69,
+    "inputs": 204,
     "forms": 0,
-    "text": 5056,
+    "text": 47699,
     "h1": "Foundation"
    },
    "declared": {
@@ -1256,10 +1337,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 16,
-    "links": 22,
+    "links": 23,
     "inputs": 0,
     "forms": 0,
-    "text": 743,
+    "text": 753,
     "h1": "Foundation"
    },
    "declared": {
@@ -1283,10 +1364,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 24,
+    "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 917,
+    "text": 930,
     "h1": "Foundation"
    },
    "declared": {
@@ -1309,11 +1390,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 27,
+    "buttons": 239,
+    "links": 101,
     "inputs": 3,
     "forms": 0,
-    "text": 2930,
+    "text": 49401,
     "h1": "Foundation"
    },
    "declared": {
@@ -1337,10 +1418,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 24,
-    "links": 21,
+    "links": 22,
     "inputs": 35,
     "forms": 0,
-    "text": 1810,
+    "text": 1818,
     "h1": "Foundation"
    },
    "declared": {
@@ -1364,10 +1445,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 11,
-    "links": 36,
+    "links": 37,
     "inputs": 0,
     "forms": 0,
-    "text": 1012,
+    "text": 1020,
     "h1": "Foundation"
    },
    "declared": {
@@ -1390,11 +1471,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 70,
-    "links": 20,
+    "buttons": 105,
+    "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 2771,
+    "text": 3830,
     "h1": "Foundation"
    },
    "declared": {
@@ -1418,16 +1499,70 @@
    "boundary": 0,
    "rendered": {
     "buttons": 4,
-    "links": 20,
+    "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 824,
+    "text": 833,
     "h1": "Foundation"
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/projects/[projectId]",
+   "url": "/portal/foundation/projects/21975235-e4bf-4d92-aba9-08c427f7bec3",
+   "file": "tenant__portal-tenantSlug-projects-projectId.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/projects/21975235-e4bf-4d92-aba9-08c427f7bec3",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 36,
+    "links": 22,
+    "inputs": 8,
+    "forms": 0,
+    "text": 5528,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant",
+   "route": "/portal/[tenantSlug]/projects",
+   "url": "/portal/foundation/projects",
+   "file": "tenant__portal-tenantSlug-projects.png",
+   "status": 200,
+   "finalUrl": "/portal/foundation/projects",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 411,
+    "h1": "Foundation"
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
     "forms": 0,
     "handlers": 0
    },
@@ -1445,10 +1580,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 63,
-    "links": 20,
+    "links": 21,
     "inputs": 7,
     "forms": 1,
-    "text": 34020,
+    "text": 34028,
     "h1": "Foundation"
    },
    "declared": {
@@ -1472,10 +1607,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 20,
-    "links": 21,
+    "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 2285,
+    "text": 2293,
     "h1": "Foundation"
    },
    "declared": {
@@ -1499,10 +1634,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 24,
+    "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 1072,
+    "text": 1080,
     "h1": "Foundation"
    },
    "declared": {
@@ -1518,18 +1653,18 @@
   {
    "lane": "tenant",
    "route": "/portal/[tenantSlug]/spotlights/[spotlightId]",
-   "url": "/portal/foundation/spotlights/e3bab844-fe68-475f-a8ef-fe613825d786",
+   "url": "/portal/foundation/spotlights/ea08c87e-17d2-4abd-8535-58d2695264a2",
    "file": "tenant__portal-tenantSlug-spotlights-spotlightId.png",
    "status": 200,
    "finalUrl": "/portal/foundation/cards",
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 27,
+    "buttons": 239,
+    "links": 101,
     "inputs": 3,
     "forms": 0,
-    "text": 2930,
+    "text": 49401,
     "h1": "Foundation"
    },
    "declared": {
@@ -1552,11 +1687,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 27,
+    "buttons": 239,
+    "links": 101,
     "inputs": 3,
     "forms": 0,
-    "text": 2930,
+    "text": 49401,
     "h1": "Foundation"
    },
    "declared": {
@@ -1580,10 +1715,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 14,
-    "links": 20,
+    "links": 22,
     "inputs": 6,
     "forms": 1,
-    "text": 1185,
+    "text": 1378,
     "h1": "Foundation"
    },
    "declared": {
@@ -1606,11 +1741,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 81,
-    "links": 21,
+    "buttons": 85,
+    "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 3011,
+    "text": 3067,
     "h1": "Foundation"
    },
    "declared": {
@@ -1633,11 +1768,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 12,
-    "links": 24,
+    "buttons": 54,
+    "links": 45,
     "inputs": 0,
     "forms": 0,
-    "text": 1213,
+    "text": 6151,
     "h1": "Foundation"
    },
    "declared": {
@@ -1661,10 +1796,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 4,
-    "links": 20,
+    "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 621,
+    "text": 629,
     "h1": "Foundation"
    },
    "declared": {
@@ -1688,10 +1823,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 24,
+    "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 917,
+    "text": 930,
     "h1": "Foundation"
    },
    "declared": {
@@ -1715,10 +1850,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 24,
+    "links": 25,
     "inputs": 0,
     "forms": 0,
-    "text": 917,
+    "text": 930,
     "h1": "Foundation"
    },
    "declared": {
@@ -1796,10 +1931,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 463,
+    "text": 474,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1823,10 +1958,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 463,
+    "text": 474,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1849,11 +1984,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 87,
-    "links": 21,
+    "buttons": 218,
+    "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 6270,
+    "text": 18789,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1877,10 +2012,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 6,
-    "links": 20,
+    "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 405,
+    "text": 414,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1904,10 +2039,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 1890,
-    "links": 40,
+    "links": 41,
     "inputs": 204,
     "forms": 0,
-    "text": 52544,
+    "text": 52553,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1931,10 +2066,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 21,
-    "links": 20,
+    "links": 21,
     "inputs": 12,
     "forms": 0,
-    "text": 2571,
+    "text": 2580,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1958,10 +2093,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 5,
-    "links": 20,
+    "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 838,
+    "text": 847,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -1984,17 +2119,44 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 4,
-    "links": 20,
+    "buttons": 5,
+    "links": 21,
     "inputs": 6,
     "forms": 0,
-    "text": 719,
+    "text": 826,
     "h1": "Immobileyes Inc."
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
+   "url": "/portal/immobileyes/cards/d53a22e4-792d-4fe7-8253-a42270fd9981/solicitation",
+   "file": "tenant2__portal-tenantSlug-cards-opportunityId-solicitation.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/cards/d53a22e4-792d-4fe7-8253-a42270fd9981/solicitation",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 22,
+    "inputs": 0,
+    "forms": 0,
+    "text": 665,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
     "forms": 0,
     "handlers": 0
    },
@@ -2011,11 +2173,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 27,
+    "buttons": 238,
+    "links": 101,
     "inputs": 3,
     "forms": 0,
-    "text": 1557,
+    "text": 36050,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2038,17 +2200,17 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 22,
-    "links": 30,
+    "buttons": 243,
+    "links": 104,
     "inputs": 3,
     "forms": 0,
-    "text": 1695,
+    "text": 36138,
     "h1": "Immobileyes Inc."
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
-    "links": 2,
+    "links": 3,
     "forms": 0,
     "handlers": 0
    },
@@ -2066,10 +2228,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 22,
+    "links": 23,
     "inputs": 0,
     "forms": 0,
-    "text": 534,
+    "text": 543,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2093,10 +2255,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 468,
+    "text": 477,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2120,10 +2282,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 463,
+    "text": 474,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2147,10 +2309,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 7,
-    "links": 22,
+    "links": 23,
     "inputs": 2,
     "forms": 0,
-    "text": 943,
+    "text": 952,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2174,10 +2336,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 4,
-    "links": 131,
+    "links": 132,
     "inputs": 1,
     "forms": 0,
-    "text": 9475,
+    "text": 9484,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2201,10 +2363,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 58,
-    "links": 21,
+    "links": 22,
     "inputs": 2,
     "forms": 0,
-    "text": 1087,
+    "text": 1096,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2228,10 +2390,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 1890,
-    "links": 40,
+    "links": 41,
     "inputs": 204,
     "forms": 0,
-    "text": 52544,
+    "text": 52553,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2255,10 +2417,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 1890,
-    "links": 40,
+    "links": 41,
     "inputs": 204,
     "forms": 0,
-    "text": 52544,
+    "text": 52553,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2282,10 +2444,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 1890,
-    "links": 40,
+    "links": 41,
     "inputs": 204,
     "forms": 0,
-    "text": 52544,
+    "text": 52553,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2309,10 +2471,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 16,
-    "links": 22,
+    "links": 23,
     "inputs": 0,
     "forms": 0,
-    "text": 750,
+    "text": 760,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2336,10 +2498,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 463,
+    "text": 474,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2362,11 +2524,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 27,
+    "buttons": 238,
+    "links": 101,
     "inputs": 3,
     "forms": 0,
-    "text": 1557,
+    "text": 36050,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2390,10 +2552,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 20,
+    "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 402,
+    "text": 411,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2416,11 +2578,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 20,
+    "buttons": 103,
+    "links": 21,
     "inputs": 1,
     "forms": 0,
-    "text": 870,
+    "text": 3593,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2444,16 +2606,43 @@
    "boundary": 0,
    "rendered": {
     "buttons": 4,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 1484,
+    "text": 1494,
     "h1": "Immobileyes Inc."
    },
    "declared": {
     "buttons": 0,
     "inputs": 0,
     "links": 0,
+    "forms": 0,
+    "handlers": 0
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "tenant2",
+   "route": "/portal/[tenantSlug]/projects",
+   "url": "/portal/immobileyes/projects",
+   "file": "tenant2__portal-tenantSlug-projects.png",
+   "status": 200,
+   "finalUrl": "/portal/immobileyes/projects",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 3,
+    "links": 21,
+    "inputs": 0,
+    "forms": 0,
+    "text": 532,
+    "h1": "Immobileyes Inc."
+   },
+   "declared": {
+    "buttons": 0,
+    "inputs": 0,
+    "links": 1,
     "forms": 0,
     "handlers": 0
    },
@@ -2471,10 +2660,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 30,
-    "links": 20,
+    "links": 21,
     "inputs": 5,
     "forms": 1,
-    "text": 2247,
+    "text": 2256,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2498,10 +2687,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 74,
-    "links": 21,
+    "links": 22,
     "inputs": 3,
     "forms": 0,
-    "text": 1674,
+    "text": 1683,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2525,10 +2714,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 3,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 461,
+    "text": 470,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2544,18 +2733,18 @@
   {
    "lane": "tenant2",
    "route": "/portal/[tenantSlug]/spotlights/[spotlightId]",
-   "url": "/portal/immobileyes/spotlights/e3bab844-fe68-475f-a8ef-fe613825d786",
+   "url": "/portal/immobileyes/spotlights/ea08c87e-17d2-4abd-8535-58d2695264a2",
    "file": "tenant2__portal-tenantSlug-spotlights-spotlightId.png",
    "status": 200,
    "finalUrl": "/portal/immobileyes/cards",
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 27,
+    "buttons": 238,
+    "links": 101,
     "inputs": 3,
     "forms": 0,
-    "text": 1557,
+    "text": 36050,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2578,11 +2767,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 18,
-    "links": 27,
+    "buttons": 238,
+    "links": 101,
     "inputs": 3,
     "forms": 0,
-    "text": 1557,
+    "text": 36050,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2606,10 +2795,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 4,
-    "links": 20,
+    "links": 21,
     "inputs": 3,
     "forms": 1,
-    "text": 645,
+    "text": 654,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2632,11 +2821,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 81,
-    "links": 21,
+    "buttons": 85,
+    "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 3016,
+    "text": 3073,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2660,10 +2849,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 4,
-    "links": 20,
+    "links": 21,
     "inputs": 0,
     "forms": 0,
-    "text": 302,
+    "text": 311,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2687,10 +2876,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 6,
-    "links": 21,
+    "links": 22,
     "inputs": 1,
     "forms": 0,
-    "text": 564,
+    "text": 573,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2714,10 +2903,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 4,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 631,
+    "text": 640,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2741,10 +2930,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 463,
+    "text": 474,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2768,10 +2957,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 8,
-    "links": 21,
+    "links": 22,
     "inputs": 0,
     "forms": 0,
-    "text": 463,
+    "text": 474,
     "h1": "Immobileyes Inc."
    },
    "declared": {
@@ -2798,7 +2987,7 @@
     "links": 41,
     "inputs": 8,
     "forms": 0,
-    "text": 13745,
+    "text": 13928,
     "h1": "AI Tools & Agents"
    },
    "declared": {
@@ -2821,11 +3010,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 17,
+    "buttons": 41,
     "links": 49,
     "inputs": 0,
     "forms": 0,
-    "text": 2609,
+    "text": 4071,
     "h1": "Analytics"
    },
    "declared": {
@@ -2906,7 +3095,7 @@
     "links": 64,
     "inputs": 0,
     "forms": 0,
-    "text": 4475,
+    "text": 5518,
     "h1": "Automation Rules"
    },
    "declared": {
@@ -2957,10 +3146,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 1,
-    "links": 61,
+    "links": 62,
     "inputs": 0,
     "forms": 0,
-    "text": 1440,
+    "text": 1514,
     "h1": "Billing Management"
    },
    "declared": {
@@ -2985,9 +3174,9 @@
    "rendered": {
     "buttons": 2,
     "links": 53,
-    "inputs": 23,
+    "inputs": 104,
     "forms": 0,
-    "text": 6920,
+    "text": 27515,
     "h1": "Opportunity Cards"
    },
    "declared": {
@@ -3011,10 +3200,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 5,
-    "links": 63,
+    "links": 67,
     "inputs": 0,
     "forms": 0,
-    "text": 1346,
+    "text": 1195,
     "h1": "Command Center"
    },
    "declared": {
@@ -3064,11 +3253,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 37,
-    "links": 77,
+    "buttons": 71,
+    "links": 82,
     "inputs": 0,
     "forms": 0,
-    "text": 6128,
+    "text": 8890,
     "h1": "Admin Dashboard"
    },
    "declared": {
@@ -3083,6 +3272,33 @@
   },
   {
    "lane": "admin",
+   "route": "/admin/documents/[documentId]",
+   "url": "/admin/documents/4f8d50de-4f07-4075-b3fc-e4a2cc0e3300",
+   "file": "admin__admin-documents-documentId.png",
+   "status": 200,
+   "finalUrl": "/admin/documents/4f8d50de-4f07-4075-b3fc-e4a2cc0e3300",
+   "redirected": false,
+   "boundary": 0,
+   "rendered": {
+    "buttons": 48,
+    "links": 52,
+    "inputs": 2,
+    "forms": 0,
+    "text": 1407,
+    "h1": "Coverage fixture — admin letter"
+   },
+   "declared": {
+    "buttons": 2,
+    "inputs": 0,
+    "links": 2,
+    "forms": 0,
+    "handlers": 4
+   },
+   "ok": true,
+   "errors": []
+  },
+  {
+   "lane": "admin",
    "route": "/admin/documents",
    "url": "/admin/documents",
    "file": "admin__admin-documents.png",
@@ -3091,11 +3307,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 2,
-    "links": 51,
+    "buttons": 10,
+    "links": 67,
     "inputs": 0,
     "forms": 0,
-    "text": 884,
+    "text": 1595,
     "h1": "Document Builder"
    },
    "declared": {
@@ -3122,7 +3338,7 @@
     "links": 52,
     "inputs": 3,
     "forms": 1,
-    "text": 79522,
+    "text": 77800,
     "h1": "Event Stream"
    },
    "declared": {
@@ -3149,7 +3365,7 @@
     "links": 51,
     "inputs": 2,
     "forms": 1,
-    "text": 1030,
+    "text": 1046,
     "h1": "Expert Time"
    },
    "declared": {
@@ -3176,7 +3392,7 @@
     "links": 51,
     "inputs": 4,
     "forms": 0,
-    "text": 1322,
+    "text": 1338,
     "h1": "Guardrail Defaults"
    },
    "declared": {
@@ -3203,7 +3419,7 @@
     "links": 57,
     "inputs": 15,
     "forms": 0,
-    "text": 1340,
+    "text": 1360,
     "h1": "Stage Opportunity Intake"
    },
    "declared": {
@@ -3226,11 +3442,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 10,
+    "buttons": 84,
     "links": 51,
     "inputs": 0,
     "forms": 0,
-    "text": 2341,
+    "text": 11443,
     "h1": "Opportunity Rollup"
    },
    "declared": {
@@ -3253,11 +3469,11 @@
    "redirected": true,
    "boundary": 0,
    "rendered": {
-    "buttons": 37,
-    "links": 77,
+    "buttons": 71,
+    "links": 82,
     "inputs": 0,
     "forms": 0,
-    "text": 6140,
+    "text": 8923,
     "h1": "Admin Dashboard"
    },
    "declared": {
@@ -3284,7 +3500,7 @@
     "links": 51,
     "inputs": 0,
     "forms": 0,
-    "text": 1904,
+    "text": 2401,
     "h1": "Pipeline Monitor"
    },
    "declared": {
@@ -3311,7 +3527,7 @@
     "links": 59,
     "inputs": 0,
     "forms": 0,
-    "text": 4469,
+    "text": 5343,
     "h1": "Process Monitor"
    },
    "declared": {
@@ -3334,11 +3550,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 13,
+    "buttons": 48,
     "links": 51,
     "inputs": 1,
     "forms": 0,
-    "text": 1873,
+    "text": 4849,
     "h1": "Processes"
    },
    "declared": {
@@ -3362,10 +3578,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 1,
-    "links": 61,
+    "links": 63,
     "inputs": 0,
     "forms": 0,
-    "text": 1920,
+    "text": 2063,
     "h1": "All Proposals"
    },
    "declared": {
@@ -3392,7 +3608,7 @@
     "links": 54,
     "inputs": 0,
     "forms": 0,
-    "text": 1911,
+    "text": 1917,
     "h1": "TVSF-R45: Ohio TVSF Round 45 — Technology Validation & Startup Fund (D"
    },
    "declared": {
@@ -3442,11 +3658,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 7,
-    "links": 54,
+    "buttons": 16,
+    "links": 55,
     "inputs": 3,
     "forms": 0,
-    "text": 1523,
+    "text": 2190,
     "h1": "Purchases"
    },
    "declared": {
@@ -3462,19 +3678,19 @@
   {
    "lane": "admin",
    "route": "/admin/rfp-curation/[solId]",
-   "url": "/admin/rfp-curation/21761c37-49d1-43f7-b45e-a13d2876cd9a",
+   "url": "/admin/rfp-curation/29a1f2c9-c244-4aba-bdb7-267f1fabcce1",
    "file": "admin__admin-rfp-curation-solId.png",
    "status": 200,
-   "finalUrl": "/admin/rfp-curation/21761c37-49d1-43f7-b45e-a13d2876cd9a",
+   "finalUrl": "/admin/rfp-curation/29a1f2c9-c244-4aba-bdb7-267f1fabcce1",
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 21,
+    "buttons": 28,
     "links": 52,
-    "inputs": 6,
+    "inputs": 10,
     "forms": 0,
-    "text": 3425,
-    "h1": "AGENTS-LIVE probe 8df03882 — Directed Energy Counter-UAS (live opportu"
+    "text": 12512,
+    "h1": "DoW 2026 SBIR Broad Agency Announcement (Release 1)"
    },
    "declared": {
     "buttons": 0,
@@ -3489,10 +3705,10 @@
   {
    "lane": "admin",
    "route": "/admin/rfp-curation/[solId]/topic/[topicId]",
-   "url": "/admin/rfp-curation/21761c37-49d1-43f7-b45e-a13d2876cd9a/topic/e3bab844-fe68-475f-a8ef-fe613825d786",
+   "url": "/admin/rfp-curation/29a1f2c9-c244-4aba-bdb7-267f1fabcce1/topic/ea08c87e-17d2-4abd-8535-58d2695264a2",
    "file": "admin__admin-rfp-curation-solId-topic-topicId.png",
    "status": 200,
-   "finalUrl": "/admin/rfp-curation/21761c37-49d1-43f7-b45e-a13d2876cd9a/topic/e3bab844-fe68-475f-a8ef-fe613825d786",
+   "finalUrl": "/admin/rfp-curation/29a1f2c9-c244-4aba-bdb7-267f1fabcce1/topic/ea08c87e-17d2-4abd-8535-58d2695264a2",
    "redirected": false,
    "boundary": 0,
    "rendered": {
@@ -3500,8 +3716,8 @@
     "links": 53,
     "inputs": 0,
     "forms": 0,
-    "text": 1087,
-    "h1": "AGENTS-LIVE probe 8df03882 — Directed Energy Counter-UAS (live opportu"
+    "text": 1078,
+    "h1": "Amphibious Combat Vehicle (ACV) Maneuver Improvements"
    },
    "declared": {
     "buttons": 0,
@@ -3523,12 +3739,12 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 74,
-    "links": 71,
+    "buttons": 137,
+    "links": 76,
     "inputs": 1,
     "forms": 0,
-    "text": 8252,
-    "h1": "Your To-Dos18"
+    "text": 13517,
+    "h1": "Your To-Dos36"
    },
    "declared": {
     "buttons": 0,
@@ -3581,7 +3797,7 @@
     "links": 64,
     "inputs": 0,
     "forms": 0,
-    "text": 2361,
+    "text": 2434,
     "h1": "Scout Monitor"
    },
    "declared": {
@@ -3604,11 +3820,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 11,
+    "buttons": 14,
     "links": 52,
-    "inputs": 49,
+    "inputs": 65,
     "forms": 0,
-    "text": 4705,
+    "text": 5939,
     "h1": "about"
    },
    "declared": {
@@ -3659,10 +3875,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 1,
-    "links": 98,
+    "links": 99,
     "inputs": 0,
     "forms": 0,
-    "text": 4267,
+    "text": 4392,
     "h1": "Site Content"
    },
    "declared": {
@@ -3716,7 +3932,7 @@
     "links": 63,
     "inputs": 6,
     "forms": 0,
-    "text": 2585,
+    "text": 2617,
     "h1": "Opportunity Sources"
    },
    "declared": {
@@ -3770,7 +3986,7 @@
     "links": 54,
     "inputs": 0,
     "forms": 0,
-    "text": 8708,
+    "text": 11233,
     "h1": "System Health"
    },
    "declared": {
@@ -3797,7 +4013,7 @@
     "links": 54,
     "inputs": 0,
     "forms": 0,
-    "text": 2339,
+    "text": 2847,
     "h1": "System State"
    },
    "declared": {
@@ -3905,7 +4121,7 @@
     "links": 56,
     "inputs": 3,
     "forms": 0,
-    "text": 3388,
+    "text": 3298,
     "h1": "Foundation"
    },
    "declared": {
@@ -3932,7 +4148,7 @@
     "links": 65,
     "inputs": 0,
     "forms": 0,
-    "text": 1295,
+    "text": 1298,
     "h1": "Tenant Management"
    },
    "declared": {
@@ -3982,11 +4198,11 @@
    "redirected": false,
    "boundary": 0,
    "rendered": {
-    "buttons": 140,
-    "links": 63,
+    "buttons": 245,
+    "links": 64,
     "inputs": 20,
     "forms": 3,
-    "text": 12707,
+    "text": 16743,
     "h1": "Workflow Monitor"
    },
    "declared": {
@@ -4010,10 +4226,10 @@
    "boundary": 0,
    "rendered": {
     "buttons": 1,
-    "links": 12,
+    "links": 16,
     "inputs": 0,
     "forms": 0,
-    "text": 1517,
+    "text": 1981,
     "h1": "Partner Console"
    },
    "declared": {
@@ -4055,21 +4271,17 @@
   }
  ],
  "unbound": {
-  "/portal/[tenantSlug]/documents/[documentId]": [
-   "tenant: no [documentId]",
-   "tenant2: no [documentId]"
-  ],
-  "/portal/[tenantSlug]/library/foundation/[foundationId]": [
-   "tenant: no [foundationId]"
-  ],
   "/portal/[tenantSlug]/vaults/[vaultId]": [
    "tenant: no [vaultId]"
+  ],
+  "/portal/[tenantSlug]/documents/[documentId]": [
+   "tenant2: no [documentId]"
   ],
   "/portal/[tenantSlug]/portals/[portalId]": [
    "tenant2: no [portalId]"
   ],
-  "/admin/documents/[documentId]": [
-   "admin: no [documentId]"
+  "/portal/[tenantSlug]/projects/[projectId]": [
+   "tenant2: no [projectId]"
   ],
   "/vaults/[vaultId]": [
    "collab: no [vaultId]"

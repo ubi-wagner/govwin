@@ -29,7 +29,10 @@ import { createLogger } from '@/lib/logger';
 
 const log = createLogger('automation-policy');
 
-export type PolicyScope = 'discovery' | 'build';
+// discovery (before they buy) · build (before they submit) · project (after they have won).
+// Three phases of one customer's life; a trigger belongs to exactly one. Widened by mig 235,
+// which also widened the CHECK on `tenant_automation_policies.scope`.
+export type PolicyScope = 'discovery' | 'build' | 'project';
 export type PolicyChannel = 'email' | 'todo' | 'both';
 
 export interface GateDefaults {

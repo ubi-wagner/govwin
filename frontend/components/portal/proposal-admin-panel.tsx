@@ -10,6 +10,7 @@ import { SectionComplianceChip } from './section-compliance-chip';
 import { LibrarySeedPanel } from './library-seed-panel';
 import { ProposalAiActions } from '@/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions';
 import { SubmissionReadinessCard } from '@/components/portal/submission-readiness-card';
+import { fmtDate } from '@/lib/fmt';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -693,7 +694,7 @@ export function ProposalAdminPanel({
                             {section.completedStage && (
                               <span
                                 className="text-[10px] text-gray-400"
-                                title={`Accepted in ${section.completedStage}${section.acceptedByName ? ` by ${section.acceptedByName}` : ''}${section.completedAt ? ` on ${new Date(section.completedAt).toLocaleDateString()}` : ''}`}
+                                title={`Accepted in ${section.completedStage}${section.acceptedByName ? ` by ${section.acceptedByName}` : ''}${section.completedAt ? ` on ${fmtDate(section.completedAt)}` : ''}`}
                               >
                                 ✓ {section.completedStage}
                               </span>

@@ -13,6 +13,7 @@ import type {
   ContentPipelineData,
   EmailAutomationData,
 } from './page';
+import { fmtDateTime, fmtNum } from '@/lib/fmt';
 
 // ─── Constants ────────────────────────────────────────────────────────
 
@@ -132,7 +133,7 @@ function HealthBar({ health }: { health: HealthSummary }) {
           className={`border-l-4 rounded-lg p-3 ${c.color}`}
         >
           <p className="text-xs text-gray-500 uppercase font-medium">{c.label}</p>
-          <p className={`text-2xl font-bold mt-1 ${c.accent}`}>{c.value.toLocaleString()}</p>
+          <p className={`text-2xl font-bold mt-1 ${c.accent}`}>{fmtNum(c.value)}</p>
         </div>
       ))}
     </div>
@@ -235,7 +236,7 @@ function WorkflowCard({
             )}
             <div>
               <span className="text-gray-500">Started:</span>{' '}
-              <span className="text-gray-700">{workflow.startedAt ? new Date(workflow.startedAt).toLocaleString() : '--'}</span>
+              <span className="text-gray-700">{workflow.startedAt ? fmtDateTime(workflow.startedAt) : '--'}</span>
             </div>
           </div>
 
@@ -538,7 +539,8 @@ function ErrorsTable({ errors }: { errors: ErrorEvent[] }) {
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+    // `overflow-x-auto`: a clipped table has no scrollbar, so its right columns cannot be read.
+    <div className="border border-gray-200 rounded-lg overflow-x-auto bg-white">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase">
@@ -636,7 +638,10 @@ function EventVolumeChart({ data }: { data: EventVolumeRow[] }) {
       </div>
 
       {/* Bar chart */}
-      <div className="flex items-end gap-1" style={{ height: 160 }}>
+      {/* Scrolls rather than overflowing: twenty-four hourly bars plus their gaps are wider than
+          a phone, and the page's MAIN is `overflow-x-clip`, so the most recent hours — the ones an
+          operator actually wants — were the ones cut off. */}
+      <div className="flex items-end gap-1 overflow-x-auto" style={{ height: 160 }}>
         {hours.map((hour) => {
           const nsMap = hourMap.get(hour)!;
           let total = 0;
@@ -1050,8 +1055,10 @@ export function SystemStateClient({
       <HealthBar health={health} />
 
       {/* Tab navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="flex gap-0 -mb-px">
+      {/* `overflow-x-auto`: at 390px the tab row is 506px wide and the page's MAIN is
+          `overflow-x-clip`, so the last tabs were unreachable rather than merely off-screen. */}
+      <div className="border-b border-gray-200 overflow-x-auto">
+        <nav className="flex gap-0 -mb-px whitespace-nowrap">
           {TABS.map((tab) => (
             <button
               key={tab.key}

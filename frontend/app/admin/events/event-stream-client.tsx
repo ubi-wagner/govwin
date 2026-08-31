@@ -1,7 +1,11 @@
 'use client';
 
+// The LEAF module, not '@/lib/events' — that one imports the database client, and a client
+// component importing it pulls postgres and node:async_hooks into the browser bundle.
+import { EVENT_NAMESPACES } from '@/lib/event-namespaces';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { fmtNum } from '@/lib/fmt';
 
 export type SerializedEvent = {
   id: string;
@@ -18,7 +22,11 @@ export type SerializedEvent = {
   createdAt: string;
 };
 
-const NAMESPACES = ['all', 'finder', 'capture', 'identity', 'proposal', 'library', 'system', 'tool'] as const;
+// The filter options, derived from the registry rather than repeated. This list was its own copy
+// and went stale when `project` was added — so post-award delivery events existed in the database,
+// were emitted correctly, and had NO OPTION in the filter that finds them. An events console that
+// cannot show a namespace is a console that says it does not exist.
+const NAMESPACES = ['all', ...EVENT_NAMESPACES] as const;
 const PHASES = ['all', 'start', 'end', 'single', 'error'] as const;
 
 const NAMESPACE_COLORS: Record<string, string> = {
@@ -287,7 +295,7 @@ export function EventStreamClient({
                       {ev.tenantName ?? (ev.tenantId ? <span className="font-mono text-gray-400">{ev.tenantId.slice(0, 8)}…</span> : <span className="text-gray-400">system</span>)}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-500 text-right whitespace-nowrap">
-                      {ev.durationMs != null ? `${ev.durationMs.toLocaleString()}ms` : '-'}
+                      {ev.durationMs != null ? `${fmtNum(ev.durationMs)}ms` : '-'}
                     </td>
                     <td className="px-3 py-2 text-xs max-w-xs">
                       <button onClick={() => toggleExpand(ev.id)} className="text-left font-mono text-gray-600 hover:text-gray-900">

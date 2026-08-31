@@ -205,7 +205,7 @@ The fan-out (`opportunity-bridge.ts`): `publishAndFanOut:251` → `publishToBrid
 `buildCardSnapshot:65`, resolving **both** umbrella `cs.opportunity_id=o.id` and topic `o.solicitation_id=cs.id`
 arms `:84`) + `fanOutBridgeEvent:230` (`SELECT tenants WHERE status IN ('active','trial'):233` → `applyToTenant`
 per tenant `:241`). `applyToTenant:175` upserts one `tenant_opportunity_cards` row
-`ON CONFLICT (tenant_id, opportunity_id)` (`:190-202`), flips `pin_update_available` only for **pinned** cards
+`ON CONFLICT (tenant_id, opportunity_id)` (`:190-202`), flips `docs_update_available` only for **pinned** cards
 whose `bridge_version` advanced (`:198-200`), advances `tenant_bridge_cursor` (`:205-209`), and emits
 **`capture:card.applied`** (`:217-223`).
 
@@ -291,7 +291,7 @@ agent:** `score_card` (`rescore.py:87-138`, a faithful port of the frontend `sco
 `tenant_bucket_scores` under `SET LOCAL app.tenant_id` (`:149-161`) against every active
 `tenant_spotlight_buckets` row (`:164-169`). `OnBucketsUpdated` (`:55-73`) rescopes all open cards when the
 tenant edits buckets. The **`scoring_strategist` agent** is the *overlay* — it fires on **pin**
-(`cards/[opportunityId]/pin/route.ts:73`), not on arrival, and lands a clamped ±15 adjustment **beside** the
+(`cards/[opportunityId]/documents/route.ts:73`), not on arrival, and lands a clamped ±15 adjustment **beside** the
 algorithmic score in `tenant_bucket_scores.factors` (clamp `guardrails.py:111-120`).
 
 **Priority predicate (decision ③):** the bucket-parameter half (keywords/naics/agency/program/set-aside + a

@@ -98,6 +98,9 @@ export default async function SystemAdminPage() {
             or the admin invoke form to populate metrics.
           </p>
         ) : (
+          // Wrapped so it can scroll: this table has its own border and no container, so at
+          // 390px its 531px of columns had nothing to scroll them and were simply cut off.
+          <div className="overflow-x-auto">
           <table className="w-full text-sm border border-gray-200 rounded">
             <thead className="bg-gray-50 text-left">
               <tr>
@@ -126,6 +129,7 @@ export default async function SystemAdminPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 

@@ -40,12 +40,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
     const ranked = await withTenant(g.tenantId, async (tx) =>
       tx`
         SELECT s.opportunity_id, s.score, s.factors, s.computed_at,
-               c.card, c.is_pinned, c.lifecycle_status
+               c.card, c.docs_copied, c.lifecycle_status
         FROM tenant_bucket_scores s
         JOIN tenant_opportunity_cards c
           ON c.tenant_id = s.tenant_id AND c.opportunity_id = s.opportunity_id
         WHERE s.tenant_id = ${g.tenantId}::uuid AND s.bucket_id = ${bucketId}::uuid
-        ORDER BY s.score DESC, c.is_pinned DESC
+        ORDER BY s.score DESC, c.docs_copied DESC
         LIMIT 500
       `,
     );

@@ -14,7 +14,8 @@ import uuid
 
 from .models.database import get_pool as _get_cms_pool, get_event_pool
 from .models.events import emit_system_event
-from .workers.gmail_client import send_email as _gmail_send
+from .mailer import send as _mailer_send
+from .mailer.types import OutboundMessage
 from .templates import render_template, render_db_template, build_trigger_metadata
 from .sender_identity import resolve_sender, load_sender_identities
 
@@ -28,24 +29,64 @@ ADMIN_EMAIL = os.getenv('ADMIN_NOTIFICATION_EMAIL', 'eric@rfppipeline.com')
 _SEND_AS = os.getenv('GOOGLE_WORKSPACE_EMAIL', 'platform@rfppipeline.com')
 
 
-async def send_email(to: str, subject: str, html: str, sender: str | None = None) -> dict:
-    """Send via service account delegation (gmail_client), matching legacy signature.
+async def send_email(
+    to: str,
+    subject: str,
+    html: str,
+    sender: str | None = None,
+    *,
+    template: str | None = None,
+    tenant_id: str | None = None,
+    correlation_id: str | None = None,
+    idempotency_key: str | None = None,
+    tags: list[str] | None = None,
+) -> dict:
+    """Send through the mail seam (`src/mailer`), keeping this module's legacy signature.
 
-    `sender` is the From identity (the delegated mailbox to send AS); it defaults to
-    _SEND_AS so existing callers are unchanged. Callers select a per-namespace sender
-    via sender_identity.resolve_sender().
+    THE SIGNATURE IS UNCHANGED for the four positional arguments, and the return value is still the
+    `{provider, message_id} | {provider, error}` dict every caller here logs and branches on. What
+    is new is the keyword-only contract — template, tenant, correlation, idempotency key — which the
+    call sites below now thread through. Everything else the seam adds (the suppression check, the
+    reservation, the ledger row, the sender object) happens inside it.
+
+    `sender` is still the From ADDRESS, because `sender_identity.resolve_sender()` returns one and
+    is the live, DB-backed answer to which address a message goes out as. The seam wraps it in a
+    `SenderIdentity` rather than replacing it — a second resolver would be a second answer.
     """
-    try:
-        result = await _gmail_send(
-            delegate_email=sender or _SEND_AS,
-            to_email=to,
-            subject=subject,
-            body_html=html,
-        )
-        return {'provider': 'gmail', 'message_id': result.get('message_id')}
-    except Exception as e:
-        logger.error('send_email failed: %s', e)
-        return {'provider': 'gmail', 'error': str(e)}
+    result = await _mailer_send(OutboundMessage(
+        to=to,
+        subject=subject,
+        html=html,
+        kind='transactional',
+        sender=_identity_for(sender, template),
+        template=template,
+        tenant_id=tenant_id,
+        correlation_id=correlation_id,
+        idempotency_key=idempotency_key,
+        tags=tags or [],
+    ))
+    if result.degraded:
+        logger.warning('send to %s ran DEGRADED — no idempotency reservation (see mailer/ledger.py)', to)
+    return result.as_legacy_dict()
+
+
+def _identity_for(sender: str | None, template: str | None):
+    """Wrap the From address in the seam's identity object — WITHOUT re-resolving it.
+
+    When the caller already resolved one (via `sender_identity.resolve_sender()`), it is used
+    verbatim. Absent one, the address is `_SEND_AS`, which is exactly what the pre-seam wrapper
+    did (`sender or _SEND_AS`).
+
+    Resolving here instead would change behaviour twice over: it would give every call site that
+    does NOT resolve a new From address, and — because `resolve_sender()` ranks an explicit identity
+    hint and the originating namespace ABOVE its template heuristic — feeding an already-resolved
+    address back in with the template still attached would let the heuristic override a decision
+    made with more context. A message deliberately sent as `automation@` whose template name
+    contains "welcome" would come back out as `engagement@`.
+    """
+    del template   # deliberately unused — see above
+    from .mailer import identity_from_address
+    return identity_from_address(sender or _SEND_AS)
 
 
 async def start_event_listener():
@@ -578,7 +619,15 @@ async def _handle_multi_tenant_notification(event, payload: dict, template_name:
         if not to_email:
             logger.info('multi-tenant notification "%s": no recipient for tenant %s', template_name, tid)
             continue
-        result = await send_email(to=to_email, subject=subject, html=html, sender=sender)
+        result = await send_email(
+            to=to_email, subject=subject, html=html, sender=sender,
+            template=template_name, tenant_id=str(tid),
+            # The trigger event is both the correlation and the idempotency key — scoped per
+            # tenant, because one event fans out to many, and each fan-out leg is its own send.
+            correlation_id=trigger_event_id, 
+            idempotency_key=f'{trigger_event_id}:{tid}' if trigger_event_id else None,
+            tags=['notification', 'multi-tenant'],
+        )
         if result.get('error'):
             # Do NOT write a dedup row on a failed send — leave it un-logged so
             # the next poll retries this tenant rather than suppressing it forever.
@@ -701,6 +750,13 @@ async def _handle_notification_requested(event) -> None:
                     to=to_email,
                     subject=f"[RFP Pipeline] Notification render failed: {template_name}",
                     html=fallback_html,
+                    template='render_failure_fallback',
+                    correlation_id=trigger_event_id,
+                    # A DISTINCT key from the real notification's. Sharing it would make the
+                    # fallback burn the key, so a later retry of the actual template — once the
+                    # renderer is fixed — would be refused as a duplicate.
+                    idempotency_key=f'{trigger_event_id}:render-failed' if trigger_event_id else None,
+                    tags=['notification', 'fallback'],
                 )
                 logger.error(
                     'notification.requested: sent plaintext fallback for failed template "%s" to %s: %s',
@@ -740,6 +796,11 @@ async def _handle_notification_requested(event) -> None:
         subject=subject,
         html=html,
         sender=sender,
+        template=template_name,
+        tenant_id=payload.get('tenantId') or payload.get('tenant_id'),
+        correlation_id=trigger_event_id,
+        idempotency_key=trigger_event_id,
+        tags=['notification'],
     )
     logger.info(f'notification.requested: sent "{template_name}" as {sender} to {to_email}: {result}')
 
@@ -1149,7 +1210,13 @@ async def _do_action_inner(action_type: str, config: dict, payload: dict, event)
                 return
             sent = 0
             for addr in dict.fromkeys(emails):  # de-dupe, preserve order
-                result = await send_email(to=addr, subject=subject, html=html)
+                result = await send_email(
+                    to=addr, subject=subject, html=html, template=template_name,
+                    tenant_id=payload.get('tenantId') or payload.get('tenant_id'),
+                    correlation_id=event.get('id'),
+                    idempotency_key=f"{event.get('id')}:{addr.lower()}" if event.get('id') else None,
+                    tags=['notification', 'collaborators'],
+                )
                 if not result.get('error'):
                     sent += 1
                 logger.info('Sent "%s" to collaborator %s: %s', template_name, addr, result)
@@ -1203,6 +1270,11 @@ async def _do_action_inner(action_type: str, config: dict, payload: dict, event)
             to=to_email,
             subject=subject,
             html=html,
+            template=template_name,
+            tenant_id=payload.get('tenantId') or payload.get('tenant_id'),
+            correlation_id=event.get('id'),
+            idempotency_key=f"{event.get('id')}:send_email" if event.get('id') else None,
+            tags=['rule-action'],
         )
 
         # If we have trigger metadata, store it on the email_send record
@@ -1241,5 +1313,12 @@ async def _do_action_inner(action_type: str, config: dict, payload: dict, event)
                 to=to_email,
                 subject=f"[RFP Admin] {subject}",
                 html=html,
+                template=admin_template,
+                # PLATFORM scope. An admin alert ABOUT a tenant is not a send BY that tenant;
+                # filing it under them would put platform traffic in a customer's own history.
+                tenant_id=None,
+                correlation_id=event.get('id'),
+                idempotency_key=f"{event.get('id')}:notify_admin" if event.get('id') else None,
+                tags=['admin-alert'],
             )
             logger.info(f'Notified admin {to_email}: {result}')

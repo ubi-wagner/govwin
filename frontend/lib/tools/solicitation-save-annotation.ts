@@ -14,17 +14,37 @@ import { randomUUID } from 'crypto';
 import { emitEventSingle } from '@/lib/events';
 import { defineTool } from './base';
 
+/**
+ * ⚠️ `.passthrough()` is load-bearing, not laziness.
+ *
+ * Callers build this from a `SourceAnchor`, which carries `excerpt`, `method`, `document_id` and
+ * `document_name` alongside the flat page/offset/length. A strict object STRIPS those before the
+ * handler runs — so the excerpt the curation workspace has always sent would be discarded on the
+ * way in, and `excerptOf`'s fallback would read a key that zod had already deleted.
+ */
 const SourceLocation = z.object({
   page: z.number().int().min(1),
   offset: z.number().int().min(0),
   length: z.number().int().min(0),
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
-});
+}).passthrough();
 
 const InputSchema = z.object({
   solicitationId: z.string().uuid(),
   kind: z.enum(['highlight', 'text_box', 'compliance_tag']),
   sourceLocation: SourceLocation,
+  /**
+   * The SELECTED TEXT, not just where it was.
+   *
+   * An anchor alone is useless anywhere the document is not open. A tenant who has not pinned the
+   * solicitation has no local copy for `{page, offset, length}` to resolve against, so a highlight
+   * carried as an anchor renders empty for exactly the customer it exists to inform — and it cannot
+   * be matched by a ranker at all, since there is nothing to match.
+   *
+   * Capped at 2,000: a highlight is a passage a curator marked, not a chapter. The anchor stays
+   * alongside it and becomes live once a tenant pins, resolving against their own copy.
+   */
+  text: z.string().max(2000).optional(),
   payload: z.record(z.string(), z.unknown()).default({}),
   /** If the annotation is anchored to a specific compliance variable
    *  (e.g. highlighting the sentence where the page limit is stated),
@@ -33,6 +53,30 @@ const InputSchema = z.object({
 });
 
 type Input = z.infer<typeof InputSchema>;
+
+/**
+ * The excerpt to store — from `text`, or from the ANCHOR the caller already sends.
+ *
+ * ── WHY THE FALLBACK IS THE LOAD-BEARING HALF ────────────────────────────────────────────────
+ * Adding `text` to the schema was not enough, and shipping it that way would have been a feature
+ * that is plumbed and dry. The curation workspace has had the selected string all along — it calls
+ * this tool with `sourceLocation` built from a `SourceAnchor`, whose `excerpt` field IS the
+ * selection. It simply does not pass a top-level `text`, because until now nothing read one.
+ *
+ * So a `text`-only implementation writes NULL for every annotation the product actually creates,
+ * the bridge's `excerpt <> ''` filter drops all of them, and no highlight ever reaches a card —
+ * while every test written against the new field passes.
+ *
+ * Reading the anchor makes the capability work for the caller that exists rather than the caller
+ * the schema imagined. `text` stays as the explicit path for callers with no anchor.
+ */
+function excerptOf(text: string | undefined, sourceLocation: Record<string, unknown> | Input['sourceLocation']): string | null {
+  const explicit = text?.trim();
+  if (explicit) return explicit.slice(0, 2000);
+  const fromAnchor = (sourceLocation as Record<string, unknown>)?.excerpt;
+  if (typeof fromAnchor === 'string' && fromAnchor.trim()) return fromAnchor.trim().slice(0, 2000);
+  return null;
+}
 
 interface Output {
   id: string;
@@ -51,7 +95,7 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
   tenantScoped: false,
   async handler(input, ctx) {
     const actorId = ctx.actor.id;
-    const { solicitationId, kind, sourceLocation, payload, complianceVariableName } = input;
+    const { solicitationId, kind, sourceLocation, text, payload, complianceVariableName } = input;
 
     // Verify solicitation exists (FK will catch it at INSERT, but a
     // pre-check gives a cleaner error).
@@ -73,11 +117,12 @@ export const solicitationSaveAnnotationTool = defineTool<Input, Output>({
       rows = await sql<{ id: string; createdAt: Date }[]>`
         INSERT INTO solicitation_annotations
           (solicitation_id, actor_id, kind, compliance_variable_name,
-           source_location, payload)
+           source_location, excerpt, payload)
         VALUES
           (${solicitationId}::uuid, ${actorId}::uuid, ${kind},
            ${complianceVariableName ?? null},
-           ${sql.json(sourceLocation)},
+           ${sql.json(sourceLocation as Parameters<typeof sql.json>[0])},
+           ${excerptOf(text, sourceLocation)},
            ${sql.json((payload) as Parameters<typeof sql.json>[0])})
         RETURNING id, created_at
       `;

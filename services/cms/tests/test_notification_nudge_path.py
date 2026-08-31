@@ -46,8 +46,12 @@ class _FakePool:
 
 
 def _install(sends):
-    async def cap(to=None, subject=None, html=None, sender=None):
-        sends.append({'to': to, 'subject': subject, 'html': html or '', 'sender': sender})
+    async def cap(to=None, subject=None, html=None, sender=None, **contract):
+        # **contract is the seam's keyword-only fields (template, tenant_id, correlation_id,
+        # idempotency_key, tags). RECORDED, not swallowed: a double that quietly accepts
+        # anything stops the test noticing when a call site drops the correlation id.
+        sends.append({'to': to, 'subject': subject, 'html': html or '', 'sender': sender,
+                      **contract})
         return {'gmail_message_id': 'x'}
 
     async def _noop(*a, **k):

@@ -20,7 +20,11 @@
 import { chromium } from 'playwright';
 import postgres from 'postgres';
 
-const BASE = 'http://localhost:3000';
+// One base URL, three historic spellings — and this file used the worst of them: a LITERAL, which
+// ignores both env names silently. A drive pinned to :3000 runs against whatever build happens to
+// be serving there, so it can report a stale product as broken, or a fixed one as still broken.
+// (That is exactly how the release-gate change looked like a product failure for two runs.)
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
 const SOLS = process.argv.slice(2);
@@ -111,6 +115,27 @@ for (const SOL of SOLS) {
     data: { spotlightSummary: summary, expertNotes: 'Umbrella instrument — read the component instructions, which supersede the general guidelines.' },
   });
   console.log(`   summary ${patch.status()}`);
+
+  /*
+   * THE MINIMUM RELEASE SET (mig 241) — the two decisions a curator makes before a customer is told
+   * this exists. Without them `solicitation.push` answers 422 and nothing reaches a tenant card,
+   * which is the gate working: this drive stopped passing the moment the gate shipped, and the
+   * honest fix is for the drive to do what a curator does, not for the gate to relax.
+   *
+   * Both are recorded as ABSENCE, which is the whole point of the three-valued basis: an umbrella
+   * BAA genuinely states no per-award amount, and its governing passages live in the component
+   * instructions rather than in marked highlights. Recording "the solicitation does not state one"
+   * is a decision; leaving it blank is not.
+   */
+  const award = await page.request.patch(`${BASE}/api/admin/rfp-curation/${SOL}`, {
+    data: { awardBasis: 'not_stated' },
+  });
+  console.log(`   award   ${award.status()} basis=not_stated (an umbrella BAA states no per-award amount)`);
+  const noHl = await page.request.patch(`${BASE}/api/admin/rfp-curation/${SOL}`, {
+    data: { fieldBasis: { highlights: 'none_needed', source_documents: 'none_published' } },
+  });
+  console.log(`   basis   ${noHl.status()} highlights=none_needed source_documents=none_published`
+    + (noHl.ok() ? '' : ` ← ${JSON.stringify(await noHl.json().catch(() => ({}))).slice(0, 160)}`));
 
   console.log(`   triage  ${await triage(SOL, 'skip_shredder')}`);
   console.log(`   triage  ${await triage(SOL, 'request_review')}`);

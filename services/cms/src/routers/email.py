@@ -441,6 +441,19 @@ async def test_send_template(template_id: str, body: TemplateTestSendRequest):
             )
             full_html = embed_trigger_flags(full_html, trigger_meta)
 
+        # The suppression list applies to a TEST send too. Sending to an address that hard-bounced
+        # damages the domain's reputation whatever the intent was, and the reputation is shared
+        # with the notification stream. Refusing with the reason is more use to the admin than a
+        # 'sent' that quietly bounces again.
+        from ..mailer.ledger import suppression_for
+        suppressed = await suppression_for(body.to_email)
+        if suppressed:
+            raise HTTPException(
+                409,
+                f'{body.to_email} is on the suppression list ({suppressed}) and cannot be mailed. '
+                'Remove the suppression first if this was resolved.',
+            )
+
         # Send directly via Gmail (no HITL for test sends)
         delegate_email = os.getenv('GOOGLE_WORKSPACE_EMAIL', 'platform@rfppipeline.com')
         result = await gmail_send(

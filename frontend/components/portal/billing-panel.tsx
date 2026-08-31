@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { fmtDate } from '@/lib/fmt';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -325,7 +326,7 @@ export default function BillingPanel({
                       </span>
                     </td>
                     <td className="py-2 text-gray-500">
-                      {new Date(p.createdAt).toLocaleDateString()}
+                      {fmtDate(p.createdAt)}
                     </td>
                   </tr>
                 ))}

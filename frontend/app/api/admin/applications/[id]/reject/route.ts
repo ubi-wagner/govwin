@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventStart, emitEventEnd, userActor } from '@/lib/events';
-import { sendEmail } from '@/lib/email';
+import { send } from '@/lib/email';
 import { applicationRejectedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
 import { closeTasksForEntity } from '@/lib/tasks/tasks';
@@ -124,12 +124,19 @@ export async function POST(request: Request, ctx: RouteContext) {
         companyName: app.companyName,
         reason: reason,
       });
-      await sendEmail({
+      const r = await send({
         to: app.contactEmail,
         subject: emailContent.subject,
         html: emailContent.html,
+        kind: 'transactional',
+        // Platform scope: a rejected application never became a tenant, so there is no tenant this
+        // send belongs to. NULL is the answer, not a stand-in.
+        tenantId: null,
+        template: 'application_rejected',
+        idempotencyKey: `application_rejected:${id}`,
+        tags: ['onboarding'],
       });
-      emailSent = true;
+      emailSent = r.accepted;
     } catch (e) {
       console.error('[admin/applications/reject] email send failed:', e);
       // non-fatal, continue

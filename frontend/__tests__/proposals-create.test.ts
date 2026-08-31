@@ -112,9 +112,18 @@ vi.mock('@/lib/storage/paths', () => ({
     `tenants/${tenantSlug}/proposals/${proposalId}/${filename}`,
 }));
 
-// Mock the dynamic import of @/lib/email used in the route
+// Mock the dynamic import of @/lib/email used in the route.
+//
+// The export name matters more than it looks. When the route moved from `sendEmail` to the `send()`
+// seam, a mock still exporting `sendEmail` left `send` undefined — the route's `send(...)` threw a
+// TypeError, the surrounding best-effort catch swallowed it, and every test here went on passing
+// while the admin-alert path was no longer exercised at all. A mock that names an export the module
+// no longer has does not fail; it quietly stops testing something.
 vi.mock('@/lib/email', () => ({
-  sendEmail: vi.fn().mockResolvedValue(undefined),
+  send: vi.fn().mockResolvedValue({
+    provider: 'gmail', messageId: 'mock', accepted: true, error: null,
+    suppressed: false, duplicate: false, correlationId: 'mock', sendId: 'mock',
+  }),
 }));
 
 // ─── Import route after mocks ──────────────────────────────────────────

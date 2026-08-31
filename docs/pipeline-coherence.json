@@ -1,0 +1,805 @@
+{
+ "generatedFrom": "frontend/scripts/audit-pipeline-coherence.mjs",
+ "selfTestPassed": true,
+ "pipelines": [
+  "projects",
+  "proposal-build",
+  "rfp-ingest",
+  "library-ingest",
+  "templating",
+  "documents",
+  "export",
+  "opportunity",
+  "ranking",
+  "automation"
+ ],
+ "seams": [
+  "events",
+  "email",
+  "todos",
+  "canvas",
+  "floor",
+  "tenant",
+  "audit",
+  "agents",
+  "dates",
+  "toast"
+ ],
+ "matrix": {
+  "automation:events": {
+   "adopted": [
+    "app/api/admin/agents/platform-config/route.ts",
+    "app/api/admin/automation/[ruleId]/route.ts",
+    "app/api/admin/automation/route.ts",
+    "app/api/admin/workflows/[instanceId]/cancel/route.ts",
+    "app/api/admin/workflows/[instanceId]/retry/route.ts",
+    "lib/automation/prestage-todos.ts",
+    "lib/process/force-advance.ts",
+    "lib/process/launch-template.ts",
+    "lib/tasks/tasks.ts",
+    "lib/tasks/update-task.ts",
+    "lib/tools/compliance-add-variable.ts",
+    "lib/tools/compliance-save-variable-value.ts",
+    "lib/tools/ingest-trigger-manual.ts",
+    "lib/tools/opportunity-add-topic.ts",
+    "lib/tools/opportunity-bulk-add-topics.ts",
+    "lib/tools/opportunity-update-topic.ts",
+    "lib/tools/registry.ts",
+    "lib/tools/solicitation-approve.ts",
+    "lib/tools/solicitation-claim.ts",
+    "lib/tools/solicitation-delete-annotation.ts",
+    "lib/tools/solicitation-dismiss.ts",
+    "lib/tools/solicitation-push.ts",
+    "lib/tools/solicitation-reject-review.ts",
+    "lib/tools/solicitation-release.ts",
+    "lib/tools/solicitation-request-review.ts",
+    "lib/tools/solicitation-save-annotation.ts",
+    "lib/tools/source-scout.ts",
+    "lib/tools/volume-add-required-item.ts",
+    "lib/tools/volume-add.ts",
+    "lib/tools/volume-delete-required-item.ts",
+    "lib/tools/volume-delete.ts",
+    "lib/tools/volume-update-required-item.ts"
+   ],
+   "bespoke": [],
+   "candidates": 39
+  },
+  "documents:canvas": {
+   "adopted": [
+    "app/admin/documents/[documentId]/page.tsx",
+    "app/api/admin/documents/[documentId]/export/route.ts",
+    "app/api/admin/documents/[documentId]/route.ts",
+    "app/api/admin/documents/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/save/route.ts",
+    "app/portal/[tenantSlug]/documents/[documentId]/page.tsx",
+    "lib/content-admin.ts",
+    "lib/content-canvas.ts",
+    "lib/documents/atomize-on-export.ts",
+    "lib/documents/duplicate-past-proposal.ts",
+    "lib/documents/starter.ts"
+   ],
+   "bespoke": [],
+   "candidates": 14
+  },
+  "rfp-ingest:events": {
+   "adopted": [
+    "app/api/admin/rfp-curation/[solId]/annotations/[annotationId]/route.ts",
+    "app/api/admin/rfp-curation/[solId]/annotations/route.ts",
+    "app/api/admin/rfp-curation/[solId]/apply-preset/route.ts",
+    "app/api/admin/rfp-curation/[solId]/assess-ingest/route.ts",
+    "app/api/admin/rfp-curation/[solId]/broadcast/route.ts",
+    "app/api/admin/rfp-curation/[solId]/compliance/route.ts",
+    "app/api/admin/rfp-curation/[solId]/force-release/route.ts",
+    "app/api/admin/rfp-curation/[solId]/ingest-assist/route.ts",
+    "app/api/admin/rfp-curation/[solId]/ingest-phase/route.ts",
+    "app/api/admin/rfp-curation/[solId]/items/[itemId]/route.ts",
+    "app/api/admin/rfp-curation/[solId]/notes/route.ts",
+    "app/api/admin/rfp-curation/[solId]/route.ts",
+    "app/api/admin/rfp-curation/[solId]/shred-audit/route.ts",
+    "app/api/admin/rfp-curation/[solId]/topics/[topicId]/compliance/route.ts",
+    "app/api/admin/rfp-curation/[solId]/triage/route.ts",
+    "app/api/admin/rfp-curation/[solId]/volumes/[volumeId]/route.ts",
+    "app/api/admin/rfp-document/[id]/set-primary/route.ts",
+    "app/api/admin/rfp-upload/route.ts",
+    "lib/curation/republish.ts",
+    "lib/ingest/ingest-topic-files.ts",
+    "lib/intake.ts",
+    "lib/scout/candidates.ts"
+   ],
+   "bespoke": [],
+   "candidates": 23
+  },
+  "templating:canvas": {
+   "adopted": [
+    "app/admin/templates/[templateId]/edit/page.tsx",
+    "app/admin/templates/page.tsx",
+    "app/api/portal/[tenantSlug]/templates/extract/route.ts",
+    "lib/templates/baa-white-paper.ts",
+    "lib/templates/biographical-sketch.ts",
+    "lib/templates/budget-justification.ts",
+    "lib/templates/commercialization-plan.ts",
+    "lib/templates/company-capability-deck.ts",
+    "lib/templates/cost/burden-cost-sheet.ts",
+    "lib/templates/current-and-pending-support.ts",
+    "lib/templates/data-management-plan.ts",
+    "lib/templates/dod-cso-phase1-briefing.ts",
+    "lib/templates/dod-d2p2-technical.ts",
+    "lib/templates/dod-sbir-phase1-cost.ts",
+    "lib/templates/dod-sbir-phase1-technical.ts",
+    "lib/templates/dod-sbir-phase2-technical.ts",
+    "lib/templates/dod-sttr-phase1-technical.ts",
+    "lib/templates/dod-sttr-phase2-technical.ts",
+    "lib/templates/doe-sbir-phase1-technical.ts",
+    "lib/templates/doe-sttr-phase1-technical.ts",
+    "lib/templates/executive-summary.ts",
+    "lib/templates/extract-skeleton.ts",
+    "lib/templates/facilities-equipment.ts",
+    "lib/templates/index.ts",
+    "lib/templates/investment-one-pager.ts",
+    "lib/templates/investment-pitch-deck.ts",
+    "lib/templates/letter-of-collaboration.ts",
+    "lib/templates/marketing-one-pager.ts",
+    "lib/templates/marketing-slide-deck.ts",
+    "lib/templates/marketing-two-pager.ts",
+    "lib/templates/marketing-whitepaper.ts",
+    "lib/templates/nasa-sbir-phase1-technical.ts",
+    "lib/templates/nih-research-strategy.ts",
+    "lib/templates/nsf-project-pitch.ts",
+    "lib/templates/nsf-sbir-phase1-project-description.ts",
+    "lib/templates/ota-solution-brief.ts",
+    "lib/templates/past-proposal-canvas.ts",
+    "lib/templates/quad-chart.ts",
+    "lib/templates/sf424a-budget.ts",
+    "lib/templates/statement-of-work.ts",
+    "lib/templates/tech-overview-deck.ts"
+   ],
+   "bespoke": [],
+   "candidates": 45
+  },
+  "automation:agents": {
+   "adopted": [
+    "lib/tasks/tasks.ts"
+   ],
+   "bespoke": [],
+   "candidates": 8
+  },
+  "documents:floor": {
+   "adopted": [
+    "app/api/admin/documents/[documentId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/save/route.ts"
+   ],
+   "bespoke": [],
+   "candidates": 6
+  },
+  "documents:events": {
+   "adopted": [
+    "app/api/admin/documents/[documentId]/route.ts",
+    "app/api/admin/documents/route.ts",
+    "app/api/portal/[tenantSlug]/cards/[opportunityId]/documents/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/lock/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/save/route.ts",
+    "app/api/portal/[tenantSlug]/documents/route.ts",
+    "lib/documents/atomize-on-export.ts"
+   ],
+   "bespoke": [],
+   "candidates": 8
+  },
+  "opportunity:events": {
+   "adopted": [
+    "app/api/admin/opportunities/[oppId]/lifecycle/route.ts",
+    "app/api/admin/opportunities/[oppId]/publish/route.ts",
+    "app/api/admin/opportunities/[oppId]/watch/route.ts",
+    "app/api/admin/reconcile-cards/route.ts",
+    "app/api/admin/tenants/[tenantId]/backfill-cards/route.ts",
+    "app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts",
+    "lib/amendments.ts",
+    "lib/opportunity-bridge.ts"
+   ],
+   "bespoke": [],
+   "candidates": 8
+  },
+  "proposal-build:canvas": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai-review/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/layout/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/document/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/findings/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/package/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/preview/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/reuse-past/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assemble/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/atomize-node/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/create/route.ts",
+    "app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx",
+    "components/proposal/section-assist-bar.tsx",
+    "lib/proposal/brand.ts",
+    "lib/proposal/cost-forms.ts",
+    "lib/proposal/cost-volume-canvas.ts",
+    "lib/proposal/document-furniture.ts",
+    "lib/proposal/figures.ts",
+    "lib/proposal/scoped-findings.ts",
+    "lib/proposal/sttr-split.ts",
+    "lib/proposal/submission-readiness.ts",
+    "lib/proposal/volume-finish.ts",
+    "lib/proposal-advance.ts",
+    "lib/proposal-ai-review.ts",
+    "lib/proposal-atom-harvest.ts",
+    "lib/review/visual-review.ts"
+   ],
+   "bespoke": [],
+   "candidates": 46
+  },
+  "rfp-ingest:agents": {
+   "adopted": [
+    "app/api/admin/rfp-curation/[solId]/shred-audit/route.ts",
+    "lib/ingest/assessment.ts",
+    "lib/ingest/ingest-topic-files.ts",
+    "lib/ingest/parse-solicitation.ts"
+   ],
+   "bespoke": [],
+   "candidates": 7
+  },
+  "templating:events": {
+   "adopted": [
+    "app/api/admin/templates/[templateId]/route.ts",
+    "app/api/admin/templates/route.ts",
+    "app/api/admin/workflows/templates/route.ts",
+    "app/api/portal/[tenantSlug]/guardrail-templates/route.ts",
+    "app/api/portal/[tenantSlug]/template-cards/[cardId]/ack/route.ts",
+    "app/api/portal/[tenantSlug]/template-cards/[cardId]/use/route.ts",
+    "app/api/portal/[tenantSlug]/templates/extract/route.ts",
+    "lib/template-bridge.ts"
+   ],
+   "bespoke": [],
+   "candidates": 8
+  },
+  "automation:tenant": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/agents/usage/route.ts",
+    "app/portal/[tenantSlug]/agents/page.tsx",
+    "app/portal/[tenantSlug]/todos/page.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 4
+  },
+  "library-ingest:events": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/atoms/[atomId]/archive/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/[atomId]/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/apply-librarian-tags/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/atomize-package/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/bulk/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/capture/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/select/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/upload/route.ts",
+    "app/api/portal/[tenantSlug]/library/canvas/route.ts",
+    "app/api/portal/[tenantSlug]/library/foundation/[foundationId]/save/route.ts",
+    "app/api/portal/[tenantSlug]/library/system-templates/route.ts",
+    "lib/library/starter-offer.ts",
+    "lib/vaults/vaults.ts"
+   ],
+   "bespoke": [],
+   "candidates": 14
+  },
+  "library-ingest:tenant": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/atoms/[atomId]/archive/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/[atomId]/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/apply-librarian-tags/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/atomize-package/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/bulk/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/capture/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/propose-regions/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/review/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/select/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/upload/route.ts",
+    "app/api/portal/[tenantSlug]/library/atoms/[atomId]/download/route.ts",
+    "app/api/portal/[tenantSlug]/library/atoms/route.ts",
+    "app/api/portal/[tenantSlug]/library/canvas/route.ts",
+    "app/api/portal/[tenantSlug]/library/foundation/[foundationId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/library/foundation/[foundationId]/save/route.ts",
+    "app/api/portal/[tenantSlug]/library/system-templates/route.ts",
+    "app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/download/route.ts",
+    "app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/ingest/route.ts",
+    "app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/route.ts",
+    "app/api/portal/[tenantSlug]/vaults/[vaultId]/members/route.ts",
+    "app/api/portal/[tenantSlug]/vaults/route.ts",
+    "app/portal/[tenantSlug]/atoms/page.tsx",
+    "app/portal/[tenantSlug]/library/foundation/[foundationId]/page.tsx",
+    "app/portal/[tenantSlug]/vaults/[vaultId]/page.tsx",
+    "app/portal/[tenantSlug]/vaults/page.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 29
+  },
+  "library-ingest:agents": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/atoms/apply-librarian-tags/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/atomize-package/route.ts",
+    "app/api/portal/[tenantSlug]/atoms/upload/route.ts"
+   ],
+   "bespoke": [],
+   "candidates": 5
+  },
+  "ranking:events": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/buckets/[bucketId]/route.ts",
+    "app/api/portal/[tenantSlug]/buckets/route.ts"
+   ],
+   "bespoke": [],
+   "candidates": 2
+  },
+  "ranking:tenant": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/buckets/[bucketId]/route.ts",
+    "app/api/portal/[tenantSlug]/buckets/route.ts",
+    "app/portal/[tenantSlug]/buckets/page.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 3
+  },
+  "documents:tenant": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/cards/[opportunityId]/documents/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/lock/route.ts",
+    "app/api/portal/[tenantSlug]/documents/[documentId]/save/route.ts",
+    "app/api/portal/[tenantSlug]/documents/route.ts",
+    "app/portal/[tenantSlug]/documents/[documentId]/page.tsx",
+    "app/portal/[tenantSlug]/documents/new/page.tsx",
+    "app/portal/[tenantSlug]/documents/page.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 8
+  },
+  "opportunity:tenant": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts",
+    "app/api/portal/[tenantSlug]/cards/route.ts",
+    "app/portal/[tenantSlug]/cards/[opportunityId]/solicitation/page.tsx",
+    "app/portal/[tenantSlug]/cards/page.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 4
+  },
+  "opportunity:agents": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 2
+  },
+  "templating:tenant": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/guardrail-templates/route.ts",
+    "app/api/portal/[tenantSlug]/template-cards/[cardId]/ack/route.ts",
+    "app/api/portal/[tenantSlug]/template-cards/[cardId]/route.ts",
+    "app/api/portal/[tenantSlug]/template-cards/[cardId]/use/route.ts",
+    "app/api/portal/[tenantSlug]/template-cards/route.ts",
+    "app/api/portal/[tenantSlug]/templates/extract/route.ts",
+    "app/api/portal/[tenantSlug]/templates/route.ts",
+    "app/portal/[tenantSlug]/templates/page.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 8
+  },
+  "library-ingest:canvas": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/library/atoms/[atomId]/download/route.ts",
+    "app/api/portal/[tenantSlug]/library/foundation/[foundationId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/library/foundation/[foundationId]/save/route.ts",
+    "app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/download/route.ts",
+    "app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/route.ts",
+    "app/portal/[tenantSlug]/library/foundation/[foundationId]/page.tsx",
+    "lib/atom-size.ts",
+    "lib/atomize-capture.ts",
+    "lib/atomize-package.ts",
+    "lib/atoms.ts",
+    "lib/library/artifact-canvas.ts",
+    "lib/library/foundation.ts",
+    "lib/library/house-docs.ts",
+    "lib/library/starter-set.ts",
+    "lib/vaults/vaults.ts"
+   ],
+   "bespoke": [],
+   "candidates": 18
+  },
+  "library-ingest:floor": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/library/foundation/[foundationId]/export/route.ts"
+   ],
+   "bespoke": [],
+   "candidates": 1
+  },
+  "proposal-build:tenant": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/library/past-proposals/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/activity/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/advance/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/research/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai-review/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/amendments/[amendmentId]/document/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/amendments/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/archive/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/layout/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/[collaboratorId]/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/[commentId]/resolve/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/compliance/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/document/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/dropbox/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/findings/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/full-draft/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/gates/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/lock/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/lock-scope/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/outcome/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/package/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/package-review/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/preview/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/readiness/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/reuse-past/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assemble/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assign/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/atomize-node/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/lock/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/versions/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/decide/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/select/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/skip/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/stage/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/strategy/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/studio/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/[docId]/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/create/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/route.ts",
+    "app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx",
+    "app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx",
+    "app/portal/[tenantSlug]/proposals/page.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 57
+  },
+  "projects:events": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts",
+    "lib/projects/baseline.ts",
+    "lib/projects/cdrl.ts",
+    "lib/projects/clins.ts",
+    "lib/projects/closeout.ts",
+    "lib/projects/comments.ts",
+    "lib/projects/evidence.ts",
+    "lib/projects/gate-closer.ts",
+    "lib/projects/invoices.ts",
+    "lib/projects/meetings.ts",
+    "lib/projects/milestone-tasks.ts",
+    "lib/projects/milestones.ts",
+    "lib/projects/modifications.ts",
+    "lib/projects/project.ts",
+    "lib/projects/reviews.ts",
+    "lib/projects/risks.ts",
+    "lib/projects/task-attachments.ts",
+    "lib/projects/time.ts",
+    "lib/projects/todos.ts"
+   ],
+   "bespoke": [],
+   "candidates": 20
+  },
+  "projects:tenant": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/notifications/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/traceability/route.ts",
+    "app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts",
+    "app/api/portal/[tenantSlug]/projects/route.ts",
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+    "app/portal/[tenantSlug]/projects/page.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 34
+  },
+  "projects:canvas": {
+   "adopted": [
+    "lib/projects/meetings.ts",
+    "lib/projects/milestones.ts",
+    "lib/projects/status-report.ts",
+    "lib/projects/wbs.ts"
+   ],
+   "bespoke": [],
+   "candidates": 11
+  },
+  "proposal-build:events": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/research/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/[collaboratorId]/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/[commentId]/resolve/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/dropbox/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/gates/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/lock/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/outcome/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/package/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/reuse-past/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assemble/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/atomize-node/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/lock/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/versions/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/decide/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/select/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/skip/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/[docId]/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/create/route.ts",
+    "lib/proposal/lock-section.ts",
+    "lib/proposal/section-todo.ts",
+    "lib/proposal-advance.ts",
+    "lib/proposal-ai-review.ts",
+    "lib/proposal-archive.ts",
+    "lib/proposal-full-draft.ts",
+    "lib/proposal-package-review.ts",
+    "lib/proposal-studio.ts",
+    "lib/proposal-visual-review.ts"
+   ],
+   "bespoke": [],
+   "candidates": 40
+  },
+  "proposal-build:agents": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance/route.ts",
+    "lib/proposal-ai-review.ts",
+    "lib/proposal-archive.ts"
+   ],
+   "bespoke": [],
+   "candidates": 9
+  },
+  "proposal-build:floor": {
+   "adopted": [
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/package/route.ts",
+    "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save/route.ts",
+    "lib/proposal/submission-readiness.ts"
+   ],
+   "bespoke": [],
+   "candidates": 9
+  },
+  "projects:dates": {
+   "adopted": [
+    "app/portal/[tenantSlug]/projects/[projectId]/page.tsx",
+    "lib/projects/baseline.ts",
+    "lib/projects/cdrl.ts",
+    "lib/projects/invoices.ts",
+    "lib/projects/meetings.ts",
+    "lib/projects/milestone-tasks.ts",
+    "lib/projects/milestones.ts",
+    "lib/projects/reviews.ts",
+    "lib/projects/status-report.ts",
+    "lib/projects/todos.ts"
+   ],
+   "bespoke": [],
+   "candidates": 15
+  },
+  "opportunity:dates": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 1
+  },
+  "projects:toast": {
+   "adopted": [
+    "components/projects/cdrl-register.tsx",
+    "components/projects/comment-thread.tsx",
+    "components/projects/deliverable-row.tsx",
+    "components/projects/evidence-panel.tsx",
+    "components/projects/gate-closer-control.tsx",
+    "components/projects/invoice-ledger.tsx",
+    "components/projects/meeting-log.tsx",
+    "components/projects/milestone-checklist.tsx",
+    "components/projects/modification-log.tsx",
+    "components/projects/notification-policy.tsx",
+    "components/projects/project-assistant.tsx",
+    "components/projects/project-roster.tsx",
+    "components/projects/review-panel.tsx",
+    "components/projects/risk-register.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 14
+  },
+  "proposal-build:toast": {
+   "adopted": [
+    "components/proposal/section-assign-bar.tsx",
+    "components/proposal/section-assist-bar.tsx"
+   ],
+   "bespoke": [],
+   "candidates": 2
+  },
+  "automation:canvas": {
+   "adopted": [
+    "lib/tools/proposal-draft-section.ts"
+   ],
+   "bespoke": [],
+   "candidates": 5
+  },
+  "documents:agents": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 1
+  },
+  "rfp-ingest:canvas": {
+   "adopted": [
+    "lib/ingest/molds.ts"
+   ],
+   "bespoke": [],
+   "candidates": 3
+  },
+  "documents:todos": {
+   "adopted": [
+    "lib/content-admin.ts"
+   ],
+   "bespoke": [],
+   "candidates": 1
+  },
+  "rfp-ingest:dates": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 1
+  },
+  "export:canvas": {
+   "adopted": [
+    "lib/export/artifact-export.ts",
+    "lib/export/canvas-html.ts",
+    "lib/export/docx-exporter.ts",
+    "lib/export/image-raster.ts",
+    "lib/export/pdf-exporter.ts",
+    "lib/export/pptx-exporter.ts",
+    "lib/export/xlsx-exporter.ts"
+   ],
+   "bespoke": [],
+   "candidates": 11
+  },
+  "export:floor": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 2
+  },
+  "rfp-ingest:todos": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 1
+  },
+  "library-ingest:todos": {
+   "adopted": [
+    "lib/library/starter-offer.ts",
+    "lib/vaults/vaults.ts"
+   ],
+   "bespoke": [],
+   "candidates": 2
+  },
+  "automation:todos": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 2
+  },
+  "projects:audit": {
+   "adopted": [
+    "lib/projects/access.ts",
+    "lib/projects/baseline.ts",
+    "lib/projects/cdrl.ts",
+    "lib/projects/clins.ts",
+    "lib/projects/closeout.ts",
+    "lib/projects/comments.ts",
+    "lib/projects/evidence.ts",
+    "lib/projects/gate-closer.ts",
+    "lib/projects/invoices.ts",
+    "lib/projects/meetings.ts",
+    "lib/projects/milestone-tasks.ts",
+    "lib/projects/milestones.ts",
+    "lib/projects/modifications.ts",
+    "lib/projects/project.ts",
+    "lib/projects/reviews.ts",
+    "lib/projects/risks.ts",
+    "lib/projects/task-attachments.ts",
+    "lib/projects/time.ts",
+    "lib/projects/wbs.ts"
+   ],
+   "bespoke": [],
+   "candidates": 19
+  },
+  "projects:agents": {
+   "adopted": [
+    "lib/projects/milestones.ts"
+   ],
+   "bespoke": [],
+   "candidates": 2
+  },
+  "projects:email": {
+   "adopted": [
+    "lib/projects/comments.ts",
+    "lib/projects/reviews.ts",
+    "lib/projects/todos.ts"
+   ],
+   "bespoke": [],
+   "candidates": 3
+  },
+  "projects:todos": {
+   "adopted": [
+    "lib/projects/comments.ts",
+    "lib/projects/milestone-tasks.ts",
+    "lib/projects/milestones.ts",
+    "lib/projects/modifications.ts",
+    "lib/projects/reviews.ts"
+   ],
+   "bespoke": [],
+   "candidates": 9
+  },
+  "proposal-build:todos": {
+   "adopted": [
+    "lib/proposal/outcome-todo.ts",
+    "lib/proposal/section-todo.ts"
+   ],
+   "bespoke": [],
+   "candidates": 3
+  },
+  "proposal-build:dates": {
+   "adopted": [],
+   "bespoke": [],
+   "candidates": 1
+  }
+ },
+ "findings": []
+}

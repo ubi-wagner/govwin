@@ -294,7 +294,8 @@ export default async function TenantDetailPage({ params }: Props) {
           {users.length === 0 ? (
             <p className="text-sm text-gray-400 italic">No users.</p>
           ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            // `overflow-x-auto`: a clipped table has no scrollbar, so its right columns cannot be read.
+            <div className="border border-gray-200 rounded-lg overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
@@ -336,7 +337,7 @@ export default async function TenantDetailPage({ params }: Props) {
           {events.length === 0 ? (
             <p className="text-sm text-gray-400 italic">No events recorded.</p>
           ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-gray-200 rounded-lg overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>

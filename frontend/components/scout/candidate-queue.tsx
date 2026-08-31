@@ -9,6 +9,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { toast } from '@/lib/toast';
+import { TimeAgo } from '@/components/ui/time-ago';
 
 interface Candidate {
   id: string;
@@ -34,13 +35,6 @@ const CLASS_BADGE: Record<string, string> = {
   unknown: 'bg-gray-100 text-gray-600 border-gray-300',
 };
 
-function rel(iso: string): string {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
 
 function rawStr(raw: Record<string, unknown>, ...keys: string[]): string {
   for (const k of keys) {
@@ -128,7 +122,7 @@ export default function ScoutCandidateQueue() {
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-gray-800">{c.title ?? '(untitled)'}</div>
                     <div className="text-xs text-gray-500 mt-0.5">
-                      {c.sourceName ?? 'scout'} · {rel(c.discoveredAt)}
+                      {c.sourceName ?? 'scout'} · <TimeAgo iso={c.discoveredAt} />
                       {c.url && <> · <a href={c.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">source ↗</a></>}
                     </div>
                     {c.snippet && <p className="text-sm text-gray-600 mt-1 line-clamp-2">{c.snippet}</p>}

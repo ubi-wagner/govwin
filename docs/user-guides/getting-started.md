@@ -174,3 +174,7 @@ The left rail is your map. Here's what each item is and the guide that covers it
 - **You can't see a section a teammate mentioned.** Collaborators only see
   sections they've been granted; ask the tenant admin to extend your access
   (see [Team & collaborators](./team-collaborators.md)).
+
+## Related
+
+- [On a phone — web and mobile](./mobile.md) — what changes when the screen is narrow

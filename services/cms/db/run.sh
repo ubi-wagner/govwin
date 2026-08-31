@@ -2,7 +2,7 @@
 # ===========================================================================
 # CRM Service — Database Migration Runner
 # ---------------------------------------------------------------------------
-# Runs all SQL migrations in order against CMS_DATABASE_URL.
+# Runs all SQL migrations in order against CRM_DATABASE.
 # Same pattern as the main db/migrations/run.sh.
 #
 # Usage:
@@ -11,12 +11,30 @@
 #   ./run.sh --dry-run            # Show what would run
 #
 # Environment:
-#   CMS_DATABASE_URL   — Required. CRM PostgreSQL connection string.
+#   CRM_DATABASE       — Required. CRM PostgreSQL connection string.
+#                        (CRM_DATABASE_URL and CMS_DATABASE_URL are honoured during
+#                        the rename; the second is deprecated.)
+#
+# ⚠️ THE CRM DATABASE IS INTERNAL TO RAILWAY'S PRIVATE NETWORK. This script cannot be
+#    run from GitHub Actions or a laptop against production — there is no public
+#    endpoint to reach. Run it from inside the deployment (a Railway shell, or the
+#    rfp-crm service's own release step). See docs/RAILWAY_ENV_VARS.md.
 # ===========================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONN="${CMS_DATABASE_URL:?CMS_DATABASE_URL is not set}"
+# The same fallback chain as src/models/database.py's crm_database_url(), newest first. Bash
+# cannot import the Python resolver, so the chain is repeated here — and
+# `tests/test_crm_database_var.py` asserts the two agree, because a rename that updates one and
+# not the other is exactly the failure this chain exists to prevent.
+CONN="${CRM_DATABASE:-${CRM_DATABASE_URL:-${CMS_DATABASE_URL:-}}}"
+if [ -z "$CONN" ]; then
+  echo "CRM_DATABASE is not set (also looked for CRM_DATABASE_URL, CMS_DATABASE_URL)" >&2
+  exit 1
+fi
+if [ -z "${CRM_DATABASE:-}" ] && [ -n "${CMS_DATABASE_URL:-}" ]; then
+  echo "warning: CMS_DATABASE_URL is DEPRECATED — the CRM database variable is now CRM_DATABASE" >&2
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

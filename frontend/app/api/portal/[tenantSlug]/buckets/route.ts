@@ -8,7 +8,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
-import { rankBucket, sanitizeBucketCriteria } from '@/lib/bucket-ranking';
+import { rankBucket, sanitizeBucketCriteria, measureCoverage, type CardFields } from '@/lib/bucket-ranking';
+import { coerceJsonb } from '@/lib/jsonb';
 import { getMaxBucketsPerTenant } from '@/lib/automation/policy';
 import { getTenantBySlug, verifyTenantAccess, canManageBuckets } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
@@ -34,16 +35,41 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ten
     const { tenantSlug } = await params;
     const g = await gate(tenantSlug, 'tenant_user');
     if ('error' in g) return g.error;
-    const [buckets, cap] = await Promise.all([
-      withTenant(g.tenantId, async (tx) =>
-        tx`SELECT id, name, description, criteria, is_active, created_at, updated_at
+    const [read, cap] = await Promise.all([
+      withTenant(g.tenantId, async (tx) => {
+        const buckets = await tx`SELECT id, name, description, criteria, is_active, created_at, updated_at
            FROM tenant_spotlight_buckets WHERE tenant_id = ${g.tenantId}::uuid AND is_active
-           ORDER BY created_at DESC`,
-      ),
+           ORDER BY created_at DESC`;
+        /**
+         * Which cards each signal can actually reach — see `measureCoverage`.
+         *
+         * ⚠️ The predicate is COPIED FROM `rankBucket`, not re-derived: `tenant_id`, and
+         * `lifecycle_status = 'open'` unless the bucket sets `includeClosed`. No `card IS NOT NULL`
+         * and no pursuit filter, because the ranker has neither — a null card is scored as `{}` and
+         * carries nothing, and that is a real card in the denominator, not one to quietly drop.
+         * Both scopes are returned so the author's own "include closed" checkbox picks the right
+         * one while they type, rather than being told about a set they are not scoring.
+         */
+        // camelCase field names, matching lib/db.ts's postgres.toCamel transform — a snake_case
+        // assertion here compiles and reads `undefined` at runtime (the repo's `sql<T>` trap).
+        type CardRow = { card: CardFields | null; lifecycleStatus: string };
+        const cards = (await tx`
+          SELECT card, lifecycle_status FROM tenant_opportunity_cards
+          WHERE tenant_id = ${g.tenantId}::uuid`) as unknown as CardRow[];
+        const now = Date.now();
+        const asFields = (r: CardRow) => coerceJsonb<CardFields>(r.card, {});
+        return {
+          buckets,
+          coverage: {
+            open: measureCoverage(cards.filter((r: CardRow) => r.lifecycleStatus === 'open').map(asFields), now),
+            all: measureCoverage(cards.map(asFields), now),
+          },
+        };
+      }),
       getMaxBucketsPerTenant(),
     ]);
     // cap: the platform max_buckets_per_tenant so the UI can show slots + disable Create at the limit.
-    return NextResponse.json({ data: { buckets, cap } });
+    return NextResponse.json({ data: { ...read, cap } });
   } catch (err) {
     console.error('[portal/buckets] GET error', err);
     return NextResponse.json({ error: 'Failed to load buckets', code: 'DB_ERROR' }, { status: 500 });

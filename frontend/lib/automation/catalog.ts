@@ -4,7 +4,7 @@
  * Framework-hard gates (the curation SLA) are deliberately NOT here: a tenant cannot
  * move them (decision ⑦). Extensible: add a row here to expose a new tunable trigger.
  */
-export type PolicyScope = 'discovery' | 'build';
+export type PolicyScope = 'discovery' | 'build' | 'project';
 
 export interface CatalogTrigger {
   scope: PolicyScope;
@@ -79,10 +79,29 @@ export const TRIGGER_CATALOG: CatalogTrigger[] = [
     agentCapable: true,
     deliveryStatus: 'active',
   },
+  // ── Project (post-award) ──
+  //
+  // Both ACTIVE: `lib/projects/notify-policy.ts` resolves them through `resolveGatePolicy` and
+  // `lib/projects/todos.ts` acts on the result. They were hard-coded constants until mig 235 —
+  // a customer could tune every reminder the proposal side sends and none their project sends.
+  {
+    scope: 'project',
+    triggerKey: 'project:task.assigned',
+    label: 'Work assigned to someone',
+    help: 'The reminder a person gets when project work lands in their queue. Tune the cadence, and whether their inbox is involved — the ToDo itself always appears, because ticking it off is how the work gets closed.',
+    deliveryStatus: 'active',
+  },
+  {
+    scope: 'project',
+    triggerKey: 'project:milestone.due_soon',
+    label: 'Milestone approaching or overdue',
+    help: 'The reminder as a phase nears its forecast date, and after it passes. Front-loaded by default — a reminder on the day is a report.',
+    deliveryStatus: 'active',
+  },
 ];
 
 export const TRIGGER_KEYS = new Set(TRIGGER_CATALOG.map((t) => t.triggerKey));
-export const VALID_SCOPES = new Set<PolicyScope>(['discovery', 'build']);
+export const VALID_SCOPES = new Set<PolicyScope>(['discovery', 'build', 'project']);
 export const VALID_CHANNELS = new Set(['email', 'todo', 'both']);
 export const VALID_RECIPIENT_ROLES = new Set(['tenant_admin', 'tenant_user', 'partner_user']);
 export const VALID_RECIPIENT_FLAGS = new Set(['delegated_managers', 'collaborators_at_stage']);

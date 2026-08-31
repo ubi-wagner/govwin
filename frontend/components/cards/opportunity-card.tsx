@@ -14,6 +14,7 @@ import type { ComplianceSummary, OriginCard } from '@/lib/cards/card';
 import { Tabs, type TabDef } from '@/components/ui/tabs';
 import { bucketLabel, complianceProgress, stageMeta, toneClass } from '@/components/cards/card-format';
 import { oppBrandAccent } from '@/lib/proposal/brand';
+import { fmtDate } from '@/lib/fmt';
 
 export interface OpportunityCardView {
   proposalId: string;
@@ -27,12 +28,6 @@ export interface OpportunityCardView {
   sourceBucket: string | null;
   origin: OriginCard;
   compliance: ComplianceSummary;
-}
-
-function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
 }
 
 function Chip({ tone, children }: { tone: Parameters<typeof toneClass>[0]; children: React.ReactNode }) {
@@ -144,7 +139,7 @@ export function OpportunityCard({ card }: { card: OpportunityCardView }) {
           <div className="text-xs uppercase tracking-wide" style={accent ? { color: accent } : undefined}>
             {accent ? 'Ohio Third Frontier · Opportunity' : <span className="text-gray-400">Opportunity</span>}
           </div>
-          <div className="font-semibold text-gray-900 truncate">{opp.title || card.title}</div>
+          <div className="font-semibold text-gray-900 truncate" title={opp.title || card.title}>{opp.title || card.title}</div>
         </div>
         <div className="flex flex-wrap items-center gap-1 justify-end">
           <Chip tone={stage.tone}>{stage.label}</Chip>

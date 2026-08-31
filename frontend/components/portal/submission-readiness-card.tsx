@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { ReadinessReport, ReadinessBlocker, BlockerCategory } from '@/lib/proposal/submission-readiness';
+import { fmtDate } from '@/lib/fmt';
 
 interface Props {
   tenantSlug: string;
@@ -121,7 +122,7 @@ export function SubmissionReadinessCard({ tenantSlug, proposalId, refreshKey = 0
                 ? `closed ${Math.abs(dr)}d ago${d.estimated ? ' (est.)' : ''}`
                 : `closes in ${dr}d${d.estimated ? ' (est.)' : ''}`;
               const cls = d.past ? 'text-red-600' : dr <= 7 ? 'text-amber-600' : 'text-gray-600';
-              return <span className={`${cls} font-medium`} title={new Date(d.closeDate).toLocaleDateString()}>⏱ {label}</span>;
+              return <span className={`${cls} font-medium`} title={fmtDate(d.closeDate)}>⏱ {label}</span>;
             })()}
             <span className="text-gray-400">·</span>
             <span className="text-emerald-600 font-medium">{report.summary.sections.locked} locked</span>

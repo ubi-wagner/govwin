@@ -41,6 +41,49 @@ except Exception:
 
 # ── assets ────────────────────────────────────────────────────────────────────
 _img_cache = {}
+try:
+    import revisions as _rev
+except ImportError:  # invoked from the repo root rather than docs/manuals
+    import importlib.util as _ilu, os as _os
+    _spec = _ilu.spec_from_file_location(
+        "revisions", _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "revisions.py"))
+    _rev = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_rev)
+
+
+def revision_block(slug):
+    """The revision badge, the capture provenance, and what changed — rendered from the record.
+
+    ── IT STATES WHAT IT DOES NOT KNOW ──────────────────────────────────────────────────────────
+    A guide with no recorded capture prints "screenshots: not recorded", and a guide whose shots
+    predate its prose says so. Both are worse-looking than a date and both are the truth; the
+    alternative is a finished-looking footer on a guide illustrated with last quarter's product,
+    which is the exact drift this system exists to make visible.
+    """
+    r = _rev.entry(slug)
+    if not r["revision"]:
+        return ('<div class="rev"><span class="revno">Unrevised</span>'
+                '<span class="revmeta">no revision recorded — run '
+                '<code>python3 docs/manuals/revisions.py bump ' + esc(slug) + ' "…"</code></span></div>')
+    cap = r.get("capture") or {}
+    shots = (f'screenshots {esc(cap["at"][:10])} · {esc(str(cap.get("shots", "?")))} shot(s) '
+             f'from {esc(cap.get("commit", "?"))}') if cap.get("at") else \
+            '<span class="warn">screenshots: not recorded</span>'
+    drift = ""
+    if cap.get("at") and r.get("revised") and cap["at"][:10] < r["revised"]:
+        drift = ('<span class="warn"> · the pictures are older than the words; '
+                 're-capture before trusting a screen</span>')
+    hist = "".join(
+        f'<li><b>rev {h["revision"]}</b> · {esc(h.get("date",""))} · '
+        f'<code>{esc(h.get("commit",""))}</code> — {esc(h.get("summary",""))}</li>'
+        for h in r.get("history", [])[:6])
+    return (f'<div class="rev"><span class="revno">Revision {r["revision"]}</span>'
+            f'<span class="revmeta">{esc(r.get("revised",""))} · '
+            f'<code>{esc(r.get("commit",""))}</code> · {shots}{drift}</span>'
+            + (f'<details class="revhist"><summary>What changed</summary><ul>{hist}</ul></details>'
+               if hist else '')
+            + '</div>')
+
+
 def data_uri(rel, maxw=1080, q=82):
     """Repo-relative image path → base64 data URI (downscaled JPEG). Cached."""
     key = (rel, maxw, q)
@@ -188,6 +231,15 @@ nav .navfoot{margin-top:18px;padding-top:12px;border-top:1px solid var(--line);f
 nav .navfoot a{display:inline;padding:0}
 main{padding:40px 52px;max-width:940px;min-width:0}
 .hero{border-bottom:2px solid var(--line);padding-bottom:20px;margin-bottom:6px}
+.rev{margin:14px 0 0;padding:10px 14px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:6px;background:#fbfcfe;font-size:12.5px}
+.rev .revno{font-weight:700;color:var(--brand);margin-right:10px}
+.rev .revmeta{color:var(--mut)}
+.rev .warn{color:#9a3412;font-weight:600}
+.rev code{font-size:11.5px;background:#eef2f7;padding:1px 5px;border-radius:3px}
+.revhist{margin-top:8px}
+.revhist summary{cursor:pointer;color:var(--brand);font-weight:600}
+.revhist ul{margin:6px 0 0 18px;color:var(--mut)}
+.revhist li{margin:3px 0}
 .hero .eyebrow{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
 .hero h1{font-size:28px;margin:6px 0 8px;color:var(--brand);letter-spacing:-.4px;text-wrap:balance}
 .hero p{color:var(--mut);margin:.25em 0}
@@ -274,6 +326,7 @@ def render_guide(spec, guides_index):
     <h1>{esc(hero.get('h1', spec['title']))}</h1>
     {lede}{badge}
   </div>
+  {revision_block(slug)}
   {body}
   <p class="foot">{spec.get('footer','')}</p>
 </main>

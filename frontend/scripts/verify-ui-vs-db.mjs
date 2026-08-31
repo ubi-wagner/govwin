@@ -23,7 +23,10 @@
 import { chromium } from 'playwright';
 import postgres from 'postgres';
 
-const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
+// One base URL, two historic names: the lenses read GUIDE_BASE, the drives read BASE_URL, and
+// a harness that silently ignores the one you passed fails with a connection error that reads
+// like the app is down. Accept both everywhere; the family's own name still wins.
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const DB = process.env.GUIDE_DB || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 const ADMIN_PW = process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!';
@@ -140,6 +143,96 @@ try {
     A('slots used equals the active bucket rows', uiUsed === dbUsed, `ui=${uiUsed} db=${dbUsed}`);
     A('the cap shown is the configured cap', uiCap === dbCap, `ui=${uiCap} db=${dbCap}`);
   }
+  // ══ 1c · THE DELIVERY WORKSPACE — three measures, and the words "not measured" ═══════════
+  //
+  // This lens had NO expectation for Projects, which under this repo's own rule means the surface
+  // was uncovered rather than passing — and it is the surface where two visible defects (a `NaN`
+  // variance and a period of performance whose ends read identically) survived every other lens.
+  //
+  // Source: lib/projects/rollup.ts — the deliverables query is copied from it, GROUP BY and all,
+  // and summed in JS exactly as `rollup()` sums it. A flattened `COUNT(*)` here would be a
+  // predicate I BELIEVE equivalent, which is how this lens manufactures confident wrong findings.
+  console.log('\n══ 1c · the project workspace vs the rows behind it ══');
+  {
+    const [proj] = await sql`
+      SELECT id, name FROM projects
+       WHERE tenant_id = ${tid} ORDER BY created_at DESC LIMIT 1`;
+    if (!proj) {
+      // Uncovered is not passing: say so, and fail, rather than skipping into a silent green.
+      A('a project exists at foundation to reconcile against', false,
+        'seed one: node scripts/seed-project-scenario.mjs');
+    } else {
+      const body = await text(p, `/portal/foundation/projects/${proj.id}`);
+
+      // rollup.ts's deliverables query, verbatim — COPIED from the source, not re-derived. It
+      // changed shape with migrations 228-229 (the deliverable now names its own CLIN, falling
+      // back to its milestone's) and a predicate I believed equivalent would have kept passing
+      // against the old join while the page computed something else.
+      const delRows = await sql`
+        SELECT COALESCE(d.clin_id, m.clin_id) AS clin_id,
+               COUNT(*) FILTER (WHERE d.accepted_at IS NOT NULL)::int AS accepted,
+               COUNT(*)::int                                          AS total
+          FROM project_deliverables d
+          JOIN project_milestones m ON m.id = d.milestone_id
+         WHERE m.project_id = ${proj.id}::uuid AND d.tenant_id = ${tid}::uuid
+         GROUP BY COALESCE(d.clin_id, m.clin_id)`;
+      const dbAccepted = delRows.reduce((a, r) => a + r.accepted, 0);
+      const dbTotal = delRows.reduce((a, r) => a + r.total, 0);
+
+      const m = body.match(/(\d+) of (\d+) accepted/);
+      A('the page states a deliverables denominator', m !== null, m ? m[0] : 'no "N of M accepted"');
+      if (m) {
+        A('deliverables accepted matches the rows', Number(m[1]) === dbAccepted, `ui=${m[1]} db=${dbAccepted}`);
+        A('deliverables total matches the rows', Number(m[2]) === dbTotal, `ui=${m[2]} db=${dbTotal}`);
+      }
+
+      // The measure contract, both directions. A denominator that EXISTS must not read
+      // "not measured"; the page claiming it measured nothing while rows sit under it is the
+      // failure the null-not-zero rule is for.
+      const notMeasured = (body.match(/not measured/g) ?? []).length;
+      A('a project WITH deliverables does not report all three measures unmeasured',
+        !(dbTotal > 0 && notMeasured >= 3), `"not measured" ×${notMeasured}, ${dbTotal} deliverable(s)`);
+
+      // lib/projects/access.ts listAssignees, verbatim predicate.
+      const [{ n: dbAssigned }] = await sql`
+        SELECT count(*)::int AS n FROM project_assignments a JOIN users u ON u.id = a.user_id
+         WHERE a.project_id = ${proj.id}::uuid AND a.tenant_id = ${tid}::uuid`;
+      const uiAssigned = num(body, /(\d+) assigned/);
+      if (dbAssigned > 0) {
+        A('the "N assigned" count matches the roster', uiAssigned === dbAssigned, `ui=${uiAssigned} db=${dbAssigned}`);
+      }
+
+      // Money, as a person reads it — and as the same number the table holds. The page used to
+      // render the raw `numeric` string (`1100000.00`), which this lens scored CLEAN because the
+      // value matched; it was the *presentation* that was unreadable. So the expectation is now
+      // both: the DB's number, formatted the way lib/projects/money.ts formats it.
+      const [funded] = await sql`
+        SELECT funded_amount FROM project_clins
+         WHERE project_id = ${proj.id}::uuid AND tenant_id = ${tid}::uuid AND funded_amount IS NOT NULL
+         ORDER BY sort_index LIMIT 1`;
+      if (funded) {
+        const want = `$${Math.round(Number(funded.funded_amount)).toLocaleString('en-US')}`;
+        A('the funded amount renders as grouped currency, not a raw numeric string',
+          body.includes(want), `expected "${want}"`);
+        A('the raw numeric string is NOT on the page', !body.includes(String(funded.funded_amount)),
+          String(funded.funded_amount));
+      }
+
+      // The D8 defect, as a permanent assertion. NaN reaches a page as the literal text "NaN"; it
+      // is not a number any matcher would otherwise look for, which is exactly why nothing caught
+      // it. `Invalid Date` is the sibling symptom from the same root cause.
+      A('no "NaN" anywhere on the workspace', !/\bNaN\b/.test(body),
+        body.match(/[^.]{0,40}NaN[^.]{0,40}/)?.[0] ?? '');
+      A('no "Invalid Date" anywhere on the workspace', !/Invalid Date/.test(body));
+
+      // "Tue Apr 28 → Wed Apr 28": a period of performance whose two ends render identically
+      // because a ten-character slice of a Date's string form cuts before the year.
+      const pop = body.match(/(\d{4}-\d{2}-\d{2}) → (\d{4}-\d{2}-\d{2})/);
+      A('a period of performance renders as two ISO dates', pop !== null, pop ? pop[0] : 'none rendered');
+      if (pop) A('its two ends are not the same date', pop[1] !== pop[2], pop[0]);
+    }
+  }
+
   await ctx.close();
 
   // ══ 2 · ADMIN TENANT TABLE — three counts per row ════════════════════════

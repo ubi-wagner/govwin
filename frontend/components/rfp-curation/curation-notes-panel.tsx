@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from '@/lib/toast';
+import { fmtDateTime } from '@/lib/fmt';
 
 interface Note { id: string; authorEmail: string | null; body: string; createdAt: string }
 
@@ -118,7 +119,7 @@ export function CurationNotesPanel({
                 <li key={n.id} className="text-sm border-l-2 border-gray-200 pl-3">
                   <p className="text-gray-800 whitespace-pre-wrap break-words">{n.body}</p>
                   <p className="text-[11px] text-gray-400 mt-0.5">
-                    {n.authorEmail ?? 'admin'} · {new Date(n.createdAt).toLocaleString()}
+                    {n.authorEmail ?? 'admin'} · {fmtDateTime(n.createdAt)}
                   </p>
                 </li>
               ))}

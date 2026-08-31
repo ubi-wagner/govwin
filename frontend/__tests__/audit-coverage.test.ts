@@ -27,6 +27,12 @@ const API_DIR = path.join(FRONTEND, 'app', 'api');
 // Mutating routes that intentionally do NOT emit a domain event. Each entry MUST carry a reason —
 // adding one is a reviewed decision, which is the whole point of the guard.
 const ALLOWLIST: Record<string, string> = {
+  // Provider delivery outcomes, not an actor business action. The route has no session by
+  // construction — Postmark calls it — and it already records to system_events under the
+  // `system` namespace (notification.delivered / .bounced / .complained), which IS the audit
+  // trail for a send. An actor-audit row would name a system actor for something no person did.
+  'app/api/webhooks/postmark/route.ts':
+    'provider delivery webhook — no actor; already emits system:notification.* to system_events',
   // Anonymous public marketing telemetry (page views / time-on-page): high-volume, non-actor,
   // no auth — recorded to the analytics tables, NOT the actor-audit spine. Auditing every
   // pageview to system_events would be volume noise, not compliance signal.

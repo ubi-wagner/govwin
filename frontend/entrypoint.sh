@@ -1,11 +1,33 @@
 #!/bin/sh
 set -e
 
-# Run pending database migrations before starting the app.
-# Uses the lightweight Node.js migration runner (no psql dependency).
+# ── Migrations run HERE, inside the deployment, before the app serves anything ────────────────
+#
+# `set -e` above means a failed migration stops the boot. That is deliberate: a server answering
+# requests against a schema it does not match is worse than a server that will not start.
+#
+# ⚠️ THE ROLE MATTERS, AND GETTING IT WRONG CRASH-LOOPS THE DEPLOY.
+#
+# `migrate.mjs` reads DATABASE_URL, and on this service DATABASE_URL is `govtech_app` — the
+# NOBYPASSRLS application role, which is correct for serving and WRONG for migrating. Any migration
+# that references a table the app role does not own fails with:
+#
+#     permission denied for table tenants
+#
+# …which reads like a problem with `tenants`. Migrations 215, 216 and 217 all carry
+# `REFERENCES tenants(id)`, so without the owner connection the next deploy does not come up.
+#
+# So: migrate as the OWNER, serve as the app role. Same split scripts/sandbox-env.sh documents.
+MIGRATE_URL="${DATABASE_URL_OWNER:-$DATABASE_URL}"
+if [ -z "$DATABASE_URL_OWNER" ]; then
+  echo "[entrypoint] ⚠️  DATABASE_URL_OWNER is NOT SET — migrating as the application role."
+  echo "[entrypoint]    Any migration needing an owner privilege will fail with a message about"
+  echo "[entrypoint]    the wrong table. Set DATABASE_URL_OWNER on this service."
+fi
+
 if [ -f /app/db/migrations/migrate.mjs ]; then
   echo "[entrypoint] Running database migrations..."
-  node /app/db/migrations/migrate.mjs
+  DATABASE_URL="$MIGRATE_URL" node /app/db/migrations/migrate.mjs
   echo "[entrypoint] Migrations complete."
 fi
 

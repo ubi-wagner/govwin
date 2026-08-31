@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { fmtDate } from '@/lib/fmt';
 
 interface Topic {
   id: string;
@@ -198,11 +199,11 @@ export function TopicDetail({ topic }: { topic: Topic; currentUserId: string }) 
             </div>
             <div>
               <dt className="text-gray-500">Posted</dt>
-              <dd>{topic.postedDate ? new Date(topic.postedDate).toLocaleDateString() : '—'}</dd>
+              <dd>{topic.postedDate ? fmtDate(topic.postedDate) : '—'}</dd>
             </div>
             <div>
               <dt className="text-gray-500">Close Date</dt>
-              <dd>{topic.closeDate ? new Date(topic.closeDate).toLocaleDateString() : '—'}</dd>
+              <dd>{topic.closeDate ? fmtDate(topic.closeDate) : '—'}</dd>
             </div>
             <div>
               <dt className="text-gray-500">POC</dt>

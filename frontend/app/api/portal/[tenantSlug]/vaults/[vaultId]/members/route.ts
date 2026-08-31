@@ -10,7 +10,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { resolveVaultAccess, inviteVaultMember, listVaultMembers, revokeVaultMember } from '@/lib/vaults/vaults';
-import { sendEmail } from '@/lib/email';
+import { send } from '@/lib/email';
 import { collaboratorInviteEmail } from '@/lib/email-templates';
 
 async function gate(tenantSlug: string, vaultId: string) {
@@ -74,8 +74,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         isNewUser: member.isNewUser, loginUrl: `${base}/login`, proposalUrl: `${base}/vaults`,
         tempPassword: member.tempPassword ?? undefined,
       });
-      const r = await sendEmail({ to: email, subject: content.subject, html: content.html });
-      emailSent = r.provider !== 'skipped' && !r.error;
+      const r = await send({
+        to: email, subject: content.subject, html: content.html,
+        kind: 'transactional', tenantId: g.tenantId, template: 'collaborator_invite',
+        // Keyed on the membership row, so a re-invite of the SAME member does not re-send while
+        // inviting a different address to the same vault still does.
+        idempotencyKey: `vault_invite:${member.id}`,
+        tags: ['invite'],
+      });
+      emailSent = r.accepted;
     } catch (e) { console.error('[vault members POST] invite email failed', e); }
     return NextResponse.json({
       data: { id: member.id, email: member.email, userId: member.userId, status: member.status, createdAt: member.createdAt },

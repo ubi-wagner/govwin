@@ -2,7 +2,7 @@
  * Mid-window propagation — the missing half of "edit the master after push".
  *
  * The bridge already has the whole delivery machine (publish → fan-out → conditional
- * pin_update_available → tenant-side rescore → watched-holder notification), and
+ * docs_update_available → tenant-side rescore → watched-holder notification), and
  * `republishIfReleased` already carries the one rule that matters — a never-released opp
  * is a silent no-op. What was missing is CALLERS: every curation-workspace edit after
  * `solicitation.push` (summary, compliance, volumes, items, attachments, amendments,

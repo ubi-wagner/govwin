@@ -370,7 +370,7 @@ export default function AdminTemplatesPage() {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-800 truncate">{record.name}</span>
+                  <span className="text-sm font-medium text-gray-800 truncate" title={record.name}>{record.name}</span>
                   {formatBadge(record.format)}
                   {record.is_system && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-200">
@@ -378,7 +378,7 @@ export default function AdminTemplatesPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mt-0.5 truncate">{record.description}</p>
+                <p className="text-xs text-gray-500 mt-0.5 truncate" title={record.description ?? undefined}>{record.description}</p>
                 <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-400">
                   <span>{record.node_count} nodes</span>
                   {record.agency && <span>{record.agency}</span>}

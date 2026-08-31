@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql } from '@/lib/db';
 import { emitEventStart, emitEventEnd, emitEventSingle, userActor } from '@/lib/events';
-import { sendEmail } from '@/lib/email';
+import { send } from '@/lib/email';
 import { applicationAcceptedEmail } from '@/lib/email-templates';
 import { isValidUUID } from '@/lib/validation';
 import { backfillTenant } from '@/lib/opportunity-bridge';
@@ -219,9 +219,12 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // Send welcome email with credentials. Post-commit + BEST-EFFORT: the tenant+user+membership
     // are already committed above, so an email-layer throw must NEVER 500 and swallow the temp
-    // password — that would leave an approved customer with no way in (sweep F1). sendEmail is
+    // password — that would leave an approved customer with no way in (sweep F1). send() is
     // contractually no-throw today; this wrap keeps the guarantee even if that ever changes.
-    let emailResult: Awaited<ReturnType<typeof sendEmail>> = { provider: 'skipped', error: 'not-sent' };
+    let emailResult: Awaited<ReturnType<typeof send>> = {
+      provider: 'skipped', messageId: null, accepted: false, error: 'not-sent',
+      suppressed: false, duplicate: false, correlationId: '', sendId: null,
+    };
     try {
       const loginUrl = `${(process.env.NEXTAUTH_URL || process.env.AUTH_URL) || process.env.NEXT_PUBLIC_APP_URL || ''}/login`;
       const emailContent = applicationAcceptedEmail({
@@ -232,14 +235,25 @@ export async function POST(request: Request, ctx: RouteContext) {
         tenantSlug: finalSlug,
         loginUrl,
       });
-      emailResult = await sendEmail({
+      emailResult = await send({
         to: app.contactEmail,
         subject: emailContent.subject,
         html: emailContent.html,
+        kind: 'transactional',
+        tenantId,
+        template: 'application_accepted',
+        // A natural key, so a replayed accept cannot mail a second temp password. The application
+        // id is right and the tenant id is not: a retry that got further last time would produce a
+        // different tenant and re-send under a fresh key.
+        idempotencyKey: `application_accepted:${id}`,
+        tags: ['onboarding'],
       });
     } catch (emailErr) {
       console.error('[applications/accept] welcome email failed (non-fatal, account already created):', emailErr);
-      emailResult = { provider: 'skipped', error: emailErr instanceof Error ? emailErr.message : String(emailErr) };
+      emailResult = {
+        ...emailResult,
+        error: emailErr instanceof Error ? emailErr.message : String(emailErr),
+      };
     }
 
     // ── Carbon-copy mirror: clone the opportunity river onto the new tenant so a
@@ -250,7 +264,7 @@ export async function POST(request: Request, ctx: RouteContext) {
     // No spotlight buckets are seeded. A bucket is the CUSTOMER's own ranking lens — a 1:n
     // they open empty and fill — so the product imposes none, and the cap is a pure authoring
     // budget rather than `seeded + headroom` (the entanglement behind B62). Until they author
-    // one, /cards falls back to is_pinned then updated_at DESC: recency-ordered, not blank.
+    // one, /cards falls back to docs_copied then updated_at DESC: recency-ordered, not blank.
 
     // The question this application asked has been answered, so the ToDos that asked it are moot
     // (bug log B51 — three accepted applications still carrying six open "review this" ToDos).
@@ -324,7 +338,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         tenantId,
         tenantSlug: finalSlug,
         userId: newUserId,
-        emailSent: emailResult.provider !== 'skipped',
+        emailSent: emailResult.accepted,
         cardsBackfilled,
       },
     });
@@ -337,7 +351,7 @@ export async function POST(request: Request, ctx: RouteContext) {
         contactEmail: app.contactEmail,
         contactName: app.contactName,
         companyName: app.companyName,
-        emailSent: emailResult.provider !== 'skipped',
+        emailSent: emailResult.accepted,
         emailProvider: emailResult.provider,
         emailFailed: !!emailResult.error,
         // The admin UI relays these to the customer when email delivery is

@@ -336,6 +336,27 @@ before it is called done. Each gate must pass before the next is meaningful:
 7. **The four lenses (any UI/API/DB change, and any backward review)** — `verify-surfaces` ·
    `verify-api-contract` · `verify-db-crud` · `verify-ui-vs-db`, against a running box. Detailed below;
    the fourth is not optional, because the other three were all green through B80.
+8. **THE ARC — the two end-to-end drives, in order.** Steps 1–7 all measure a *slice*. None of them
+   asks the only question a customer has: **does the thing happen.** Run both halves; the second
+   continues from the first's journal, so together they are one continuous artifact:
+
+   ```bash
+   source scripts/sandbox-env.sh
+   cd frontend
+   node scripts/drive-end-to-end.mjs --fresh      # pre-award: a government PDF → … → download
+   npx tsx scripts/drive-project-lifecycle.mts    # post-award: award → ToDo → project → milestone
+   ```
+
+   **Both require the Python worker running** — the workflow engine is a separate process, and
+   without it every automation assertion fails for a reason that has nothing to do with the product.
+   `sandbox-heartbeat.sh` supervises it; `EMULATE=1` also gives the agents an endpoint, without which
+   every agent task fails `Connection error` — and a queue full of `failed` rows looks exactly like a
+   queue nobody populated.
+
+   This step is not redundant with the lenses. It is the only one that has ever caught a *sequence*
+   defect, and it has caught two that every lens above graded green: twenty project handlers running
+   with no tenant context behind twenty textbook `{error,code}` envelopes, and `setBaseline` having
+   never once succeeded on the app path because `sql.begin` forwards past the tenant-context Proxy.
 
 **Sandbox DB coordinates:** `postgresql://govtech:changeme@localhost:5432/govtech_intel` (local PG16).
 This is the target for steps 3, 5, 7 and the SQL lane of step 6.

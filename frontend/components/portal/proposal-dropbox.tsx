@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { fmtDate } from '@/lib/fmt';
 
 interface DropboxFile {
   key: string;
@@ -201,7 +202,7 @@ export function ProposalDropbox({
               </span>
               {file.lastModified && (
                 <span className="text-xs text-gray-400 flex-shrink-0">
-                  {new Date(file.lastModified).toLocaleDateString()}
+                  {fmtDate(file.lastModified)}
                 </span>
               )}
               {canDelete && (

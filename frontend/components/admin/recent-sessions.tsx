@@ -2,28 +2,18 @@
 
 import { useState } from 'react';
 import type { VisitorSession } from '@/lib/analytics-admin';
+import { TimeAgo } from '@/components/ui/time-ago';
+import { fmtShortDateTime } from '@/lib/fmt';
+/*
+ * This file used `toLocaleString(undefined, …)`, and the atlas sweep caught it: /admin/analytics
+ * threw React #418 and took the whole page to its error boundary, at HTTP 200. `undefined` means
+ * "the ambient locale", and the server's ambient (Node's locale, the container's UTC) is not the
+ * browser's. Same failure as reading the clock during render, from the other direction — see
+ * lib/fmt.ts.
+ */
 
-function fmtTime(iso: string | null): string {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '—';
-  }
-}
+const fmtTime = (iso: string | null): string => fmtShortDateTime(iso);
 
-function relTime(iso: string | null): string {
-  if (!iso) return '';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (Number.isNaN(ms)) return '';
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.round(h / 24)}d ago`;
-}
 
 function fmtDur(ms: number | null): string {
   if (ms == null || ms <= 0) return '—';
@@ -60,7 +50,7 @@ function SessionRow({ s }: { s: VisitorSession }) {
             {(s.deviceType || 'desktop')} · {browserFromUA(s.userAgent)}{loc ? ` · ${loc}` : ''} · {acq}
           </div>
         </div>
-        <span className="text-[11px] text-gray-400 whitespace-nowrap">{relTime(s.lastSeen)}</span>
+        <span className="text-[11px] text-gray-400 whitespace-nowrap"><TimeAgo iso={s.lastSeen} /></span>
       </button>
       {open && (
         <div className="px-3 pb-3 bg-gray-50/60">

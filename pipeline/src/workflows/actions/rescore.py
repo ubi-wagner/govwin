@@ -99,45 +99,130 @@ def _close_ms(close_date: Any) -> Optional[float]:
     return dt.timestamp() * 1000.0
 
 
-def score_card(card: dict, criteria: dict, now_ms: float) -> dict:
+# How much each attribute DIMENSION says about a customer's taste. Mirror of
+# AFFINITY_DIMENSION_WEIGHT in lib/bucket-scoring.ts — see that comment for the measurement that
+# motivated it (one up-vote lifting three unrelated cards because all four were "sbir").
+_AFFINITY_DIMENSION_WEIGHT = {"tech": 1.0, "naics": 0.9, "agency": 0.7, "phase": 0.5, "program": 0.3}
+
+
+def _affinity_keys(card: dict) -> list[str]:
+    """One card's attribute keys, lowercased. Mirror of affinityKeys in lib/bucket-scoring.ts.
+
+    The vocabulary is shared by the profile builder and the factor, so a dimension added to one is
+    added to both by construction — the failure mode a second hand-written list guarantees.
+    """
+    out: list[str] = []
+
+    def add(dim: str, v) -> None:
+        if isinstance(v, str) and v.strip():
+            out.append(f"{dim}:{v.strip().lower()}")
+
+    add("agency", card.get("agency"))
+    add("program", card.get("programType"))
+    add("phase", card.get("phaseType"))
+    for t in card.get("techFocusAreas") or []:
+        add("tech", t)
+    for n in card.get("naicsCodes") or []:
+        add("naics", n)
+    return out
+
+
+def build_affinity_profile(voted: list[dict]) -> dict:
+    """Fold a tenant's judged cards into an attribute profile.
+
+    Each entry is ``{"card": {...}, "verdict": "monitoring"|"pursuing"|"passed"|...}``. `pursuing`
+    counts as a like — buying is the strongest endorsement there is — and anything else contributes
+    nothing, which is the point of only counting cards a person actually judged.
+
+    Mirror of buildAffinityProfile in lib/bucket-scoring.ts.
+    """
+    net: dict[str, int] = {}
+    votes = 0
+    for entry in voted or []:
+        verdict = entry.get("verdict")
+        delta = 1 if verdict in ("monitoring", "pursuing") else -1 if verdict == "passed" else 0
+        if delta == 0:
+            continue
+        votes += 1
+        # De-duplicated per card: a card listing the same tech area twice is one opinion, not two.
+        for k in set(_affinity_keys(entry.get("card") or {})):
+            net[k] = net.get(k, 0) + delta
+    return {"net": net, "votes": votes}
+
+
+def score_card(card: dict, criteria: dict, now_ms: float, inputs: dict | None = None) -> dict:
     """Score one card (0-100) against a bucket's criteria. Faithful port of the
-    frontend scoreCard — same signals, same default weights, same rounding."""
+    frontend scoreCard — same signals, same default weights, same rounding.
+
+    ABSENT IS NOT ZERO. Every factor guards BOTH sides: a bucket naming agencies against a card
+    whose agency the ingest never captured contributes nothing and stays OUT of the denominator,
+    while a card with an agency that does not match scores a real 0 and stays in. Before mig 238
+    only `timeline` did this — the other four quietly charged the tenant's lens for the platform's
+    missing data.
+
+    THE CORPUS FACTOR WAS REMOVED (mig 239). mig 238 fed a ts_rank over the tenant's copy of the
+    whole solicitation. Measured on one 330-page general BAA, ts_rank returns the SAME value for
+    terms the document has nothing to do with — agriculture 0.0608 and concrete 0.0608 and
+    submarine 0.0608; manufacturing 0.0827 and quantum 0.0827. A general solicitation mentions
+    everything once, so ranking against it measures document LENGTH rather than relevance, and the
+    normalization then turned "appears once" into 100. What ranks instead is the CURATED record on
+    the card: summary, expert notes, technology focus, volumes, required items and the highlights.
+
+    Mirror of frontend/lib/bucket-ranking.ts::scoreCard. frontend/scripts/verify-scorer-parity.mjs
+    asserts they agree over a shared fixture set; this docstring is not the check.
+    """
     card = card or {}
     criteria = criteria or {}
     w = criteria.get("weights") or {}
     parts: list[tuple[str, float, float]] = []  # (key, v in [0,1], weight)
 
+    tfa = card.get("techFocusAreas")
+    vols = card.get("volumes")
+    items = card.get("requiredItems")
+    hls = card.get("highlights") or []
+    if not isinstance(hls, list):
+        hls = []
     text = " ".join(
         str(x) for x in (
             card.get("title"), card.get("spotlightSummary"),
             card.get("description"), card.get("office"),
+            # mig 238. Not agency/programType/setAside: each already has its own weighted factor,
+            # and folding them in here too would double-count one signal as a silent weight change.
+            card.get("phaseType"), card.get("topicNumber"), card.get("topicBranch"),
+            *(tfa if isinstance(tfa, list) else ()),
+            # The curated build-out (mig 239): what the admin decided this proposal is MADE OF.
+            *(vols if isinstance(vols, list) else ()),
+            *(items if isinstance(items, list) else ()),
+            # And what they MARKED while reading -- the passage a person judged worth keeping,
+            # which is exactly what the raw document text is not.
+            *(h.get("text") for h in hls if isinstance(h, dict)),
         ) if x
     ).lower()
 
     kws = criteria.get("keywords") or []
-    if kws:
+    if kws and text != "":
         hits = sum(1 for k in kws if k and _keyword_hit(text, k))
         parts.append(("keyword", hits / len(kws), w.get("keyword", 1)))
 
     naics = criteria.get("naics") or []
-    if naics:
+    if naics and (card.get("naicsCodes") or []):
         cn = {str(n) for n in (card.get("naicsCodes") or [])}
         inter = sum(1 for n in naics if str(n) in cn)
         parts.append(("naics", inter / len(naics), w.get("naics", 1)))
 
     agencies = criteria.get("agencies") or []
-    if agencies:
-        a = (card.get("agency") or "").lower()
+    if agencies and card.get("agency"):
+        a = str(card.get("agency")).lower()
         parts.append(("agency", 1.0 if any(x.lower() in a for x in agencies) else 0.0, w.get("agency", 1)))
 
     ptypes = criteria.get("programTypes") or []
-    if ptypes:
-        p = (card.get("programType") or "").lower()
+    if ptypes and card.get("programType"):
+        p = str(card.get("programType")).lower()
         parts.append(("program", 1.0 if any(p == x.lower() for x in ptypes) else 0.0, w.get("program", 1)))
 
     setasides = criteria.get("setAsides") or []
-    if criteria.get("useAccessibility") and setasides:
-        s = (card.get("setAsideType") or "").lower()
+    if criteria.get("useAccessibility") and setasides and card.get("setAsideType"):
+        s = str(card.get("setAsideType")).lower()
         parts.append(("accessibility", 1.0 if any(x.lower() in s for x in setasides) else 0.0, w.get("accessibility", 1)))
 
     if criteria.get("useTimeline") is not False and card.get("closeDate"):
@@ -146,6 +231,30 @@ def score_card(card: dict, criteria: dict, now_ms: float) -> dict:
             days = (close_ms - now_ms) / 86_400_000.0
             v = 0.0 if days <= 0 else 1.0 if days <= 30 else 0.6 if days <= 60 else 0.3 if days <= 90 else 0.1
             parts.append(("timeline", v, w.get("timeline", 0.5)))
+
+    # ── AFFINITY — what this tenant's own thumbs say about a card they have NOT judged ─────────
+    # Mirror of lib/bucket-scoring.ts. Three constraints, each load-bearing:
+    #   · only on UNJUDGED cards — scoring an up-voted card by its similarity to up-voted cards is a
+    #     self-reinforcing loop (it always matches itself), and the verdict is already expressed in
+    #     the feed's ORDER BY. Ranking matters where nobody has looked yet.
+    #   · absent is not zero, twice: no profile, no votes, or no overlapping attribute → abstain.
+    #     A customer who voted on power systems has said nothing about maritime sensors.
+    #   · signed and symmetric: disliked 0, liked 1, contested 0.5.
+    profile = (inputs or {}).get("affinity") or {}
+    net = profile.get("net") or {}
+    # NOT `not card.get("verdict")`: 'unreviewed' is truthy AND is the column default, so that
+    # version skips every card nobody has judged — the population this factor exists for.
+    _judged = card.get("verdict") in ("monitoring", "pursuing", "passed")
+    if profile.get("votes", 0) > 0 and not _judged:
+        known = [k for k in set(_affinity_keys(card)) if net.get(k, 0) != 0]
+        if known:
+            # Weighted mean over matched dimensions; an unknown dimension is 0.5 — a shrug.
+            def _dw(k: str) -> float:
+                return _AFFINITY_DIMENSION_WEIGHT.get(k.split(":", 1)[0], 0.5)
+
+            num = sum((1.0 if net[k] > 0 else 0.0) * _dw(k) for k in known)
+            den = sum(_dw(k) for k in known)
+            parts.append(("affinity", num / den, w.get("affinity", 0.5)))
 
     total_w = sum(p[2] for p in parts)
     # Clamp to [0,100] to belt the DB CHECK (mig 180) — matches frontend scoreCard.

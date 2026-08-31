@@ -53,6 +53,11 @@ interface CardRow {
   bridgeEvent: string | null;
   replicantCount: number;
   pinnedCount: number;
+  interestedCount: number;
+  reviewedCount: number;
+  passedCount: number;
+  buildComplete: boolean;
+  portalCount: number;
 }
 
 const iso = (d: Date | null): string | null => (d ? new Date(d).toISOString() : null);
@@ -84,7 +89,17 @@ export default async function AdminMasterCardsPage() {
            WHERE sv2.solicitation_id = cs.id AND sv2.topic_id IS NULL) AS item_count,
         b.version AS bridge_version, b.posted_at AS last_published_at, b.event_type AS bridge_event,
         COALESCE(r.replicant_count, 0)::int AS replicant_count,
-        COALESCE(r.pinned_count, 0)::int AS pinned_count
+        COALESCE(r.pinned_count, 0)::int AS pinned_count,
+        -- ── DEMAND (mig 240/241) ───────────────────────────────────────────────────────────
+        -- Which tenants said YES, how many went as far as pulling the documents, and how many
+        -- said no. Interest was already recorded, already emitted as capture:topic.pinned, and
+        -- already countable — and it reached an admin only if they went looking. This makes the
+        -- signal legible where the build-out decision is actually made.
+        COALESCE(r.interested_count, 0)::int AS interested_count,
+        COALESCE(r.reviewed_count, 0)::int AS reviewed_count,
+        COALESCE(r.passed_count, 0)::int AS passed_count,
+        COALESCE(cs.build_complete, false) AS build_complete,
+        (SELECT count(*)::int FROM proposal_portals pp WHERE pp.opportunity_id = o.id) AS portal_count
       FROM opportunities o
       LEFT JOIN curated_solicitations cs ON cs.opportunity_id = o.id
       LEFT JOIN solicitation_compliance sc ON sc.solicitation_id = cs.id AND sc.topic_id IS NULL
@@ -96,8 +111,14 @@ export default async function AdminMasterCardsPage() {
       LEFT JOIN (
         SELECT opportunity_id,
                count(*) AS replicant_count,
-               count(*) FILTER (WHERE is_pinned) AS pinned_count
-        FROM tenant_opportunity_cards GROUP BY opportunity_id
+               count(*) FILTER (WHERE docs_copied) AS pinned_count,
+               -- pursuing counts as interest: a purchase is the strongest form of it.
+               count(*) FILTER (WHERE pursuit_status IN ('monitoring','pursuing')) AS interested_count,
+               count(*) FILTER (WHERE pursuit_status IN ('monitoring','pursuing') AND docs_copied) AS reviewed_count,
+               count(*) FILTER (WHERE pursuit_status = 'passed') AS passed_count
+        FROM tenant_opportunity_cards
+        WHERE archived_at IS NULL
+        GROUP BY opportunity_id
       ) r ON r.opportunity_id = o.id
       ORDER BY o.created_at DESC
       LIMIT 500
@@ -142,6 +163,11 @@ export default async function AdminMasterCardsPage() {
     bridgeEvent: r.bridgeEvent,
     replicantCount: r.replicantCount,
     pinnedCount: r.pinnedCount,
+    interestedCount: r.interestedCount,
+    reviewedCount: r.reviewedCount,
+    passedCount: r.passedCount,
+    buildComplete: r.buildComplete,
+    portalCount: r.portalCount,
   }));
 
   // The discovery river's backlog, shared by every stage (#176).

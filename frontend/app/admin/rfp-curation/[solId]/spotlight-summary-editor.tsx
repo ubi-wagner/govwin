@@ -28,6 +28,15 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [prop, setProp] = useState<Propagation | null>(null);
   const [pushed, setPushed] = useState(false);
+  /** Award size + how we came by it (mig 241) — required before release, estimate allowed. */
+  const [awardBasis, setAwardBasis] = useState('');
+  const [awardBasisSaved, setAwardBasisSaved] = useState('');
+  const [awardAmount, setAwardAmount] = useState('');
+  const [awardAmountSaved, setAwardAmountSaved] = useState('');
+  /** The other two decisions the release gate asks for (mig 241). */
+  const [docsBasis, setDocsBasis] = useState('');
+  const [hlBasis, setHlBasis] = useState('');
+  const [basisSaved, setBasisSaved] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -40,6 +49,18 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
           setValue(s); setSaved(s);
           setNote(n); setNoteSaved(n);
           setPushed(d.data?.solicitation?.status === 'pushed_to_pipeline');
+          // The GET is `SELECT cs.*, o.*`, so the basis arrives as the whole map (camelCased by
+          // postgres.toCamel: field_basis → fieldBasis). Reading a top-level `awardBasis` that no
+          // query produces is the plumbed-and-dry shape this session has already hit twice.
+          const fb = d.data?.solicitation?.fieldBasis;
+          const b = (fb && typeof fb === 'object' && typeof fb.award_amount === 'string') ? fb.award_amount : '';
+          const a = d.data?.solicitation?.awardAmount;
+          const aStr = typeof a === 'number' ? String(a) : '';
+          setAwardBasis(b); setAwardBasisSaved(b);
+          const db = (fb && typeof fb === 'object' && typeof fb.source_documents === 'string') ? fb.source_documents : '';
+          const hb = (fb && typeof fb === 'object' && typeof fb.highlights === 'string') ? fb.highlights : '';
+          setDocsBasis(db); setHlBasis(hb); setBasisSaved(`${db}|${hb}`);
+          setAwardAmount(aStr); setAwardAmountSaved(aStr);
         }
       } catch { /* ignore */ } finally {
         setLoaded(true);
@@ -53,11 +74,43 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
       const body: Record<string, string> = {};
       if (value !== (saved ?? '')) body.spotlightSummary = value;
       if (note !== (noteSaved ?? '')) body.expertNotes = note;
-      const res = await fetch(`/api/admin/rfp-curation/${solId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      // The award is sent as its own PATCH: the route treats summary / note / award as three
+      // independent writes and emits a different event for each, so batching them would make one
+      // event stand for three decisions.
+      const awardBody: Record<string, unknown> | null =
+        awardBasis !== awardBasisSaved || awardAmount !== awardAmountSaved
+          ? { awardBasis, ...(awardBasis === 'not_stated' ? {} : { awardAmount: Number(awardAmount) }) }
+          : null;
+      const res = Object.keys(body).length > 0
+        ? await fetch(`/api/admin/rfp-curation/${solId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+          })
+        : new Response(JSON.stringify({ data: {} }), { status: 200 });
+      if (`${docsBasis}|${hlBasis}` !== basisSaved) {
+        const fb: Record<string, string> = {};
+        if (docsBasis) fb.source_documents = docsBasis;
+        if (hlBasis) fb.highlights = hlBasis;
+        if (Object.keys(fb).length > 0) {
+          const br = await fetch(`/api/admin/rfp-curation/${solId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fieldBasis: fb }),
+          });
+          if (!br.ok) {
+            const j = await br.json().catch(() => ({}));
+            setErr(j.error || 'Could not save the release decisions.'); setBusy(false); return;
+          }
+          setBasisSaved(`${docsBasis}|${hlBasis}`);
+        }
+      }
+      if (awardBody) {
+        const ar = await fetch(`/api/admin/rfp-curation/${solId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(awardBody),
+        });
+        if (!ar.ok) {
+          const j = await ar.json().catch(() => ({}));
+          setErr(j.error || 'Could not save the award size.'); setBusy(false); return;
+        }
+        setAwardBasisSaved(awardBasis); setAwardAmountSaved(awardAmount);
+      }
       if (res.ok) {
         const j = await res.json().catch(() => ({}));
         // Baseline from the server ECHO, not the local closure — the route trims to its
@@ -80,7 +133,9 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
     }
   };
 
-  const dirty = value !== (saved ?? '') || note !== (noteSaved ?? '');
+  const dirty = value !== (saved ?? '') || note !== (noteSaved ?? '')
+    || awardBasis !== awardBasisSaved || awardAmount !== awardAmountSaved
+    || `${docsBasis}|${hlBasis}` !== basisSaved;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 mb-4">
@@ -121,6 +176,89 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
         placeholder={loaded ? 'e.g. Component instructions expected in Amendment 3 — page limits may tighten.' : 'Loading…'}
         className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
       />
+      {/*
+        AWARD SIZE — the first question a small business asks, and until mig 241 it had no way in:
+        `award_amount` had zero writers in the tree and measured 0 of 22 on the box while the bridge
+        carried it onto every card.
+
+        The BASIS is the control, not the number. Demanding a figure from an admin reading a BAA
+        that states none leaves two options — block the release or invent one — and inventing it is
+        what INGEST_PROVENANCE forbids. "Our estimate" is the middle path: real knowledge, badged
+        so a customer never mistakes it for something we read.
+      */}
+      <div className="mt-3 mb-1 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-800">
+          Award size <span className="text-rose-600">*</span>
+          <span className="ml-2 px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-800 align-middle">Customer-visible</span>
+        </h3>
+        <span className="text-[11px] text-gray-400">Required before release — an estimate counts</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={awardBasis}
+          onChange={(e) => { setAwardBasis(e.target.value); setErr(null); setProp(null); }}
+          disabled={!loaded || busy}
+          className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+        >
+          <option value="">— not decided —</option>
+          <option value="stated">Stated in the solicitation</option>
+          <option value="estimated">Admin estimated amount</option>
+          <option value="not_stated">Solicitation does not state one</option>
+        </select>
+        {awardBasis && awardBasis !== 'not_stated' && (
+          <div className="flex items-center gap-1">
+            <span className="text-sm text-gray-500">$</span>
+            <input
+              type="number" min="0" step="1000" value={awardAmount}
+              onChange={(e) => { setAwardAmount(e.target.value); setErr(null); setProp(null); }}
+              disabled={!loaded || busy}
+              placeholder="250000"
+              className="w-36 rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+        )}
+        {awardBasis === 'estimated' && (
+          <span className="text-[11px] text-amber-700">Shown to customers as &ldquo;our estimate&rdquo;</span>
+        )}
+        {awardBasis === 'not_stated' && (
+          <span className="text-[11px] text-gray-500">Shown to customers as &ldquo;Award size not stated&rdquo;</span>
+        )}
+      </div>
+
+      {/*
+        THE REST OF THE MINIMUM RELEASE SET (mig 241).
+        Each is satisfiable by recording an ABSENCE, because absence is a finding: an umbrella BAA
+        whose governing text lives in the component instructions genuinely needs no highlights, and
+        an opportunity the organization published no files for is a real and common state. What
+        release will not accept is silence — that and "the document is silent" are different facts.
+      */}
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="block text-[11px] font-medium text-gray-600">
+            Source documents <span className="text-rose-600">*</span>
+          </label>
+          <select value={docsBasis} onChange={(e) => { setDocsBasis(e.target.value); setErr(null); }}
+                  disabled={!loaded || busy}
+                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none">
+            <option value="">— not decided —</option>
+            <option value="attached">Attached to this solicitation</option>
+            <option value="none_published">The organization published none</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] font-medium text-gray-600">
+            Highlighted passages <span className="text-rose-600">*</span>
+          </label>
+          <select value={hlBasis} onChange={(e) => { setHlBasis(e.target.value); setErr(null); }}
+                  disabled={!loaded || busy}
+                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none">
+            <option value="">— not decided —</option>
+            <option value="marked">Marked in the document</option>
+            <option value="none_needed">None needed for this instrument</option>
+          </select>
+        </div>
+      </div>
+
       <div className="mt-2 flex items-center gap-3">
         <button
           onClick={save}
@@ -129,6 +267,9 @@ export default function SpotlightSummaryEditor({ solId }: { solId: string }) {
         >
           {busy ? 'Saving…' : pushed && dirty ? 'Save — broadcasts to tenant cards' : 'Save'}
         </button>
+        {!awardBasis && (
+          <span className="text-[11px] text-rose-600">Award size undecided — push will be blocked.</span>
+        )}
         {!value.trim() && (
           <span className="text-[11px] text-rose-600">
             {pushed ? 'Summary empty — tenant ranking will degrade.' : 'Summary empty — push will be blocked.'}

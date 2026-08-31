@@ -588,6 +588,138 @@ async def resolve_profile_variables(
 # absence meant rfp_admin stopped being notified (the 052 regression). _layout()
 # takes only the body; defensive p.get(...) guarantees a render. (Launch Review #2.)
 TEMPLATES.update({
+    # ── Post-award projects (D6) ─────────────────────────────────────────────────────────────
+    #
+    # The award bridge's NOTIFY step names this template. A NOTIFY naming a template that exists
+    # nowhere does not error — `render_template()` returns None and the listener emits
+    # `system:notification.failed` instead of sending mail. That has happened twice (the 052
+    # regression, then eight more found by audit join 7), which is why the template is written in
+    # the same change as the workflow that names it.
+    # ── Project work assigned to a person (G1) ──────────────────────────────────────────────
+    # WRITTEN IN THE SAME CHANGE AS `lib/projects/todos.ts`, which names it. A template referenced
+    # by code and defined nowhere emits `notification.failed` instead of sending — B141, twice.
+    #
+    # One task, one mail, because this one IS per-person and per-item: "you have been given this".
+    # The GROUPED mail is `project_nudge`, which chases what is already known.
+    'project_task_assigned': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">A task is yours</h2>
+        <p><strong>{_e(str(p.get('title') or 'A project task'))}</strong>
+        {' on ' + _e(str(p.get('project'))) if p.get('project') else ''}.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;font-size:14px;color:#475569;">
+            {'Due <strong>' + _e(str(p.get('dueOn'))) + '</strong>.' if p.get('dueOn')
+             else 'No due date set.'}
+            It is in your to-do queue, and the project workspace is where you tick it off.</p>
+        </div>
+        {_button('Open the project', p.get('workspaceUrl', '/portal'))}
+    '''),
+    # ── The health assessment is ready (A1) ─────────────────────────────────────────────────
+    # WRITTEN IN THE SAME CHANGE AS THE NOTIFY STEP THAT NAMES IT (B141, twice over).
+    #
+    # It carries the SHAPE of the finding and not the finding itself — how many phases are
+    # slipping, how many at risk — because the assessment is advisory and belongs on the screen
+    # where the rows behind it are, not paraphrased into an inbox where nobody can check it.
+    'project_health_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Your project assessment is ready</h2>
+        <p>The health assessment for
+        <strong>{_e(str(p.get('project') or 'your project'))}</strong> has finished.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;font-size:14px;color:#475569;">
+            {_e(str(p.get('headline'))) if p.get('headline')
+             else 'It is advisory: nothing has been changed on the project. Open it to read what it found, and decide what to do.'}</p>
+        </div>
+        {_button('Open the project', p.get('workspaceUrl', '/portal'))}
+    '''),
+    # ── The project nudge (M2) ──────────────────────────────────────────────────────────────
+    # WRITTEN IN THE SAME CHANGE AS THE SWEEP THAT NAMES IT. B141: eight NOTIFY steps named a
+    # template that existed nowhere, so the mail emitted `notification.failed` instead of sending —
+    # twice. A template referenced by a code path and defined nowhere is a silent no-send.
+    #
+    # One mail per tenant per sweep, grouping every milestone and task that came due or went late.
+    # Per-row mail would be the fastest possible way to teach someone to filter this sender.
+    'project_nudge': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Coming due on your projects</h2>
+        <p>{_e(str(p.get('summary') or 'Some project work is due soon or already late.'))}</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            {''.join(
+                f'<p style="margin:6px 0;font-size:14px;color:#475569;">'
+                f'<strong>{_e(str(i.get("title") or "Untitled"))}</strong>'
+                f'{" &mdash; " + _e(str(i.get("project"))) if i.get("project") else ""}'
+                f'<br><span style="color:{"#b91c1c" if i.get("overdue") else "#475569"};">'
+                f'{"overdue" if i.get("overdue") else "due"} {_e(str(i.get("dueOn") or ""))}'
+                f' &middot; {_e(str(i.get("kind") or "item"))}</span></p>'
+                for i in (p.get('items') or [])[:20]
+            ) or '<p style="margin:4px 0;font-size:14px;color:#475569;">Nothing outstanding.</p>'}
+        </div>
+        <p style="font-size:13px;color:#64748b;">You are seeing this because you own or are assigned
+        to this work. Ticking a task off, or closing the milestone, stops the reminder.</p>
+        {_button('Open your projects', p.get('workspaceUrl', '/portal'))}
+    '''),
+    # ── The mention (H1) ────────────────────────────────────────────────────────────────────
+    # WRITTEN IN THE SAME CHANGE AS `lib/projects/comments.ts`, which names it. B141 twice over:
+    # a template referenced by a code path and defined nowhere emits `notification.failed` instead
+    # of sending, and nothing downstream notices.
+    #
+    # One mail per mentioned person. Unlike the nudge this is NOT grouped and NOT repeated: a
+    # mention happens once, somebody chose to say it to you, and a digest would strip exactly the
+    # thing that makes it worth reading.
+    'project_comment_mention': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">You were mentioned</h2>
+        <p>Somebody mentioned you in a comment
+        {' on ' + _e(str(p.get('project'))) if p.get('project') else ' on a project'}.</p>
+        <div style="background:#f8fafc;border-left:3px solid {BRAND_NAVY};border-radius:4px;padding:16px;margin:16px 0;">
+            <p style="margin:0;font-size:14px;color:#334155;white-space:pre-wrap;">{_e(str(p.get('excerpt') or ''))}</p>
+        </div>
+        <p style="font-size:13px;color:#64748b;">It is in your to-do queue as well. Replying in the
+        workspace, or resolving the thread, clears it.</p>
+        {_button('Open the conversation', p.get('workspaceUrl', '/portal'))}
+    '''),
+    # ── The review request and its answer (H2) ──────────────────────────────────────────────
+    # BOTH written in the same change as lib/projects/reviews.ts, which names them. A template a
+    # code path names and nothing defines emits `notification.failed` instead of sending — B141,
+    # twice in this repo's history.
+    'project_review_requested': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Please review this</h2>
+        <p>You have been asked to review a {_e(str(p.get('kind') or 'deliverable'))}
+        {' on ' + _e(str(p.get('project'))) if p.get('project') else ''}.</p>
+        {'<div style="background:#f8fafc;border-left:3px solid ' + BRAND_NAVY + ';border-radius:4px;padding:16px;margin:16px 0;">'
+         '<p style="margin:0;font-size:14px;color:#334155;white-space:pre-wrap;">' + _e(str(p.get('note'))) + '</p></div>'
+         if p.get('note') else ''}
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;font-size:14px;color:#475569;">
+            {'Wanted by <strong>' + _e(str(p.get('dueOn'))) + '</strong>.' if p.get('dueOn') else 'No date set.'}
+            Approve it, or <strong>reject it with a reason</strong> &mdash; the reason is what tells
+            whoever wrote it what to change.</p>
+        </div>
+        {_button('Open the review', p.get('workspaceUrl', '/portal'))}
+    '''),
+    # The ANSWER goes back to whoever asked. A decision nobody hears about is the meeting this
+    # feature replaces.
+    'project_review_decided': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{'#b91c1c' if p.get('decision') == 'rejected' else BRAND_NAVY};">
+        {'Rejected' if p.get('decision') == 'rejected' else 'Approved'}</h2>
+        <p>The {_e(str(p.get('kind') or 'deliverable'))} you sent for review
+        {' on ' + _e(str(p.get('project'))) if p.get('project') else ''} was
+        <strong>{_e(str(p.get('decision') or 'decided'))}</strong>.</p>
+        {'<div style="background:#fef2f2;border-left:3px solid #b91c1c;border-radius:4px;padding:16px;margin:16px 0;">'
+         '<p style="margin:0;font-size:14px;color:#334155;white-space:pre-wrap;">' + _e(str(p.get('reason'))) + '</p></div>'
+         if p.get('reason') else ''}
+        {_button('Open the project', p.get('workspaceUrl', '/portal'))}
+    '''),
+    'project_setup_ready': lambda p: _layout(f'''
+        <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">Congratulations &mdash; you won</h2>
+        <p><strong>{_e(str(p.get('title') or 'Your proposal'))}</strong> has been recorded as awarded,
+        and a project is ready to set up.</p>
+        <p>Two documents start it off: the <strong>executed contract</strong> and the
+        <strong>proposal as submitted</strong>. Everything the workspace tracks &mdash; CLINs,
+        milestones, deliverables &mdash; is measured against those two files, so the workspace asks
+        for them before it will let you baseline the schedule.</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:16px;margin:16px 0;">
+            <p style="margin:4px 0;font-size:14px;color:#475569;">A task has been added to your
+            queue: <strong>Set up project</strong>.</p>
+        </div>
+        {_button('Set up the workspace', p.get('workspaceUrl', '/portal'))}
+    '''),
     'rfp_ready_for_curation': lambda p: _layout(f'''
         <h2 style="margin:0 0 16px;font-size:20px;color:{BRAND_NAVY};">RFP ready for curation</h2>
         <p>An uploaded RFP has been shredded and is ready for triage.</p>

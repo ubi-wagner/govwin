@@ -135,7 +135,7 @@ export async function confirmAmendment(
 
   // Mirror-card reach: the proposal flags above only land for tenants who already HAVE a
   // provisioned proposal — the pre-purchase/mid-window audience (pinned holders, pending
-  // buyers) hears about it through a bridge republish (pin_update_available + the watched-opp
+  // buyers) hears about it through a bridge republish (docs_update_available + the watched-opp
   // notification). Pre-release amendments for a not-yet-provisioned buyer are additionally
   // REPLAYED at provision time (replayConfirmedAmendments, called by release-portal).
   await republishSolicitationCards({ solicitationId: p.solicitationId, actorId: p.actorId });

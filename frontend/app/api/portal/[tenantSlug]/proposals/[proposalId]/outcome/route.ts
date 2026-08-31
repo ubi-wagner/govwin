@@ -335,7 +335,12 @@ export async function POST(request: Request, ctx: RouteContext) {
             type: 'contract.started',
             actor: userActor(sessionUser.id, sessionUser.email),
             tenantId,
-            payload: { contractId, proposalId, opportunityId: proposal.opportunityId, title: `Contract: ${proposal.title}` },
+            // `tenantId` is IN THE PAYLOAD as well as on the event row, because the workflow
+            // engine's input_map resolver only understands `payload.*` / `result.*` / `step.*`
+            // (processor.resolve_input) — it cannot reach the event's own tenant column. The
+            // OnContractStarted NOTIFY step maps `tenant_id: payload.tenantId`, so without this
+            // the notification is dispatched with no tenant and the CRM has nobody to mail.
+            payload: { contractId, proposalId, tenantId, opportunityId: proposal.opportunityId, title: `Contract: ${proposal.title}` },
           });
           let kickoffLaunched = false;
           // #190: tenant-side kickoff gate — fully tenant-tunable (not SLA-pinned).

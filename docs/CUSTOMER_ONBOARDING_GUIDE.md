@@ -249,7 +249,7 @@ overall number:
 A card carries **as many ranks as you have buckets**. It is not duplicated per bucket, and there is
 no single "match score".
 
-Actions per card: **Pin to pursue** · **Not interested** (passes it) · **Build →** (starts the
+Actions per card: **👍 Interested** · **Not interested** (passes it) · **Build →** (starts the
 purchase). Above the feed: **Include closed** and **Show passed** toggles, **Refresh**, the count,
 and a **Sort** selector defaulting to *Best match*.
 

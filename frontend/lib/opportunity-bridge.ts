@@ -19,6 +19,27 @@ import { scoreCardForTenant } from '@/lib/bucket-ranking';
 // Re-exported so existing `import { BridgeEventType } from '@/lib/opportunity-bridge'` keeps working.
 export type { BridgeEventType };
 
+/**
+ * One document of the solicitation as it reaches a tenant — the MANIFEST entry.
+ *
+ * The bytes are NOT here, and as of mig 239 they do not arrive at fan-out either. The manifest says
+ * WHAT the organization published so a tenant can see it before deciding; `copyCorpusInward` copies
+ * the text into their own `tenant_opportunity_documents` rows when they PIN.
+ *
+ * The documents are REFERENCE. They are not what ranks — see the header of mig 239 for the
+ * measurement that settled it.
+ */
+export interface OppCardDoc {
+  sourceDocumentId: string;
+  documentType: string;
+  documentLabel: string | null;
+  filename: string;
+  isPrimary: boolean;
+  contentHash: string | null;
+  pageCount: number | null;
+  charCount: number;
+}
+
 /** The customer-visible face of the card (the only part that reaches a tenant). */
 export interface OppCard {
   opportunityId: string;
@@ -30,7 +51,40 @@ export interface OppCard {
   naicsCodes: string[] | null;
   setAsideType: string | null;
   programType: string | null;
+  /** Phase I vs Direct-to-Phase-II — a real discriminator for a small business, dropped until mig 238. */
+  phaseType: string | null;
+  /** The technology signal. Extracted by the AI shred, edited by the rfp_admin on the topic route,
+   *  read by `capture_strategist` — and carried by neither the bridge nor either scorer until now. */
+  techFocusAreas: string[] | null;
+  /** Topic identity, on a card that IS a topic (11 of 22 opportunities carry a topic_number). */
+  topicNumber: string | null;
+  topicBranch: string | null;
+  topicStatus: string | null;
+  /** Who to ask. */
+  pocName: string | null;
+  pocEmail: string | null;
   classificationCode: string | null;
+  /**
+   * Were these dates READ from the solicitation, or inferred? (mig 240)
+   *
+   * `opportunities.dates_estimated` is populated on every master row and reached the card on none
+   * of them. It is the dates' provenance, and this project's own rule is that *a value the product
+   * did not read from the solicitation must never look like one it did* — which a close date
+   * cannot honour if the flag saying it was estimated stops at the master.
+   *
+   * It matters most where it is least visible: a bucket's timeline factor scores a card by how
+   * soon it closes, so an inferred date moves a customer's ranking exactly like a real one.
+   */
+  datesEstimated: boolean;
+  /**
+   * Per-field release basis (mig 241) — how the RFP admin came by each value.
+   *
+   * `{"award_amount": "estimated"}` is the case that earns it: an admin often knows what a Phase I
+   * runs when the topic is silent, and that knowledge is worth showing — but showing it the same
+   * way as a figure read from the document would be a lie. Same rule as `datesEstimated`, one level
+   * more general, and the same rule the ingest-provenance spine applies to compliance values.
+   */
+  fieldBasis: Record<string, string>;
   postedDate: string | null;
   preReleaseDate: string | null;
   openDate: string | null;
@@ -60,8 +114,41 @@ export interface OppCard {
     submissionFormat: string | null;
     volumeCount: number;
   } | null;
+  /** What the organization published, as published. Manifest only — see OppCardDoc. */
+  documents: OppCardDoc[];
+  /**
+   * The curated build-out — "volumes and skeletons" (mig 239).
+   *
+   * What the admin decided this proposal is MADE OF: the volume names and the required items inside
+   * them. Small, specific, and every entry exists because a person decided it belonged. This is a
+   * ranking signal in a way the solicitation text is not — "Technical Volume", "Commercialization
+   * Plan", "Phase I Work Plan" says what the work IS, where 330 pages of BAA says only that the
+   * document is long.
+   */
+  volumes: string[];
+  requiredItems: string[];
+  /**
+   * What the curator MARKED while reading (mig 239). The residue of a reading that otherwise
+   * evaporates into a 103-character blurb. Bounded at the bridge — a card is read on every list
+   * render, so the cap belongs here rather than in the input.
+   */
+  highlights: OppCardHighlight[];
   frozenAt: string;
 }
+
+/** One admin highlight as it reaches a tenant. */
+export interface OppCardHighlight {
+  text: string;
+  kind: string;
+  page: number | null;
+  /** The compliance variable it anchors, when it was made to justify one. */
+  variable: string | null;
+}
+
+/** Bounds for what rides the card. A card is read on every list render. */
+const MAX_HIGHLIGHTS = 24;
+const MAX_HIGHLIGHT_CHARS = 400;
+const MAX_VOLUME_ENTRIES = 40;
 
 const jsonParam = (v: unknown) => sql.json(v as Parameters<typeof sql.json>[0]);
 
@@ -74,12 +161,55 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
              o.pre_release_date, o.open_date, o.close_date, o.award_date, o.award_amount, o.awardee,
              o.estimated_value_min, o.estimated_value_max, o.description, o.expert_notes,
              o.lifecycle_status, o.submission_stage,
+             o.phase_type, o.tech_focus_areas, o.topic_number, o.topic_branch, o.topic_status,
+             o.poc_name, o.poc_email, o.dates_estimated, o.field_basis,
              o.built_by, o.released_by, o.released_at,
              ub.email AS built_by_email, ur.email AS released_by_email,
              cs.namespace, cs.spotlight_summary, cs.build_complete,
              sc.page_limit_technical, sc.page_limit_cost, sc.submission_format,
              (SELECT count(*)::int FROM solicitation_volumes sv
-                WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL) AS volume_count
+                WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL) AS volume_count,
+             -- The document MANIFEST (mig 238). Aliased camelCase because lib/db.ts applies
+             -- postgres.toCamel to every column — but a jsonb_build_object's KEYS are values, not
+             -- column names, so they pass through untouched and must be written camelCase here.
+             -- char_count is computed from the master text so the manifest can state the corpus
+             -- size without carrying it.
+             -- The curated build-out (mig 239): volume names and the required items inside them.
+             -- Umbrella-level only (topic_id IS NULL) so a topic card is not handed another
+             -- topic's skeleton. DISTINCT because one volume name can carry many items.
+             (SELECT COALESCE(jsonb_agg(DISTINCT sv.volume_name ORDER BY sv.volume_name), '[]'::jsonb)
+                FROM solicitation_volumes sv
+               WHERE sv.solicitation_id = cs.id AND sv.topic_id IS NULL
+                 AND COALESCE(sv.volume_name, '') <> '') AS volumes,
+             (SELECT COALESCE(jsonb_agg(DISTINCT vri.item_name ORDER BY vri.item_name), '[]'::jsonb)
+                FROM volume_required_items vri
+                JOIN solicitation_volumes sv2 ON sv2.id = vri.volume_id
+               WHERE sv2.solicitation_id = cs.id AND sv2.topic_id IS NULL
+                 AND COALESCE(vri.item_name, '') <> '') AS required_items,
+             -- What the curator MARKED. Bounded in SQL as well as in TS, so a pathological
+             -- annotation set cannot make one card payload enormous before it reaches the cap.
+             (SELECT COALESCE(jsonb_agg(h ORDER BY h->>'page'), '[]'::jsonb) FROM (
+                SELECT jsonb_build_object(
+                         'text', left(sa.excerpt, 400),
+                         'kind', sa.kind,
+                         'page', (sa.source_location->>'page')::int,
+                         'variable', sa.compliance_variable_name) AS h
+                  FROM solicitation_annotations sa
+                 WHERE sa.solicitation_id = cs.id AND COALESCE(sa.excerpt, '') <> ''
+                 ORDER BY sa.created_at
+                 LIMIT 24) q) AS highlights,
+             (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                        'sourceDocumentId', sd.id,
+                        'documentType',     sd.document_type,
+                        'documentLabel',    sd.document_label,
+                        'filename',         sd.original_filename,
+                        'isPrimary',        sd.is_primary,
+                        'contentHash',      sd.content_hash,
+                        'pageCount',        sd.page_count,
+                        'charCount',        length(COALESCE(sd.extracted_text, ''))
+                      ) ORDER BY sd.is_primary DESC, (sd.document_type = 'source') DESC, sd.created_at),
+                      '[]'::jsonb)
+                FROM solicitation_documents sd WHERE sd.solicitation_id = cs.id) AS documents
       FROM opportunities o
       -- Resolve the solicitation for BOTH the umbrella (cs.opportunity_id = o.id)
       -- and its topics (o.solicitation_id = cs.id). Without the topic arm, a topic
@@ -116,6 +246,12 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
      */
     const str = (v: unknown): string | null =>
       v == null ? null : v instanceof Date ? v.toISOString() : String(v);
+    /** A jsonb string array, cleaned and bounded. */
+    const strList = (v: unknown, cap: number): string[] =>
+      (Array.isArray(v) ? v : [])
+        .filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+        .map((x) => x.trim())
+        .slice(0, cap);
     const hasMatrix = o.pageLimitTechnical != null || o.pageLimitCost != null || (num(o.volumeCount) ?? 0) > 0;
     return {
       opportunityId,
@@ -127,7 +263,25 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       naicsCodes: (o.naicsCodes as string[]) ?? null,
       setAsideType: (o.setAsideType as string) ?? null,
       programType: (o.programType as string) ?? null,
+      phaseType: (o.phaseType as string) ?? null,
+      techFocusAreas: (o.techFocusAreas as string[]) ?? null,
+      topicNumber: (o.topicNumber as string) ?? null,
+      topicBranch: (o.topicBranch as string) ?? null,
+      topicStatus: (o.topicStatus as string) ?? null,
+      pocName: (o.pocName as string) ?? null,
+      pocEmail: (o.pocEmail as string) ?? null,
       classificationCode: (o.classificationCode as string) ?? null,
+      datesEstimated: o.datesEstimated === true,
+      fieldBasis: (() => {
+        // Only string values survive: the map is rendered directly, and a nested object or a number
+        // arriving from a future writer must not reach a customer as "[object Object]".
+        const raw = o.fieldBasis;
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+        return Object.fromEntries(
+          Object.entries(raw as Record<string, unknown>)
+            .filter(([, v]) => typeof v === 'string' && v.trim() !== ''),
+        ) as Record<string, string>;
+      })(),
       postedDate: str(o.postedDate),
       preReleaseDate: str(o.preReleaseDate),
       openDate: str(o.openDate),
@@ -149,6 +303,18 @@ export async function buildCardSnapshot(opportunityId: string, frozenAt: string)
       releasedBy: str(o.releasedBy),
       releasedByEmail: (o.releasedByEmail as string) ?? null,
       releasedAt: str(o.releasedAt),
+      documents: Array.isArray(o.documents) ? (o.documents as OppCardDoc[]) : [],
+      volumes: strList(o.volumes, MAX_VOLUME_ENTRIES),
+      requiredItems: strList(o.requiredItems, MAX_VOLUME_ENTRIES),
+      highlights: (Array.isArray(o.highlights) ? (o.highlights as OppCardHighlight[]) : [])
+        .filter((h) => typeof h?.text === 'string' && h.text.trim() !== '')
+        .slice(0, MAX_HIGHLIGHTS)
+        .map((h) => ({
+          text: h.text.trim().slice(0, MAX_HIGHLIGHT_CHARS),
+          kind: typeof h.kind === 'string' ? h.kind : 'highlight',
+          page: Number.isFinite(Number(h.page)) ? Number(h.page) : null,
+          variable: typeof h.variable === 'string' ? h.variable : null,
+        })),
       frozenAt,
       complianceSummary: hasMatrix
         ? {
@@ -171,6 +337,33 @@ export interface BridgeEvent {
   version: number;
   eventType: BridgeEventType;
   card: OppCard;
+}
+
+/**
+ * Normalize a card read back out of stored jsonb.
+ *
+ * `OppCard` is the contract for a card this build PUBLISHES. A card read from `opportunity_bridge`
+ * was written by whatever build was deployed at the time, so the fields mig 238 added are simply
+ * absent on every row published before it — and a TS cast over stored jsonb asserts a shape the
+ * bytes do not have. That is the same class as the `sql<T>` trap the data-layer SOP documents: it
+ * compiles, and then `card.documents.map(...)` throws on a legacy row.
+ *
+ * Backfill and reconcile both replay historical bridge rows, so both go through here.
+ */
+export function normalizeCard(raw: unknown): OppCard {
+  const c = (raw ?? {}) as Partial<OppCard>;
+  return {
+    ...(c as OppCard),
+    datesEstimated: c.datesEstimated === true,
+    phaseType: c.phaseType ?? null,
+    techFocusAreas: Array.isArray(c.techFocusAreas) ? c.techFocusAreas : null,
+    topicNumber: c.topicNumber ?? null,
+    topicBranch: c.topicBranch ?? null,
+    topicStatus: c.topicStatus ?? null,
+    pocName: c.pocName ?? null,
+    pocEmail: c.pocEmail ?? null,
+    documents: Array.isArray(c.documents) ? c.documents : [],
+  };
 }
 
 /** Publish a forward-only card version to the bridge (admin approve / update / close). */
@@ -214,6 +407,116 @@ export async function publishToBridge(
   }
 }
 
+/**
+ * Copy the solicitation corpus INWARD — the bytes the manifest describes (mig 238).
+ *
+ * ⚠️ CALLED AT PIN, NOT AT FAN-OUT (mig 239). It ran on every apply, for every holder, whether or
+ * not any of them ever opened the document — 21 MB per opportunity across seven tenants on this
+ * box. The documents are REFERENCE: the card's manifest says what exists, and the bytes arrive
+ * when a tenant pins. What ranks is the curated record on the card, not this.
+ *
+ * The master (`solicitation_documents`) is RLS-off platform scope, so it is read on the bypass
+ * pool; the write lands in the tenant's FORCE-RLS `tenant_opportunity_documents` under `withTenant`.
+ *
+ * Three properties worth stating, because each is load-bearing:
+ *
+ *  · **Forward-only, like the card.** A stale event must not overwrite a newer copy, or an
+ *    out-of-order fan-out would restore a superseded amendment's text under a current card.
+ *  · **Hash short-circuit.** Documents rarely change; lifecycle republishes are frequent. Rewriting
+ *    375,000 characters per tenant because an opp reopened is real money for no information. When
+ *    the content hash matches what we already hold we advance `bridge_version` and leave the text.
+ *  · **Prune to the manifest, but only on success.** The mirror states what the organization has
+ *    published NOW; a document the admin withdrew must not linger. But an empty manifest from a
+ *    FAILED read would wipe a tenant's corpus, so the prune is inside the same try as the read and
+ *    an exception leaves the mirror exactly as it was.
+ *
+ * Best-effort throughout: a corpus failure must never fail the fan-out. The card still lands, the
+ * card's own curated record still ranks, and `reconcileTenant` re-drives the copy on the next pass.
+ * (Not `card_tsv` — the scorer matches literally, and that index is not a scoring input today.)
+ *
+ * ── RETURNS THE NUMBER OF DOCUMENTS WHOSE TEXT ACTUALLY LANDED ───────────────────────────────
+ * Not the number of ROWS written. A document that exists but has not been shredded yet upserts a
+ * row with an empty `extracted_text` — a legitimate state, and not a copy of anything. Counting it
+ * let `pinCard` believe a copy had succeeded when nothing readable had arrived, so a pin that
+ * should have been refused went through. Absent is not zero, one layer down.
+ */
+export async function copyCorpusInward(tenantId: string, ev: BridgeEvent): Promise<number> {
+  try {
+    // The master's own rows — the manifest on the card says WHICH, this reads the bytes.
+    const docs = await sqlBypass<Array<{
+      id: string; documentType: string; documentLabel: string | null; originalFilename: string;
+      isPrimary: boolean; contentHash: string | null; pageCount: number | null;
+      storageKey: string; extractedText: string | null;
+    }>>`
+      SELECT sd.id, sd.document_type, sd.document_label, sd.original_filename, sd.is_primary,
+             sd.content_hash, sd.page_count, sd.storage_key, sd.extracted_text
+      FROM solicitation_documents sd
+      JOIN opportunities o ON o.solicitation_id = sd.solicitation_id
+      WHERE o.id = ${ev.opportunityId}::uuid
+    `;
+    return await withTenant(tenantId, async (tx) => {
+      let written = 0;
+      for (const d of docs) {
+        const text = d.extractedText ?? '';
+        // The text is written only when the hash CHANGED (or we hold nothing). Otherwise this is a
+        // version bump on the row we already have. `EXCLUDED.bridge_version > current` keeps the
+        // whole thing forward-only; a stale event is a no-op with an empty RETURNING.
+        const rows = await tx`
+          INSERT INTO tenant_opportunity_documents (
+            tenant_id, opportunity_id, source_document_id, document_type, document_label,
+            original_filename, is_primary, content_hash, page_count, char_count,
+            storage_key, extracted_text, bridge_version)
+          VALUES (
+            ${tenantId}::uuid, ${ev.opportunityId}::uuid, ${d.id}::uuid, ${d.documentType},
+            ${d.documentLabel}, ${d.originalFilename}, ${d.isPrimary}, ${d.contentHash},
+            ${d.pageCount}, ${text.length}, ${d.storageKey}, ${text}, ${ev.version})
+          ON CONFLICT (tenant_id, opportunity_id, source_document_id) DO UPDATE SET
+            document_type     = EXCLUDED.document_type,
+            document_label    = EXCLUDED.document_label,
+            original_filename = EXCLUDED.original_filename,
+            is_primary        = EXCLUDED.is_primary,
+            page_count        = EXCLUDED.page_count,
+            storage_key       = EXCLUDED.storage_key,
+            bridge_version    = EXCLUDED.bridge_version,
+            -- Hash short-circuit: same content, keep the bytes we already TOASTed.
+            content_hash      = EXCLUDED.content_hash,
+            extracted_text    = CASE
+              WHEN tenant_opportunity_documents.content_hash IS NOT NULL
+               AND tenant_opportunity_documents.content_hash = EXCLUDED.content_hash
+              THEN tenant_opportunity_documents.extracted_text
+              ELSE EXCLUDED.extracted_text END,
+            char_count        = CASE
+              WHEN tenant_opportunity_documents.content_hash IS NOT NULL
+               AND tenant_opportunity_documents.content_hash = EXCLUDED.content_hash
+              THEN tenant_opportunity_documents.char_count
+              ELSE EXCLUDED.char_count END,
+            updated_at        = now()
+          WHERE EXCLUDED.bridge_version > tenant_opportunity_documents.bridge_version
+          RETURNING id
+        `;
+        // Only a row carrying TEXT counts as a copy — see the note on the return value above.
+        if (rows.length > 0 && text.length > 0) written++;
+      }
+      // Prune to the manifest — inside the same try, so a failed read never wipes a corpus.
+      const keep = docs.map((d) => d.id);
+      if (keep.length > 0) {
+        await tx`
+          DELETE FROM tenant_opportunity_documents
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${ev.opportunityId}::uuid
+            AND source_document_id <> ALL(${keep}::uuid[])`;
+      } else {
+        await tx`
+          DELETE FROM tenant_opportunity_documents
+          WHERE tenant_id = ${tenantId}::uuid AND opportunity_id = ${ev.opportunityId}::uuid`;
+      }
+      return written;
+    });
+  } catch (e) {
+    console.error('[bridge] corpus copy-inward failed (non-fatal)', tenantId, ev.opportunityId, e);
+    return 0;
+  }
+}
+
 /** Upsert one tenant's denormalized card from a bridge event (tenant-scoped via RLS GUC).
  *  `watched` (RANK-8) = this master opp is admin-pinned for updates, so a newer version landing on an
  *  EXISTING mirror card fans an elevated update notification to this holder (pre-purchase reach). */
@@ -251,9 +554,9 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false)
         bridge_version = EXCLUDED.bridge_version,
         lifecycle_status = EXCLUDED.lifecycle_status,
         submission_stage = EXCLUDED.submission_stage,
-        pin_update_available = CASE
-          WHEN tenant_opportunity_cards.is_pinned AND EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
-          THEN true ELSE tenant_opportunity_cards.pin_update_available END,
+        docs_update_available = CASE
+          WHEN tenant_opportunity_cards.docs_copied AND EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
+          THEN true ELSE tenant_opportunity_cards.docs_update_available END,
         updated_at = now()
       WHERE EXCLUDED.bridge_version > tenant_opportunity_cards.bridge_version
       RETURNING tenant_id
@@ -261,6 +564,10 @@ async function applyToTenant(tenantId: string, ev: BridgeEvent, watched = false)
     return { applied: rows.length > 0, existedBefore: !!prior };
   });
   if (!applied) return false;
+  // NO corpus copy here (mig 239). It used to run on every apply for every holder; the documents
+  // are reference material and now arrive at PIN. A tenant who has already pinned gets
+  // `docs_update_available` set by the upsert above, and resyncing re-copies against the new
+  // version — so an amendment still reaches the people who asked for the document.
   // System cursor (not tenant-RLS'd) — records forward-only progress. Only advances when the
   // card advanced above, so a stale apply can't regress last_event_id either.
   await sql`
@@ -423,7 +730,7 @@ export async function backfillTenant(tenantId: string): Promise<number> {
   let applied = 0;
   for (const h of heads) {
     try {
-      await applyToTenant(tenantId, { id: h.id, opportunityId: h.opportunityId, version: h.version, eventType: h.eventType, card: h.card });
+      await applyToTenant(tenantId, { id: h.id, opportunityId: h.opportunityId, version: h.version, eventType: h.eventType, card: normalizeCard(h.card) });
       applied++;
     } catch (e) {
       console.error('[bridge] backfill apply failed', h.opportunityId, e);
@@ -468,7 +775,7 @@ export async function reconcileTenant(tenantId: string): Promise<number> {
   let applied = 0;
   for (const h of behind) {
     try {
-      await applyToTenant(tenantId, { id: h.id, opportunityId: h.opportunityId, version: h.version, eventType: h.eventType, card: h.card });
+      await applyToTenant(tenantId, { id: h.id, opportunityId: h.opportunityId, version: h.version, eventType: h.eventType, card: normalizeCard(h.card) });
       applied++;
     } catch (e) {
       console.error('[bridge] reconcile apply failed', h.opportunityId, e);

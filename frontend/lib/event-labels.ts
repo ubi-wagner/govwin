@@ -174,6 +174,290 @@ export function describeEvent(ev: EventLike): string {
     }
   }
 
+  // Post-award projects (migration 217). EVERY type here needs a case, or it reaches a customer's
+  // Activity feed as a de-punctuated identifier — which is B136 ("Shadow descended") happening
+  // again in a new namespace. The fallback humanizer produces "clin created", which is not wrong
+  // so much as it is nobody's sentence.
+  if (namespace === 'project') {
+    const project = str(payload.name) ?? 'the project workspace';
+    switch (type) {
+      case 'project.created':
+        return `Project workspace opened: ${project}`;
+      case 'source_document.uploaded': {
+        const kind = payload.kind === 'executed_contract' ? 'Executed contract' : 'As-submitted proposal';
+        return `${kind} uploaded${str(payload.filename) ? ` — ${str(payload.filename)}` : ''}`;
+      }
+      case 'clin.created':
+        return `CLIN ${str(payload.clinNumber) ?? ''} added${str(payload.title) ? ` — ${str(payload.title)}` : ''}`.trim();
+      case 'baseline.set':
+        return phase === 'start' ? 'Freezing the contract baseline' : 'Contract baseline set';
+      case 'modification.drafted': {
+        const n = typeof payload.changes === 'number' ? payload.changes : null;
+        return `Modification ${str(payload.modNumber) ?? ''} drafted`
+          + `${n ? ` — ${n} change${n === 1 ? '' : 's'}, not yet applied` : ' — no contract change'}`;
+      }
+      case 'milestone.auto_closed':
+        return `Milestone closed by the AI manager: ${str(payload.title) ?? 'a milestone'}`;
+      case 'milestone.auto_close_declined': {
+        // The DECLINE is the more interesting row. A sweep that only logged its successes would
+        // make "nothing happened" and "a phase was held back" look identical in the feed.
+        const why = Array.isArray(payload.objections) ? payload.objections : [];
+        return `AI manager held back ${str(payload.title) ?? 'a milestone'}`
+          + `${why.length ? ` — ${String(why[0])}` : ''}`;
+      }
+      case 'status_narrative.requested':
+        // The check is the point, and the feed says so — otherwise "narrative drafted" reads as
+        // "the report now contains generated numbers", which is the one thing it does not.
+        return phase === 'start'
+          ? 'Drafting the status-report narrative — every figure is checked against the rows'
+          : 'Status-report narrative drafted, pending review';
+      case 'health.assessment_requested':
+        // ADVISORY, said in the feed itself. A reader scanning the activity log must not think a
+        // date moved because an assessment ran.
+        return phase === 'start'
+          ? 'Assessing project health — advisory, nothing will be changed'
+          : 'Project health assessment requested';
+      case 'cdrl.registered': {
+        const dist = str(payload.distribution);
+        return `CDRL ${str(payload.cdrlNumber) ?? ''} registered — ${str(payload.title) ?? 'a data item'}`
+          + `${str(payload.frequency) && payload.frequency !== 'one_time' ? `, ${String(payload.frequency).replace('_', ' ')}` : ''}`
+          + `${dist ? ` \u00b7 Distribution ${dist}` : ''}`;
+      }
+      case 'cdrl.submitted': {
+        // LATE or EARLY, said plainly. "CDRL submitted" is the row nobody can act on; whether it
+        // met the contract date is the only thing a program review asks.
+        const late = typeof payload.daysLate === 'number' ? payload.daysLate : null;
+        const when = late === null || late === 0 ? ''
+          : late > 0 ? ` \u2014 ${late} day${late === 1 ? '' : 's'} late`
+          : ` \u2014 ${-late} day${late === -1 ? '' : 's'} early`;
+        const ref = str(payload.transmittalRef);
+        return `Delivered to the customer: ${str(payload.title) ?? 'a deliverable'}`
+          + `${str(payload.cdrlNumber) ? ` (CDRL ${str(payload.cdrlNumber)})` : ''}${when}`
+          + `${ref ? ` \u00b7 ${ref}` : ''}`;
+      }
+      case 'invoice.drafted': {
+        const n = typeof payload.total === 'number' ? payload.total : null;
+        return `Invoice ${str(payload.invoiceNumber) ?? ''} drafted`
+          + `${n === null ? '' : ` — ${n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}, not yet claimed`}`;
+      }
+      case 'invoice.submitted': {
+        const n = typeof payload.total === 'number' ? payload.total : null;
+        return `Invoice ${str(payload.invoiceNumber) ?? ''} submitted`
+          + `${n === null ? '' : ` — ${n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}`}`;
+      }
+      case 'invoice.paid': {
+        // PART-paid is the normal case, and "Invoice paid" over a 90% payment is the sentence that
+        // makes somebody stop chasing the withholding.
+        const got = typeof payload.amount === 'number' ? payload.amount : null;
+        const cash = got === null ? '' : ` — ${got.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} received`;
+        return payload.settled === true
+          ? `Invoice ${str(payload.invoiceNumber) ?? ''} settled${cash}`
+          : `Payment against invoice ${str(payload.invoiceNumber) ?? ''}${cash} · still outstanding`;
+      }
+      case 'invoice.voided': {
+        const freed = typeof payload.hoursReleased === 'number' ? payload.hoursReleased : 0;
+        return `Invoice ${str(payload.invoiceNumber) ?? ''} voided`
+          + `${str(payload.reason) ? ` — ${str(payload.reason)}` : ''}`
+          + `${freed > 0 ? ` · ${freed} time entr${freed === 1 ? 'y' : 'ies'} released to bill again` : ''}`;
+      }
+      case 'modification.executed': {
+        // What it MOVED, not that it happened. "Modification executed" six months later is a row
+        // nobody can act on; the money and the dates are why anyone opens the feed.
+        const applied = typeof payload.applied === 'number' ? payload.applied : 0;
+        const added = typeof payload.clinsCreated === 'number' ? payload.clinsCreated : 0;
+        const what = [
+          applied - added > 0 ? `${applied - added} CLIN field${applied - added === 1 ? '' : 's'}` : null,
+          added > 0 ? `${added} new CLIN${added === 1 ? '' : 's'}` : null,
+        ].filter(Boolean).join(' and ');
+        const pop = payload.movedPeriodOfPerformance === true
+          ? ' · period of performance moved — rebaseline requested' : '';
+        return `Modification ${str(payload.modNumber) ?? ''} executed`
+          + `${what ? ` — ${what}` : ''}${pop}`;
+      }
+      case 'project.rebaselined':
+        return phase === 'start' ? 'Rebaselining the project plan' : 'Project plan rebaselined';
+      case 'milestone.due':
+        return `Milestone due: ${str(payload.title) ?? 'a milestone'}`;
+      case 'milestone.met': {
+        // The completion RECORD, not just the fact. "Milestone met" six months later tells a
+        // reader nothing; the variance and the note are why anyone opens the feed.
+        const what = str(payload.title) ?? 'a milestone';
+        const v = typeof payload.varianceDays === 'number' ? payload.varianceDays : null;
+        const when = v === null || v === 0 ? ''
+          : v > 0 ? ` — ${v} day${v === 1 ? '' : 's'} late` : ` — ${-v} day${v === -1 ? '' : 's'} early`;
+        const note = str(payload.note);
+        return `Milestone met: ${what}${when}${note ? ` · ${note}` : ''}`;
+      }
+      case 'milestone.rescheduled': {
+        const what = str(payload.title) ?? 'a milestone';
+        const d = typeof payload.deltaDays === 'number' ? payload.deltaDays : null;
+        const by = d === null || d === 0 ? ''
+          : d > 0 ? ` — pushed out ${d} day${d === 1 ? '' : 's'}` : ` — pulled in ${-d} day${d === -1 ? '' : 's'}`;
+        const also = typeof payload.cascaded === 'number' && payload.cascaded > 0
+          ? `, and ${payload.cascaded} later milestone${payload.cascaded === 1 ? '' : 's'} with it` : '';
+        return `Milestone rescheduled: ${what}${by}${also}`;
+      }
+      case 'milestone.due_soon':
+        return `Milestone due ${str(payload.dueOn) ?? 'soon'}: ${str(payload.title) ?? 'a milestone'}`;
+      case 'milestone.overdue': {
+        const late = typeof payload.daysLate === 'number' ? payload.daysLate : null;
+        return `Milestone overdue${late ? ` by ${late} day${late === 1 ? '' : 's'}` : ''}: `
+          + `${str(payload.title) ?? 'a milestone'}`;
+      }
+      case 'project.closed': {
+        const n = typeof payload.milestones === 'number' ? payload.milestones : null;
+        const note = str(payload.note);
+        return `Project closed out${n ? ` — ${n} milestone${n === 1 ? '' : 's'}` : ''}`
+          + `${note ? ` · ${note}` : ''}`;
+      }
+      case 'project.reopened':
+        // "Closed-out" is the fact that matters: this project was finished, and is not any more.
+        return `Closed-out project reopened${str(payload.reason) ? ` — ${str(payload.reason)}` : ''}`;
+      case 'task.completed':
+        return `Task done: ${str(payload.title) ?? 'a task'}`;
+      case 'task.blocked':
+        return `Task blocked: ${str(payload.title) ?? 'a task'}`
+          + `${str(payload.reason) ? ` — ${str(payload.reason)}` : ''}`;
+      case 'task.reopened':
+        return `Task reopened: ${str(payload.title) ?? 'a task'}`;
+      case 'task.due_soon':
+        return `Task due ${str(payload.dueOn) ?? 'soon'}: ${str(payload.title) ?? 'a task'}`;
+      case 'task.overdue': {
+        const late = typeof payload.daysLate === 'number' ? payload.daysLate : null;
+        return `Task overdue${late ? ` by ${late} day${late === 1 ? '' : 's'}` : ''}: `
+          + `${str(payload.title) ?? 'a task'}`;
+      }
+      case 'deliverable.uploaded':
+        return `Deliverable uploaded: ${str(payload.title) ?? str(payload.filename) ?? 'a deliverable'}`;
+      case 'deliverable.authored':
+        return `Deliverable drafted in-product: ${str(payload.title) ?? 'a document'}`
+          + `${str(payload.preset) ? ` (${str(payload.preset)})` : ''}`;
+      case 'deliverable.accepted':
+        return `Deliverable accepted: ${str(payload.title) ?? 'a deliverable'}`;
+
+      // ── The plan (mig 221) ────────────────────────────────────────────────────────────────
+      case 'task.reassigned': {
+        // WHO it moved to is the whole reason this event exists — "a task was reassigned" is a
+        // sentence that makes a reader open the project to learn anything.
+        const what = str(payload.title) ?? 'a task';
+        const to = str(payload.to);
+        return `Task handed over: ${what}${to ? ` — now ${to}` : ''}`;
+      }
+      case 'task.rescheduled': {
+        const what = str(payload.title) ?? 'a task';
+        const from = str(payload.from);
+        const to = str(payload.to);
+        return `Task moved: ${what}${from && to ? ` — ${from} → ${to}` : to ? ` — now due ${to}` : ''}`;
+      }
+      case 'task.reference_attached':
+        return `Reference attached to ${str(payload.title) ?? 'a task'}`
+          + `${str(payload.filename) ? ` — ${str(payload.filename)}` : ''}`;
+      case 'task.reference_removed':
+        return `Reference removed from ${str(payload.title) ?? 'a task'}`;
+      case 'milestone.dependency_set':
+        return str(payload.dependsOnId)
+          ? `Milestone now follows another: ${str(payload.title) ?? 'a milestone'}`
+          : `Milestone dependency cleared: ${str(payload.title) ?? 'a milestone'}`;
+
+      // ── The conversation (mig 222) ────────────────────────────────────────────────────────
+      case 'comment.posted': {
+        // The EXCERPT, not just the fact. A feed row saying "a comment was posted" is a row
+        // whose only function is to make somebody click.
+        const on = str(payload.entityType);
+        const where = !on || on === 'project' ? '' : ` on a ${on}`;
+        const said = str(payload.excerpt);
+        const n = typeof payload.mentioned === 'number' ? payload.mentioned : 0;
+        const who = n > 0 ? ` · ${n} person${n === 1 ? '' : 's'} mentioned` : '';
+        return `Comment${where}${said ? `: ${said}` : ''}${who}`;
+      }
+      case 'comment.resolved':
+        return 'Comment thread resolved';
+      case 'comment.reopened':
+        return 'Comment thread reopened';
+      case 'comment.edited':
+        // "by its author" is the rule, not decoration — nobody else can, and a reader seeing an
+        // edited comment should know it was not rewritten by somebody else.
+        return 'Comment edited by its author';
+
+      // ── The review gate (mig 223) ─────────────────────────────────────────────────────────
+      case 'review.requested':
+        return `Review requested on a ${str(payload.entityType) ?? 'deliverable'}`
+          + `${str(payload.dueOn) ? ` — wanted by ${str(payload.dueOn)}` : ''}`;
+      case 'review.approved':
+        return `Review approved — the ${str(payload.entityType) ?? 'deliverable'} can be accepted`;
+      case 'review.rejected':
+        // The REASON. A rejection whose reason is not in the feed sends the reader hunting for
+        // the one thing that tells them what to change.
+        return `Review REJECTED: ${str(payload.reason) ?? 'no reason recorded'}`;
+      case 'review.withdrawn':
+        return 'Review request withdrawn';
+
+      // ── Meetings (mig 226) ────────────────────────────────────────────────────────────────
+      case 'meeting.recorded': {
+        const n = typeof payload.attendees === 'number' ? payload.attendees : 0;
+        return `Meeting recorded: ${str(payload.title) ?? 'a meeting'}`
+          + `${str(payload.heldOn) ? ` (${str(payload.heldOn)})` : ''}`
+          + `${n ? ` · ${n} attendee${n === 1 ? '' : 's'}` : ''}`;
+      }
+      case 'meeting.actions_raised': {
+        // Both halves. Saying "5 raised" when one was refused is how the notes and the plan start
+        // disagreeing about what was agreed.
+        const raised = typeof payload.raised === 'number' ? payload.raised : 0;
+        const refused = typeof payload.refused === 'number' ? payload.refused : 0;
+        return `${raised} action item${raised === 1 ? '' : 's'} raised from `
+          + `"${str(payload.title) ?? 'a meeting'}"${refused ? ` · ${refused} refused` : ''}`;
+      }
+
+      // ── The register (mig 225) ────────────────────────────────────────────────────────────
+      case 'risk.raised':
+        return `Risk raised: ${str(payload.title) ?? 'a risk'}`
+          + `${typeof payload.score === 'number' ? ` — scored ${payload.score}/25` : ''}`;
+      case 'issue.raised':
+        return `Issue logged: ${str(payload.title) ?? 'an issue'}`;
+      case 'risk.became_issue':
+        // The transition a program review asks about, and the score it was rated at — which is the
+        // register's whole claim to having been useful.
+        return `A risk HAPPENED: ${str(payload.title) ?? 'a risk'}`
+          + `${typeof payload.score === 'number' ? ` — we had it at ${payload.score}/25` : ''}`;
+      case 'risk.rescored': {
+        const from = typeof payload.from === 'number' ? payload.from : null;
+        const to = typeof payload.to === 'number' ? payload.to : null;
+        const dir = from !== null && to !== null ? (to > from ? 'up' : 'down') : '';
+        return `Risk rescored ${dir}: ${str(payload.title) ?? 'a risk'}`
+          + `${from !== null && to !== null ? ` — ${from} → ${to}` : ''}`;
+      }
+      case 'risk.closed':
+        return `Risk closed: ${str(payload.title) ?? 'a risk'}`
+          + `${str(payload.note) ? ` · ${str(payload.note)}` : ''}`;
+      case 'issue.closed':
+        return `Issue resolved: ${str(payload.title) ?? 'an issue'}`
+          + `${str(payload.note) ? ` · ${str(payload.note)}` : ''}`;
+      case 'risk.mitigation_planned':
+        return `Mitigation planned: ${str(payload.title) ?? 'a mitigation'}`;
+
+      // ── The customer's act, filed by us (mig 224) ─────────────────────────────────────────
+      case 'acceptance_evidence.filed': {
+        // "reports" is doing the work. This row must never read as the customer's own act — the
+        // product has not met that person and verified nothing.
+        const who = str(payload.customerName);
+        const kind = str(payload.kind) ?? 'evidence';
+        const on = str(payload.occurredOn);
+        return `Customer acceptance evidence filed (${kind})`
+          + `${who ? ` — reports ${who}` : ''}${on ? `, ${on}` : ''}`;
+      }
+
+      // ── The daily sweep ───────────────────────────────────────────────────────────────────
+      case 'nudge_sweep.completed': {
+        const n = typeof payload.notified === 'number' ? payload.notified
+          : typeof payload.items === 'number' ? payload.items : null;
+        return `Project reminders sent${n !== null ? ` — ${n} item${n === 1 ? '' : 's'}` : ''}`;
+      }
+
+      default:
+        break;
+    }
+  }
+
   // Closed-loop system events (email/notification delivery, failures)
   if (namespace === 'system') {
     if (type === 'content_pipeline.post.publish_completed') {
@@ -195,6 +479,16 @@ export function describeEvent(ev: EventLike): string {
       return `Admin alert sent (${count} admin${count === 1 ? '' : 's'} notified)`;
     }
     if (type === 'notification.delivered') return `Notification delivered to ${recipient}`;
+    if (type === 'notification.bounced') {
+      // The hard/soft distinction is the whole content of this event for a reader: one means the
+      // address is dead and will not be mailed again, the other means try tomorrow.
+      return payload.hard
+        ? `Notification hard-bounced for ${recipient} — address suppressed`
+        : `Notification soft-bounced for ${recipient} — will be retried`;
+    }
+    if (type === 'notification.complained') {
+      return `${recipient} marked a notification as spam — address suppressed`;
+    }
     if (type === 'notification.delivery_failed') return `Notification failed for ${recipient}`;
     if (type.endsWith('.failed')) {
       const action = str(payload.actionType) ?? humanizeType(type);

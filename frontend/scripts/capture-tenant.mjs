@@ -6,14 +6,57 @@
  */
 import { chromium } from 'playwright';
 import fs from 'fs';
+import { createRequire } from 'node:module';
 import path from 'path';
 
-const BASE = 'http://localhost:3000';
+// One base URL, three historic spellings — and this file used the worst of them: a LITERAL, which
+// ignores both env names silently. A drive pinned to :3000 runs against whatever build happens to
+// be serving there, so it can report a stale product as broken, or a fixed one as still broken.
+// (That is exactly how the release-gate change looked like a product failure for two runs.)
+const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const ROOT = '/home/user/govwin';
 const SH = path.join(ROOT, 'docs/manuals/img/shots/tenant');
 const CR = path.join(ROOT, 'docs/manuals/img/crops/tenant');
 fs.mkdirSync(SH, { recursive: true });
+
+/**
+ * Record WHICH RUN produced these pictures.
+ *
+ * A screenshot with no provenance is indistinguishable from a screenshot taken a year ago, which
+ * is how the guides came to illustrate a product that had moved. The run id, the commit and the
+ * base URL go into docs/manuals/guides/_revisions.json, and build_guides.py prints them in the
+ * footer — so "are these current?" is answered by looking, not by re-reading the whole guide.
+ *
+ * Best-effort: a capture that cannot write its provenance still produced the shots, and failing
+ * the run over bookkeeping would be worse than the gap it records.
+ */
+function recordCapture(slug, shots, crops) {
+  try {
+    // `require` does not exist in an ESM module — the first run reported
+    // "provenance NOT recorded (require is not defined)", which is the best-effort design working:
+    // it said what it failed to do instead of silently writing nothing.
+    const { execSync } = createRequire(import.meta.url)('node:child_process');
+    const commit = execSync('git -C /home/user/govwin rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+    const p = '/home/user/govwin/docs/manuals/guides/_revisions.json';
+    const data = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : { guides: {} };
+    data.guides = data.guides || {};
+    data.guides[slug] = data.guides[slug] || {};
+    data.guides[slug].capture = {
+      runId: `${slug}-${Date.now().toString(36)}`,
+      at: new Date().toISOString(),
+      base: BASE,
+      commit,
+      shots,
+      crops,
+    };
+    fs.writeFileSync(p, `${JSON.stringify(data, null, 2)}\n`);
+    console.log(`\n  provenance recorded — ${slug} · ${commit} · ${shots} shot(s) · ${crops} crop(s)`);
+  } catch (e) {
+    console.log(`\n  ⚠ provenance NOT recorded (${String(e.message).slice(0, 60)}) — the shots are fine, the record is not`);
+  }
+}
+
 fs.mkdirSync(CR, { recursive: true });
 
 const USER = { email: 'eric@immobileyes.com', pw: 'Immobileyes2026!' };
@@ -125,5 +168,10 @@ try {
       if (extra) await extra();
     } catch (e) { warn('route FAIL ' + name + ' ' + e.message.slice(0, 60)); }
   }
+  // Count what actually landed on disk, not what we intended to write — the difference
+  // is exactly the failure a best-effort capture is allowed to have.
+  const _shots = fs.existsSync(SH) ? fs.readdirSync(SH).filter((f) => f.endsWith('.png')).length : 0;
+  const _crops = fs.existsSync(CR) ? fs.readdirSync(CR).filter((f) => f.endsWith('.png')).length : 0;
+  recordCapture('customer-admin', _shots, _crops);
   console.log('\n✅ tenant capture complete');
 } catch (e) { console.error('FATAL', e); process.exitCode = 1; } finally { await b.close(); }

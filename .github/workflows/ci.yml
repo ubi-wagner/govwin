@@ -63,7 +63,7 @@ jobs:
       - name: Run CMS tests
         run: pytest tests/ -v --tb=short
         env:
-          CMS_DATABASE_URL: ""
+          CRM_DATABASE: ""
           SHARED_DATABASE_URL: ""
 
       # React SPA frontend
@@ -102,15 +102,15 @@ jobs:
       - name: Run CRM migrations
         run: bash services/cms/db/run.sh
         env:
-          CMS_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm_db
+          CRM_DATABASE: postgresql://crm:crm@localhost:5432/crm_db
       - name: Verify tables exist
         run: |
-          psql "$CMS_DATABASE_URL" -c "\dt" | grep -q cms_posts
-          psql "$CMS_DATABASE_URL" -c "\dt" | grep -q email_accounts
-          psql "$CMS_DATABASE_URL" -c "\dt" | grep -q email_outbox
+          psql "$CRM_DATABASE" -c "\dt" | grep -q cms_posts
+          psql "$CRM_DATABASE" -c "\dt" | grep -q email_accounts
+          psql "$CRM_DATABASE" -c "\dt" | grep -q email_outbox
           echo "All CRM tables verified"
         env:
-          CMS_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm_db
+          CRM_DATABASE: postgresql://crm:crm@localhost:5432/crm_db
 
   # CI-01: main-DB migration smoke check. Runs the full migration chain
   # (db/migrations/migrate.mjs) against a fresh pgvector Postgres so a broken

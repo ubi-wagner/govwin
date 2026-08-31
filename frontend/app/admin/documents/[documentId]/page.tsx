@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import type { CanvasDocument } from '@/lib/types/canvas-document';
+import { fmtDateTime } from '@/lib/fmt';
 
 interface HistoryEntry {
   key: string;
@@ -158,7 +159,7 @@ export default function DocumentEditorPage() {
                       className="w-full text-left px-3 py-2 hover:bg-gray-50 text-xs"
                     >
                       <div className="text-gray-700">
-                        {new Date(h.timestamp).toLocaleString()}
+                        {fmtDateTime(h.timestamp)}
                       </div>
                       <div className="text-gray-400">
                         {(h.size / 1024).toFixed(1)} KB

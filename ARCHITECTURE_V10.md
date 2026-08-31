@@ -250,7 +250,7 @@ every opportunity onto a new tenant.
 | Publish | `publishToBridge()` — `INSERT … version = max(version)+1` (append-only) |
 | Replicate | `fanOutBridgeEvent()` → `applyToTenant()` per `status IN ('active','trial')` tenant |
 | Tenant isolation | `applyToTenant` runs inside `withTenant(tenantId)` (SET LOCAL `app.tenant_id`) |
-| Pin-update signal | on re-publish, `pin_update_available` flips true only if the tenant pinned an older version |
+| Pin-update signal | on re-publish, `docs_update_available` flips true only if the tenant pinned an older version |
 | Lifecycle propagation | `republishIfReleased()` re-publishes + re-fans a released opp on stage/content edits |
 | New-customer backfill | `backfillTenant()` applies the head version of every opportunity (currently a manual admin route) |
 
@@ -374,7 +374,7 @@ the event, the DB flip, and the customer cards always agree.
 reads the tenant's cards under `withTenant()` and LATERAL-joins the card's **best** bucket score:
 
 ```sql
-ORDER BY c.is_pinned DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
+ORDER BY c.docs_copied DESC, bs.top_score DESC NULLS LAST, c.updated_at DESC
 ```
 
 So the feed is genuinely **ranked** (pinned → best bucket score → recency), not recency with a "ranked
@@ -528,8 +528,10 @@ automation listener, the audit surface, and the spine correlation below.
 
 ### 6.2 Namespaces → templates → instances (carrying the opportunity)
 
-The 7 canonical namespaces are unchanged (V9 §8.2: `finder | capture | identity | proposal | library |
-system | tool`). The workflow engine (V9 §8.4, `run_workflow_processor`, ~10s poll) now registers **12
+There are now **8 canonical namespaces**: V9 §8.2's seven (`finder | capture | identity | proposal |
+library | system | tool`) plus **`project`** — post-award Projects, added by migration 217.
+They are reconciled across TypeScript, Python, the SQL CHECK and the docs by
+`frontend/__tests__/event-namespace-registry.test.ts`. The workflow engine (V9 §8.4, `run_workflow_processor`, ~10s poll) now registers **12
 templates** on boot (each writes a `process_templates` row with `active` + `trigger_key`), up from 9 in
 V9 — the additions are `ProjectCollaboration`, `OnProposalSectionEdited`, and `OnProposalOutcomeRecorded`.
 
@@ -577,9 +579,18 @@ on `payload->>` working — hence §6.1 is load-bearing for both.
 
 ---
 
-## 7. New / Changed Schema (migrations 093 → 184)
+## 7. New / Changed Schema (migrations 093 → 236)
 
-Highest migration: **184** (179 Command Center watermark · 180 bucket-score integrity · 181 ranking spine · 182 master build_complete/provisioning cockpit · 183 section-spine comment anchors · 184 document_templates per-command RLS; 149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system, 163–167 canvas trust-hub + amendment/archive, 168–169 cost-volume forms + TVSF seed, 170–171 semantic `atom_embeddings`, 172–176 scout schedule/RLS gap/tasks-broadcast/classification + program-guide drafts, 177–178 template-stable/bridge + document/template provenance; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
+Highest migration: **236**. Since 217 the post-award half was built out: **218** the milestone
+construct (dated segment · checklist · completion record) · **219** close-out · **220** the
+deliverable's authored CanvasDocument · **221** the task spine (`scope`, milestone-to-milestone
+dependencies, the four date triggers) · **222** threaded comments + roster-resolved mentions ·
+**223** the review gate (approving is not accepting) · **228** collapsed `project_wbs_nodes` into
+`project_milestones` · **229** the cost baseline 228 silently dropped · **230** contract
+modifications (the only write path to a CLIN) · **231** invoicing · **232** the CDRL register and
+its third state, *submitted* · **233/234** the CLIN child-cascade correction, where 233 asserted
+ordering as fact and measuring proved it wrong · **235** the per-project notification policy ·
+**236** the AI-manager gate closer. Earlier: (215 email ledger · 216 delivery spine · 217 the `project` namespace — see §7.x; 214 closed a committed demo credential; 185–213 per docs/; 179 Command Center watermark · 180 bucket-score integrity · 181 ranking spine · 182 master build_complete/provisioning cockpit · 183 section-spine comment anchors · 184 document_templates per-command RLS; 149–152 system templates + starter library, 153–156 scout opps + TVSF compliance preset, 157–162 the partner-manager/EconDev system, 163–167 canvas trust-hub + amendment/archive, 168–169 cost-volume forms + TVSF seed, 170–171 semantic `atom_embeddings`, 172–176 scout schedule/RLS gap/tasks-broadcast/classification + program-guide drafts, 177–178 template-stable/bridge + document/template provenance; was 103 at this doc's 2026-07-03 drive-verify; 104–108 added the
 purchase→curation→release flow). **109–125** then landed identity/multi-membership + tenant documents
 (110/111), agent-memory RLS + the `NOBYPASSRLS`-track agent role (116/117), scout crawl/schedules (118),
 the observability lifecycle (120), the `library_units` drop (121), portal delegated managers (123), the
@@ -599,7 +610,7 @@ never hard-deleted; cascade + selection rules in **docs/ARCHIVABLE_CONTRACT.md**
 |-----------|------|
 | `093_collaborator_library_scope` | `library_unit_shares`, `collaborator_library_prefs` (per-collaborator scope on legacy `library_units` — **all three since dropped**, migs 121/125) |
 | `094_oppcard_bridge_spine` | **`opportunity_bridge`**, **`tenant_opportunity_cards`** (RLS forced), **`tenant_bridge_cursor`**; `govtech_app` role |
-| `095_oppcard_pin_docs` | `tenant_opportunity_cards.pinned_docs` jsonb (pin-pulls-docs-local manifest) |
+| `095_oppcard_pin_docs` | `tenant_opportunity_cards.copied_docs` jsonb (pin-pulls-docs-local manifest) |
 | `096_tenant_spotlight_buckets` | **`tenant_spotlight_buckets`**, **`tenant_bucket_scores`** (both RLS forced) |
 | `097_portals_shadow_guardrails` | `proposal_portals`, `shadow_admin_grants`, `guardrail_templates` (L3 execute layer, RLS) |
 | `098_portal_workflow_guardrails` | `proposal_portals.current_stage_index`; seeds a global guardrail template |
@@ -619,8 +630,8 @@ Key new tables (constraints; CHECK enums are in §2.1 and §5.1; full columns in
 - **`opportunity_bridge`** — `(opportunity_id → opportunities, version, event_type, card jsonb, posted_by)`,
   UNIQUE `(opportunity_id, version)`, append-only, **not** RLS (global feed).
 - **`tenant_opportunity_cards`** — `(tenant_id → tenants, opportunity_id [soft ref, no FK], card jsonb,
-  bridge_version, lifecycle_status, submission_stage, pursuit_status, is_pinned, pin_update_available,
-  pinned_docs jsonb)`, UNIQUE `(tenant_id, opportunity_id)`, RLS ENABLE+FORCE on `app.tenant_id`.
+  bridge_version, lifecycle_status, submission_stage, pursuit_status, docs_copied, docs_update_available,
+  copied_docs jsonb)`, UNIQUE `(tenant_id, opportunity_id)`, RLS ENABLE+FORCE on `app.tenant_id`.
 - **`tenant_spotlight_buckets`** `(tenant_id, name, criteria jsonb, is_active)` + **`tenant_bucket_scores`**
   `(tenant_id, bucket_id CASCADE, opportunity_id, score, factors jsonb)` UNIQUE `(tenant_id, bucket_id,
   opportunity_id)` — both RLS forced.
@@ -628,6 +639,38 @@ Key new tables (constraints; CHECK enums are in §2.1 and §5.1; full columns in
   PK `(group_atom_id, member_atom_id)`, **`atom_lineage`** PK `(parent_atom_id, child_atom_id)` CHECK
   parent≠child, **`document_cocoons`**, **`taxonomy_terms`** UNIQUE `(dimension, value)`.
 - **`proposal_compliance_matrix`** (pre-exists mig 001) — now *populated*.
+
+### 7.x The outbound-email ledger and the post-award Projects spine (migs 215 → 217)
+
+Two capabilities landed after 184 and both add tables rather than change the existing spine.
+
+- **mig 215 — the email seam.** `email_send_ledger` (**not** `email_sends`: the CRM already owns a table
+  of that name in `cms-postgres`, and `rfp-crm` holds pools to *both* databases, so the collision was
+  real) + `email_suppressions` (`CHECK (email = lower(email))`, so a case variant cannot slip past a
+  suppression). The ledger's SELECT policy is **equality only** — no `OR tenant_id IS NULL` arm, the
+  `episodic_memories` shape from mig 186 rather than the `tasks` shape from 185 — and there is **no write
+  policy at all**: every insert goes through the seam under an explicit bypass, so an app-context writer
+  cannot forge a send record. One row is RESERVED *before* dispatch and confirmed after, which is what
+  makes a crash mid-send visible instead of invisible.
+- **mig 216 — Projects.** Eight tables: `projects`, `project_assignments`,
+  `project_source_documents`, `project_clins`, `project_wbs_nodes`, `project_milestones`,
+  `project_deliverables`, `project_provenance` — **seven now**: migs 228–229 collapsed
+  `project_wbs_nodes` into `project_milestones` (the milestone IS the WBS element) and dropped it,
+  the only project table ever dropped. Every one carries `tenant_id` **NOT NULL and directly**
+  — never by lineage through a parent — with force-RLS and a `tenant_isolation` policy, because a policy
+  that has to join to find its tenant is a policy that can be joined around. Baseline immutability is a
+  **trigger** raising `23001`, not an app rule: an app-layer rule protects only the writers that exist
+  today, and the baseline is the one value in the capability that cannot be recomputed once lost. Note
+  `forecast_date` — the design's DDL said `current_date`, which is a reserved word and would not have
+  applied.
+- **mig 217 — the `project` namespace.** Widens `system_events_namespace_chk` to 8. See §6.2.
+
+Assignment — *which employees* of a tenant see a project — is **app-enforced** in one predicate
+(`lib/projects/access.ts`), because the per-request context carries `app.tenant_id` and nothing else;
+expressing it in RLS would mean putting a user id into the request context for every table in the
+database to serve one feature. That belt is load-bearing exactly as CLAUDE.md says of platform rows:
+a reader that omits it leaks, and RLS will not catch it. `partner_user` is refused the capability
+outright, which is what removes cross-tenant from Projects entirely.
 
 ### Table drops & the drop rule (migs 121, 125)
 
@@ -661,7 +704,7 @@ retired table: the CMS `matched_opportunities` email variable (`services/cms/src
 `tenant_pipeline_items` (always 0); the rfp-curation **Customer Interest** panel
 (`app/admin/rfp-curation/[solId]`) joined the retired pins table; and `v_opportunity_rollup` counted off
 it. All three now read `tenant_opportunity_cards` (`lifecycle_status <> 'archived'`,
-`COALESCE(pinned_at, created_at)`, archived tenants excluded). Full ledger:
+`COALESCE(docs_copied_at, created_at)`, archived tenants excluded). Full ledger:
 `docs/DEPRECATION_CLEANUP_2026-07-22.md`.
 
 ### RLS reality (updated from V9 §7.4 and migs 116/117)
@@ -722,7 +765,7 @@ Everything below is **unchanged** by this refactor — V9 is the source of truth
 | CMS/CRM (87 endpoints, 7 workers, Vite SPA, event listener) | V9 §6 |
 | Storage (S3/R2, three prefixes) | V9 §11 |
 | Deployment (Railway, migrations at deploy, CI) | V9 §12 |
-| Event system shape (system_events, 7 namespaces, start/end/single) | V9 §8 |
+| Event system shape (system_events, 8 namespaces, start/end/single) | V9 §8 + mig 217 |
 
 The 3-source strawman generation remains the open AI-integration gap (the `publish_section_draft`
 landing primitive is shipped; `OnProposalCreated → draft_v0` fires only when the pipeline
@@ -771,6 +814,28 @@ The **ingest → curate → release → fan-out (per topic) → pin → provisio
 spine is end-to-end wired and driven-green; the customer surface is converged on the canonical cards;
 the library is unified on atoms with enforced visibility; the compliance matrix and rankings are real;
 and the workflow engine runs live keyed to the opportunity spine.
+
+---
+
+### 10.x The instrument set, as it stands
+
+Nine instruments now measure this system, and three of them were added because the existing ones
+were structurally incapable of seeing a class of defect:
+
+| Instrument | The question no other one asks |
+|---|---|
+| `verify-surfaces` · `verify-api-contract` · `verify-db-crud` · `verify-ui-vs-db` · `verify-write-contract` | the five lenses — render, envelope, write-lands, number-matches, refuse-cleanly |
+| `reconcile-capability` | is there a DOOR? a feature nothing calls and no page covers |
+| `audit-automation-spine` | does the trigger→start→end chain close, across two runtimes |
+| `audit-pipeline-coherence` | do ten pipelines do one job ONE way, or ten ways |
+| `audit-row-type-truth` | does the `sql<T>` row type tell the truth about what postgres.js returns |
+| `probe-interaction-mobile` | can you REACH everything at 390px — which is not "does the page scroll" |
+| `audit-env-inventory` | can an operator know to set every variable the services read |
+
+The five lenses can all be green while ten pipelines each solve the same problem differently, while
+a row type quietly hands a `Date` to a field declared `string`, while a page's primary action sits
+clipped off the viewport, and while a production variable appears in no deploy document. Each of the
+bottom four exists because that happened.
 
 ---
 

@@ -52,4 +52,10 @@ export function isNew(seen: Map<string, Date>, tab: string, newestItemAt: Date |
 export function isValidScope(scope: string): boolean {
   return /^(admin|tenant:[0-9a-fA-F-]{36}|partner:[0-9a-fA-F-]{36})$/.test(scope);
 }
-export const KNOWN_TABS = new Set(['opp', 'todos', 'workflows', 'activity', 'admin', 'tenant', 'system']);
+export const KNOWN_TABS = new Set([
+  'opp', 'todos', 'workflows', 'activity', 'admin', 'tenant', 'system',
+  // Post-award (migs 216-223). Without this, marking the Projects lane seen is REFUSED and the
+  // "new since you looked" dot never clears — a lane that always shouts is a lane people stop
+  // looking at.
+  'projects',
+]);

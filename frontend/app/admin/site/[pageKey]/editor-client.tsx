@@ -5,6 +5,7 @@ import type { PageVersion, PageBlock } from '@/lib/content-admin';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { useUnsavedChanges } from '@/components/admin/admin-nav-context';
 import { MarketingIcon, ICON_CATALOG } from '@/components/marketing/icons';
+import { fmtDate } from '@/lib/fmt';
 
 function shortActor(s: string | null): string {
   return !s ? 'system' : s.includes('@') ? s.split('@')[0] : s;
@@ -12,7 +13,7 @@ function shortActor(s: string | null): string {
 function fmtWhen(d: Date | string | null): string {
   if (!d) return '—';
   const dt = new Date(d);
-  return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return Number.isNaN(dt.getTime()) ? '—' : fmtDate(dt);
 }
 
 /**
@@ -359,9 +360,16 @@ export default function EditorClient({
         </button>
       </div>
 
-      <div className="fixed bottom-0 left-64 right-0 bg-white border-t px-8 py-3 flex items-center gap-3">
+      {/*
+        `left-64` is the DESKTOP sidebar width, hard-coded. At 390px the bar started 256px in
+        with 134px left for an input and three buttons, so all four ran off the screen — found
+        by the mobile width sweep the moment it could reach this route. The offset now matches
+        the nav shell's own breakpoint (the drawer is `lg:hidden`), and the row wraps below it
+        rather than demanding a width a phone does not have.
+      */}
+      <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white border-t px-4 lg:px-8 py-3 flex flex-wrap items-center gap-2 lg:gap-3">
         <input
-          className="flex-1 border rounded px-3 py-2 text-sm"
+          className="w-full lg:flex-1 border rounded px-3 py-2 text-sm"
           placeholder="Audit note (what changed?)"
           value={note}
           onChange={(e) => setNote(e.target.value)}

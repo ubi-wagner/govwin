@@ -18,6 +18,7 @@
  * Roman that appear nowhere in that document, and dropped its seventh volume.
  */
 import { extractByPattern, hasUsableSourceText } from './pattern-extract';
+import { anthropicHeaders, anthropicMessagesUrl } from '@/lib/ai/endpoint';
 import {
   DEFAULT_SBIR_CSO_SKELETON,
   type ParsedCompliance,
@@ -206,10 +207,12 @@ export async function parseSolicitation(text: string, hint?: ParseHint): Promise
   if (!apiKey || apiKey === 'sk-noop' || !text?.trim()) return patternOnly();
 
   try {
-    const base = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '');
-    const res = await fetch(`${base}/v1/messages`, {
+    // Through the shared seam. This site already read `ANTHROPIC_BASE_URL` correctly; it moves
+    // here so the literal host lives in exactly one file and a test can say so — the sibling
+    // raw-fetch caller had the same three lines with the env read left out.
+    const res = await fetch(anthropicMessagesUrl(), {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      headers: anthropicHeaders(apiKey),
       body: JSON.stringify({ model: MODEL, max_tokens: 4096, system: SYSTEM, messages: [{ role: 'user', content: buildPrompt(text, hint) }] }),
     });
     // A failed / unparseable AI call is NOT a reason to throw away layer 1 — the deterministic

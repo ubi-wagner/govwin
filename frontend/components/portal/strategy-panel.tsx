@@ -11,6 +11,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { ProposalStrategy } from '@/lib/proposal/strategy';
+import { fmtDate } from '@/lib/fmt';
 
 export function StrategyPanel({ tenantSlug, proposalId }: { tenantSlug: string; proposalId: string }) {
   const [data, setData] = useState<ProposalStrategy | null>(null);
@@ -37,7 +38,7 @@ export function StrategyPanel({ tenantSlug, proposalId }: { tenantSlug: string; 
             <span className="ml-2 text-[11px] font-normal text-indigo-500">advisory · AI-generated</span>
           </h3>
           {data.generatedAt && (
-            <p className="mt-0.5 text-xs text-indigo-400">Generated {new Date(data.generatedAt).toLocaleDateString()}</p>
+            <p className="mt-0.5 text-xs text-indigo-400">Generated {fmtDate(data.generatedAt)}</p>
           )}
         </div>
         <button

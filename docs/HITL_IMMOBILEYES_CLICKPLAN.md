@@ -41,7 +41,7 @@ stack up per `ALPHA_HITL_RUNBOOK.md §1`, migrations **001→108**, seed + fixtu
 |---|---|---|---|---|
 | 8 | `/portal/immobileyes/atoms` | Upload a capability doc → atomize → tag `vol` → Create | `library_atoms` rows (reference + primitive), tenant-scoped | ✅ |
 | 9 | `/portal/immobileyes/buckets` | Create 2–3 **Spotlight buckets** | Each card carries a **rank per bucket** (`tenant_bucket_scores`) | ✅ |
-| 10 | `/portal/immobileyes/cards` | **Pin** Navy | The OPP's files copy into the tenant (`pinned_docs`); nudges armed | ✅ (⚠ real S3) |
+| 10 | `/portal/immobileyes/cards` | **Pin** Navy | The OPP's files copy into the tenant (`copied_docs`); nudges armed | ✅ (⚠ real S3) |
 | 11 | pinned card → **Purchase** | Type `rfppipelinetest` → Complete | Portal opens **`curation_pending`**; `$0` completed `purchases`; `shadow_admin_grants` written; `capture:purchase.completed` emitted | ✅ this cycle |
 | 12 | `/portal/immobileyes/portals` | View | **"Waiting for RFP Expert Curation"** + live **72h** countdown | ✅ this cycle |
 
