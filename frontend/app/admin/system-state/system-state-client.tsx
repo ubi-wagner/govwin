@@ -94,6 +94,14 @@ function HealthBar({ health }: { health: HealthSummary }) {
       accent: health.activeWorkflows > 0 ? 'text-blue-700' : 'text-gray-400',
     },
     {
+      // Split out of Active Workflows rather than hidden inside it. These are not slow — they are
+      // stopped, waiting for a person, and that person is usually whoever is reading this bar.
+      label: 'Awaiting a person',
+      value: health.awaitingPerson,
+      color: 'border-amber-400 bg-amber-50',
+      accent: health.awaitingPerson > 0 ? 'text-amber-700' : 'text-gray-400',
+    },
+    {
       label: 'Pending Jobs',
       value: health.pendingJobs,
       color: 'border-indigo-400 bg-indigo-50',
@@ -723,9 +731,22 @@ const CONTENT_EVENT_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 function ContentPipelineSection({ data }: { data: ContentPipelineData }) {
-  const published = data.blocksByStatus.find((s) => s.status === 'published')?.count ?? 0;
-  const draft = data.blocksByStatus.find((s) => s.status === 'draft')?.count ?? 0;
-  const pending = data.blocksByStatus.find((s) => s.status === 'pending')?.count ?? 0;
+  // ── THE VOCABULARY MOVED WITH THE STORE ────────────────────────────────────────────────────
+  // These tiles looked for 'published' and 'pending', which were `cms_content`'s status names.
+  // `content_pages` says active · draft · archived — so after the source was repointed the list
+  // below showed real counts while the headline tiles above it read 0. A summary that disagrees
+  // with the table under it is the same defect as the ACTIVE WORKFLOWS tile on this very page.
+  // 'published' is still accepted so the tile stays right if it is ever fed legacy rows.
+  const at = (...names: string[]) =>
+    names.reduce((n, k) => n + (data.blocksByStatus.find((s) => s.status === k)?.count ?? 0), 0);
+  const published = at('active', 'published');
+  const draft = at('draft');
+  // `content_pages` has no review state — a page is a draft until it is published. Reported as
+  // null rather than 0, because "nothing is waiting" and "this system has no such state" are
+  // different things and a confident 0 says the first.
+  const pending: number | null = data.blocksByStatus.some((s) => s.status === 'pending')
+    ? at('pending') : null;
+  const archived = at('archived');
   const recentPublications = data.recentEvents.filter((e) => e.type === 'content.page_published').length;
 
   return (
@@ -733,16 +754,18 @@ function ContentPipelineSection({ data }: { data: ContentPipelineData }) {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="border-l-4 border-green-400 bg-green-50 rounded-lg p-3">
-          <p className="text-xs text-gray-500 uppercase font-medium">Published Blocks</p>
+          <p className="text-xs text-gray-500 uppercase font-medium">Live pages</p>
           <p className="text-2xl font-bold mt-1 text-green-700">{published}</p>
         </div>
         <div className="border-l-4 border-gray-400 bg-gray-50 rounded-lg p-3">
-          <p className="text-xs text-gray-500 uppercase font-medium">Draft Blocks</p>
+          <p className="text-xs text-gray-500 uppercase font-medium">Drafts</p>
           <p className="text-2xl font-bold mt-1 text-gray-700">{draft}</p>
         </div>
         <div className="border-l-4 border-yellow-400 bg-yellow-50 rounded-lg p-3">
-          <p className="text-xs text-gray-500 uppercase font-medium">Pending Review</p>
-          <p className={`text-2xl font-bold mt-1 ${pending > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>{pending}</p>
+          <p className="text-xs text-gray-500 uppercase font-medium">{pending === null ? 'Archived' : 'Pending Review'}</p>
+          <p className={`text-2xl font-bold mt-1 ${(pending ?? archived) > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>
+            {pending ?? archived}
+          </p>
         </div>
         <div className="border-l-4 border-blue-400 bg-blue-50 rounded-lg p-3">
           <p className="text-xs text-gray-500 uppercase font-medium">Recent Publications</p>

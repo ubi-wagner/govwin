@@ -20,7 +20,7 @@
  * it lands where every other piece of work in this product lands. Resolving the thread closes
  * those ToDos — a mention is "please look at this", and it is done when the conversation is.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { createTask } from '@/lib/tasks/tasks';
 import type { Role } from '@/lib/rbac';
@@ -208,11 +208,6 @@ export async function postComment(
         excerpt: body.slice(0, 120),
       },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.comment_posted',
-      entityType: 'project_comment', entityId: row.id,
-      metadata: { projectId, anchor: entityType, mentioned: mentions.userIds.length },
-    });
 
     // Best-effort, after the comment is safely saved: a notification that fails must not lose
     // somebody's words.
@@ -340,11 +335,6 @@ export async function setCommentResolved(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, commentId, entityType: row.entityType, entityId: row.entityId },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId,
-      action: resolved ? 'project.comment_resolved' : 'project.comment_reopened',
-      entityType: 'project_comment', entityId: commentId, metadata: { projectId },
     });
     return { ok: true, data: row };
   } catch (err) {

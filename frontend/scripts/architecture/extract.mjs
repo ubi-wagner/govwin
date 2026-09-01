@@ -63,10 +63,31 @@ try {
   for (const p of pks) tables[p.table_name]?.pk.push(p.column_name);
   const fks = fkRows.map((f) => ({ table: f.table, col: f.col, refTable: f.refTable, refCol: f.refCol }));
 
-  const model = { tables, fks };
-  const out = join(HERE, 'model', 'schema.json');
-  writeFileSync(out, JSON.stringify(model));
-  console.error(`extract: ${Object.keys(tables).length} tables · ${fks.length} FKs → ${out}`);
+  // ── REFUSE A MODEL WITH NO RELATIONSHIPS ────────────────────────────────────────────────────
+  // `information_schema.constraint_column_usage` shows only constraints on tables the CURRENT ROLE
+  // owns or holds a privilege on. Run as the scoped `govtech_app` role, every column and primary
+  // key still comes back and the FK join returns EMPTY — so this wrote a 139-table model with 0
+  // foreign keys, printed a success line, and the generator built a 187 KB explorer (vs 232) whose
+  // entire subject, the relationships, was missing. Nothing failed. Nothing looked wrong.
+  //
+  // A schema with tables and no foreign keys is not a schema anybody ships, so treat it as what it
+  // is: the extractor could not see what it exists to extract. Exit 2 — cannot earn a verdict —
+  // rather than overwrite a good model with a silent one.
+  const tableCount = Object.keys(tables).length;
+  if (tableCount > 0 && fks.length === 0) {
+    console.error(
+      `extract: CANNOT EARN A VERDICT — ${tableCount} tables and 0 foreign keys. Almost certainly a\n`
+      + `  PRIVILEGE problem, not a schema without relationships: information_schema hides\n`
+      + `  constraints on tables the connected role has no privilege on. Re-run against the OWNER:\n`
+      + `    ARCH_DB_URL="$DATABASE_URL_OWNER" node frontend/scripts/architecture/extract.mjs\n`
+      + `  The existing model has been left alone.`);
+    process.exitCode = 2;
+  } else {
+    const model = { tables, fks };
+    const out = join(HERE, 'model', 'schema.json');
+    writeFileSync(out, JSON.stringify(model));
+    console.error(`extract: ${tableCount} tables · ${fks.length} FKs → ${out}`);
+  }
 } catch (e) {
   console.error('extract failed:', e.message);
   process.exitCode = 1;

@@ -33,7 +33,8 @@
  * decision is what removes cross-tenant from this capability entirely. Relying on "nobody will
  * assign one" would make the exclusion a convention; refusing the role makes it a rule.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
+import { emitEventSingle, userActor } from '@/lib/events';
 import { hasRoleAtLeast, isRole, type Role } from '@/lib/rbac';
 
 export interface ProjectActor {
@@ -230,9 +231,12 @@ export async function assignMember(
       VALUES (${actor.tenantId}::uuid, ${projectId}::uuid, ${userId}::uuid, ${actor.userId}::uuid)
       ON CONFLICT (project_id, user_id) DO NOTHING`;
 
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.member_assigned',
-      entityType: 'project', entityId: projectId, metadata: { assigned: userId, email: member.email },
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'member.assigned',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, userId, email: member.email },
     });
     return { ok: true, data: { userId, email: member.email } };
   } catch (err) {
@@ -278,9 +282,12 @@ export async function unassignMember(
     if (!rows.length) {
       return { ok: false, status: 404, error: 'That person is not on this project', code: 'NOT_FOUND' };
     }
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.member_unassigned',
-      entityType: 'project', entityId: projectId, metadata: { removed: userId },
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'member.unassigned',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, userId },
     });
     return { ok: true, data: { removed: userId } };
   } catch (err) {

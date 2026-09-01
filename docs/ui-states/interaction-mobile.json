@@ -5,84 +5,96 @@
    "route": "/portal/foundation/cards",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__tenant-portal-foundation-cards__vp-phone-open.jpg"
+   "file": "probe__tenant-portal-foundation-cards__vp-phone-open.jpg",
+   "bytes": 0
   },
   {
    "lane": "tenant",
    "route": "/portal/foundation/buckets",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__tenant-portal-foundation-buckets__vp-phone-open.jpg"
+   "file": "probe__tenant-portal-foundation-buckets__vp-phone-open.jpg",
+   "bytes": 48376
   },
   {
    "lane": "tenant",
    "route": "/portal/foundation/atoms",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__tenant-portal-foundation-atoms__vp-phone-open.jpg"
+   "file": "probe__tenant-portal-foundation-atoms__vp-phone-open.jpg",
+   "bytes": 2231224
   },
   {
    "lane": "tenant",
    "route": "/portal/foundation/library",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__tenant-portal-foundation-library__vp-phone-open.jpg"
+   "file": "probe__tenant-portal-foundation-library__vp-phone-open.jpg",
+   "bytes": 2231224
   },
   {
    "lane": "tenant",
    "route": "/portal/foundation/documents",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__tenant-portal-foundation-documents__vp-phone-open.jpg"
+   "file": "probe__tenant-portal-foundation-documents__vp-phone-open.jpg",
+   "bytes": 360920
   },
   {
    "lane": "tenant",
    "route": "/portal/foundation/templates",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__tenant-portal-foundation-templates__vp-phone-open.jpg"
+   "file": "probe__tenant-portal-foundation-templates__vp-phone-open.jpg",
+   "bytes": 304654
   },
   {
    "lane": "tenant",
    "route": "/portal/foundation/proposals/c3db60b1-2f0e-4bc8-903c-1ec098906c58",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__tenant-portal-foundation-proposals-c3db60b1-2f0e-4bc8__vp-phone-open.jpg"
+   "file": "probe__tenant-portal-foundation-proposals-c3db60b1-2f0e-4bc8__vp-phone-open.jpg",
+   "bytes": 108523
   },
   {
    "lane": "tenant",
    "route": "/portal/foundation/projects/21975235-e4bf-4d92-aba9-08c427f7bec3",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__tenant-portal-foundation-projects-21975235-e4bf-4d92-__vp-phone-open.jpg"
+   "file": "probe__tenant-portal-foundation-projects-21975235-e4bf-4d92-__vp-phone-open.jpg",
+   "bytes": 316025
   },
   {
    "lane": "admin",
    "route": "/admin/rfp-curation",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__admin-admin-rfp-curation__vp-phone-open.jpg"
+   "file": "probe__admin-admin-rfp-curation__vp-phone-open.jpg",
+   "bytes": 223418
   },
   {
    "lane": "admin",
    "route": "/admin/workflows",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__admin-admin-workflows__vp-phone-open.jpg"
+   "file": "probe__admin-admin-workflows__vp-phone-open.jpg",
+   "bytes": 1740224
   },
   {
    "lane": "admin",
    "route": "/admin/agents",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__admin-admin-agents__vp-phone-open.jpg"
+   "file": "probe__admin-admin-agents__vp-phone-open.jpg",
+   "bytes": 604094
   },
   {
    "lane": "admin",
    "route": "/admin/templates",
    "viewport": "phone",
    "width": 390,
-   "file": "probe__admin-admin-templates__vp-phone-open.jpg"
+   "file": "probe__admin-admin-templates__vp-phone-open.jpg",
+   "bytes": 73463
   }
  ],
  "summary": [
@@ -91,10 +103,11 @@
    "route": "/portal/foundation/cards",
    "status": 200,
    "probed": true,
-   "opened": 37,
+   "opened": 39,
+   "candidates": 250,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 342
+   "smallTargets": 361
   },
   {
    "lane": "tenant",
@@ -102,6 +115,7 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 17,
    "overflow": 0,
    "clipped": 0,
    "smallTargets": 46
@@ -112,9 +126,10 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 1778,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 2054
+   "smallTargets": 2041
   },
   {
    "lane": "tenant",
@@ -122,9 +137,10 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 1778,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 2054
+   "smallTargets": 2041
   },
   {
    "lane": "tenant",
@@ -132,19 +148,21 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 0,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 126
+   "smallTargets": 124
   },
   {
    "lane": "tenant",
    "route": "/portal/foundation/templates",
    "status": 200,
    "probed": true,
-   "opened": 0,
+   "opened": 1,
+   "candidates": 84,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 107
+   "smallTargets": 108
   },
   {
    "lane": "tenant",
@@ -152,6 +170,7 @@
    "status": 200,
    "probed": true,
    "opened": 2,
+   "candidates": 26,
    "overflow": 0,
    "clipped": 0,
    "smallTargets": 54
@@ -162,6 +181,7 @@
    "status": 200,
    "probed": true,
    "opened": 13,
+   "candidates": 38,
    "overflow": 0,
    "clipped": 0,
    "smallTargets": 71
@@ -171,20 +191,22 @@
    "route": "/admin/rfp-curation",
    "status": 200,
    "probed": true,
-   "opened": 2,
+   "opened": 1,
+   "candidates": 32,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 70
+   "smallTargets": 83
   },
   {
    "lane": "admin",
    "route": "/admin/workflows",
    "status": 200,
    "probed": true,
-   "opened": 0,
+   "opened": 25,
+   "candidates": 255,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 313
+   "smallTargets": 334
   },
   {
    "lane": "admin",
@@ -192,19 +214,21 @@
    "status": 200,
    "probed": true,
    "opened": 0,
+   "candidates": 2,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 51
+   "smallTargets": 54
   },
   {
    "lane": "admin",
    "route": "/admin/templates",
    "status": 200,
    "probed": true,
-   "opened": 0,
+   "opened": 1,
+   "candidates": 5,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 47
+   "smallTargets": 51
   }
  ]
 }

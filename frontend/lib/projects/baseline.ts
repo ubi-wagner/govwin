@@ -17,7 +17,7 @@
  * rebaseline instead" — and the trigger stays as the thing that is actually true regardless of
  * which code path arrives.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { withEventBracket, emitEventSingle, userActor } from '@/lib/events';
 import { canAssign, canAccessProject, type ProjectActor } from './access';
@@ -141,11 +141,6 @@ export async function setBaseline(
           return { milestones: ms.length, baselinedAt: proj.baselinedAt.toISOString() };
         });
 
-        await auditLog({
-          tenantId: actor.tenantId, userId: actor.userId, action: 'project.baseline_set',
-          entityType: 'project', entityId: projectId,
-          metadata: { milestones: out.milestones },
-        });
 
         return {
           result: { milestones: out.milestones },
@@ -288,11 +283,6 @@ export async function rebaseline(
           return { milestones: ms.length };
         });
 
-        await auditLog({
-          tenantId: actor.tenantId, userId: actor.userId, action: 'project.rebaselined',
-          entityType: 'project', entityId: projectId,
-          metadata: { shiftDays, reason, ...out },
-        });
 
         return {
           result: { shiftDays, ...out },

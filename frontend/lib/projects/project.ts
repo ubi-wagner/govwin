@@ -21,7 +21,7 @@
  * baseline route checks, and it is the only place the two-artifact rule is enforced.
  */
 import { randomUUID } from 'crypto';
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { putObject } from '@/lib/storage/s3-client';
 import { customerProjectPath } from '@/lib/storage/paths';
@@ -105,10 +105,6 @@ export async function createProject(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId: row.id, name, contractId, correlationId: randomUUID() },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.project_created',
-      entityType: 'project', entityId: row.id, metadata: { name },
     });
 
     return { ok: true, data: row };
@@ -229,10 +225,6 @@ export async function addSourceDocument(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, documentId: row.id, kind: input.kind, filename },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.source_document_uploaded',
-      entityType: 'project', entityId: projectId, metadata: { kind: input.kind, filename },
     });
 
     return { ok: true, data: row };

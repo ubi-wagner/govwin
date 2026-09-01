@@ -215,6 +215,146 @@ export async function findSend(params: {
   }
 }
 
+/**
+ * The recent send history, and the 30-day totals — for the operator console.
+ *
+ * ── WHY THESE LIVE HERE AND NOT IN THE PAGE ─────────────────────────────────────────────────
+ * `__tests__/email-transport-boundary.test.ts` enforces that only `lib/email` touches the ledger
+ * tables, and it caught the first version of the console doing exactly that. The rule is not
+ * bureaucratic: the ledger is denied to the application role by RLS (migration 215), so a query
+ * written anywhere else compiles, ships, and fails at run time in front of whoever opened the page.
+ * Reading through this module means the owner connection is used once, in the place that owns it.
+ */
+export interface LedgerRow {
+  id: string;
+  toEmail: string;
+  subject: string | null;
+  template: string | null;
+  kind: string;
+  status: string;
+  provider: string;
+  error: string | null;
+  tenantSlug: string | null;
+  createdAt: Date;
+  sentAt: Date | null;
+}
+
+export async function recentSends(limit = 100): Promise<LedgerRow[]> {
+  try {
+    return await sqlBypass<LedgerRow[]>`
+      SELECT l.id, l.to_email, l.subject, l.template, l.kind, l.status, l.provider, l.error,
+             t.slug AS tenant_slug, l.created_at, l.sent_at
+        FROM email_send_ledger l
+        LEFT JOIN tenants t ON t.id = l.tenant_id
+       ORDER BY l.created_at DESC
+       LIMIT ${limit}`;
+  } catch (err) {
+    console.error('[email/ledger] recentSends failed:', err);
+    return [];
+  }
+}
+
+/** Sends by status over a trailing window. Empty on failure — the caller says so on the page. */
+export async function sendTotals(days = 30): Promise<{ status: string; n: number }[]> {
+  try {
+    return await sqlBypass<{ status: string; n: number }[]>`
+      SELECT status, count(*)::int AS n
+        FROM email_send_ledger
+       WHERE created_at > now() - (${days} || ' days')::interval
+       GROUP BY status ORDER BY 2 DESC`;
+  } catch (err) {
+    console.error('[email/ledger] sendTotals failed:', err);
+    return [];
+  }
+}
+
+/**
+ * Lift a suppression — let an address receive mail again.
+ *
+ * ── THERE WAS NO WAY OUT ────────────────────────────────────────────────────────────────────
+ * `suppress` existed and nothing undid it, in code or in any UI. So one hard bounce or one spam
+ * complaint stopped a customer's mail permanently: a mailbox that was full on Tuesday, an address
+ * that was mistyped once and then corrected, a colleague who hit "spam" on a notification — any of
+ * those and that person silently receives nothing, for good, with no page that even shows the
+ * state, let alone changes it.
+ *
+ * That is the worst shape a guard can have. Suppression is CORRECT — mailing a dead address damages
+ * the sending domain's reputation for every other customer — but a correct guard with no release is
+ * a trap, and the person it traps cannot see it happening.
+ *
+ * Returns whether a row was actually removed, so a caller can tell "lifted" from "was not
+ * suppressed" rather than reporting success either way.
+ */
+export async function lift(email: string): Promise<boolean> {
+  try {
+    const rows = await sqlBypass<{ email: string }[]>`
+      DELETE FROM email_suppressions
+       WHERE email = ${normalizeAddress(email)}
+      RETURNING email`;
+    return rows.length > 0;
+  } catch (err) {
+    console.error('[email/ledger] lift failed:', err);
+    return false;
+  }
+}
+
+/** Every suppressed address, newest first — the operator's view of who cannot be reached. */
+export interface Suppression {
+  email: string;
+  reason: string;
+  source: string;
+  detail: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
+export async function listSuppressions(limit = 200): Promise<Suppression[]> {
+  try {
+    return await sqlBypass<Suppression[]>`
+      SELECT email, reason, source, detail, created_at
+        FROM email_suppressions
+       ORDER BY created_at DESC
+       LIMIT ${limit}`;
+  } catch (err) {
+    console.error('[email/ledger] listSuppressions failed:', err);
+    return [];
+  }
+}
+
+/** What we have sent one person, and whether we can still reach them. */
+export interface AddressMailState {
+  sent: number;
+  suppressed: boolean;
+}
+
+/**
+ * Mail state for a batch of addresses — the contact list's "have we written to them" column.
+ *
+ * This lives here rather than in `lib/contacts.ts` because the boundary test means it: the two
+ * ledger tables are queried in exactly one directory, and a consumer that needs a number out of
+ * them asks for the number, not for the table. (Migration 215 also denies both tables to the app
+ * role, so a query written elsewhere fails at run time in whatever request reached it.)
+ *
+ * Batched deliberately: the same fact per contact, fetched per contact, is 200 round trips for a
+ * page that renders one table.
+ */
+export async function mailStateFor(emails: string[]): Promise<Map<string, AddressMailState>> {
+  const wanted = [...new Set(emails.map(normalizeAddress).filter(Boolean))];
+  const out = new Map<string, AddressMailState>();
+  if (wanted.length === 0) return out;
+  try {
+    const rows = await sqlBypass<{ email: string; sent: number; suppressed: boolean }[]>`
+      SELECT a.email,
+             (SELECT COUNT(*)::int FROM email_send_ledger e
+               WHERE LOWER(e.to_email) = a.email)                          AS sent,
+             EXISTS (SELECT 1 FROM email_suppressions s WHERE s.email = a.email) AS suppressed
+        FROM UNNEST(${wanted}::text[]) AS a(email)`;
+    for (const r of rows) out.set(r.email, { sent: r.sent, suppressed: r.suppressed });
+  } catch (err) {
+    console.error('[email/ledger] mailStateFor failed:', err);
+  }
+  return out;
+}
+
 /** Add an address to the suppression list. Idempotent — a second bounce is not an error. */
 export async function suppress(params: {
   email: string;

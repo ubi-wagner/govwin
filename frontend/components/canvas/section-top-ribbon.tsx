@@ -145,8 +145,19 @@ export function SectionTopRibbon({
   return (
     <div className="bg-white border-b border-gray-200 shadow-sm z-20 sticky top-0">
 
-      {/* ── Row 1: breadcrumb + metadata ───────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-100">
+      {/*
+        ── Row 1: breadcrumb + metadata ─────────────────────────────────
+        `flex-wrap` and `gap-y-1` are load-bearing at phone width. Row 2 below has always wrapped;
+        this one did not, and its right-hand chip group carries `shrink-0` — so at 390px the chips
+        ran to 495px and the sticky ribbon pushed the page sideways. The mobile sweep measured it:
+        `<div class="flex items-center gap-2 shrink-0"> ends 495`, on the section editor, which is
+        where a person on a phone actually reads a proposal.
+
+        Wrapping rather than hiding: every chip here — version, page budget, status, lock,
+        compliance — is a fact about the section, and "no text clipped with no way to recover it" is
+        the invariant the sweep asserts. A second line costs 20px and loses nothing.
+      */}
+      <div className="flex flex-wrap items-center gap-3 gap-y-1 px-4 py-2 border-b border-gray-100">
         <Link
           href={backUrl}
           className="text-sm text-blue-600 hover:text-blue-800 font-medium shrink-0 flex items-center gap-1"
@@ -169,8 +180,9 @@ export function SectionTopRibbon({
           </span>
         </div>
 
-        {/* Right-side metadata chips */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right-side metadata chips — wrap internally too, so a long status label cannot
+            reintroduce the overflow the row above just fixed. */}
+        <div className="flex flex-wrap items-center gap-2 gap-y-1 shrink-0">
           {version != null && (
             <span className="text-[10px] text-gray-400 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded font-mono">
               v{version}

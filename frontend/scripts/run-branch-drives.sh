@@ -269,7 +269,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
+SCENARIO_DRIVES="commercial-path pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -432,6 +432,21 @@ DRIVES=(
   # two actors and needs the app serving. It refuses a verdict when the app is serving no CSS,
   # which is the failure that once made it report 75 phantom findings across the whole tree.
   "mobile-interaction|scripts/probe-interaction-mobile.mts"
+  # THE TWO OPERATORS' CONSOLES. Every other lens asks whether a page renders or whether an
+  # envelope is well-formed; this asks the question an operator asks — can I see the state of the
+  # system, and is what I am shown TRUE — for rfp_admin and tenant_admin across system status,
+  # workflow status, events and audit, users and companies, the architecture explorer and the
+  # cross-tenant project explorer. It caught /admin/system-state stating ACTIVE WORKFLOWS 0 while
+  # the list beneath it showed 34, and the architecture explorer describing a schema 68 migrations
+  # out of date. It also checks the OTHER direction: a tenant_admin must not reach the platform
+  # console.
+  "oversight-surfaces|scripts/drive-oversight-surfaces.mts"
+  # THE PATH A PROSPECT WALKS FIRST, and the least-driven part of the system until now. The
+  # end-to-end arc starts from a tenant that already EXISTS; this covers everything before that —
+  # the public application form, the admin accept, the tenant/user/membership it creates, the
+  # welcome that carries the way in, and the first sign-in. Every defect found in the 2026-08-31
+  # sweep lived in a join nobody walked, and these were the joins nobody walked.
+  "commercial-path|scripts/drive-commercial-path.mts"
   # THE SPEND GUARDRAILS, both directions. Eleven cases: the tenant budget refuses and allows, a
   # monthly_budget of 0 disables, the platform cap refuses even when the tenant has headroom, the
   # kill switch stops everything, the hourly rate limit refuses and allows, and the framework

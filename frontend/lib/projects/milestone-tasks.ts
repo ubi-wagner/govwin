@@ -33,7 +33,7 @@
  * work isn't finished" and "the customer hasn't accepted it" are different problems with different
  * next actions.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import { isoDate } from './dates';
@@ -234,10 +234,12 @@ export async function createMilestoneTask(
                 sort_index`;
     if (!row) return { ok: false, status: 500, error: 'Failed to add the task', code: 'DB_ERROR' };
 
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.task_created',
-      entityType: 'project_milestone_task', entityId: row.id,
-      metadata: { projectId, milestoneId, scope, title },
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'task.created',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, milestoneId, taskId: row.id, title },
     });
 
     // Project the assignment onto the platform ToDo spine — the queue, the bell, the Command
@@ -398,11 +400,6 @@ export async function updateTask(
           to: row.assigneeUserId ?? row.assigneeRole,
         },
       });
-      await auditLog({
-        tenantId: actor.tenantId, userId: actor.userId, action: 'project.task_reassigned',
-        entityType: 'project_milestone_task', entityId: taskId,
-        metadata: { projectId, from: before.assigneeUserId ?? before.assigneeRole, to: row.assigneeUserId ?? row.assigneeRole },
-      });
     }
     if (rescheduled) {
       await emitEventSingle({
@@ -414,11 +411,6 @@ export async function updateTask(
           projectId, milestoneId: row.milestoneId, taskId, title: row.title,
           from: isoDate(before.dueDate), to: isoDate(row.dueDate),
         },
-      });
-      await auditLog({
-        tenantId: actor.tenantId, userId: actor.userId, action: 'project.task_rescheduled',
-        entityType: 'project_milestone_task', entityId: taskId,
-        metadata: { projectId, from: isoDate(before.dueDate), to: isoDate(row.dueDate) },
       });
     }
 
@@ -519,10 +511,6 @@ export async function setTaskStatus(
       tenantId: actor.tenantId,
       payload: { projectId, milestoneId: row.milestoneId, taskId, title: row.title, ...(next === 'blocked' ? { reason } : {}) },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: `project.task_${next}`,
-      entityType: 'project_milestone_task', entityId: taskId, metadata: { projectId, title: row.title },
-    });
 
     // The checklist is the source of truth and the ToDo follows it. Ticking the work off clears it
     // from the person's queue; blocking does NOT — a blocked task is still theirs, and hiding it
@@ -581,11 +569,6 @@ export async function setMilestoneDependency(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, milestoneId, dependsOnId: row.dependsOnId, title: row.title },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.milestone_dependency_set',
-      entityType: 'project_milestone', entityId: milestoneId,
-      metadata: { projectId, dependsOnId: row.dependsOnId },
     });
     return { ok: true, data: { milestoneId, dependsOnId: row.dependsOnId } };
   } catch (err) {
@@ -779,11 +762,6 @@ export async function rescheduleMilestone(
         projectId, milestoneId, title: target.title,
         from, to: when.value, deltaDays, cascaded: moved - 1,
       },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.milestone_rescheduled',
-      entityType: 'project_milestone', entityId: milestoneId,
-      metadata: { projectId, from, to: when.value, deltaDays, moved },
     });
     return { ok: true, data: { moved, deltaDays } };
   } catch (err) {

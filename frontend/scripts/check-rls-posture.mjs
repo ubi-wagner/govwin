@@ -61,6 +61,14 @@ const GLOBAL_BY_DESIGN = {
   tool_invocation_metrics: 'platform telemetry, not tenant business data',
   tenant_bridge_cursor: 'forward-only bridge watermark — engine state, written by the platform',
   volume_required_items: 'shared catalog descending from platform-scope solicitation_volumes',
+  // `applications.tenant_id` (migration 242) is a POINTER to what a lead became, not a marker of
+  // who owns the row. An application is a PROSPECT record: it exists before any tenant does, it is
+  // rfp_admin-only, and no tenant surface reads it. Scoping it by that column would be actively
+  // wrong — a tenant would then see the applications carrying no tenant_id yet (every prospect
+  // still in the funnel), because tenant_isolation_select has an `OR tenant_id IS NULL` arm.
+  // Protected the same way `users` is: by the app-layer admin gate, not by RLS.
+  applications: 'prospect records — platform scope; tenant_id points at what the lead BECAME, and '
+    + 'scoping by it would expose every un-converted prospect to every tenant',
 };
 
 let bad = 0;

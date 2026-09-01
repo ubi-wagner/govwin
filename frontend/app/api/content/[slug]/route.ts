@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { getContentBySlug } from '@/lib/cms';
 
 interface RouteContext {
   params: Promise<{ slug: string }>;
@@ -24,29 +24,12 @@ export async function GET(_request: Request, ctx: RouteContext) {
       return NextResponse.json({ error: 'Missing slug', code: 'VALIDATION_ERROR' }, { status: 400 });
     }
 
-    const [article] = await sql<{
-      id: string;
-      slug: string;
-      title: string;
-      contentType: string;
-      body: string;
-      excerpt: string | null;
-      author: string | null;
-      tags: string[];
-      published: boolean;
-      publishedAt: Date | null;
-      featuredImage: string | null;
-      metadata: Record<string, unknown>;
-      createdAt: Date;
-      updatedAt: Date;
-    }[]>`
-      SELECT id, slug, title, content_type, body, excerpt, author, tags,
-             published, published_at, featured_image, metadata,
-             created_at, updated_at
-      FROM cms_content
-      WHERE slug = ${slug} AND published = true
-      LIMIT 1
-    `;
+    // ── READS THE CANONICAL STORE, THROUGH THE SHARED HELPER ────────────────────────────────
+    // This used to run its own SELECT against `cms_content`, the superseded table — so a public
+    // endpoint served the pre-migration set while every marketing page served the current one, and
+    // anything published since the move answered 404 here. It now goes through `getContentBySlug`,
+    // the same function the pages use, rather than a second query that can drift from it.
+    const article = await getContentBySlug(slug);
 
     if (!article) {
       return NextResponse.json({ error: 'Article not found', code: 'NOT_FOUND' }, { status: 404 });

@@ -251,10 +251,30 @@ export async function verifyProposalAccess(
   }
 }
 
-export async function auditLog(params: { tenantId?: string; userId?: string; action: string; entityType?: string; entityId?: string; metadata?: Record<string, unknown> }) {
-  try {
-    await sql`INSERT INTO audit_log (tenant_id, user_id, action, entity_type, entity_id, metadata) VALUES (${params.tenantId ?? null}, ${params.userId ?? null}, ${params.action}, ${params.entityType ?? null}, ${params.entityId ?? null}, ${sql.json((params.metadata ?? {}) as Parameters<typeof sql.json>[0])})`;
-  } catch (e) {
-    console.error('[auditLog] Error:', e);
-  }
-}
+/*
+ * `auditLog()` USED TO LIVE HERE. It is gone, and this note is why — so nobody adds it back.
+ *
+ * It inserted into `audit_log`, which migration 142 DROPPED, annotated `→ system_events (live
+ * audit trail)`. Nothing updated the function, and its body was wrapped in a catch that only
+ * logged, so every call raised `relation "audit_log" does not exist`, printed to stderr, and
+ * returned normally. It had been a no-op for 74 migrations.
+ *
+ * The tempting fix was to point it at `system_events`. That was tried here and was WRONG, and the
+ * way it was wrong is the interesting part. Of its 45 call sites — every one in the post-award
+ * Projects tree — 36 sat DIRECTLY BELOW an `emitEventSingle`/`withEventBracket` recording the same
+ * fact with a conformant type. Redirecting therefore did not restore a missing audit trail; the
+ * trail was never missing. It DOUBLED it, with a second malformed row per action: `baseline.set`
+ * beside `baseline_set`, `clin.created` beside `clin_created`. Those flat types also violate the
+ * `entity.action_past_tense` contract, so nothing had a written label and the customer's feed
+ * rendered them as de-punctuated identifiers — which is exactly how the project-lifecycle drive
+ * caught it, one run after the redirect shipped.
+ *
+ * So: the 36 duplicates were deleted, and the 9 sites where `auditLog` really was the only record
+ * became `emitEventSingle` calls with proper dotted types (`member.assigned`,
+ * `milestone.gate_closer_set`, `task.created`, `milestone.created`, `deliverable.created`,
+ * `modification.discarded`, `risk.closed`, `wbs_node.created`, `member.unassigned`).
+ *
+ * There is ONE audit trail — `system_events` — and one way into it: the `emitEvent*` helpers in
+ * `lib/events.ts`. A second, parallel "domain audit" concept is what allowed a dead writer to sit
+ * unnoticed beside a working one. `__tests__/audit-log-destination.test.ts` keeps it that way.
+ */

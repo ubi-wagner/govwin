@@ -847,6 +847,35 @@ cards and 10 bucket scores. The real fix read the schema's own semantics instead
 **Before fixing an invariant violation, check what the fix implies downstream** — and count the
 footprint rather than assuming your own change was small.
 
+## Rules learned by breaking them — 2026-08-31 (the front-to-back sweep)
+
+**RUN THE MUTATING INSTRUMENTS ONE AT A TIME. Concurrency manufactures findings.** Three of the
+five lenses and the whole branch suite are documented as NOT read-only — `verify-db-crud` and
+`verify-write-contract` say so in their own headers, and the branch drives create tenants. Running
+the suite alongside the lenses to save wall-clock produced a `verify-ui-vs-db` failure naming a
+`scenario-host-*` tenant (`users: page=1 db=3`), which is exactly the shape of the B80 defect that
+lens exists to catch — a page and a table disagreeing. It was neither: the drive created two more
+users between the page render and the verification query. The same run turned three PASSING branch
+drives into failures and three different ones green. **Serially, the suite was 58/58 and every lens
+was clean.** A page-vs-database comparison has no meaning while something else is writing; if a
+lens reports a disagreement, re-run it alone before reading a line of product code.
+
+**A CAPTURE THAT WROTE NOTHING IS NOT EVIDENCE.** A fullPage screenshot of a very tall page came
+back as a ZERO-BYTE file. Playwright did not throw, the route was reported clean, and the contact
+sheet carried a blank tile — worse than a missing image, because the sweep counted it as
+looked-at. Every instrument that photographs must stat what it wrote; an empty file is uncovered,
+in the same words used for a route that could not be measured.
+
+**THE SECOND WRITER IS THE BUG, NOT THE DEAD ONE.** `auditLog()` had written to a table dropped 74
+migrations earlier, failing silently at 45 call sites. The obvious repair — point it at
+`system_events` — was wrong, and the way it was wrong is the lesson: 36 of those sites sat directly
+below an `emitEventSingle` recording the same fact, so the trail was never missing and the redirect
+DOUBLED it with malformed types. **Before restoring a writer that has been dead for a long time,
+check whether something else has been doing its job.** A long-dead writer with no complaints is
+evidence that its output was redundant. The project-lifecycle drive caught it one run later, via a
+check nobody would connect to auditing: *"every one of them is a written sentence, not a
+de-punctuated type."*
+
 ## Deviations
 
 If you cannot follow this strategy for a specific test, call it out in the PR description and propose an amendment. "I couldn't figure out how to test it" is not a valid excuse — ask for help before skipping.

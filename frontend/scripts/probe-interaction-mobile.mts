@@ -35,8 +35,8 @@
  */
 import { chromium, type Page, type Browser } from 'playwright';
 import postgres from 'postgres';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { overflowing, smallTargets, clipped, openEverything } from './lib/mobile-measure.mts';
+import { mkdirSync, writeFileSync, readFileSync, statSync } from 'node:fs';
+import { overflowing, smallTargets, clipped, openEverything, selfTestClipped } from './lib/mobile-measure.mts';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -187,14 +187,35 @@ async function bindParams(slug: string): Promise<Record<string, string>> {
       // a redirect that 500s is still a broken route.
       spotlightId: await one(sql`SELECT c.opportunity_id::text AS v FROM tenant_opportunity_cards c
         JOIN tenants t ON t.id = c.tenant_id WHERE t.slug = ${slug} ORDER BY c.opportunity_id LIMIT 1`),
-      solId: await one(sql`SELECT cs.id::text AS v FROM curated_solicitations cs ORDER BY cs.created_at DESC LIMIT 1`),
-      topicId: await one(sql`SELECT o.id::text AS v FROM opportunities o
-        WHERE o.topic_number IS NOT NULL AND o.solicitation_id IS NOT NULL ORDER BY o.created_at DESC LIMIT 1`),
+      // solId + topicId are bound TOGETHER, below, from one row. Resolved independently — the
+      // newest solicitation and the newest topic — they name different solicitations the moment
+      // anything ingests without topics, and `/admin/rfp-curation/[solId]/topic/[topicId]` then
+      // 404s. That 404 is the PRODUCT BEING RIGHT about a topic that is not in that solicitation,
+      // and it cost this probe a route it reported as unmeasured. Exactly the `site/docs` bug
+      // twenty lines down, which is why that one carries the same warning.
       templateId: await one(sql`SELECT dt.id::text AS v FROM document_templates dt ORDER BY dt.created_at DESC LIMIT 1`),
       tenantId: await one(sql`SELECT t.id::text AS v FROM tenants t WHERE t.slug = ${slug} LIMIT 1`),
       profileId: await one(sql`SELECT sp.id::text AS v FROM source_profiles sp ORDER BY sp.created_at LIMIT 1`),
       pageKey: await one(sql`SELECT cp.page_key AS v FROM content_pages cp WHERE cp.content_type = 'page' LIMIT 1`),
     };
+    // The solicitation and one of ITS topics, from a single join. Preferring a solicitation that
+    // HAS a topic also selects for what the consumer needs: a topic route can only be swept where
+    // a topic exists. Falls back to the newest solicitation (leaving topicId unbound, and
+    // reported) when nothing has been shredded with topics yet.
+    try {
+      const [pair] = await sql<Array<{ sol: string; topic: string }>>`
+        SELECT cs.id::text AS sol, o.id::text AS topic
+          FROM curated_solicitations cs
+          JOIN opportunities o ON o.solicitation_id = cs.id
+         WHERE o.topic_number IS NOT NULL
+         ORDER BY cs.created_at DESC, o.created_at DESC LIMIT 1`;
+      if (pair) { out.solId = pair.sol; out.topicId = pair.topic; }
+      else {
+        const [sol] = await sql<Array<{ v: string }>>`
+          SELECT cs.id::text AS v FROM curated_solicitations cs ORDER BY cs.created_at DESC LIMIT 1`;
+        if (sol) out.solId = sol.v;
+      }
+    } catch { /* left unbound, and reported */ }
     // /admin/site/docs/[type]/[slug] needs BOTH halves of one row, or it addresses a document of
     // one type under another type's slug — a 404 dressed as coverage.
     try {
@@ -258,6 +279,17 @@ async function probeRoute(browser: Browser, lane: Lane, route: string) {
     await login(page, lane.email, lane.pw);
     await page.setViewportSize({ width: VP.w, height: VP.h });
     const resp = await page.goto(BASE + route, { waitUntil: 'domcontentloaded' });
+    // ── MEASURE THE LOADED PAGE, NOT THE SKELETON ───────────────────────────────────────────────
+    // A flat 1200ms was not enough for the routes that fetch their body client-side. The workflow
+    // monitor carries 164 controls once its instance list lands; probed at 1200ms it showed ONE,
+    // so the probe opened nothing, found no overflow, and reported "holds at 390px" — about a
+    // spinner. That is the false green this whole tree exists to refuse: the width check passed
+    // because there was nothing on the page to overflow.
+    //
+    // networkidle is the signal that the client fetches finished; it is capped rather than awaited
+    // outright because a page that polls (the Live monitor does) never goes idle, and a probe that
+    // hangs on one route is worse than one that measures it slightly early.
+    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
     await page.waitForTimeout(1200);
 
     console.log(`\n  ${route}`);
@@ -271,19 +303,25 @@ async function probeRoute(browser: Browser, lane: Lane, route: string) {
       return;
     }
 
-    const opened = await openEverything(page);
+    const { opened, candidates } = await openEverything(page);
     const over = await overflowing(page, VP.w);
     const small = await smallTargets(page);
     const cut = await clipped(page);
 
-    if (opened === 0) {
+    if (opened === 0 && candidates === 0) {
+      // Genuinely nothing to open. That IS the page's dense state, so the width check below is the
+      // whole measurement and this route is covered — counting it unearned would be the mirror
+      // error: claiming a gap where the product simply has no overlay.
+      console.log('    · no disclosure on this route — its resting state is its dense state');
+    } else if (opened === 0) {
       // Said out loud rather than counted as a pass. This route's overlays remain unmeasured, and
       // a clean line below would claim otherwise.
       unearned += 1;
-      console.log('    ⚠ OPENED NOTHING — this route has no disclosure the probe can reach, so its');
-      console.log('      dense states are still unmeasured. The width check below still counts.');
+      console.log(`    ⚠ OPENED NOTHING, yet ${candidates} control(s) are on the page — the probe`);
+      console.log('      cannot name this route\'s disclosures, so its dense states are UNMEASURED.');
+      console.log('      The width check below still counts, but it is measuring the resting page.');
     } else {
-      console.log(`    · opened ${opened} control(s)`);
+      console.log(`    · opened ${opened} of ${candidates} candidate control(s)`);
     }
 
     A(over.length === 0, `nothing runs past ${VP.w}px with everything open`,
@@ -294,10 +332,25 @@ async function probeRoute(browser: Browser, lane: Lane, route: string) {
       ? `: ${small.slice(0, 4).map((s) => `${s.tag}"${s.label}" ${s.w}×${s.h}`).join(', ')}` : ''}`);
 
     const file = `probe__${lane.id}-${route.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 46)}__vp-phone-open.jpg`;
-    await page.screenshot({ path: `${OUT}/${file}`, type: 'jpeg', quality: 80, fullPage: true });
-    shots.push({ lane: lane.id, route, viewport: VP.name, width: VP.w, file });
+    // A CAPTURE THAT WROTE NOTHING IS NOT EVIDENCE.
+    // `/portal/foundation/cards` with 35 disclosures open is tens of thousands of pixels tall, and
+    // the fullPage screenshot came back as a ZERO-BYTE file. Playwright did not throw, the route
+    // was reported clean, and the contact sheet had a blank tile nobody would read as a failure —
+    // which is worse than a missing image, because the sweep counted it as looked-at. The whole
+    // point of this tree is that a page at rest is not the UI and somebody has to LOOK; an empty
+    // file silently removes the looking.
+    await page.screenshot({ path: `${OUT}/${file}`, type: 'jpeg', quality: 80, fullPage: true })
+      .catch((e) => { console.log(`    ⚠ screenshot failed — ${(e as Error).message.slice(0, 70)}`); });
+    let bytes = 0;
+    try { bytes = statSync(`${OUT}/${file}`).size; } catch { /* never written */ }
+    if (bytes === 0) {
+      unearned += 1;
+      console.log('    ⚠ SCREENSHOT IS EMPTY — nothing was captured for this route, so nobody can');
+      console.log('      look at it. Uncovered, not passing (the measurements above still stand).');
+    }
+    shots.push({ lane: lane.id, route, viewport: VP.name, width: VP.w, file, bytes });
     summary.push({
-      lane: lane.id, route, status, probed: true, opened,
+      lane: lane.id, route, status, probed: true, opened, candidates,
       overflow: over.length, clipped: cut.length, smallTargets: small.length,
     });
   } catch (e) {
@@ -428,6 +481,17 @@ async function main() {
         console.error('produced 75 phantom findings across the whole tree.');
         console.error('Restage and restart:  rm -rf .next/standalone/.next/static &&');
         console.error('  cp -r .next/static .next/standalone/.next/static  (docs/CONTINUATION.md §2)');
+        process.exit(2);
+      }
+
+      // And is the subtlest measurement below still telling the truth? `clipped()` has to ignore
+      // recoverable truncation and report unrecoverable truncation, and a wrong version of it is
+      // silent either way. Known answer first, then the routes.
+      const self = await selfTestClipped(page);
+      console.log(`· preflight — clipped() self-test: ${self.detail}`);
+      if (!self.ok) {
+        console.error('\nHARNESS DEFECT: clipped() does not agree with its own fixture, so every');
+        console.error('"no text clipped" line below would be unearned and every finding suspect.');
         process.exit(2);
       }
     } finally { await pre.close(); }

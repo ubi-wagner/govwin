@@ -17,7 +17,7 @@
 import { randomUUID } from 'crypto';
 import { starterFromPreset, isBlankPreset, countNodes } from '@/lib/documents/starter';
 import { createNode, type CanvasNode } from '@/lib/types/canvas-document';
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { putObject } from '@/lib/storage/s3-client';
 import { customerProjectPath } from '@/lib/storage/paths';
@@ -171,9 +171,12 @@ export async function createMilestone(
                 forecast_date, status, met_at, owner_user_id, completion_note, completion_metrics,
                 sort_index`;
 
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.milestone_created',
-      entityType: 'project_milestone', entityId: row.id, metadata: { projectId, title },
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'milestone.created',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, milestoneId: row.id, title },
     });
     return { ok: true, data: row };
   } catch (err) {
@@ -295,10 +298,6 @@ export async function markMilestoneMet(
         ...(note ? { note } : {}), ...(metrics ? { metrics } : {}),
       },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.milestone_met',
-      entityType: 'project_milestone', entityId: milestoneId, metadata: { projectId, varianceDays: variance },
-    });
     return { ok: true, data: row };
   } catch (err) {
     console.error('[projects/milestones] markMilestoneMet failed:', err);
@@ -342,9 +341,12 @@ export async function createDeliverable(
                 byte_size, uploaded_by, uploaded_at, accepted_at, accepted_by, sort_index,
                 document_id`;
 
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.deliverable_created',
-      entityType: 'project_deliverable', entityId: row.id, metadata: { projectId, title },
+    await emitEventSingle({
+      namespace: 'project',
+      type: 'deliverable.created',
+      actor: userActor(actor.userId),
+      tenantId: actor.tenantId,
+      payload: { projectId, milestoneId: input.milestoneId, deliverableId: row.id, title },
     });
     return { ok: true, data: row };
   } catch (err) {
@@ -435,11 +437,6 @@ export async function uploadDeliverable(
         replacedAcceptance: Boolean(existing.acceptedAt),
       },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.deliverable_uploaded',
-      entityType: 'project_deliverable', entityId: deliverableId,
-      metadata: { projectId, filename, replacedAcceptance: Boolean(existing.acceptedAt) },
-    });
     return { ok: true, data: row };
   } catch (err) {
     console.error('[projects/milestones] uploadDeliverable failed:', err);
@@ -521,10 +518,6 @@ export async function acceptDeliverable(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, deliverableId, title: row.title, filename: row.filename },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.deliverable_accepted',
-      entityType: 'project_deliverable', entityId: deliverableId, metadata: { projectId },
     });
     return { ok: true, data: row };
   } catch (err) {
@@ -683,11 +676,6 @@ export async function authorDeliverable(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, deliverableId, documentId, title: starter.title, preset },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.deliverable_authored',
-      entityType: 'project_deliverable', entityId: deliverableId,
-      metadata: { projectId, documentId, preset },
     });
     return { ok: true, data: { deliverableId, documentId, title: starter.title, docType: starter.docType } };
   } catch (err) {

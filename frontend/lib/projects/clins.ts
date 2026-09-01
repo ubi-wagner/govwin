@@ -10,7 +10,7 @@
  * string sort on numbering is the exact bug migration 143 fixed for `proposal_sections`. The number
  * is an identifier; the order is an integer.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
 import { recordProvenance, type ProvenanceMethod } from './provenance';
@@ -138,10 +138,6 @@ export async function createClin(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, clinId: clin.id, clinNumber, title },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.clin_created',
-      entityType: 'project_clin', entityId: clin.id, metadata: { projectId, clinNumber },
     });
 
     return { ok: true, data: clin };

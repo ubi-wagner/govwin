@@ -94,52 +94,39 @@ async def _seed(cms, slug, section, order, *, body, metadata=None):
     )
 
 
-async def test_publish_bridges_and_keeps_live_stable(conns):
+async def test_bridge_refuses_against_a_real_database(conns):
+    """The retired bridge refuses, and leaves BOTH databases untouched.
+
+    This file used to assert the opposite against real Postgres: that publishing moved cms_posts
+    rows live, stripped editing bookkeeping from the public copy, preserved order, and was
+    idempotent on republish. All of that was true, and all of it stopped mattering when
+    front-facing content moved to `content_pages` — the bridge then wrote a table the website no
+    longer reads, so a publish reported a count and changed nothing a visitor could see.
+
+    Worth knowing WHY this was the last place still asserting the old contract: the file is
+    skipif-gated on a live database, so it does not run in the ordinary suite. Three unit tests
+    asserting the same behaviour failed loudly and were rewritten; this one was silently skipped,
+    and only turned up because `check-cms-content-retirable.mjs` scans the tree for anything that
+    still touches the table rather than trusting a green test run.
+
+    The both-databases assertion is the point. A refusal that had already flipped cms_posts to
+    published would leave the CMS store believing it had shipped content the public copy never
+    received — a half-write is the state nobody can reason about six months later.
+    """
+    from fastapi import HTTPException
     from src.routers.page_blocks import _bridge_publish
     cms, shared = conns
-    hero, cta = f"{_PAGE}-hero", f"{_PAGE}-cta"
+    hero = f"{_PAGE}-hero"
     await _seed(cms, hero, "hero", 0, body="orig hero", metadata={"cta_text": "A"})
-    await _seed(cms, cta, "cta", 1, body="orig cta")
 
-    statuses = ("draft", "pending", "published")
+    with pytest.raises(HTTPException) as exc:
+        await _bridge_publish(cms, shared, page=_PAGE, from_statuses=("draft", "pending", "published"))
 
-    # First publish: both drafts go live.
-    assert await _bridge_publish(cms, shared, page=_PAGE, from_statuses=statuses) == 2
-    assert await shared.fetchval("SELECT body FROM cms_content WHERE slug=$1", hero) == "orig hero"
+    assert exc.value.status_code == 410
+    # The refusal names where content IS authored. An error that only says "no" sends the reader
+    # back through a service that is no longer the answer.
+    assert "/admin/site" in exc.value.detail and "content_pages" in exc.value.detail
 
-    # Save an edit -> draft, with editing bookkeeping in metadata.
-    await cms.execute(
-        """UPDATE cms_posts SET body='edited hero', status='draft',
-               metadata='{"cta_text":"B","_versions":[1],"_currentVersion":2,"_draftedBy":"x"}'::jsonb
-           WHERE slug=$1""",
-        hero,
-    )
-    # The live row is UNCHANGED until publish — the core guarantee.
-    assert await shared.fetchval("SELECT body FROM cms_content WHERE slug=$1", hero) == "orig hero"
-
-    # Publish -> live updated; editing bookkeeping stripped from the public copy.
-    await _bridge_publish(cms, shared, page=_PAGE, from_statuses=statuses)
-    row = await shared.fetchrow("SELECT body, status, metadata FROM cms_content WHERE slug=$1", hero)
-    pub_meta = json.loads(row["metadata"])
-    assert row["body"] == "edited hero" and row["status"] == "published"
-    assert pub_meta == {"cta_text": "B"}  # _versions / _currentVersion / _draftedBy removed
-
-    # Version history is retained on the CMS side (cms_posts), not the public copy.
-    cms_meta = json.loads(await cms.fetchval("SELECT metadata FROM cms_posts WHERE slug=$1", hero))
-    assert "_versions" in cms_meta
-
-    # Order preserved on the public reference.
-    orders = await shared.fetch(
-        "SELECT display_order FROM cms_content WHERE $1 = ANY(tags) ORDER BY display_order", _PAGE)
-    assert [r["display_order"] for r in orders] == [0, 1]
-
-
-async def test_republish_is_idempotent(conns):
-    from src.routers.page_blocks import _bridge_publish
-    cms, shared = conns
-    slug = f"{_PAGE}-solo"
-    await _seed(cms, slug, "hero", 0, body="solo")
-    statuses = ("draft", "pending", "published")
-    await _bridge_publish(cms, shared, page=_PAGE, from_statuses=statuses)
-    await _bridge_publish(cms, shared, page=_PAGE, from_statuses=statuses)
-    assert await shared.fetchval("SELECT count(*) FROM cms_content WHERE $1 = ANY(tags)", _PAGE) == 1
+    # Nothing moved, on either side.
+    assert await cms.fetchval("SELECT status FROM cms_posts WHERE slug=$1", hero) == "draft"
+    assert await shared.fetchval("SELECT count(*) FROM cms_content WHERE slug=$1", hero) == 0

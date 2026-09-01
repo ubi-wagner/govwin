@@ -17,7 +17,7 @@
  * there — and the object itself is left in storage, so the row is what goes, not the bytes.
  */
 import { randomUUID } from 'crypto';
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { putObject } from '@/lib/storage/s3-client';
 import { customerProjectPath } from '@/lib/storage/paths';
@@ -131,11 +131,6 @@ export async function attachToTask(
       tenantId: actor.tenantId,
       payload: { projectId, taskId, attachmentId: row.id, filename, title: task.title },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.task_reference_attached',
-      entityType: 'project_milestone_task', entityId: taskId,
-      metadata: { projectId, attachmentId: row.id, filename },
-    });
     return { ok: true, data: row };
   } catch (err) {
     console.error('[projects/task-attachments] attachToTask failed:', err);
@@ -178,11 +173,6 @@ export async function detachFromTask(
       actor: userActor(actor.userId),
       tenantId: actor.tenantId,
       payload: { projectId, taskId: row.taskId, attachmentId, filename: row.filename },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.task_reference_removed',
-      entityType: 'project_milestone_task', entityId: row.taskId,
-      metadata: { projectId, attachmentId, filename: row.filename },
     });
     return { ok: true, data: { attachmentId } };
   } catch (err) {

@@ -21,7 +21,7 @@
  * The ninth time this capability draws that line. Submitting is a claim; payment is cash arriving,
  * later, often partial. `amount_paid` is its own number for that reason.
  */
-import { sql, auditLog } from '@/lib/db';
+import { sql } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
 import { emitEventSingle, userActor } from '@/lib/events';
 import { canAccessProject, canAssign, type ProjectActor } from './access';
@@ -222,7 +222,13 @@ export async function billableHours(
          -- an already-invoiced entry billed a second time is the failure the link exists to stop.
          AND e.approved_at IS NOT NULL AND e.invoice_line_id IS NULL
          AND (${upTo ?? null}::date IS NULL OR e.worked_on <= ${upTo ?? null}::date)
-       GROUP BY e.milestone_id, m.title, m.clin_id
+       -- m.sort_index is in the GROUP BY because the ORDER BY reads it. Without it Postgres
+       -- refuses the whole statement ("must appear in the GROUP BY clause or be used in an
+       -- aggregate function") — and the catch below turns that refusal into an empty array, so
+       -- the invoicing page told a builder there was nothing to bill while approved, unbilled
+       -- hours sat in the table. A caught error that returns a plausible-looking empty result is
+       -- worse than a throw: nothing upstream can tell "none" from "the query never ran".
+       GROUP BY e.milestone_id, m.title, m.clin_id, m.sort_index
        ORDER BY m.sort_index, m.title`;
   } catch (err) {
     console.error('[projects/invoices] billableHours failed:', err);
@@ -487,11 +493,6 @@ export async function submitInvoice(
       tenantId: actor.tenantId,
       payload: { projectId, invoiceId, invoiceNumber: inv.invoiceNumber, submittedOn, total },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.invoice_submitted',
-      entityType: 'project_invoice', entityId: invoiceId,
-      metadata: { projectId, invoiceNumber: inv.invoiceNumber, total, submittedOn },
-    });
     return { ok: true, data: { invoiceId, total } };
   } catch (err) {
     const mapped = fromTrigger(err);
@@ -570,11 +571,6 @@ export async function recordPayment(
         amount, amountPaid: paidNow, total: money(total), settled, paidOn,
       },
     });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.invoice_payment_recorded',
-      entityType: 'project_invoice', entityId: invoiceId,
-      metadata: { projectId, invoiceNumber: inv.invoiceNumber, amount, amountPaid: paidNow, settled },
-    });
     return { ok: true, data: { invoiceId, amountPaid: paidNow, settled } };
   } catch (err) {
     const mapped = fromTrigger(err);
@@ -643,11 +639,6 @@ export async function voidInvoice(
         projectId, invoiceId, invoiceNumber: out.invoiceNumber,
         reason: why, hoursReleased: out.released,
       },
-    });
-    await auditLog({
-      tenantId: actor.tenantId, userId: actor.userId, action: 'project.invoice_voided',
-      entityType: 'project_invoice', entityId: invoiceId,
-      metadata: { projectId, invoiceNumber: out.invoiceNumber, reason: why, hoursReleased: out.released },
     });
     return { ok: true, data: { invoiceId, hoursReleased: out.released } };
   } catch (err) {

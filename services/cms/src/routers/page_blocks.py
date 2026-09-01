@@ -1,10 +1,20 @@
 """
-Page Block management API routes.
+Page Block management API routes — PUBLISH IS RETIRED.
 
-Visual editor CRUD + workflow for page blocks. Editing and version history live
-in the CMS-local database (cms_posts, the staging + version store); publish and
-approve bridge blocks to the Main DB public reference (cms_content) that the
-marketing pages read. Drafts never touch the live cms_content rows.
+Editing and version history live in the CMS-local database (`cms_posts`). Publish and approve used
+to bridge blocks into Main-DB `cms_content`, which the marketing pages read.
+
+They no longer read it. Front-facing content is authored in the RFP Pipeline admin at /admin/site,
+which writes `content_pages` — a versioned, canvas-native store in the main database — and as of
+2026-08-31 the frontend reads nothing else. That made this bridge a silent no-op: it accepted an
+edit, reported a published count, and changed nothing on the site.
+
+`_bridge_publish` therefore refuses with 410 and says where content is authored. The read and
+draft-editing endpoints still work, so the console renders rather than crashing, but nothing here
+can write the main database any more.
+
+Retiring this router (and `content.py`, `media.py`, and the `cms_posts`/`cms_media`/`cms_reviews`/
+`cms_events`/`cms_generations` tables) is Phase 1 of docs/CMS_CRM_CONSOLIDATION.md.
 """
 import json
 import logging
@@ -212,80 +222,37 @@ async def _bridge_publish(
     cms_pool, shared_pool, *, page: str,
     block_ids: list | None = None, from_statuses: tuple = ('draft', 'pending'),
 ) -> int:
-    """Publish page-block cms_posts rows to the public cms_content reference.
+    """REFUSES. This bridge published into a store the website no longer reads.
 
-    Flips matching cms_posts rows to 'published' (CMS DB), then upserts each into
-    Main DB cms_content (content_type='page_block', status='published') keyed by
-    slug — preserving tags, display_order and display metadata. Editing bookkeeping
-    (_versions etc.) is stripped from the public copy. Returns the bridged count.
+    ── WHY IT REFUSES INSTEAD OF PUBLISHING ────────────────────────────────────────────────────
+    It upserted into Main-DB `cms_content` — the table front-facing content moved OFF. The
+    frontend reads `content_pages` (the versioned, canvas-native store the platform's own Site
+    Content editor writes) and, since 2026-08-31, reads nothing else: every legacy fallback was
+    removed after measurement showed all 14 legacy documents and all 116 legacy page-blocks were
+    covered or belonged to redirected pages.
+
+    So this function's writes could not appear on the site. Proven, not inferred: a block written
+    exactly this way, tagged for `homepage`, then the live homepage fetched — HTTP 200, 65,987
+    bytes, marker absent. The console accepted the edit, reported a published count, and changed
+    nothing.
+
+    A silent no-op is the worst available behaviour, because the person believes their edit
+    shipped. Refusing names where the content actually lives. The read endpoints of this router
+    still work, so the console renders its history rather than crashing.
+
+    Removing this router entirely is the finish (docs/CMS_CRM_CONSOLIDATION.md Phase 1); it was
+    not done in the same pass because the Vite console cannot be exercised from the platform
+    sandbox, and deleting a UI you cannot run is how you find out later that it was load-bearing.
     """
-    if block_ids:
-        ids = [uuid.UUID(b) for b in block_ids]
-        rows = await cms_pool.fetch(
-            """
-            UPDATE cms_posts
-            SET status = 'published', published_at = COALESCE(published_at, now()), updated_at = now()
-            WHERE category = 'page_block' AND $1 = ANY(tags)
-              AND status = ANY($2::text[]) AND id = ANY($3::uuid[])
-            RETURNING slug, title, body, excerpt, tags, metadata, display_order,
-                      author_name, featured_image_url, published_at
-            """,
-            page, list(from_statuses), ids,
-        )
-    else:
-        rows = await cms_pool.fetch(
-            """
-            UPDATE cms_posts
-            SET status = 'published', published_at = COALESCE(published_at, now()), updated_at = now()
-            WHERE category = 'page_block' AND $1 = ANY(tags)
-              AND status = ANY($2::text[])
-            RETURNING slug, title, body, excerpt, tags, metadata, display_order,
-                      author_name, featured_image_url, published_at
-            """,
-            page, list(from_statuses),
-        )
-
-    for r in rows:
-        meta = r['metadata']
-        if isinstance(meta, str):
-            try:
-                meta = json.loads(meta)
-            except (json.JSONDecodeError, TypeError):
-                meta = {}
-        if not isinstance(meta, dict):
-            meta = {}
-        public_meta = {k: v for k, v in meta.items() if k not in _BOOKKEEPING_META_KEYS}
-        await shared_pool.execute(
-            """
-            INSERT INTO cms_content
-                (slug, title, body, excerpt, content_type, author, tags,
-                 status, published, published_at, featured_image, metadata,
-                 display_order, updated_at)
-            VALUES ($1, $2, $3, $4, 'page_block', $5, $6,
-                    'published', true, COALESCE($7, now()), $8, $9::jsonb, $10, now())
-            ON CONFLICT (slug) DO UPDATE SET
-                title = EXCLUDED.title,
-                body = EXCLUDED.body,
-                excerpt = EXCLUDED.excerpt,
-                author = EXCLUDED.author,
-                tags = EXCLUDED.tags,
-                status = 'published',
-                published = true,
-                published_at = COALESCE(cms_content.published_at, EXCLUDED.published_at),
-                featured_image = EXCLUDED.featured_image,
-                metadata = EXCLUDED.metadata,
-                display_order = EXCLUDED.display_order,
-                updated_at = now()
-            """,
-            r['slug'], r['title'], r['body'], r['excerpt'], r['author_name'],
-            list(r['tags'] or []), r['published_at'], r['featured_image_url'],
-            json.dumps(public_meta), r['display_order'],
-        )
-
-    return len(rows)
-
-
-# ── Endpoints ────────────────────────────────────────────────────────────────
+    raise HTTPException(
+        status_code=410,
+        detail=(
+            'Front-facing content is authored in the RFP Pipeline admin at /admin/site, which '
+            'writes the content_pages store the website reads. This bridge published into '
+            'cms_content, which the site no longer reads — so publishing here would report '
+            'success and change nothing. See docs/CMS_CRM_CONSOLIDATION.md.'
+        ),
+    )
 
 @router.get("/")
 async def list_page_blocks(request: Request, page: str):
@@ -651,16 +618,11 @@ async def delete_block(request: Request, block_id: str):
         if not row:
             raise HTTPException(status_code=404, detail='Block not found')
 
-        # Remove the published copy from the public reference too (best-effort).
+        # No published copy to clean up: this router can no longer write Main-DB `cms_content`
+        # (see `_bridge_publish`), and the frontend no longer reads it. Deleting from it here would
+        # be the last writer to a store being retired, and would quietly mutate the main database
+        # from a service that is no longer its author.
         shared_pool = get_event_pool()
-        if shared_pool:
-            try:
-                await shared_pool.execute(
-                    "DELETE FROM cms_content WHERE slug = $1 AND content_type = 'page_block'",
-                    row['slug'],
-                )
-            except Exception as e:
-                logger.error('[DELETE /page-blocks] cms_content cleanup failed: %s', e)
 
         await _emit_shared_event(shared_pool, 'content.page_block_deleted', user_id, {
             'blockId': block_id,

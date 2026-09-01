@@ -11,6 +11,9 @@ export const dynamic = 'force-dynamic';
 
 export type HealthSummary = {
   activeWorkflows: number;
+  /** Of the active ones, how many are parked at a human gate. Reported beside the total, never
+   *  blended into it — "in flight" and "waiting for you" are different asks of an operator. */
+  awaitingPerson: number;
   pendingJobs: number;
   eventsLastHour: number;
   eventsLast24h: number;
@@ -118,6 +121,7 @@ export type EmailAutomationData = {
 
 type HealthRow = {
   activeWorkflows: number;
+  awaitingPerson: number;
   pendingJobs: number;
   eventsLastHour: number;
   eventsLast24h: number;
@@ -257,6 +261,7 @@ function serializeTreeNode(row: EventRow, children: EventTreeNode[]): EventTreeN
 async function fetchHealthSummary(): Promise<HealthSummary> {
   const defaults: HealthSummary = {
     activeWorkflows: 0,
+    awaitingPerson: 0,
     pendingJobs: 0,
     eventsLastHour: 0,
     eventsLast24h: 0,
@@ -267,7 +272,22 @@ async function fetchHealthSummary(): Promise<HealthSummary> {
   try {
     const rows = await sql<HealthRow[]>`
       SELECT
-        (SELECT COUNT(*) FROM process_instances WHERE status IN ('running', 'pending', 'retrying') AND archived_at IS NULL) AS active_workflows,
+        -- ── ONE DEFINITION OF "ACTIVE", SHARED WITH THE LIST BELOW ──────────────────────────
+        -- This tile used to count status IN ('running','pending','retrying'), while the Active
+        -- Workflows tab on the SAME PAGE counts NOT IN ('completed','cancelled','failed'). The
+        -- difference is the paused status, which is the HITL state — a workflow parked at a human gate —
+        -- and there were 34 of them. So the headline an operator reads at a glance said ACTIVE
+        -- WORKFLOWS 0 while the list directly beneath it showed 34 things waiting on that
+        -- operator. A zero that contradicts the list under it is worse than no tile at all.
+        --
+        -- A paused instance IS active for every purpose this page serves: work is in flight and somebody
+        -- has to move it. The list's predicate is the correct one, so it is the one both use.
+        (SELECT COUNT(*) FROM process_instances
+          WHERE status NOT IN ('completed', 'cancelled', 'failed') AND archived_at IS NULL) AS active_workflows,
+        -- The half an operator can act on, called out separately rather than blended in: these
+        -- are not slow, they are WAITING FOR A PERSON.
+        (SELECT COUNT(*) FROM process_instances
+          WHERE status = 'paused' AND archived_at IS NULL) AS awaiting_person,
         (SELECT COUNT(*) FROM pipeline_jobs WHERE status IN ('pending', 'running')) AS pending_jobs,
         (SELECT COUNT(*) FROM system_events WHERE created_at > NOW() - INTERVAL '1 hour') AS events_last_hour,
         (SELECT COUNT(*) FROM system_events WHERE created_at > NOW() - INTERVAL '24 hours') AS events_last_24h,
@@ -278,6 +298,7 @@ async function fetchHealthSummary(): Promise<HealthSummary> {
     if (row) {
       return {
         activeWorkflows: Number(row.activeWorkflows) || 0,
+        awaitingPerson: Number(row.awaitingPerson) || 0,
         pendingJobs: Number(row.pendingJobs) || 0,
         eventsLastHour: Number(row.eventsLastHour) || 0,
         eventsLast24h: Number(row.eventsLast24h) || 0,
@@ -501,10 +522,16 @@ async function fetchContentPipeline(): Promise<ContentPipelineData> {
   };
 
   try {
+    // ── THE CANONICAL STORE, NOT THE RETIRED ONE ──────────────────────────────────────────
+    // This counted page_blocks in `cms_content` — the store front-facing content moved OFF. So
+    // the operator's Content Pipeline panel described the system that was replaced: a fixed 116
+    // published blocks and nothing pending, whatever anybody did in Site Content. A panel that
+    // cannot move is worse than no panel, because it reads as "nothing is happening".
+    // `content_pages` is versioned, so count DISTINCT page keys per status rather than rows.
     const statusRows = await sql<BlockStatusRow[]>`
-      SELECT status, COUNT(*)::int AS count
-      FROM cms_content
-      WHERE content_type = 'page_block'
+      SELECT status, COUNT(DISTINCT page_key)::int AS count
+      FROM content_pages
+      WHERE content_type = 'page'
       GROUP BY status
     `;
     data.blocksByStatus = statusRows.map((r: BlockStatusRow) => ({
@@ -516,11 +543,14 @@ async function fetchContentPipeline(): Promise<ContentPipelineData> {
   }
 
   try {
+    // `draft` is the state a page sits in awaiting publication — the legacy table's 'pending'.
+    // COUNT(DISTINCT page_key) is deliberate: content_pages is VERSIONED, so a page edited three
+    // times has three draft rows and a plain COUNT(*) reported "about — 3 pending" for one page.
     const pendingRows = await sql<PendingPageRow[]>`
-      SELECT tags[1] AS page, COUNT(*)::int AS pending_count
-      FROM cms_content
-      WHERE content_type = 'page_block' AND status = 'pending'
-      GROUP BY tags[1]
+      SELECT page_key AS page, COUNT(DISTINCT version_no)::int AS pending_count
+      FROM content_pages
+      WHERE content_type = 'page' AND status = 'draft'
+      GROUP BY page_key
     `;
     data.pendingByPage = pendingRows.map((r: PendingPageRow) => ({
       page: r.page ?? 'unknown',

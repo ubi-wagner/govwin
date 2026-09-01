@@ -1,6 +1,8 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-31 (migration head **241**, and **`main` is now at that head** — PR #213
+**Last updated:** 2026-09-01 (migration head **243** — the marketing/sales spine: 242 closed the
+funnel sever, 243 added `contacts`, the subject the CRM never had. See
+"📍 The funnel is joined" immediately below.) (2026-08-31: migration head **241**, and **`main` is now at that head** — PR #213
 merged the entire arc; see the Branch line below before doing anything else. Earlier: head **237** —
 see "The post-award build-out + doc-currency pass" below. Earlier context from 2026-08-24 at head **213** follows.) (migration head **213** — see "The isolation pass" immediately below: migs
 212/213 closed a live cross-tenant read leak across eleven proposal-spine tables, the agent workforce
@@ -21,6 +23,54 @@ commit. It carries **nothing unmerged**.
 Fetch before you push — more than one session works this branch, and they have collided (2026-08-31:
 two sessions independently built the same rename; the divergent line was preserved on a side branch
 rather than force-pushed).
+
+---
+
+## 📍 The funnel is joined (2026-09-01, migration head **243**)
+
+Canonical: **docs/MARKETING_SALES_SYSTEM.md** (design + what each decision cost) and
+**docs/CMS_CRM_CONSOLIDATION.md** (what was consolidated and why).
+
+**What shipped.** The commercial spine, end to end in the main database — no cross-database join
+anywhere in it.
+
+* **mig 242** — `session_id` on `waitlist` and `applications`, `applications.tenant_id`. One field
+  at two write sites, and the whole funnel joins: campaign → session → application → customer.
+* **mig 243** — `contacts`: a person by normalised email, whether or not they ever convert.
+  `contact_id` on both capture tables. One writer (`lib/contacts.ts`), called by both routes.
+* **`/admin/funnel`** and **`/admin/contacts`**, with Analytics moved under Marketing & Sales.
+* **`/admin/crm`** — the outbound-mail console, and the first way to LIFT a suppression.
+
+**Three decisions worth carrying forward, each of which the obvious design gets wrong:**
+
+1. **`contacts` has no `tenant_id` and no `status`.** Both duplicate a fact `applications` owns, and
+   the copy is the one that goes stale. Worse, a `tenant_id` would make RLS classify contacts as
+   tenant-owned, and scoping by it exposes every un-converted prospect to every tenant through the
+   `OR tenant_id IS NULL` arm of `tenant_isolation_select`. Conversion is DERIVED. Because RLS
+   therefore protects nothing here, `__tests__/prospect-tables-admin-only.test.ts` forbids any file
+   under `app/portal` / `app/partner` naming `contacts`, `applications` or `waitlist` in a query.
+2. **`users` is not a source for the contacts backfill.** Folding them in was 47 people, almost all
+   staff and seeded accounts, and the funnel would have opened on a 2% conversion rate whose
+   denominator was 98% us. The 7 customers predating `applications` read as un-attributed, which is
+   what they are.
+3. **A step rate must carry its own numerator.** The first funnel page divided the full contact
+   count by sessions and rendered *"1 contact · 1.9% of sessions"* for a person who never had a
+   session — arithmetically fine, factually meaningless, and no assertion could see it. **Found by
+   looking at the rendered page.** The rate is now *contacts traced to a session* over sessions,
+   and `conversionRate()` returns `null` below a floor of 20 rather than a confident `0.0%`
+   (`__tests__/funnel-rate-floor.test.ts`, red-tested against the naive expression).
+
+**Proven:** `drive-commercial-path` step 7 — `hn/launch-week` → contact → application → customer,
+counted exactly once across the buckets. Red-tested by disabling `recordContact`: 5 of 7 assertions
+fail, and the two that still pass are the two that should. `verify-surfaces` 86/86 clean (it caught
+`<Link href="/api/enter?…">` prefetching an RSC payload that does not exist — a route handler is not
+a page; use a plain `<a>`. The contacts page was also passing `?tenant=`, which `/api/enter` ignores
+in favour of `slug`, landing the admin on `/portal`).
+
+**Still open (Phase 4):** the audience exists and nothing composes a campaign against it yet.
+Bodies, templates and sequences stay in `cms-postgres`, which is what it is good at; the send goes
+through the one `lib/email` seam. And Postmark is configured in code but **not switched on** — see
+the checklist in MARKETING_SALES_SYSTEM §4.
 
 ---
 
@@ -380,6 +430,47 @@ Status: `<scratchpad>/health-status.txt` (one line) + `health.log`. It can't pre
 > anything else. The heartbeat now sources `sandbox-env.sh` (occurrence FIVE of one credential in two
 > places — B146/B147), and note the pool caches credentials at connect time, so fixing the role
 > password requires a server RESTART, not just an `ALTER ROLE`.
+>
+> ⚠️ **Occurrence SIX is the OBJECT STORE, and it is not a credential at all.** The same heartbeat
+> hardcoded `LOCAL_STORAGE_DIR=/tmp/govwin-storage` and `AWS_S3_BUCKET=rfp-pipeline-local` for the
+> server, while `scripts/sandbox-env.sh` gave every drive `/home/user/.govwin/storage` and named no
+> bucket. So the app server wrote uploads into one filesystem tree and in-process drives read a
+> DIFFERENT one — 88 objects on one side, 207 on the other, both live and both real.
+>
+> It presents as a product defect and a convincing one: `drive-pin-honesty` reported that pinning
+> REFUSED to copy a published document, naming the exact storage key — and the key really was
+> there, in the other store. Nothing in the failure points at configuration; the pin code, the copy
+> helper and the refusal are all behaving correctly on the evidence they have.
+>
+> **The rule generalises past passwords: any value BOTH the server and a drive must agree on
+> belongs in `sandbox-env.sh`, and the heartbeat resolves it from there.** Storage now does
+> (`STORAGE_DRIVER`, `LOCAL_STORAGE_DIR`, `AWS_S3_BUCKET`, `AWS_REGION`). When an in-process drive
+> disagrees with the running product about something that clearly exists, diff
+> `/proc/<server-pid>/environ` against a sourced `sandbox-env.sh` before reading any more code.
+
+**1b. A LONG-LIVED PROCESS SERVING CODE THAT NO LONGER EXISTS — twice in one hour, two different
+processes, and both looked like product defects.**
+
+*The server.* `next build` replaces `.next/standalone` underneath a running server. The old process
+keeps serving HTML that references the OLD chunk hashes, which are gone, so every
+`/_next/static/chunks/*.js` answers `400 text/html` and the browser refuses to execute it. The page
+still renders — it is server HTML — and `/login` still answers **200**. Nothing hydrates: no handler
+fires, no form accepts a file, no toast appears. It presents as *"the upload form rejects my PDF"*,
+and the arc drive reported exactly that. **A 200 on `/login` is not evidence the build under it still
+exists** — the heartbeat now pulls a chunk URL out of the HTML it just fetched and requires it to
+come back as JavaScript.
+
+*The worker.* The pipeline worker imports every archetype and workflow ONCE, at boot. Check out a
+branch that adds two and the process keeps serving `:8080` knowing nothing about them — the event
+fires, no instance is created, and the drive reports *"the workflow engine created an instance from
+the event — none"*, which reads as a broken bridge. A worker booted with **36** archetypes against a
+checkout that has **38** made two live archetypes look dead. The heartbeat now restarts a worker when
+any file under `pipeline/src` is newer than the process.
+
+The shared lesson, and it is the same one the lenses keep teaching: **liveness is not currency.**
+`:3000` answering and `:8080` listening are both true of a process running code you deleted an hour
+ago. After ANY `next build`, branch switch, merge or rebase, restart both — or read their start times
+against the tree before believing a failure.
 
 **2. Verify dispatched agents.** ALWAYS re-derive a sub-agent's finding against the actual code/schema before
 acting on it — agents have returned stale/incomplete generation (this session: a "readiness uses the cheap
@@ -1272,8 +1363,27 @@ These are recurring bug-classes — treat them as a checklist, not one-offs:
    failing on the exact behaviour you just added, which reads like your code is wrong. After every
    rebuild, kill by PID and confirm the new one is younger than the build:
    `fuser -k 3000/tcp` then `ps -o pid,lstart -p $(fuser 3000/tcp)`. (`ss` is not installed here; use
-   `fuser`. And `pkill -f standalone/server.js` never matches — the heartbeat launches a bare
-   `node server.js` with cwd=standalone.)
+   `fuser`.)
+
+   **`pkill -f "standalone/server.js"` MATCHES NOTHING — and not for the reason previously written
+   here.** It is not that the heartbeat launches a bare `node server.js`: **Next renames its own
+   process to `next-server (v15…)` once it boots**, so no cmdline pattern mentioning `server.js`,
+   `standalone`, or the path ever matches it, and `ps | grep node` does not list it either. A kill
+   that hits nothing is silent, `port_busy` then reports :3000 healthy, and the stale process
+   survives. A server started at 18:04 survived four deliberate restarts that way and served for an
+   hour. **Kill by PORT** (`fuser -n tcp 3000`), never by cmdline.
+
+   **The decisive staleness signal is `readlink /proc/<pid>/cwd` ending in `(deleted)`.** `next
+   build` REPLACES `.next/standalone`, so the running process keeps serving out of an unlinked
+   directory — a build that no longer exists on disk. Everything still answers 200: `/login`
+   renders, shared chunks keep their hashes across builds, and only a route whose chunk hash
+   CHANGED asks for a file that is gone, gets `400 text/html`, and dies with a ChunkLoadError. That
+   presents as **one page rendering Next's "Something went wrong" boundary at HTTP 200** while the
+   rest of the product looks fine — a completely convincing product defect (it cost most of an hour
+   in the 2026-08-31 sweep, chasing `/admin/workflows`). Sampling ONE chunk to check freshness does
+   not catch it, because the chunk you sample is usually a shared one. `sandbox-heartbeat.sh` now
+   checks the `(deleted)` cwd first, and kills by port before restarting — the old stale branch
+   called `start_server` WITHOUT killing, so the replacement could not bind :3000 and died.
 5. **JWT is the singular-session source of truth:** everything authz reads the active
    membership off the token; never infer tenant from `users.tenant_id`.
 6. **Section ordering = `sort_index`, never `section_number` string:** any new query that lists

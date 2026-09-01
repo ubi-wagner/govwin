@@ -20,6 +20,7 @@ import { emitEventSingle } from '@/lib/events';
 import { createTask } from '@/lib/tasks/tasks';
 import { send } from '@/lib/email';
 import { adminNewApplicationAlert } from '@/lib/email-templates';
+import { recordContact } from '@/lib/contacts';
 
 const ApplicationSchema = z.object({
   contactEmail: z.string().email().max(200),
@@ -51,6 +52,15 @@ const ApplicationSchema = z.object({
   termsAccepted: z.literal(true),
   termsSignature: z.string().email().max(200).optional(),
   termsVersion: z.string().max(50).default('v1'),
+
+  // ── ATTRIBUTION ────────────────────────────────────────────────────────────────────────────
+  // The analytics session in the browser when this form was submitted. Optional, deliberately:
+  // somebody who phones, is met at a conference, or arrives with the referrer stripped has no
+  // session, and a required field here would push the client into inventing one. An invented
+  // attribution is worse than an absent one — it is indistinguishable from a real one, and it
+  // quietly poisons every campaign number computed from this chain. Joins to `visitor_sessions`,
+  // which already carries referrer and the three UTM fields.
+  sessionId: z.string().max(120).nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -136,6 +146,19 @@ export async function POST(request: Request) {
 
     // Pull loose metadata we don't promote to named columns
     const userAgent = request.headers.get('user-agent')?.slice(0, 500) ?? null;
+
+    // The person behind the application (migration 243), recorded BEFORE the insert so the link
+    // goes in with the row rather than in a follow-up UPDATE that could be interrupted between
+    // them. `recordContact` never throws: an application must land whatever our bookkeeping does,
+    // and a null id simply leaves the row un-attributed, which is the honest reading.
+    const contactId = await recordContact({
+      email: input.contactEmail,
+      name: input.contactName,
+      companyName: input.companyName,
+      sessionId: input.sessionId ?? null,
+      source: 'application',
+    });
+
     const rows = await sql<{ id: string }[]>`
       INSERT INTO applications (
         contact_email, contact_name, contact_title, contact_phone,
@@ -143,7 +166,7 @@ export async function POST(request: Request) {
         sam_registered, sam_cage_code, duns_uei,
         previous_submissions, previous_awards, previous_award_programs,
         tech_summary, tech_areas, target_programs, target_agencies, desired_outcomes,
-        motivation, referral_source,
+        motivation, referral_source, session_id, contact_id,
         status, terms_accepted_at, terms_version,
         user_agent, metadata
       ) VALUES (
@@ -159,7 +182,7 @@ export async function POST(request: Request) {
         ${input.targetPrograms}::text[],
         ${input.targetAgencies}::text[],
         ${input.desiredOutcomes}::text[],
-        ${input.motivation}, ${input.referralSource},
+        ${input.motivation}, ${input.referralSource}, ${input.sessionId ?? null}, ${contactId},
         'pending', now(), 'v1',
         ${userAgent}, ${sql.json({
           termsSignature: input.termsSignature ?? null,
