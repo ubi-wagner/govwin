@@ -269,7 +269,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="commercial-path application-intake pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
+SCENARIO_DRIVES="commercial-path application-intake archive pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -456,6 +456,15 @@ DRIVES=(
   # same as no task, and RLS cannot catch that because a platform row is readable from
   # everywhere; the app-layer predicate is what decides whether a person is told.
   "application-intake|scripts/drive-application-intake.mts"
+  # THE ARCHIVABLE CONTRACT on all three entities it lives on — portal, atom, tenant.
+  # Restored after a script of this name was found MISSING while two documents cited it as
+  # evidence that tenant archive was verified. The behaviour worked; the verification did
+  # not exist, which is uncovered rather than passing. It asserts the CASCADE (a portal
+  # archive that leaves its workflows active keeps nudging a build the customer archived),
+  # the GATE rather than the column (verifyTenantAccess reads tenants.archived_at, so the
+  # timestamp alone proves only that an UPDATE ran), and RESTORE on every case — an
+  # archive test that never restores proves half a contract and leaves the box dirty.
+  "archive|scripts/drive-archive.mts"
   # THE SPEND GUARDRAILS, both directions. Eleven cases: the tenant budget refuses and allows, a
   # monthly_budget of 0 disables, the platform cap refuses even when the tenant has headroom, the
   # kill switch stops everything, the hourly rate limit refuses and allows, and the framework

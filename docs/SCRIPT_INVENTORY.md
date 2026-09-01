@@ -24,7 +24,7 @@ a stale green nobody re-checks. The live answer is `bash scripts/run-branch-driv
 table is the record. Everything in **SUITE** below ran in that suite; everything else did not.
 
 
-## SUITE — 59
+## SUITE — 60
 
 Runs on every `run-branch-drives.sh`. This is the regression net.
 
@@ -38,6 +38,7 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `demo-canvas-capabilities.mts` | — | 2026-08-24 |
 | `drive-admin-demand.mts` | — | 2026-08-31 |
 | `drive-application-intake.mts` | — | 2026-09-01 |
+| `drive-archive.mts` | — | — |
 | `drive-atomization.mts` | — | 2026-08-30 |
 | `drive-award-to-contract.mts` | — | 2026-08-24 |
 | `drive-bridge-buckets.mjs` | — | 2026-08-30 |
@@ -343,7 +344,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `repair-truncated-source-text.mts` | — | 2026-08-20 |
 | `seed-demo-automation.mts` | — | 2026-07-19 |
 | `seed-house-library.mts` | — | 2026-07-25 |
-| `seed-launch-todos.mts` | — | — |
+| `seed-launch-todos.mts` | — | 2026-09-01 |
 | `seed-librarian-catalog.mjs` | — | 2026-08-11 |
 | `seed-review-junk.mjs` | — | 2026-08-11 |
 | `seed-slide-deck.mts` | — | 2026-08-11 |
@@ -419,7 +420,7 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 
 | class | count |
 |---|---|
-| SUITE | 59 |
+| SUITE | 60 |
 | LENS | 4 |
 | CROSS-CHECK | 2 |
 | RULER | 7 |
@@ -428,4 +429,4 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 | NPM-WIRED | 1 |
 | DOCUMENTED | 95 |
 | UNREFERENCED | 95 |
-| **total** | **298** |
+| **total** | **299** |

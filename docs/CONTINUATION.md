@@ -1007,10 +1007,11 @@ items show 📄 template + ✎ notes badges in the volume list. Proven by `scrip
 - **archived** = whole COMPANY (license lapsed): `tenants.archived_at`, orthogonal to per-user state so
   renewal restores everyone to their exact prior state for free. Archived companies vanish from the login
   list (`getActiveMemberships` filters them); admins can still enter to renew. Admin control on the tenant
-  page. DONE; verified once by `scripts/drive-archive.mts`, WHICH IS NO LONGER IN THE TREE — so the
-  claim is a record of a past run, not a check anything re-runs today. Treat tenant archive as
-  UNCOVERED until a drive exists again (uncovered is not passing). Every user-creation path now
-  writes a membership.
+  page. DONE + verified — `scripts/drive-archive.mts` was found MISSING while this line cited it,
+  and has been REBUILT (2026-09-01, suite drive `archive`). It now covers all three archivable
+  entities, asserts the GATE rather than the column, and red-tests: removing
+  `t.archived_at IS NULL` from `verifyTenantAccess` fails exactly that assertion. Every
+  user-creation path writes a membership.
 See the identity design's "Never hard-delete" + "third state: ARCHIVED" sections.
 
 **As-built mechanism (don't re-derive):**
