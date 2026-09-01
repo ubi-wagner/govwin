@@ -5,15 +5,20 @@
  * Suitable for single-container Railway deploys.
  * For multi-container: migrate to rate_limit_state table or Redis.
  *
- * ⚠️ `rate_limit_state` IS A PLAN, NOT AN IMPLEMENTATION — verified 2026-09-01.
- * That table holds three configured source limits (sam_gov 100/hr, sbir_gov 30/hr,
- * grants_gov 50/hr) and NO code in any of the three services reads or writes it; this
- * comment is its only mention in the tree. The limiting that actually runs is the
- * in-memory map below, which is per-container and therefore does not hold across
- * containers and does not defend a third-party quota the way those stored numbers imply.
- * Said out loud because the rows LOOK like enforcement: somebody reading them would
- * reasonably conclude the SAM.gov quota is protected. Found by
- * `audit-producer-consumer.mjs` (docs/PRODUCER_CONSUMER_AUDIT.md).
+ * ⚠️ `rate_limit_state` IS UNUSED SCHEMA — verified 2026-09-01. That table holds three
+ * configured source quotas and NO code in any of the three services reads or writes it;
+ * the line above is its only mention in the tree.
+ *
+ * What that does and does not mean, because the first version of this note got it wrong:
+ *   · it does NOT mean a third-party quota is undefended. This limiter is IP-based and
+ *     protects OUR public endpoints. The SAM.gov quota is handled in the pipeline, by
+ *     `sam_gov.py` reading `X-RateLimit-Remaining` and raising `IngesterRateLimitError`
+ *     on 429 — reacting to the provider's own accounting, which is strictly better than
+ *     a counter of our own that can drift.
+ *   · it DOES mean the limiter here is per-container. On a multi-container deploy each
+ *     container carries its own Map, so a caller gets N times the intended limit. That is
+ *     the real, bounded consequence, and it is a scaling concern rather than a live gap.
+ * Found by `audit-producer-consumer.mjs` (docs/PRODUCER_CONSUMER_AUDIT.md).
  *
  * Usage in middleware:
  *   if (!checkRateLimit(ip, '/api/applications', 5, 15 * 60 * 1000)) {

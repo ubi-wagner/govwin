@@ -43,13 +43,21 @@ case, which is exactly what the control case is for.
 
 ### Confirmed — a capability that looks live and is not
 
-**`rate_limit_state`** — three sources configured (`sam_gov` 100/hr, `sbir_gov` 30/hr, `grants_gov`
-50/hr), `hourly_used`/`daily_used` at zero, and **no code reads or writes the table**. Its only
-mention in the tree is a comment in `frontend/lib/rate-limit.ts`: *"For multi-container: migrate to
-rate_limit_state table or Redis."* The table is a PLAN. Live rate limiting is per-container and
-in-memory, which means it does not hold across containers and does not protect a third-party quota
-the way the configured numbers imply. Nothing is broken; the risk is that somebody reads those rows
-and believes the SAM.gov quota is defended.
+**`rate_limit_state`** — three sources configured (`sam_gov` 100/hr, `sbir_gov` 30/hr,
+`grants_gov` 50/hr) and **no code reads or writes the table**. Its only mention in the tree is a
+comment in `frontend/lib/rate-limit.ts` naming it as a future migration target. Unused schema.
+
+> ⚠️ **The first version of this entry overstated it, and the correction is the useful part.** It
+> said the stored numbers imply a third-party quota is defended when it is not. That was wrong on
+> both halves: `lib/rate-limit.ts` is an **IP-based limiter for our own public endpoints**, nothing
+> to do with third-party quotas — and the SAM.gov quota **is** defended, in the pipeline, by
+> `sam_gov.py` reading `X-RateLimit-Remaining` and raising `IngesterRateLimitError` on 429. Reacting
+> to the provider's own accounting is strictly better than keeping a local counter that can drift.
+>
+> The real consequence is narrower: the limiter is **per-container**, so on a multi-container deploy
+> a caller gets N times the intended limit against our own endpoints. A scaling concern, not an
+> operational blocker. Recorded because "an audit found something alarming" is exactly the claim that
+> needs checking hardest.
 
 **`system_health_snapshots`** — zero rows, and referenced by **nothing in any of the three
 services**. Dead schema: no writer, no reader, no surface.
@@ -69,7 +77,11 @@ here so a future run does not re-open it.
 * `scout_runs.found_count` · `new_count` · `acted_count` — the scout records what it found and no
   surface displays it.
 * `agent_performance.avg_cost_usd` — cost per agent computed, never surfaced.
-* `contracts.award_amount_cents` — read, never written; the contract value is not recorded anywhere.
+* `contracts.award_amount_cents` — read, never written: the `outcome=awarded` route creates the
+  contract without an amount and no surface captures one. **Not a wrong number** — the page
+  renders `money ?? 'Not recorded'`, and project cost rolls up from CLINs
+  (`project_milestones.planned_cost`), not from this column. A missing input, not a broken
+  measure.
 * `canvas_versions.parent_version_id` — version lineage has a column and no writer.
 * `proposals.stripe_payment_id` — written; nothing reads it (self-serve checkout is descoped).
 * 23 columns touched by no code at all (§3 of the report) — schema that was declared and never used.
