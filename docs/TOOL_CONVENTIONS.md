@@ -1,5 +1,9 @@
 # Tool Conventions
 
+> ⚠️ **STALE PATHS — verified 2026-09-01 against the tree.** `pipeline/src/tools/` does not exist;
+> the tool layer lives under `pipeline/src/agents/` (fabric, archetypes, context). The conventions
+> here still hold; the file paths do not.
+
 Binding specification for the dual-use Tool framework.
 
 See also: [API_CONVENTIONS.md](./API_CONVENTIONS.md), [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), and the authoring guide at `frontend/lib/tools/README.md`. Namespace registry: ARCHITECTURE_V9.md §8.

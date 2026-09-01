@@ -1,5 +1,11 @@
 # Memory Management Reference
 
+> ⚠️ **DESIGN, NOT AS-BUILT — verified 2026-09-01 against the tree.** The tenant-facing agent
+> surfaces this describes were never built: `…/portal/[tenantSlug]/agents/` contains `usage` and
+> nothing else — no `config`, no `memories`, no `performance`. Agent memory IS live
+> (`episodic_memories`, platform-scope since mig 186) and oversight is at `/admin/agents`. Treat
+> everything here about a tenant-side memory console as a proposal.
+
 > Complete reference for the AI memory system across all three services.
 > Source of truth: `pipeline/src/agents/memory.py`, `pipeline/src/agents/context.py`,
 > `pipeline/src/agents/lifecycle/`, `pipeline/src/agents/learning/`.

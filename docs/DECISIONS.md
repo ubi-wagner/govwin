@@ -113,7 +113,7 @@ for:
 **Why:** Volumes are per-service, not shared. Any state we want both
 services to read (e.g., uploaded RFP PDFs that pipeline must shred and
 frontend must preview) MUST live in S3 or Postgres. The legacy
-`frontend/lib/storage.ts` helpers that write to `/data` are kept for
+`frontend/lib/storage/` helpers that write to `/data` are kept for
 backward compatibility but marked deprecated; new code uses the S3 path
 helpers.
 

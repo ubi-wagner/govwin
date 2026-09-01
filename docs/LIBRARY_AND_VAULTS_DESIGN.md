@@ -1,5 +1,10 @@
 # Library, Foundation Artifacts & Collaboration Vaults — Consolidated Design
 
+> ⚠️ **PARTLY AS-BUILT — verified 2026-09-01 against the tree.** `scripts/seed-starter-set.mts`
+> and `lib/library/starter-match.ts` do not exist; the starter-library path shipped as
+> `scripts/drive-copy-starter.mts` / `drive-library-starter-copy.mts` over `library_atoms` and the
+> house `rfp-pipeline` tenant (mig 152). The DESIGN below is current; those two file names are not.
+
 Canonical design for (a) the in-library **Create Canvas** tool, (b) the **foundation
 artifact** containment model, (c) the **type × form × context** taxonomy + starter
 seeding, and (d) **collaboration vaults ("nooks")** — the segregated external-partner

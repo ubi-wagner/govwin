@@ -30,7 +30,12 @@ standalone archive button/route.
 3. **Filter every active-view query** — the entity AND its cascaded children filter `archived_at IS
    NULL` in every active list/count. A missed query leaks archived rows back in. Enumerate all sites.
 4. **Audit** — `<namespace>:<entity>.archived` / `.restored` via `lib/events`, tenant-scoped where the
-   entity is (proposal/library/finder per docs/NAMESPACES.md). Never `admin`/`cms`/`spotlight`.
+   entity is. The namespace registry lives in CODE, in three runtimes that must agree —
+   `frontend/lib/event-namespaces.ts`, `pipeline/src/events.py`, and the
+   `system_events_namespace_chk` constraint in Postgres (the only one that FAILS rather than
+   warns). There is no ~~docs/NAMESPACES.md~~; it was announced in CHANGELOG.md and never written,
+   and a prose copy of a list three runtimes enforce would be a fourth thing to drift.
+   Never `admin`/`cms`/`spotlight`.
 5. **Surface + restore** — an archive action on the entity + an Archived view with restore. Retrievable.
 
 ## Reference implementation

@@ -295,13 +295,13 @@ skeleton, and release the workspace (provisioned unlocked → V0).
 
 | # | Action | Expected Result |
 |---|--------|-----------------|
-| 1 | Navigate to CMS Content: [{BASE_URL}/admin/content]({BASE_URL}/admin/content) | Content management page loads |
+| 1 | Navigate to CMS Content: [{BASE_URL}/admin/site]({BASE_URL}/admin/site) | Content management page loads |
 | 2 | Navigate to S3 Storage: [{BASE_URL}/admin/storage]({BASE_URL}/admin/storage) | Storage browser loads, showing bucket contents |
 | 3 | Verify three head folders visible | `rfp-admin/`, `rfp-pipeline/`, `customers/` |
 | 4 | Navigate into `rfp-pipeline/` | Solicitation artifacts visible (if Step 3 completed) |
 
 **Clickable links:**
-- [{BASE_URL}/admin/content]({BASE_URL}/admin/content)
+- [{BASE_URL}/admin/site]({BASE_URL}/admin/site)
 - [{BASE_URL}/admin/storage]({BASE_URL}/admin/storage)
 
 ---
@@ -314,10 +314,10 @@ skeleton, and release the workspace (provisioned unlocked → V0).
 
 | # | Action | Expected Result |
 |---|--------|-----------------|
-| 1 | Navigate to [{BASE_URL}/admin/content]({BASE_URL}/admin/content) | Content management page loads |
+| 1 | Navigate to [{BASE_URL}/admin/site]({BASE_URL}/admin/site) | Content management page loads |
 | 2 | Verify "Open in CMS Portal" link is visible | Link present, pointing to CMS SPA `/pages` editor |
 | 3 | Click "Open in CMS Portal" | CMS SPA visual page editor loads (may open in new tab) |
-| 4 | Navigate to [{BASE_URL}/admin/content/editor]({BASE_URL}/admin/content/editor) directly | Redirects to or renders the CMS SPA page editor |
+| 4 | Navigate to [{BASE_URL}/admin/site]({BASE_URL}/admin/site) directly | Redirects to or renders the CMS SPA page editor |
 | 5 | Verify page list is displayed | All managed pages visible with block counts and statuses |
 | 6 | Click into a page | Block editor opens showing ordered content blocks |
 | 7 | Add a blank block | New empty block appears at the correct position |
@@ -347,8 +347,8 @@ draft -> submitted_for_review -> approved -> published
 - `system:content.published` -- content published (triggers ISR revalidation)
 
 **Clickable links:**
-- [{BASE_URL}/admin/content]({BASE_URL}/admin/content)
-- [{BASE_URL}/admin/content/editor]({BASE_URL}/admin/content/editor)
+- [{BASE_URL}/admin/site]({BASE_URL}/admin/site)
+- [{BASE_URL}/admin/site]({BASE_URL}/admin/site)
 
 ---
 
@@ -391,13 +391,13 @@ draft -> submitted_for_review -> approved -> published
 | 4 | Verify automation page loads | Page renders with automation rules list, rule creation form, and execution log |
 | 5 | Navigate back via sidebar | Sidebar still visible and functional |
 | 6 | Verify "Email Outbox" link is visible in sidebar | Link present under the appropriate nav section |
-| 7 | Click "Email Outbox" | Navigates to [{BASE_URL}/admin/email-outbox]({BASE_URL}/admin/email-outbox) |
+| 7 | Click "Email Outbox" | Navigates to [{BASE_URL}/admin/crm]({BASE_URL}/admin/crm) |
 | 8 | Verify email outbox page loads | Page renders with pending/claimed/sent email list, approve/reject buttons per email |
 | 9 | Verify outbox count badge (if emails are pending) | Badge shows count of pending emails next to nav link |
 
 **Clickable links:**
 - [{BASE_URL}/admin/automation]({BASE_URL}/admin/automation)
-- [{BASE_URL}/admin/email-outbox]({BASE_URL}/admin/email-outbox)
+- [{BASE_URL}/admin/crm]({BASE_URL}/admin/crm)
 
 ---
 
@@ -412,14 +412,14 @@ draft -> submitted_for_review -> approved -> published
 | Tenants | [{BASE_URL}/admin/tenants]({BASE_URL}/admin/tenants) | Operations |
 | Purchases | [{BASE_URL}/admin/purchases]({BASE_URL}/admin/purchases) | Operations |
 | Automation | [{BASE_URL}/admin/automation]({BASE_URL}/admin/automation) | Operations |
-| Email Outbox | [{BASE_URL}/admin/email-outbox]({BASE_URL}/admin/email-outbox) | Operations |
+| Email Outbox | [{BASE_URL}/admin/crm]({BASE_URL}/admin/crm) | Operations |
 | Event Stream | [{BASE_URL}/admin/events]({BASE_URL}/admin/events) | Monitoring |
 | Pipeline Jobs | [{BASE_URL}/admin/pipeline]({BASE_URL}/admin/pipeline) | Monitoring |
 | System Health | [{BASE_URL}/admin/system]({BASE_URL}/admin/system) | Monitoring |
 | System State | [{BASE_URL}/admin/system-state]({BASE_URL}/admin/system-state) | Monitoring |
 | Sources | [{BASE_URL}/admin/sources]({BASE_URL}/admin/sources) | Intelligence |
-| CMS Content | [{BASE_URL}/admin/content]({BASE_URL}/admin/content) | Content |
-| CMS Editor | [{BASE_URL}/admin/content/editor]({BASE_URL}/admin/content/editor) | Content |
+| CMS Content | [{BASE_URL}/admin/site]({BASE_URL}/admin/site) | Content |
+| CMS Editor | [{BASE_URL}/admin/site]({BASE_URL}/admin/site) | Content |
 | S3 Storage | [{BASE_URL}/admin/storage]({BASE_URL}/admin/storage) | Content |
 
 ---

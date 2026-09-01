@@ -101,7 +101,7 @@ reachable; pipeline `GET :8080/health` returns ok; `SELECT max(filename) FROM _m
    `[PASS/FAIL]`  ⚠ *The daily auto-scout + email digest are descoped (manual scout works).*
 
 ### T3 — Opp river: create → skeleton → push → mirror  *(role: rfp_admin → new customer)*
-7. **Ingest / create an opp:** `/admin/rfp-upload` (upload an RFP PDF) **or** the intake form. → **Expect:**
+7. **Ingest / create an opp:** `/admin/rfp-curation/upload` (upload an RFP PDF) **or** the intake form. → **Expect:**
    an `opportunities` row + a `curated_solicitations` (`status='new'`) row; RFP doc stored. `[PASS/FAIL]`
    ⚠ *A duplicate-title upload with empty description currently 500s (B1) — use distinct titles.*
 8. **Curate the skeleton** in `/admin/rfp-curation/<solId>`:
@@ -167,7 +167,7 @@ reachable; pipeline `GET :8080/health` returns ok; `SELECT max(filename) FROM _m
     Word with headings/tables/TOC. `[PASS/FAIL]`  ⚠ *PDF export is a ToDo (docx only).*
 
 ### T6 — Event + automation audit  *(role: master_admin)*
-21. `/admin/activity` (or query `system_events`) → **Expect:** events posting across the run with real
+21. `/admin/events` (or query `system_events`) → **Expect:** events posting across the run with real
     payloads (objects, not string scalars — the jsonb class was squashed): `capture:application.accepted`,
     `capture:tenant.cards_backfilled`, `finder:*` (source/opp/topic), `proposal:proposal.created/locked`,
     `tool:invoke.*`. `[PASS/FAIL]`

@@ -312,9 +312,11 @@ lossless:
   (they enter a slumbering company to renew it).
 - **Archiving touches NO per-user rows.** So restoring (clear `archived_at`) returns
   everyone to **exactly** their prior state — active users active, individually-inactive
-  users still inactive — for free, no snapshot needed. Verified end-to-end
-  (`scripts/drive-archive.mts`): archived → all users denied; admin still enters;
-  restored → back; the individually-inactive user stays inactive.
+  users still inactive — for free, no snapshot needed. This WAS verified end-to-end by
+  `scripts/drive-archive.mts` (archived → all users denied; admin still enters; restored →
+  back; the individually-inactive user stays inactive) — but that script is no longer in the
+  tree, so nothing re-checks it. The behaviour is implemented; the verification is not
+  reproducible, which makes it uncovered rather than proven.
 - **An archived company disappears from the login list.** `getActiveMemberships` excludes
   archived tenants, so a user only ever lands on / selects a *reachable* company; if all
   their companies are archived they get an "Access paused" message (never a broken land).

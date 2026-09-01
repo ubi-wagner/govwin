@@ -1326,15 +1326,15 @@ ISR revalidation path mapping: security→/infosec, get-started→/pricing (see 
 
 ### Dual-Editor Architecture
 Two valid editors exist for marketing page content:
-1. **Legacy Next.js Editor** at `/admin/content/editor` — quick edits from admin dashboard
+1. **Legacy Next.js Editor** at `/admin/site` — quick edits from admin dashboard
 2. **CMS SPA PageEditor** at CMS Portal `/pages/:page` — full visual editing with AI revision, workflow
-Both read/write the same `cms_content` rows (content_type='page_block'). `/admin/content` now redirects to `/admin/content/editor`.
+Both read/write the same `cms_content` rows (content_type='page_block'). `/admin/site` now redirects to `/admin/site`.
 
 ### Admin Sidebar
-- Content → links to `/admin/content/editor`
+- Content → links to `/admin/site`
 - CMS Portal → external link to CMS SPA
 - Automation → `/admin/automation` (automation rules)
-- Email Outbox → `/admin/email-outbox` (sent email archive)
+- Email Outbox → `/admin/crm` (sent email archive)
 
 ### Deployment
 - Single environment: `main` branch → Railway production auto-deploy

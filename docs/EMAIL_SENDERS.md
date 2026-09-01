@@ -83,7 +83,7 @@ done. None are performed automatically.
      Authenticate email, publish the provided `google._domainkey` TXT record.
    - **DMARC**: `v=DMARC1; p=quarantine; rua=mailto:dmarc@rfppipeline.com`.
 4. **OAuth / credentials**: the CMS uses service-account delegation (`gmail_client`);
-   the frontend transactional path (`frontend/lib/email.ts`) uses an OAuth2 refresh
+   the frontend transactional path (`frontend/lib/email/`) uses an OAuth2 refresh
    token — see that file's header for `GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN`.
 5. Verify each delegated send works (Workspace → each mailbox can be "sent as" by the
    service account) before relying on the new identities in production.

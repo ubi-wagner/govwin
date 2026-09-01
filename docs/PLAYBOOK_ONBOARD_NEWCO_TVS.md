@@ -135,7 +135,7 @@ is valid, and nothing SBIR-specific is required.
   accepted but won't auto-extract). Optionally drop the two **topic files** (TVS-2026-01-A / -B) into
   the topics zone for a multi-topic ingest. **UNCHECK "✨ Run Ingest Assist"** so the opp stays
   `status='new'` and un-fanned (see gotcha). Submit. (`components/rfp-curation/upload-form.tsx`)
-- **CALL** `POST /api/admin/rfp-upload` (multipart): `{ title, agency, office?, programType:'other',
+- **CALL** `POST /api/admin/rfp-curation/upload` (multipart): `{ title, agency, office?, programType:'other',
   solicitationNumber, closeDate, postedDate, description, files[] }`. Accepts `.pdf .docx .xlsx .pptx
   .txt .md` (30 MB total); role rfp_admin+.
 - **WRITES** (tx): `opportunities` (`source='manual_upload', is_active=true, program_type='other',
@@ -171,7 +171,7 @@ storage-free and creates the same master record without a file:
   without R2; use the **file-upload door in production** to attach the actual RFP document.
 
 ### Phase-B gotchas
-- **File-upload door needs object storage (R2/S3).** `POST /api/admin/rfp-upload` puts the file to
+- **File-upload door needs object storage (R2/S3).** `POST /api/admin/rfp-curation/upload` puts the file to
   `rfp-pipeline/{oppId}/…`; without `AWS_S3_BUCKET_NAME` it 500s. Prod has R2; a bare sandbox does not —
   use the intake door (B-alt) there.
 - **Uncheck "Run Ingest Assist"** unless you want the opp published to EVERY tenant on upload (it calls

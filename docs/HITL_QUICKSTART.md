@@ -123,7 +123,7 @@ If you only have 15 minutes, run these critical-path tests:
 3. **Customer Login:** In incognito, sign in as tenant_admin (eric@ubihere.com / UbihereAdmin)
 4. **Portal Dashboard:** Verify `/portal/ubihere/dashboard` renders with company name
 5. **Cards:** Navigate to `/portal/ubihere/cards`, verify the opportunity-card feed loads (`/spotlights` redirects here)
-6. **CMS:** Navigate to `/admin/content`, verify content manager loads
+6. **CMS:** Navigate to `/admin/site`, verify content manager loads
 7. **Public Site:** Navigate to `/`, verify homepage renders
 8. **Auth Guard:** In incognito (logged out), navigate to `/admin/dashboard` -- verify redirect to `/login`
 

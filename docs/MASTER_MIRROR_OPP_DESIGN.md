@@ -304,7 +304,7 @@ The master OPP card carries an **RFP-admin-only** ledger: **who bought a portal*
 Two RFP-side passes around the customer; **manual/shadow-assisted today**, automation-driven later.
 
 **A — RFP admin, ingestor (master, Release 1):**
-1. **Ingest minimums** — `/admin/rfp-upload` (hardened: `content_hash` includes the oppId → no
+1. **Ingest minimums** — `/admin/rfp-curation/upload` (hardened: `content_hash` includes the oppId → no
    dup-title 500; S3 failure rolls back the orphan).
 1b. **Topic files → topic opportunities (multi-topic BAAs).** In the curation workspace, drop the
    individual topic files into the topic drop-zone → `POST /api/admin/upload-topic-files` →

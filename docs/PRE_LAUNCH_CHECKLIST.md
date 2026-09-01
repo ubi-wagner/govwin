@@ -55,7 +55,7 @@ insert the missing `home` memberships) before launch.
 
 ## 2. Email delivery is wired
 
-`lib/email.ts` tries **Gmail API first, then Resend, else returns `provider:'skipped'`** (a silent
+`lib/email/` tries **Gmail API first, then Resend, else returns `provider:'skipped'`** (a silent
 no-op). Nudges, final-notices, and the welcome-email-with-temp-password all depend on this. Set
 **one** provider fully.
 

@@ -1,5 +1,9 @@
 # Rate Limiting, Monitoring & Cost Model Reference
 
+> ⚠️ **DESIGN, NOT AS-BUILT — verified 2026-09-01 against the tree.** The routes it names
+> (`…/agents/config`, `…/agents/performance`) do not exist; only `…/agents/usage` does. Live spend
+> and cap enforcement is `docs/AGENT_SPEND_AND_CAPS.md` and the `/admin/agents` console.
+
 > Complete reference for rate limiting, cost estimation, usage tracking, and monitoring
 > across the platform — AI **and** system.
 > Source of truth: `frontend/lib/rate-limit.ts`, `pipeline/src/agents/fabric.py`,
