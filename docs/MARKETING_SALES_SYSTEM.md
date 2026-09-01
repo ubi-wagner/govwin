@@ -19,7 +19,7 @@ Measured, on the sandbox:
 
 | stage | table | rows | carries |
 |---|---|---|---|
-| somebody looks | `visitor_sessions` · `page_views` | 46 · 251 | referrer, **utm_source/medium/campaign**, geo, device, path history |
+| somebody looks | `visitor_sessions` · `page_views` | 46 · 251 | referrer, geo, device on the SESSION; **utm_source/medium/campaign** on each PAGE VIEW |
 | — **the sever** — | | | |
 | somebody raises a hand | `waitlist` · `applications` | 0 · 1 | email, company, `referral_source`, `source` |
 | somebody becomes a customer | `tenants` | 8 | |
@@ -97,21 +97,33 @@ what keeps this from drifting back apart.
 
 **One field, at two write sites, and the whole funnel joins.**
 
-* add `session_id text` to `waitlist` and `applications` (nullable — a person who arrives by phone
-  has no session, and that must stay a legal state rather than a fabricated one)
-* the public forms already run in the browser that owns the analytics `session_id`; pass it on
-  submit, and store it
-* index it, and add `first_touch` to the read model: `visitor_sessions` already carries `referrer`
-  and the three UTM fields
+**BUILT — migration 242.** `session_id text` on `waitlist` and `applications`, nullable, plus
+`applications.tenant_id`. The capture routes and the accept route write all three.
+
+Nullable is deliberate: somebody who phones, is met at a conference, or arrives with the referrer
+stripped has no session. A NOT NULL column would push the client into inventing one, and an
+invented attribution is worse than an absent one — indistinguishable from a real one, and it
+quietly poisons every campaign number computed from the chain.
+
+⚠️ The UTM fields are on **`page_views`**, not `visitor_sessions` — the session row carries
+referrer, geo and device, and the campaign is per page view, because a visitor can arrive on one
+campaign and return on another. Both are keyed by `session_id`, so the chain is unchanged, but a
+join written against the wrong table fails with 42703. An earlier draft of this document said
+otherwise; `drive-commercial-path` found it.
+
+Proven end to end by that drive: **`hn/launch-week → the company`**, in one join, from a campaign
+to a customer.
 
 What this buys immediately, with no other work: *which page, campaign, referrer and geography
 produced every hand raised*, and — via `applications → tenants` (Phase 1b) — every customer.
 
-**Phase 1b:** `applications` has no `tenant_id`. The accept flow creates a tenant and does not
-record which application produced it, so the join from a lead to a customer is lost at the last
-step. One column, written where the tenant is created.
-
-*Cost: small. Value: everything else in this document depends on it. Do it first.*
+**Phase 1b — BUILT.** `applications.tenant_id`, written in the same statement that records the
+accept decision, inside the same transaction that created the tenant, so the two can never
+disagree. `ON DELETE SET NULL`, not CASCADE: if a company is ever removed, the application is still
+a record that somebody applied and was accepted, and losing it would delete the evidence of the
+very conversion this column exists to measure. The migration backfills only where unambiguous — an
+accepted application whose contact email matches exactly one tenant admin; two candidates is left
+NULL rather than guessed.
 
 ### Phase 2 — `contacts`: the subject
 

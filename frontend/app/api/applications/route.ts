@@ -51,6 +51,15 @@ const ApplicationSchema = z.object({
   termsAccepted: z.literal(true),
   termsSignature: z.string().email().max(200).optional(),
   termsVersion: z.string().max(50).default('v1'),
+
+  // ── ATTRIBUTION ────────────────────────────────────────────────────────────────────────────
+  // The analytics session in the browser when this form was submitted. Optional, deliberately:
+  // somebody who phones, is met at a conference, or arrives with the referrer stripped has no
+  // session, and a required field here would push the client into inventing one. An invented
+  // attribution is worse than an absent one — it is indistinguishable from a real one, and it
+  // quietly poisons every campaign number computed from this chain. Joins to `visitor_sessions`,
+  // which already carries referrer and the three UTM fields.
+  sessionId: z.string().max(120).nullable().optional(),
 });
 
 export async function POST(request: Request) {
@@ -143,7 +152,7 @@ export async function POST(request: Request) {
         sam_registered, sam_cage_code, duns_uei,
         previous_submissions, previous_awards, previous_award_programs,
         tech_summary, tech_areas, target_programs, target_agencies, desired_outcomes,
-        motivation, referral_source,
+        motivation, referral_source, session_id,
         status, terms_accepted_at, terms_version,
         user_agent, metadata
       ) VALUES (
@@ -159,7 +168,7 @@ export async function POST(request: Request) {
         ${input.targetPrograms}::text[],
         ${input.targetAgencies}::text[],
         ${input.desiredOutcomes}::text[],
-        ${input.motivation}, ${input.referralSource},
+        ${input.motivation}, ${input.referralSource}, ${input.sessionId ?? null},
         'pending', now(), 'v1',
         ${userAgent}, ${sql.json({
           termsSignature: input.termsSignature ?? null,

@@ -176,7 +176,13 @@ export async function POST(request: Request, ctx: RouteContext) {
         SET status = 'accepted',
             reviewed_by = ${userId},
             reviewed_at = now(),
-            review_notes = ${reviewNotes || null}
+            review_notes = ${reviewNotes || null},
+            -- WHICH APPLICATION BECAME WHICH CUSTOMER. Without this the funnel loses its last
+            -- step: a lead converted, and nothing recorded what it converted INTO, so no campaign
+            -- could ever be credited with a customer. It is written in the same statement that
+            -- records the decision, inside the same transaction that created the tenant, so the
+            -- two can never disagree (migration 242).
+            tenant_id = ${tenantId}
         WHERE id = ${id}
       `;
 

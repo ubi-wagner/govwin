@@ -65,6 +65,7 @@ const COMPANY = `Drive Commercial ${STAMP}`;
 // administrator per company — and a fixed domain makes the SECOND run of this drive fail on it.
 const DOMAIN = `drive-commercial-${STAMP}.test`;
 const CONTACT = `founder@${DOMAIN}`;
+const SESSION = `drive-sess-${STAMP}`;
 
 async function main() {
   const sc = await scenario('commercial-path');
@@ -100,6 +101,8 @@ async function main() {
         previousSubmissions: 0,
         previousAwards: 0,
         referralSource: 'harness',
+        // The session the browser would have. Migration 242 carries it across the sever.
+        sessionId: SESSION,
         termsAccepted: true,
       },
     });
@@ -240,12 +243,46 @@ async function main() {
       await ctx2.close();
     }
 
-    // ══ 6 · THE ATTRIBUTION QUESTION ══════════════════════════════════════════════════════════
-    console.log('\n6 · Can we say where this customer came from?');
-    const [attr] = await sql<{ referralSource: string | null; source: string | null }[]>`
-      SELECT referral_source AS "referralSource", source FROM applications WHERE id = ${appId}::uuid`;
-    ok(attr?.referralSource === 'harness', 'what they typed is kept', attr?.referralSource ?? '—');
-    note('the SESSION that brought them is not — see docs/MARKETING_SALES_SYSTEM.md, the sever');
+    // ══ 6 · THE WHOLE CHAIN, JOINED ══════════════════════════════════════════════════════════
+    console.log('\n6 · Where did this customer come from? — the join, end to end');
+    const [attr] = await sql<{ referralSource: string | null; sessionId: string | null; tenantId: string | null }[]>`
+      SELECT referral_source AS "referralSource", session_id AS "sessionId", tenant_id AS "tenantId"
+        FROM applications WHERE id = ${appId}::uuid`;
+    ok(attr?.referralSource === 'harness', 'what they told us is kept', attr?.referralSource ?? '—');
+    ok(attr?.sessionId === SESSION, 'the SESSION that brought them is kept — the sever is closed',
+       attr?.sessionId ?? 'null');
+    ok(attr?.tenantId === tenantId, 'and the company it became is recorded',
+       `${attr?.tenantId ?? 'null'}`);
+
+    // The point of all three: one query, from a campaign to a customer. Seeded here because the
+    // sandbox has no real visitor row for this made-up session — what is being proven is that the
+    // JOIN resolves, which is the thing that did not exist before migration 242.
+    // THE UTM FIELDS LIVE ON page_views, NOT visitor_sessions. The session row carries referrer,
+    // geo and device; the campaign is per page view, because a visitor can arrive on one campaign
+    // and return on another. Both are keyed by session_id, so the chain is unchanged — but a join
+    // written against the wrong one fails with 42703, which is how this was found.
+    await sql`
+      INSERT INTO visitor_sessions (id, session_id, first_page, referrer, last_seen_at, page_count)
+      VALUES (gen_random_uuid(), ${SESSION}, '/pricing', 'https://news.ycombinator.com', now(), 3)
+      ON CONFLICT DO NOTHING`;
+    await sql`
+      INSERT INTO page_views (id, session_id, page_path, referrer, utm_source, utm_medium, utm_campaign)
+      VALUES (gen_random_uuid(), ${SESSION}, '/pricing', 'https://news.ycombinator.com',
+              'hn', 'referral', 'launch-week')`;
+    const [chain] = await sql<{ campaign: string | null; source: string | null; referrer: string | null; slug: string | null }[]>`
+      SELECT pv.utm_campaign AS campaign, pv.utm_source AS source, v.referrer, t.slug
+        FROM applications a
+        JOIN visitor_sessions v ON v.session_id = a.session_id
+        JOIN page_views pv      ON pv.session_id = a.session_id
+        JOIN tenants t          ON t.id = a.tenant_id
+       WHERE a.id = ${appId}::uuid
+       LIMIT 1`;
+    ok(!!chain, 'campaign → session → application → customer resolves in ONE join',
+       chain ? `${chain.source}/${chain.campaign} → ${chain.slug}` : 'the join found nothing');
+    sc.track('the probe visitor session', [
+      async () => (await sql`DELETE FROM page_views WHERE session_id = ${SESSION}`).count,
+      async () => (await sql`DELETE FROM visitor_sessions WHERE session_id = ${SESSION}`).count,
+    ]);
 
     await ctx.close();
   } finally {

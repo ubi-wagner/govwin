@@ -26,6 +26,8 @@ export async function POST(request: Request) {
       company_name?: string;
       website?: string;
       notes?: string;
+      /** The analytics visitor session, when the browser has one. See migration 242. */
+      session_id?: string;
     };
     try {
       body = await request.json();
@@ -62,12 +64,23 @@ export async function POST(request: Request) {
         notes: body.notes ?? null,
       });
 
+      // The analytics session that was in the browser. Optional — somebody who arrives by phone
+      // or with a stripped referrer has none, and inventing one would be worse than leaving it
+      // absent (migration 242). Joins to visitor_sessions for referrer and UTM.
+      const sessionId = typeof body.session_id === 'string' && body.session_id.trim()
+        ? body.session_id.trim().slice(0, 120) : null;
+
       const [entry] = await sql<{ id: string; createdAt: string }[]>`
-        INSERT INTO waitlist (email, company_name, metadata)
-        VALUES (${body.email.toLowerCase().trim()}, ${body.company_name ?? null}, ${metadata})
+        INSERT INTO waitlist (email, company_name, metadata, session_id)
+        VALUES (${body.email.toLowerCase().trim()}, ${body.company_name ?? null}, ${metadata},
+                ${sessionId})
         ON CONFLICT (email) DO UPDATE SET
           company_name = COALESCE(EXCLUDED.company_name, waitlist.company_name),
-          metadata = waitlist.metadata || EXCLUDED.metadata
+          metadata = waitlist.metadata || EXCLUDED.metadata,
+          -- COALESCE keeps the FIRST touch. Somebody who signs up twice was brought here once;
+          -- overwriting would credit the last campaign they happened to arrive through, which is
+          -- the attribution error most worth avoiding.
+          session_id = COALESCE(waitlist.session_id, EXCLUDED.session_id)
         RETURNING id, created_at
       `;
 
