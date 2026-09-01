@@ -44,6 +44,7 @@
 import { chromium } from 'playwright';
 import postgres from 'postgres';
 import { mkdirSync } from 'node:fs';
+import { TERMS_VERSION } from '../lib/terms';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -162,12 +163,20 @@ async function main() {
 
     // ══ 2 · IT REACHES THE SYSTEM ═════════════════════════════════════════════════════════════
     console.log('\n2 · It reaches the system — the row, the person, the event');
-    const [app] = await sql<{ id: string; status: string; sessionId: string | null; contactId: string | null }[]>`
-      SELECT id, status, session_id, contact_id FROM applications WHERE company_name = ${COMPANY}`;
+    const [app] = await sql<{ id: string; status: string; sessionId: string | null; contactId: string | null;
+      termsVersion: string | null; termsAcceptedAt: Date | null }[]>`
+      SELECT id, status, session_id, contact_id, terms_version, terms_accepted_at
+        FROM applications WHERE company_name = ${COMPANY}`;
     appId = app?.id ?? null;
     ok(!!appId, 'it lands as an application row', appId ?? 'no row');
     ok(app?.status === 'pending', 'in a state that asks a human for a decision', app?.status ?? '—');
     ok(app?.sessionId === sid, 'carrying the session that brought them', app?.sessionId ?? 'null');
+    // WHICH TERMS THEY SIGNED. This column is the evidence of what somebody agreed to, so a wrong
+    // value is worse than a refused submission — the schema used to default it to 'v1', which would
+    // have attributed to every signer an agreement to text they never saw.
+    ok(app?.termsVersion === TERMS_VERSION, 'recording the exact terms version they accepted',
+       `${app?.termsVersion ?? 'null'} (current: ${TERMS_VERSION})`);
+    ok(!!app?.termsAcceptedAt, 'with the moment of acceptance', app?.termsAcceptedAt ? 'stamped' : 'no timestamp');
 
     contactId = app?.contactId ?? null;
     ok(!!contactId, 'and a PERSON, not just an address', contactId ? 'contact linked' : 'no contact');
