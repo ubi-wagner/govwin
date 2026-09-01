@@ -104,6 +104,31 @@ everything else here. It checks references, not judgements.
 
 ---
 
+## 2e. The public surface, swept 2026-09-01
+
+Asked what else was on the punch list, I swept the part a stranger can reach. **Nothing was found
+wrong**, which is worth recording as *checked* rather than assumed:
+
+* **12 API routes answer without authentication**, and all twelve are public by design: the
+  analytics beacon, the two capture forms, the auth routes, public content, invite acceptance, two
+  file servers and two webhooks. (My first enumeration reported 20+, including
+  `/api/admin/site/*/publish` — my gate pattern did not know `requireAdmin`. The grep was
+  incomplete, not the product.)
+* **Both file servers are correctly scoped.** `/api/uploads/[...key]` serves only the `cms/` prefix
+  and rejects traversal; `/api/storage/local/[...key]` is gated on the dev-only storage driver and
+  404s in production, with the reasoning in its own header.
+* **Stripe's webhook is signature-verified** and refuses to run without `STRIPE_WEBHOOK_SECRET`.
+  **Postmark's is Basic-auth'd** on `POSTMARK_WEBHOOK_SECRET` — Postmark does not sign, so the URL
+  secret *is* the authorization.
+* **The password-reset token self-invalidates on use.** The HMAC key is
+  `AUTH_SECRET:<current password hash>`, so changing the password changes the key and the old token
+  stops validating. One-hour TTL. (I suspected a replay window because the *payload* is only
+  `userId.expiresAt`; the hash is in the key, which is the stronger construction.)
+* **No committed secrets.** The only pattern hits are inside `agents/guardrails.py` — the code that
+  detects leaked keys. No `.env` file is tracked.
+
+---
+
 ## 3. What still blocks a real customer
 
 ### 3a. ⛔ Outbound email is not switched on — the only hard blocker
