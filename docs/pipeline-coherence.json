@@ -484,6 +484,7 @@
    "adopted": [
     "app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts",
     "app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts",
+    "lib/projects/access.ts",
     "lib/projects/baseline.ts",
     "lib/projects/cdrl.ts",
     "lib/projects/clins.ts",
@@ -501,7 +502,8 @@
     "lib/projects/risks.ts",
     "lib/projects/task-attachments.ts",
     "lib/projects/time.ts",
-    "lib/projects/todos.ts"
+    "lib/projects/todos.ts",
+    "lib/projects/wbs.ts"
    ],
    "bespoke": [],
    "candidates": 22
@@ -737,6 +739,7 @@
   },
   "projects:agents": {
    "adopted": [
+    "lib/projects/access.ts",
     "lib/projects/milestones.ts"
    ],
    "bespoke": [],
