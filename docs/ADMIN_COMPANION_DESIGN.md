@@ -147,6 +147,41 @@ the guardrail gate. A bespoke chat endpoint would have to re-earn every one of t
 
 ---
 
+## 4b. The curation loop — the machine reports, the human curates, the board keeps
+
+**Decided 2026-09-01.** The nightly verification run and the notes board are deliberately NOT
+wired together, and the human is the only path between them.
+
+```
+   NIGHTLY RUN                    YOU                       THE BOARD
+   ───────────                    ───                       ─────────
+   cold-start, tsc, vitest,  ──▶  read it over coffee  ──▶  add the one or two things
+   60 drives, 2 audits            decide what matters       worth remembering
+        │                                                        │
+   push + email                                          survives every session
+   raw, complete, unfiltered                             anchored · stated · audited
+```
+
+**Why not automate the last arrow.** It is the obvious next step and it is the wrong one. A machine
+writing into the board floods a curated surface with raw output, and the signal — the two notes a
+week that actually matter — gets buried under 30 green reports. The board's whole value is that
+everything on it was worth someone's judgement. Automating entry destroys exactly that.
+
+It also keeps the human as the integrity mechanism, which is the same argument that made one ledger
+right instead of two mailboxes (§0). A note nobody chose to write is a note nobody has read.
+
+**What is actually enforced, stated honestly.** The separation today is **by instruction**, not by
+construction: the nightly's prompt tells it to report and stop, and never mentions the board — but
+it has Bash, so it *could* write one if some future prompt told it to. The real guarantee is the
+practice, not a lock. If that ever stops being enough, the fix is a narrower author check, not a
+more elaborate prompt.
+
+**Cadence is set by attention, not by cron.** Read the report daily to start. After a week you will
+know which three lines you actually look at, and *then* the run can be narrowed to those — which is
+the right order, because neither of us knows yet what a useful nightly report contains.
+
+---
+
 ## 5. Phase 3 — conversational, and why it is last
 
 Follow-up questions over the same window. Genuinely useful, and the least valuable per unit of
