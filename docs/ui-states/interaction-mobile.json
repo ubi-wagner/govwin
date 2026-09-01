@@ -14,7 +14,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-buckets__vp-phone-open.jpg",
-   "bytes": 48423
+   "bytes": 48404
   },
   {
    "lane": "tenant",
@@ -54,7 +54,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-proposals-c3db60b1-2f0e-4bc8__vp-phone-open.jpg",
-   "bytes": 108663
+   "bytes": 108523
   },
   {
    "lane": "tenant",
@@ -70,7 +70,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-rfp-curation__vp-phone-open.jpg",
-   "bytes": 223418
+   "bytes": 230612
   },
   {
    "lane": "admin",
@@ -78,7 +78,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-workflows__vp-phone-open.jpg",
-   "bytes": 1746193
+   "bytes": 1742654
   },
   {
    "lane": "admin",
@@ -86,7 +86,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-agents__vp-phone-open.jpg",
-   "bytes": 604002
+   "bytes": 603907
   },
   {
    "lane": "admin",
@@ -103,11 +103,11 @@
    "route": "/portal/foundation/cards",
    "status": 200,
    "probed": true,
-   "opened": 38,
-   "candidates": 244,
+   "opened": 39,
+   "candidates": 247,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 353
+   "smallTargets": 357
   },
   {
    "lane": "tenant",
@@ -191,11 +191,11 @@
    "route": "/admin/rfp-curation",
    "status": 200,
    "probed": true,
-   "opened": 1,
-   "candidates": 32,
+   "opened": 2,
+   "candidates": 22,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 81
+   "smallTargets": 73
   },
   {
    "lane": "admin",
@@ -206,7 +206,7 @@
    "candidates": 255,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 332
+   "smallTargets": 334
   },
   {
    "lane": "admin",
@@ -217,7 +217,7 @@
    "candidates": 2,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 52
+   "smallTargets": 54
   },
   {
    "lane": "admin",
@@ -228,7 +228,7 @@
    "candidates": 5,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 49
+   "smallTargets": 51
   }
  ]
 }

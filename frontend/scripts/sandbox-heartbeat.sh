@@ -64,7 +64,38 @@ LOG="$SCR/health.log"; STATUS="$SCR/health-status.txt"; HEART="$SCR/.heartbeat";
 ts() { date -u +'%Y-%m-%dT%H:%M:%SZ'; }
 
 emu_env() { [ "$EMULATE" = "1" ] && echo "ANTHROPIC_BASE_URL=http://127.0.0.1:${EMU_PORT} ANTHROPIC_API_KEY=emulated-claude"; }
+
+# ── STAGE static + public INTO the standalone build ─────────────────────────────────────────────
+# `next build` REPLACES `.next/standalone` wholesale and copies neither `.next/static` nor
+# `public/` into it. Next has always been like this; what makes it bite is that the two halves fail
+# DIFFERENTLY:
+#
+#   · a missing `.next/static` is loud — every chunk 404s and no page works, so it is fixed at once;
+#   · a missing `public/` is SILENT — every page renders, and only the handful of routes that embed
+#     a static asset are broken. `/admin/architecture` is a 443-char shell around an <iframe>, so it
+#     returns 200 with content and reads as a clean page; the explorer inside it is a 404.
+#
+# That is why this belongs in code and not only in CONTINUATION §2. The recipe was documented and
+# still got dropped, because a hand-run rebuild-restart cycle stages `static` (or nothing works and
+# you notice) and forgets `public` (and everything works and you don't). `oversight-surfaces` FAILED
+# the suite on exactly this — correctly: it asks for the asset itself, not for the page that frames
+# it. Called before every start, so it cannot be skipped by whoever restarts the server.
+stage_standalone() {
+  [ -d "$STANDALONE" ] || return 0
+  if [ -d "$FE/.next/static" ]; then
+    rm -rf "$STANDALONE/.next/static"
+    cp -r "$FE/.next/static" "$STANDALONE/.next/static"
+  fi
+  # `public/*` into an existing directory, NOT `cp -r public <dir>/` — the latter nests a second
+  # `public/` inside when the target already exists, and then serves nothing from either.
+  if [ -d "$FE/public" ]; then
+    mkdir -p "$STANDALONE/public"
+    cp -r "$FE"/public/. "$STANDALONE/public/"
+  fi
+}
+
 start_server() {
+  stage_standalone
   ( cd "$STANDALONE" && env \
       DATABASE_URL="$DBURL" DATABASE_URL_OWNER="$DBURL_OWNER" \
       AUTH_SECRET='dev-screenshot-secret-000' AUTH_TRUST_HOST=true \
