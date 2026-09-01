@@ -667,6 +667,19 @@ export function describeEventOrNull(ev: EventLike): string | null {
   const entry = LABELS[type];
   if (typeof entry === 'function') return entry(payload);
   if (typeof entry === 'string') return entry;
+  // ── working notes (the shared board, mig 244) ──────────────────────────────────────────────
+  if (namespace === 'system' && type === 'note.created') {
+    const who = str(payload.author);
+    const where = str(payload.anchor);
+    return `Note added${who ? ` by ${who.replace('_', ' ')}` : ''}${where ? ` on ${where}` : ''}`;
+  }
+  if (namespace === 'system' && type === 'note.advanced') {
+    return `Note moved from ${str(payload.from) ?? '?'} to ${str(payload.to) ?? '?'}`;
+  }
+  if (namespace === 'system' && type === 'note.resolved') {
+    return 'Note resolved';
+  }
+
   return null;
 }
 

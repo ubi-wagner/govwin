@@ -28,8 +28,10 @@ import { join } from 'node:path';
 
 const ROOT = process.cwd();
 
-/** Platform-scope tables with no RLS and no tenant column to scope by. */
-const PROSPECT_TABLES = ['contacts', 'applications', 'waitlist'] as const;
+/** Platform-scope tables with no RLS and no tenant column to scope by.
+ *  `working_notes` (mig 244) joins them: an ops board naming staging defects and unreleased work
+ *  is not something a customer should be able to read, and RLS cannot stop them. */
+const PROSPECT_TABLES = ['contacts', 'applications', 'waitlist', 'working_notes'] as const;
 
 /** Trees a tenant or partner can reach. None of them may name a prospect table. */
 const TENANT_TREES = [
