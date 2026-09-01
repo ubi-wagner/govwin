@@ -83,9 +83,12 @@ step now sits after "review your matched opportunities", where the bucket form's
 typing from the seeded profile. The three pieces only work as one.
 
 ### 2d. Five documented routes that 404, and a launch checklist that was wrong about security
-Runbooks and click-plans sent an operator to `/admin/rfp-upload`, `/admin/content`,
-`/admin/content/editor`, `/admin/email-outbox` and `/admin/activity` — all gone. Repointed
-(34 replacements across 7 docs).
+Runbooks and click-plans sent an operator to ~~`/admin/rfp-upload`~~, ~~`/admin/content`~~,
+~~`/admin/content/editor`~~, ~~`/admin/email-outbox`~~ and ~~`/admin/activity`~~ — all gone.
+Repointed to `/admin/rfp-curation/upload`, `/admin/site`, `/admin/crm` and `/admin/events`
+(34 replacements across 7 docs). *Struck through above because they do not exist: a document
+correcting a dead reference has to name it, and the audit reads `~~…~~` as a mention rather
+than a citation — otherwise the only way to satisfy it would be to delete the correction.*
 
 `PRE_LAUNCH_CHECKLIST.md` said *"the app runs as the RLS-bypassing owner"* and told the reader to
 schedule the `NOBYPASSRLS` cutover after go-live. That cutover landed in **migration 136**, 107
