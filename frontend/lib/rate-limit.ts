@@ -5,6 +5,16 @@
  * Suitable for single-container Railway deploys.
  * For multi-container: migrate to rate_limit_state table or Redis.
  *
+ * ⚠️ `rate_limit_state` IS A PLAN, NOT AN IMPLEMENTATION — verified 2026-09-01.
+ * That table holds three configured source limits (sam_gov 100/hr, sbir_gov 30/hr,
+ * grants_gov 50/hr) and NO code in any of the three services reads or writes it; this
+ * comment is its only mention in the tree. The limiting that actually runs is the
+ * in-memory map below, which is per-container and therefore does not hold across
+ * containers and does not defend a third-party quota the way those stored numbers imply.
+ * Said out loud because the rows LOOK like enforcement: somebody reading them would
+ * reasonably conclude the SAM.gov quota is protected. Found by
+ * `audit-producer-consumer.mjs` (docs/PRODUCER_CONSUMER_AUDIT.md).
+ *
  * Usage in middleware:
  *   if (!checkRateLimit(ip, '/api/applications', 5, 15 * 60 * 1000)) {
  *     return new NextResponse('Too many requests', { status: 429 });
