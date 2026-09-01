@@ -26,6 +26,10 @@ Measured, on the sandbox:
 | somebody pays | `purchases` | 7 | |
 | we contacted them | `email_send_ledger` | 8 | to, template, status, provider id |
 
+**The sever is closed** (migrations 242 · 243) — `session_id` on both capture tables,
+`applications.tenant_id`, and `contacts` as the subject between them. The rest of this document
+describes how, and what each decision cost.
+
 Both ends are real and populated. The middle is not missing *data* — the browser has a
 `session_id` and the analytics tables already hold everything attribution needs. It is missing
 **one write**: neither `POST /api/waitlist` nor `POST /api/applications` references the session at
@@ -129,26 +133,70 @@ NULL rather than guessed.
 
 A person, by normalised email, independent of whether they ever become a customer.
 
-* `contacts(id, email UNIQUE, name, company_name, first_session_id, first_seen_at, source, status)`
-* backfilled from `waitlist`, `applications`, `users` and `email_send_ledger.to_email`
-* `contact_id` on `waitlist` and `applications`; `contacts.tenant_id` set when they convert
-* **RLS from the same migration.** Contacts are platform scope (`tenant_id IS NULL` until
-  conversion) — an admin's prospect list is not a customer's data, and a contact who belongs to no
-  tenant yet must not be readable from a tenant context
+**BUILT — migration 243.** `contacts(id, email UNIQUE, name, company_name, first_session_id,
+first_seen_at, source)`, `contact_id` on `waitlist` and `applications`, one writer in
+`lib/contacts.ts` called by both capture routes. Three things about it came out differently from
+the sketch above, and each was a decision rather than a shortcut:
 
-This is where docs/CRM_MIGRATION_PLAN.md Phase 1 lands, unchanged in substance and now with the
-attribution chain already attached.
+**No `tenant_id`, and no `status`.** Both were in the original sketch and both duplicate a fact
+another table already owns. `applications.tenant_id` (Phase 1b) is the single answer to "which
+company did this person become"; a copy on the contact is the one that goes stale, and nothing on
+any page would show that it had. Conversion is therefore DERIVED — `contacts → applications.
+contact_id → applications.tenant_id` — and the same for status. **One fact, one writer.**
+
+`tenant_id` here is also *actively unsafe*, which is the sharper reason. It would make the RLS
+posture checker classify contacts as tenant-owned, and scoping by it would expose every contact
+with no tenant yet — the entire prospect list — to every tenant context, because
+`tenant_isolation_select` carries an `OR tenant_id IS NULL` arm. A column added for tidiness would
+hand each customer the list of everyone else considering the product.
+
+**No RLS, deliberately** — with no tenant column there is nothing for a policy to scope by.
+Protection is the app-layer admin gate, the same posture as `users` and `applications`. Because RLS
+therefore cannot catch a mistake here, `__tests__/prospect-tables-admin-only.test.ts` does: no file
+under `app/portal`, `app/api/portal`, `app/partner` or `app/api/partner` may name `contacts`,
+`applications` or `waitlist` in a query. Red-tested against a portal page that reads `contacts`.
+
+**Users are NOT a source.** The obvious backfill folds every user row in; on the sandbox that is 47
+people, almost all of them staff, seeded accounts and invited teammates. The funnel would have
+opened on "48 contacts → 1 application", a 2% conversion rate whose denominator is 98% us. The 7
+customers who predate `applications` therefore read as un-attributed, which is the truth: they
+arrived before we recorded leads. "Everyone we hold an email address for" is a different question
+and is answered by a union at read time.
 
 ### Phase 3 — the funnel view
 
-One page under Marketing & Sales that reads the spine end to end:
+**BUILT — `/admin/funnel`, with `/admin/contacts` beneath it** (and Analytics moved under the same
+banner: visitor counts are a marketing measurement, not a health metric, and filing them under
+System is the same mistake that kept the funnel severed).
 
-> sessions → hands raised → applications accepted → customers → revenue, **by source and campaign**,
+> sessions → contacts → applications → accepted → customers → revenue, **by source and campaign**,
 > with drop-off stated at each step.
 
 The rule from the Projects rollups applies here and is not negotiable: **a rate with no denominator
-reads "not measured", never a confident 0%.** A conversion rate computed over three sessions is
-noise, and a dashboard that prints it as `0.0%` invents a fact.
+reads "not measured", never a confident 0%.** It is enforced in one place —
+`conversionRate()` in `lib/contacts.ts`, which returns `null` below `RATE_FLOOR` (20) — because the
+page has nine columns that would each otherwise grow their own copy of the arithmetic. Guarded by
+`__tests__/funnel-rate-floor.test.ts`, red-tested against the naive `(num/den)*100`, whose output
+for `(0, 3)` is a confident `0.0%`.
+
+Three more properties the page will not give up:
+
+* **Coverage is stated first.** On a box where no campaign has ever been tagged, *"0 of 52 sessions
+  carry a `utm_source`"* is the single most useful fact on the page, and burying it under a table of
+  zeroes would let a reader take those zeroes for performance.
+* **The un-attributed row is shown, not dropped.** Every contact who arrived by phone or with the
+  referrer stripped is counted there, so the columns sum to the totals. A by-source table that
+  quietly omits the un-attributed majority is the most convincing wrong number this capability
+  could produce. The drive asserts the sum.
+* **A step rate carries its own numerator.** Sessions → contacts joins only through
+  `first_session_id`, so the rate is *contacts traced to a session* over sessions — not the full
+  contact count. The first version divided the whole count and rendered "1 contact · 1.9% of
+  sessions" for a person who never had a session: arithmetically fine, factually meaningless, and
+  nothing on the page said so. Found by looking at the rendered page, not by any assertion.
+
+Proven end to end by `drive-commercial-path` step 7: `hn/launch-week` → contact → application →
+customer, counted exactly once across the buckets. Red-tested by disabling `recordContact` — 5 of
+the 7 assertions fail, and the two that still pass are the two that should.
 
 ### Phase 4 — outbound to contacts
 
@@ -175,9 +223,11 @@ likely to be undone by muscle memory while anything else is half-done.
 
 ### Sequencing
 
-1 → 1b → 2 → 3 unlock each other in order and are the whole of the marketing capability. 4 depends
-on 2. 5 and 6 are independent cleanup and can happen whenever. **Nothing in 1–4 requires touching
-`cms-postgres` at all**, which is the point: the growth system is a main-database system.
+1 → 1b → 2 → 3 unlock each other in order and are the whole of the marketing capability — **all
+four are now built** (migrations 242 and 243; `/admin/funnel`, `/admin/contacts`). 4 depends on 2
+and is the next piece of work. 5 and 6 are independent cleanup and can happen whenever. **Nothing
+in 1–4 requires touching `cms-postgres` at all**, which is the point: the growth system is a
+main-database system.
 
 ---
 
@@ -226,8 +276,10 @@ Concretely, today:
 |---|---|
 | reach the site, read it, apply | ✅ works |
 | be accepted, provisioned, and build a real submission | ✅ proven end to end |
-| be attributed to a campaign | ❌ the sever |
-| be emailed as part of a list | ❌ no contacts |
+| be attributed to a campaign | ✅ migrations 242–243, proven `hn/launch-week → the company → the person` |
+| be counted honestly when they can't be attributed | ✅ the un-attributed row, and coverage stated first |
+| be listed as a person, not an address | ✅ `contacts` · `/admin/contacts` |
+| be emailed as part of a list | ⚠️ the audience exists; segmenting and sending to it is Phase 4 |
 | pay self-serve | ❌ descoped by decision — comp codes stand in |
 | receive mail at all, in production | ⚠️ Postmark configured in code, not switched on |
 
@@ -235,8 +287,11 @@ Concretely, today:
 doing the outreach, the EconDev partner channel. That is a real motion and the product supports it
 fully.
 
-**Not yet ready to run a marketing funnel**, because the funnel cannot measure itself. Phase 1 is
-small and changes that. Phase 2–3 make it a system.
+**And now able to measure a funnel**, which it could not do when this section was first written.
+What is still missing is the *sending* half: an audience exists and can be segmented by hand, but
+nothing composes a campaign against it yet (Phase 4). The measurement side is honest about its own
+limits — on a box that has never tagged a campaign the page says so at the top, in place of a table
+of zeroes that would read as performance.
 
 ### Before any launch, whatever the motion
 

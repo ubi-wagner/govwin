@@ -1,6 +1,5 @@
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 // Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool.
 // (docs/RLS_CUTOVER.md: admin/CMS reads on RLS-forced tables MUST use sqlBypass.)
 import { sqlBypass } from '@/lib/db';
@@ -185,11 +184,15 @@ export default async function AdminProjectsPage() {
                           trailing column, which put the only way to act on a project past the
                           right-hand edge at 1440px — reachable by scrolling, but the same shape as
                           the clipped primary action this tree found on the documents page. */}
-                      <Link
+                      {/* A plain anchor, NOT next/link: `/api/enter` is a route handler, not a
+                          page, so Link prefetches an RSC payload that does not exist and logs
+                          "Failed to fetch RSC payload" on every render of this table — a client
+                          throw that `verify-surfaces` fails the page on, correctly. */}
+                      <a
                         href={`/api/enter?slug=${encodeURIComponent(r.tenantSlug)}&next=${encodeURIComponent(`/portal/${r.tenantSlug}/projects/${r.id}`)}`}
                         className="block font-medium text-blue-700 hover:underline truncate"
                         title={`${r.name} — open in ${r.tenantSlug}'s own workspace`}
-                      >{r.name}</Link>
+                      >{r.name}</a>
                       {r.contractTitle && (
                         <div className="text-xs text-gray-400 truncate" title={r.contractTitle}>
                           {r.contractTitle}

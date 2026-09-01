@@ -89,7 +89,15 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **238** — mig 237 the freeze trigger that returned NEW on a DELETE and so
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **243** — migs 242/243 the
+**marketing/sales spine**: 242 closed the funnel sever (`session_id` on `waitlist`/`applications` +
+`applications.tenant_id`, so campaign → session → application → customer joins), 243 added
+`contacts` — a person by normalised email, with **deliberately no `tenant_id` and no `status`**,
+because both duplicate a fact `applications` owns AND a `tenant_id` there would expose every
+un-converted prospect to every tenant through the `OR tenant_id IS NULL` arm of
+`tenant_isolation_select`; conversion is DERIVED. `users` is NOT a backfill source — folding in 47
+staff and seeded accounts would put a denominator under every rate that is mostly us. Surfaces:
+`/admin/funnel` · `/admin/contacts` · `/admin/crm` (canonical docs/MARKETING_SALES_SYSTEM.md); mig 237 the freeze trigger that returned NEW on a DELETE and so
 cancelled it silently, leaving children without parents through a CASCADE; migs 228–236 the post-award build-out: 229 the milestone cost
 baseline after 228 collapsed `project_wbs_nodes` into `project_milestones`, 230 contract
 modifications, 231 invoicing, 232 the CDRL register, 233/234 the CLIN child-cascade correction,
@@ -460,7 +468,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (2512 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (2546 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 - **`npx tsc --noEmit` DOES NOT CHECK THE DRIVES.** `tsconfig.json` includes `**/*.ts` and

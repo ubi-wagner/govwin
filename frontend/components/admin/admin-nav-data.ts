@@ -64,6 +64,17 @@ export const ADMIN_NAV: AdminNavSection[] = [
       { href: '/admin/crm', label: 'Outbound Mail' },
       { href: '/admin/waitlist', label: 'Waitlist' },
       { href: '/admin/applications', label: 'Applications' },
+      // The two halves of "did any of it work": Funnel is the join, Contacts the people it joins,
+      // Analytics the raw visits underneath. Analytics sat under System until migrations 242/243
+      // gave it something to join to — visitor counts are a marketing measurement, not a health
+      // metric, and filing it under System is the same mistake that kept the funnel severed.
+      {
+        href: '/admin/funnel', label: 'Funnel',
+        children: [
+          { href: '/admin/contacts', label: 'Contacts' },
+          { href: '/admin/analytics', label: 'Analytics' },
+        ],
+      },
     ],
   },
   // What happens AFTER somebody buys. The dividing line is the purchase: above it we are trying to
@@ -115,7 +126,7 @@ export const ADMIN_NAV: AdminNavSection[] = [
       },
       { href: '/admin/events', label: 'Event Stream' },
       { href: '/admin/agents', label: 'Agents' },
-      { href: '/admin/analytics', label: 'Analytics' },
+      // Analytics moved to Marketing & Sales — see the note there.
       { href: '/admin/architecture', label: 'Architecture' },
     ],
   },

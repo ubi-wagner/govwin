@@ -1,6 +1,8 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-08-31 (migration head **241**, and **`main` is now at that head** — PR #213
+**Last updated:** 2026-09-01 (migration head **243** — the marketing/sales spine: 242 closed the
+funnel sever, 243 added `contacts`, the subject the CRM never had. See
+"📍 The funnel is joined" immediately below.) (2026-08-31: migration head **241**, and **`main` is now at that head** — PR #213
 merged the entire arc; see the Branch line below before doing anything else. Earlier: head **237** —
 see "The post-award build-out + doc-currency pass" below. Earlier context from 2026-08-24 at head **213** follows.) (migration head **213** — see "The isolation pass" immediately below: migs
 212/213 closed a live cross-tenant read leak across eleven proposal-spine tables, the agent workforce
@@ -21,6 +23,54 @@ commit. It carries **nothing unmerged**.
 Fetch before you push — more than one session works this branch, and they have collided (2026-08-31:
 two sessions independently built the same rename; the divergent line was preserved on a side branch
 rather than force-pushed).
+
+---
+
+## 📍 The funnel is joined (2026-09-01, migration head **243**)
+
+Canonical: **docs/MARKETING_SALES_SYSTEM.md** (design + what each decision cost) and
+**docs/CMS_CRM_CONSOLIDATION.md** (what was consolidated and why).
+
+**What shipped.** The commercial spine, end to end in the main database — no cross-database join
+anywhere in it.
+
+* **mig 242** — `session_id` on `waitlist` and `applications`, `applications.tenant_id`. One field
+  at two write sites, and the whole funnel joins: campaign → session → application → customer.
+* **mig 243** — `contacts`: a person by normalised email, whether or not they ever convert.
+  `contact_id` on both capture tables. One writer (`lib/contacts.ts`), called by both routes.
+* **`/admin/funnel`** and **`/admin/contacts`**, with Analytics moved under Marketing & Sales.
+* **`/admin/crm`** — the outbound-mail console, and the first way to LIFT a suppression.
+
+**Three decisions worth carrying forward, each of which the obvious design gets wrong:**
+
+1. **`contacts` has no `tenant_id` and no `status`.** Both duplicate a fact `applications` owns, and
+   the copy is the one that goes stale. Worse, a `tenant_id` would make RLS classify contacts as
+   tenant-owned, and scoping by it exposes every un-converted prospect to every tenant through the
+   `OR tenant_id IS NULL` arm of `tenant_isolation_select`. Conversion is DERIVED. Because RLS
+   therefore protects nothing here, `__tests__/prospect-tables-admin-only.test.ts` forbids any file
+   under `app/portal` / `app/partner` naming `contacts`, `applications` or `waitlist` in a query.
+2. **`users` is not a source for the contacts backfill.** Folding them in was 47 people, almost all
+   staff and seeded accounts, and the funnel would have opened on a 2% conversion rate whose
+   denominator was 98% us. The 7 customers predating `applications` read as un-attributed, which is
+   what they are.
+3. **A step rate must carry its own numerator.** The first funnel page divided the full contact
+   count by sessions and rendered *"1 contact · 1.9% of sessions"* for a person who never had a
+   session — arithmetically fine, factually meaningless, and no assertion could see it. **Found by
+   looking at the rendered page.** The rate is now *contacts traced to a session* over sessions,
+   and `conversionRate()` returns `null` below a floor of 20 rather than a confident `0.0%`
+   (`__tests__/funnel-rate-floor.test.ts`, red-tested against the naive expression).
+
+**Proven:** `drive-commercial-path` step 7 — `hn/launch-week` → contact → application → customer,
+counted exactly once across the buckets. Red-tested by disabling `recordContact`: 5 of 7 assertions
+fail, and the two that still pass are the two that should. `verify-surfaces` 86/86 clean (it caught
+`<Link href="/api/enter?…">` prefetching an RSC payload that does not exist — a route handler is not
+a page; use a plain `<a>`. The contacts page was also passing `?tenant=`, which `/api/enter` ignores
+in favour of `slug`, landing the admin on `/portal`).
+
+**Still open (Phase 4):** the audience exists and nothing composes a campaign against it yet.
+Bodies, templates and sequences stay in `cms-postgres`, which is what it is good at; the send goes
+through the one `lib/email` seam. And Postmark is configured in code but **not switched on** — see
+the checklist in MARKETING_SALES_SYSTEM §4.
 
 ---
 

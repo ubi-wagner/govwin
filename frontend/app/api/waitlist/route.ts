@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { emitEventSingle, systemActor } from '@/lib/events';
+import { recordContact } from '@/lib/contacts';
 
 export async function GET() {
   // Admin-only check endpoint — not needed for V1 public form
@@ -83,6 +84,26 @@ export async function POST(request: Request) {
           session_id = COALESCE(waitlist.session_id, EXCLUDED.session_id)
         RETURNING id, created_at
       `;
+
+      // The person behind the sign-up (migration 243). `recordContact` never throws — a
+      // bookkeeping failure must not cost somebody their place on the list — so a null id here
+      // leaves `waitlist.contact_id` unset and the funnel view counts the row as un-attributed,
+      // which is the honest reading.
+      const contactId = await recordContact({
+        email: body.email,
+        companyName: body.company_name ?? null,
+        sessionId: sessionId,
+        source: 'waitlist',
+      });
+      if (contactId) {
+        try {
+          await sql`
+            UPDATE waitlist SET contact_id = ${contactId}
+             WHERE id = ${entry.id} AND contact_id IS NULL`;
+        } catch (e) {
+          console.error('[waitlist] contact link failed:', e);
+        }
+      }
 
       try {
         await emitEventSingle({

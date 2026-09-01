@@ -320,6 +320,41 @@ export async function listSuppressions(limit = 200): Promise<Suppression[]> {
   }
 }
 
+/** What we have sent one person, and whether we can still reach them. */
+export interface AddressMailState {
+  sent: number;
+  suppressed: boolean;
+}
+
+/**
+ * Mail state for a batch of addresses — the contact list's "have we written to them" column.
+ *
+ * This lives here rather than in `lib/contacts.ts` because the boundary test means it: the two
+ * ledger tables are queried in exactly one directory, and a consumer that needs a number out of
+ * them asks for the number, not for the table. (Migration 215 also denies both tables to the app
+ * role, so a query written elsewhere fails at run time in whatever request reached it.)
+ *
+ * Batched deliberately: the same fact per contact, fetched per contact, is 200 round trips for a
+ * page that renders one table.
+ */
+export async function mailStateFor(emails: string[]): Promise<Map<string, AddressMailState>> {
+  const wanted = [...new Set(emails.map(normalizeAddress).filter(Boolean))];
+  const out = new Map<string, AddressMailState>();
+  if (wanted.length === 0) return out;
+  try {
+    const rows = await sqlBypass<{ email: string; sent: number; suppressed: boolean }[]>`
+      SELECT a.email,
+             (SELECT COUNT(*)::int FROM email_send_ledger e
+               WHERE LOWER(e.to_email) = a.email)                          AS sent,
+             EXISTS (SELECT 1 FROM email_suppressions s WHERE s.email = a.email) AS suppressed
+        FROM UNNEST(${wanted}::text[]) AS a(email)`;
+    for (const r of rows) out.set(r.email, { sent: r.sent, suppressed: r.suppressed });
+  } catch (err) {
+    console.error('[email/ledger] mailStateFor failed:', err);
+  }
+  return out;
+}
+
 /** Add an address to the suppression list. Idempotent — a second bounce is not an error. */
 export async function suppress(params: {
   email: string;

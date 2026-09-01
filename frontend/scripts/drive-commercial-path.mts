@@ -284,6 +284,60 @@ async function main() {
       async () => (await sql`DELETE FROM visitor_sessions WHERE session_id = ${SESSION}`).count,
     ]);
 
+    // ══ 7 · THE PERSON ═══════════════════════════════════════════════════════════════════════
+    // Migration 243 added the subject the CRM never had. The chain above joins a campaign to a
+    // COMPANY; this joins it to a PERSON, which is what an outbound list is made of. Both halves
+    // matter and they fail differently: the first breaks if a capture route drops the session, the
+    // second if it drops the contact — and the second is silent, because the application still
+    // lands and nothing on any page says a contact was missed.
+    console.log('\n7 · Who are they? — the contact, and the funnel that counts them');
+    const [ct] = await sql<{
+      id: string; email: string; name: string | null; companyName: string | null;
+      firstSessionId: string | null; source: string | null;
+    }[]>`
+      SELECT c.id, c.email, c.name, c.company_name, c.first_session_id, c.source
+        FROM contacts c JOIN applications a ON a.contact_id = c.id
+       WHERE a.id = ${appId}::uuid`;
+    ok(!!ct, 'the application is linked to a person, not just an address',
+       ct ? ct.email : 'no contact joined to the application');
+    ok(ct?.email === CONTACT.toLowerCase(), 'stored normalised, so one person is one row',
+       ct?.email ?? '—');
+    // The first-touch session is what makes the person attributable at all. Without it they fall
+    // into the un-attributed bucket on /admin/funnel — correctly, but invisibly to anyone who
+    // assumes the funnel is complete.
+    ok(ct?.firstSessionId === SESSION, 'and carries the FIRST-touch session, not the latest',
+       ct?.firstSessionId ?? 'null');
+    ok(ct?.source === 'application', 'recording how they entered our world', ct?.source ?? '—');
+
+    // Now the aggregate the admin actually reads. Copying the page's own function rather than
+    // re-typing a predicate that looks equivalent — rule (3): a hand-written expectation here
+    // manufactures confident, wrong findings (B80).
+    const { funnelBySource } = await import('../lib/contacts.ts');
+    const buckets = await funnelBySource(90);
+    const mine = buckets.find((b) => b.source === 'hn' && b.campaign === 'launch-week');
+    ok(!!mine, 'the funnel places them under the campaign that brought them',
+       mine ? `hn/launch-week: ${mine.sessions} session(s), ${mine.contacts} contact(s)` : 'no hn/launch-week bucket');
+    ok((mine?.contacts ?? 0) >= 1 && (mine?.customers ?? 0) >= 1,
+       'with the customer counted in the same row — campaign to revenue, one line',
+       mine ? `${mine.contacts} contact(s) · ${mine.customers} customer(s)` : '—');
+    // The un-attributed bucket must NOT also be counting them: a person in two buckets makes every
+    // rate on the page sum past 100% and is the exact shape of double-count a funnel cannot show.
+    const unattr = buckets.find((b) => b.source === null);
+    const totalContacts = buckets.reduce((n, b) => n + b.contacts, 0);
+    const [{ n: realContacts }] = await sql<{ n: number }[]>`
+      SELECT COUNT(*)::int AS n FROM contacts
+       WHERE first_seen_at >= now() - INTERVAL '90 days'`;
+    ok(totalContacts === realContacts,
+       'and every contact is counted exactly once across the buckets',
+       `${totalContacts} bucketed vs ${realContacts} in the window`
+       + (unattr ? ` (${unattr.contacts} un-attributed)` : ''));
+
+    if (ct?.id) {
+      sc.track('the contact', [
+        async () => (await sql`DELETE FROM contacts WHERE id = ${ct.id}::uuid`).count,
+      ]);
+    }
+
     await ctx.close();
   } finally {
     // The factory owns teardown. A scenario tenant's events ARE fixture noise rather than a

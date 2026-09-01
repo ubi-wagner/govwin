@@ -39,8 +39,8 @@ export type {
   EmailKind, EmailDriver, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult, SendStatus,
 } from './types';
 export { resolveSender } from './sender-identity';
-export { suppress, suppressionFor, findSend, lift, listSuppressions, recentSends, sendTotals } from './ledger';
-export type { LedgerSend, Suppression, LedgerRow } from './ledger';
+export { suppress, suppressionFor, findSend, lift, listSuppressions, recentSends, sendTotals, mailStateFor } from './ledger';
+export type { LedgerSend, Suppression, LedgerRow, AddressMailState } from './ledger';
 
 /** Deliberately permissive — the same shape the admin routes already validate with. */
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
