@@ -1,6 +1,12 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-09-01 (migration head **243** — the marketing/sales spine: 242 closed the
+**Last updated:** 2026-09-01 · **branch restarted from `main` at `fb203632` (PR #215 merged).**
+Doc-currency + UI-atlas + launch-gap pass — canonical **docs/LAUNCH_GAPS_2026-09-01.md**. One hard
+blocker to guided onboarding: outbound email is not switched on. Three defects fixed: the
+attribution chain was fed by nothing (no form read `_rfp_sid`), acceptance dropped the customer's
+own answers (`tenant_profiles` written zero times), and the first-run checklist had no bucket step
+plus a tick that fired on a row's existence. New instrument: `audit-doc-currency.mjs`.
+(migration head **243** — the marketing/sales spine: 242 closed the
 funnel sever, 243 added `contacts`, the subject the CRM never had. See
 "📍 The funnel is joined" immediately below.) (2026-08-31: migration head **241**, and **`main` is now at that head** — PR #213
 merged the entire arc; see the Branch line below before doing anything else. Earlier: head **237** —
