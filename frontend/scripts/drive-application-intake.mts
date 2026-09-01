@@ -20,6 +20,21 @@
  * calls the same function the ToDo surface calls, as the real admin, and requires the row to come
  * back. A task created into a bucket nobody queries is the same as no task.
  *
+ * ── BOTH SIDES, THROUGH THE UI ───────────────────────────────────────────────────────────────
+ * The first version of this drive POSTed a crafted body and asserted the ToDo by calling
+ * `listOpenTasksForActor` directly. That proves the server and the query; it does not prove that a
+ * person can do this. A form can validate, disable its own submit, or never render its success
+ * state while the endpoint behind it is perfect — and an admin page can hold the right rows and
+ * show none of them. So this now:
+ *
+ *   PUBLIC SIDE — opens /apply, types into every field, clicks the chips, walks the terms
+ *     acceptance, signs, presses Submit, and requires the SUCCESS STATE to render.
+ *   ADMIN SIDE — signs in as the real rfp_admin, opens /admin/applications and requires the
+ *     company name to be ON THE PAGE, then opens the ToDo surface and requires the ToDo to be
+ *     visible there too.
+ *
+ * Both halves are photographed, because a 200 is not evidence and neither is a row.
+ *
  * ⚠️ NOT READ-ONLY. It submits a real application. Teardown removes the application, the contact,
  * the task and the ledger row it created, and nothing else.
  *
@@ -28,9 +43,11 @@
  */
 import { chromium } from 'playwright';
 import postgres from 'postgres';
+import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const SHOTS = process.env.SHOTS_DIR || '/tmp/branch-drives';
 const DB = process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
 if (!DB) { console.error('CannotRun: DATABASE_URL_OWNER is required.'); process.exit(2); }
 
@@ -55,6 +72,7 @@ const COMPANY = `Intake Probe ${STAMP}`;
 const CONTACT = `founder@${DOMAIN}`;
 
 async function main() {
+  try { mkdirSync(SHOTS, { recursive: true }); } catch { /* exists */ }
   const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
   let appId: string | null = null;
   let contactId: string | null = null;
@@ -70,29 +88,77 @@ async function main() {
     const sid = await page.evaluate(() => { try { return sessionStorage.getItem('_rfp_sid'); } catch { return null; } });
     ok(!!sid, 'the browser carries an analytics session', sid ?? 'none');
 
-    const res = await page.evaluate(async (p) => {
-      const r = await fetch('/api/applications', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contactEmail: p.contact, contactName: 'Probe Founder', contactTitle: 'CEO',
-          companyName: p.company, companySize: '1-10', companyState: 'OH',
-          samRegistered: true, previousSubmissions: 0, previousAwards: 0,
-          techSummary: 'Additive construction for expeditionary basing, driven by the intake probe.',
-          techAreas: ['additive construction'], targetPrograms: ['sbir_phase_1'],
-          targetAgencies: ['DoD'], desiredOutcomes: ['more wins'],
-          motivation: 'production lock check', referralSource: 'harness',
-          // Copied from ApplicationSchema, not guessed: `termsAccepted` is a z.literal(true)
-          // and omitting it is a 422. The first run of this drive did exactly that, and the
-          // product was right to refuse — a field-level error naming the field is the
-          // correct behaviour, and the finding was mine.
-          termsAccepted: true, termsVersion: 'v1', termsSignature: p.contact,
-          sessionId: (() => { try { return sessionStorage.getItem('_rfp_sid'); } catch { return null; } })(),
-        }),
-      });
-      return { status: r.status, body: (await r.text()).slice(0, 200) };
-    }, { contact: CONTACT, company: COMPANY });
-    ok(res.status >= 200 && res.status < 300, 'the public form accepts the submission', `HTTP ${res.status}`);
-    if (res.status >= 300) console.log(`      · ${res.body}`);
+    // ── fill the REAL form, as a person would ────────────────────────────────────────────────
+    await page.goto(`${BASE}/apply`, { waitUntil: 'networkidle' });
+    const type = async (name: string, value: string) => {
+      const el = page.locator(`[name="${name}"]`).first();
+      if (await el.count() === 0) { ok(false, `the form has a ${name} field`, 'not found'); return; }
+      await el.fill(value);
+    };
+    await type('contactName', 'Probe Founder');
+    await type('contactEmail', CONTACT);
+    await type('contactTitle', 'CEO');
+    await type('contactPhone', '555-0100');
+    await type('companyName', COMPANY);
+    await type('companyState', 'OH');
+    await type('techSummary', 'Additive construction for expeditionary basing, driven by the intake probe.');
+    await type('motivation', 'production lock check');
+    await type('referralSource', 'harness');
+
+    // A required radio group. The first run missed it and the browser's own
+    // "Please select one of these options" tooltip is what showed up in the screenshot — the form
+    // was right, the drive was incomplete.
+    await page.locator('input[name="samRegistered"][value="yes"]').first().check();
+
+    // Chips are `<button type="button" aria-pressed>`; click by the label a person sees. The
+    // labels are taken from the component's own option arrays, not guessed — the first run tried
+    // "DoD" and "Win more federal work", neither of which exists (they are "DoD (General)" and
+    // "Daily opportunity Spotlight"), and a chip that does not match is silently not selected.
+    for (const label of ['Materials / Manufacturing', 'SBIR Phase I', 'DoD (General)',
+                         'Daily opportunity Spotlight']) {
+      const chip = page.getByRole('button', { name: label, exact: true }).first();
+      ok(await chip.count() > 0, `the "${label}" option is on the form`,
+         await chip.count() > 0 ? '' : 'no such chip — the drive and the form disagree');
+      if (await chip.count() > 0) await chip.click();
+    }
+
+    // ── SCROLL-TO-ACCEPT ─────────────────────────────────────────────────────────────────────
+    // The Terms panel says "Please scroll to the bottom of the Terms & Conditions to continue",
+    // and the signature field + I Accept only exist once `tcScrolledToBottom` is true
+    // (scrollTop + clientHeight >= scrollHeight - 50).
+    //
+    // THIS IS WHY DRIVING THE UI MATTERS. A crafted POST sends `termsAccepted: true` and never
+    // meets this gate at all, so the previous version of this drive proved a path no applicant
+    // can take. Scroll the container the way a person scrolls it.
+    // The scrollable div only EXISTS once the panel is opened (`tcOpen`), so the button comes
+    // first. Removing this click while rewriting is what made the previous run report "no
+    // scrollable T&C container" — the container was not hidden, it was not rendered.
+    const review = page.getByRole('button', { name: /Review Terms/i }).first();
+    if (await review.count() > 0) { await review.click(); await page.waitForTimeout(400); }
+    const tc = page.locator('div.max-h-80.overflow-y-auto').first();
+    const tcCount = await tc.count();
+    ok(tcCount > 0, 'opening the panel renders the scrollable Terms',
+       tcCount > 0 ? '' : 'no scrollable T&C container after clicking Review');
+    if (tcCount > 0) {
+      await tc.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+      await page.waitForTimeout(500);
+    }
+    const sig = page.locator('input[type="email"]').last();
+    if (await sig.count() > 0) await sig.fill(CONTACT).catch(() => {});
+    const accept = page.getByRole('button', { name: 'I Accept', exact: true }).first();
+    ok(await accept.count() > 0, 'scrolling the terms reveals I Accept — the gate opens',
+       await accept.count() > 0 ? 'I Accept present after scroll' : 'still no I Accept after scrolling to the bottom');
+    if (await accept.count() > 0) await accept.click();
+
+    await page.getByRole('button', { name: /submit|apply/i }).last().click();
+    // The SUCCESS STATE, not the network response: a form that posts and never tells the applicant
+    // is a broken form with a perfect endpoint.
+    const landed = await page.getByText(/Thanks for applying/i).first()
+      .waitFor({ timeout: 15000 }).then(() => true).catch(() => false);
+    ok(landed, 'the applicant is told it worked — the success state renders',
+       landed ? '"Thanks for applying"' : 'no success state; the page still shows the form');
+    if (!landed) console.log(`      · ${(await page.textContent('body') ?? '').replace(/\s+/g, ' ').slice(0, 240)}`);
+    await page.screenshot({ path: `${SHOTS}/intake-1-public.png`, fullPage: true });
 
     // ══ 2 · IT REACHES THE SYSTEM ═════════════════════════════════════════════════════════════
     console.log('\n2 · It reaches the system — the row, the person, the event');
@@ -145,6 +211,62 @@ async function main() {
       ok(!!mine, `the admin's own ToDo query returns it (${admin.email})`,
          mine ? `${seen.length} open item(s), this one among them`
               : `${seen.length} open item(s), NOT including this one — created into a bucket nobody queries`);
+
+      // ══ 4 · THE ADMIN SIDE, ON THE ACTUAL PAGES ═════════════════════════════════════════════
+      // The query returning the row and a person SEEING it are different claims. A page can hold
+      // the right rows and render none of them — that is exactly how /admin/storage shipped a red
+      // error banner past every lens (B131). So: sign in as the real admin and read the screen.
+      console.log('\n4 · The admin side — signed in, on the pages a person actually opens');
+      const ap = await (await browser.newContext()).newPage();
+      await ap.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+      await ap.waitForSelector('#email', { timeout: 20000 });
+      await ap.fill('#email', admin.email);
+      await ap.fill('#password', process.env.ADMIN_PW || process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!');
+      await ap.click('button[type="submit"]');
+      await ap.waitForLoadState('networkidle').catch(() => {});
+      await ap.waitForTimeout(2500);
+      if (ap.url().includes('/login')) {
+        console.log('  CANT-RUN could not sign the admin in — the page assertions are UNCHECKED, not passing.');
+        failed += 1;
+      } else {
+        await ap.goto(`${BASE}/admin/applications`, { waitUntil: 'networkidle' });
+        const appsText = (await ap.textContent('body')) ?? '';
+        ok(appsText.includes(COMPANY), 'the application is ON the admin applications page',
+           appsText.includes(COMPANY) ? COMPANY : 'the company name is not in the rendered page');
+        // Scoped to THIS application, by PROXIMITY rather than by container.
+        //
+        // Two earlier versions of this assertion were wrong in opposite directions. The first
+        // tested the whole page for /pending/i and passed with no application at all, because the
+        // page carries a "1 pending review" summary — an assertion that cannot fail is not an
+        // assertion. The second scoped to `tr, li, [data-application-id]` and found nothing,
+        // because the page renders applications as CARDS, not table rows.
+        //
+        // What "this one is pending" means on a card layout is that the badge sits next to the
+        // name, so that is what this measures: the status within 200 characters of the company.
+        const idx = appsText.indexOf(COMPANY);
+        const near = idx >= 0 ? appsText.slice(idx, idx + 200) : '';
+        ok(/pending/i.test(near), 'and THAT application is shown as awaiting a decision',
+           near ? near.replace(/\s+/g, ' ').slice(0, 70) : 'the company is not in the page text');
+        await ap.screenshot({ path: `${SHOTS}/intake-2-admin-applications.png`, fullPage: true });
+
+        // The ToDo surface. The dashboard renders the queue an admin actually works from.
+        await ap.goto(`${BASE}/admin/dashboard`, { waitUntil: 'networkidle' });
+        let todoText = (await ap.textContent('body')) ?? '';
+        if (!todoText.includes(COMPANY)) {
+          // The queue may live behind the bell / a drawer rather than on the dashboard body.
+          const bell = ap.getByRole('button', { name: /to-?do|task|notification/i }).first();
+          if (await bell.count() > 0) { await bell.click().catch(() => {}); await ap.waitForTimeout(1200); }
+          todoText = (await ap.textContent('body')) ?? '';
+        }
+        ok(todoText.includes(COMPANY) || todoText.includes('Review application'),
+           'and the ToDo is VISIBLE to the admin on their own queue',
+           todoText.includes(COMPANY) ? 'the company is named in the queue'
+             : todoText.includes('Review application') ? 'the triage item is listed'
+             : 'the ToDo exists in the database but does not reach the admin\'s screen');
+        await ap.screenshot({ path: `${SHOTS}/intake-3-admin-todo.png`, fullPage: true });
+        console.log(`      · screenshots in ${SHOTS}/intake-{1-public,2-admin-applications,3-admin-todo}.png`);
+      }
+      await ap.close();
     }
 
     // ── and the email, which is the notification rather than the ledger ──────────────────────
@@ -170,6 +292,13 @@ async function main() {
     try {
       if (appId) {
         await sql`DELETE FROM tasks WHERE entity_type = 'application' AND entity_id = ${appId}`;
+        // The route's triage ToDo is not the only one. The ACTIVE automation rule "Admin alert on
+        // new application" also raises a `broadcast` note on capture:application.submitted, keyed
+        // to nothing this drive owns — so three runs left three of them sitting in the admin's
+        // queue before this line existed. Remove only notes raised while this probe was running.
+        await sql`DELETE FROM tasks
+                   WHERE task_type = 'broadcast' AND title LIKE 'Automation: capture.application%'
+                     AND created_at >= ${new Date(STAMP - 60_000)}`;
         await sql`DELETE FROM email_send_ledger WHERE idempotency_key LIKE ${'%' + appId + '%'}`;
         await sql`DELETE FROM system_events WHERE payload->>'applicationId' = ${appId}`;
         await sql`DELETE FROM applications WHERE id = ${appId}::uuid`;
