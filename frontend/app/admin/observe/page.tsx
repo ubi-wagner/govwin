@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { observe, clampWindow, type Observation } from '@/lib/observe';
+import CompanionButton from '@/components/admin/companion-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,11 +20,16 @@ export const dynamic = 'force-dynamic';
  * seventh. A column recorded v1 for a v4 signature. In each case the page said "done" and was
  * telling the truth about the only thing it knew.
  *
- * ── NO AI, ON PURPOSE ────────────────────────────────────────────────────────────────────────
- * Every finding here is arithmetic — a start with no end, a reserve with no confirm, a task
- * assigned to a role no queue reads. That makes it free to run, correct when the model is down,
- * and testable. The advisory pass over these observations is a separate, later thing
- * (docs/ADMIN_COMPANION_DESIGN.md §4), and it will only ever be as good as this is.
+ * ── THE FINDINGS ARE ARITHMETIC; THE COMPANION IS JUDGEMENT ──────────────────────────────────
+ * Every finding computed HERE is countable — a start with no end, a reserve with no confirm, a
+ * task assigned to a role no queue reads. That makes it free to run, correct when the model is
+ * down, and testable, which is why it stays deterministic and why the companion does not repeat it.
+ *
+ * The companion button reads the same window and says what counting cannot catch: a sequence that
+ * completed but skipped the step the next screen needs, a thing that is right today only because a
+ * value happened to be null. It is advisory, it runs under the platform spend caps as an
+ * archetype, and it is instructed never to reassure — an empty window means nothing happened, not
+ * that nothing is wrong. docs/ADMIN_COMPANION_DESIGN.md §4.
  */
 
 const WINDOWS = [5, 15, 60, 240];
@@ -98,6 +104,10 @@ export default async function ObservePage({
 
       {o && (
         <>
+          {/* The companion sits ABOVE the arithmetic, because it reads what counting cannot
+              catch — and below the window's own findings, because those are free and always right. */}
+          <div className="mb-5"><CompanionButton minutes={mins} /></div>
+
           {/* ── the discrepancies, first, because they are the point ─────────────────────── */}
           <section className="mb-6" data-testid="observe-discrepancies">
             {findings.length === 0 && notes.length === 0 ? (

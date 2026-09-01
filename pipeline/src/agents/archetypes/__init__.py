@@ -32,6 +32,7 @@ from .proposal_manager import ProposalManagerArchetype
 from .status_narrator import StatusNarratorArchetype
 from .redaction_guard import RedactionGuardArchetype
 from .research_scout import ResearchScoutArchetype
+from .ops_companion import OpsCompanionArchetype
 from .rfp_ingest_manager import RfpIngestManagerArchetype
 from .scoring_strategist import ScoringStrategistArchetype
 from .section_drafter import SectionDrafterArchetype
@@ -73,6 +74,7 @@ __all__ = [
     "StatusNarratorArchetype",
     "RedactionGuardArchetype",
     "ResearchScoutArchetype",
+    "OpsCompanionArchetype",
     "RfpIngestManagerArchetype",
     "ScoringStrategistArchetype",
     "SectionDrafterArchetype",
