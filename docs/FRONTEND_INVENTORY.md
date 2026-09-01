@@ -13,21 +13,21 @@
 
 | kind | files | lines |
 |---|---:|---:|
-| api-route | 284 | 43,026 |
+| api-route | 285 | 43,199 |
 | app-boundary | 5 | 132 |
-| app-component | 26 | 8,960 |
+| app-component | 26 | 9,173 |
 | auth | 2 | 241 |
-| component | 178 | 45,654 |
+| component | 180 | 46,141 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 461 |
-| lib | 328 | 68,834 |
+| lib | 329 | 69,083 |
 | middleware | 1 | 330 |
 | other | 4 | 157 |
-| page | 119 | 18,721 |
-| script | 202 | 30,642 |
+| page | 120 | 19,201 |
+| script | 208 | 32,308 |
 | server-action | 1 | 45 |
-| test | 236 | 33,125 |
-| **total** | **1473** | **260,192** |
+| test | 240 | 33,565 |
+| **total** | **1488** | **263,900** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -50,7 +50,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/admin/billing` | app/admin/billing/page.tsx | server | — | rfp_admin | auth | — | StatCard, Link | yes |
 | `/admin/cards` | app/admin/cards/page.tsx | server | — | rfp_admin | auth | — | IntakeStageStrip, MasterCards | yes |
 | `/admin/command` | app/admin/command/page.tsx | server | — | rfp_admin | auth | — | EmptyLane, Link, OpportunityLanes, TaskQueue, TenantSurfacedList, OpsDigestCard, SystemList, CommandTabs | yes |
-| `/admin/crm` | app/admin/crm/page.tsx | server | — | rfp_admin | — | — | — | yes |
+| `/admin/crm` | app/admin/crm/page.tsx | server | — | rfp_admin | auth | — | SuppressionList | yes |
 | `/admin/dashboard` | app/admin/dashboard/page.tsx | server | — | rfp_admin | auth | — | StatCard, TaskQueue, Link | yes |
 | `/admin/documents` | app/admin/documents/page.tsx | server | — | rfp_admin | auth | — | DocumentListClient | yes |
 | `/admin/documents/[documentId]` | app/admin/documents/[documentId]/page.tsx | client | [documentId] | rfp_admin | — | — | CanvasEditor | yes |
@@ -62,6 +62,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/admin/pipeline` | app/admin/pipeline/page.tsx | server | — | rfp_admin | auth | — | — | yes |
 | `/admin/process` | app/admin/process/page.tsx | server | — | rfp_admin | auth | — | Link, ProcessMonitorClient | yes |
 | `/admin/processes` | app/admin/processes/page.tsx | server | — | rfp_admin | auth | — | AdminProcessesClient | yes |
+| `/admin/projects` | app/admin/projects/page.tsx | server | — | rfp_admin | auth | runInTenant | Link, Measure | yes |
 | `/admin/proposals` | app/admin/proposals/page.tsx | server | — | rfp_admin | auth | — | Link | yes |
 | `/admin/provisioning` | app/admin/provisioning/page.tsx | server | — | rfp_admin | auth | — | Link, SlaCountdown, InstantReleaseButton | yes |
 | `/admin/provisioning/[portalId]` | app/admin/provisioning/[portalId]/page.tsx | server | [portalId] | rfp_admin | auth | — | StatusBadge, ReadinessBars, SlaBlock, ReleasePanel, CurationNotesPanel, Row, SlaCountdown | yes |
@@ -83,7 +84,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/admin/templates` | app/admin/templates/page.tsx | client | — | rfp_admin | — | — | Link, TemplatePreviewer | yes |
 | `/admin/templates/[templateId]/edit` | app/admin/templates/[templateId]/edit/page.tsx | server | [templateId] | rfp_admin | auth | — | TemplateCanvasEditor | yes |
 | `/admin/tenants` | app/admin/tenants/page.tsx | server | — | rfp_admin | auth | — | CreatePartnerOrgForm, NewCompanyForm, Link | yes |
-| `/admin/tenants/[tenantId]` | app/admin/tenants/[tenantId]/page.tsx | server | [tenantId] | rfp_admin | auth | — | Link, TenantArchiveControl, StatCard, TenantAiConfigCard | yes |
+| `/admin/tenants/[tenantId]` | app/admin/tenants/[tenantId]/page.tsx | server | [tenantId] | rfp_admin | auth | — | Link, TenantArchiveControl, StatCard, TenantDetailsEditor, TenantAiConfigCard | yes |
 | `/admin/waitlist` | app/admin/waitlist/page.tsx | server | — | rfp_admin | auth | — | Link | yes |
 | `/admin/workflows` | app/admin/workflows/page.tsx | server | — | rfp_admin | auth | — | Link, LaunchContentClient, LaunchCollaborationClient, WorkflowMonitorClient | yes |
 | `/apply` | app/(marketing)/apply/page.tsx | server | — | — (public) | — | — | ApplicationForm, CustomSections | NO |
@@ -182,6 +183,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/admin/documents/[documentId]` | DELETE GET PUT | app/api/admin/documents/[documentId]/route.ts | rfp_admin | auth | — | — | 6 |
 | `/api/admin/documents/[documentId]/export` | POST | app/api/admin/documents/[documentId]/export/route.ts | rfp_admin | auth | — | — | 4 |
 | `/api/admin/documents/upload-image` | POST | app/api/admin/documents/upload-image/route.ts | rfp_admin | auth | — | — | 2 |
+| `/api/admin/email/suppressions` | DELETE GET | app/api/admin/email/suppressions/route.ts | rfp_admin | auth | — | — | 3 |
 | `/api/admin/event-brackets/sweep` | POST | app/api/admin/event-brackets/sweep/route.ts | rfp_admin | auth | — | — | 2 |
 | `/api/admin/expert-time/availability` | DELETE GET POST | app/api/admin/expert-time/availability/route.ts | rfp_admin | requireAdmin | — | — | 6 |
 | `/api/admin/extract-topics` | POST | app/api/admin/extract-topics/route.ts | rfp_admin | auth | — | — | 3 |
@@ -198,7 +200,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/admin/provisioning/[portalId]/release` | POST | app/api/admin/provisioning/[portalId]/release/route.ts | rfp_admin | auth | — | 0×sql 3×bypass | 2 |
 | `/api/admin/reconcile-cards` | POST | app/api/admin/reconcile-cards/route.ts | rfp_admin | auth | — | — | 2 |
 | `/api/admin/rfp-curation` | GET | app/api/admin/rfp-curation/route.ts | rfp_admin | auth | — | 2×sql | 2 |
-| `/api/admin/rfp-curation/[solId]` | GET PATCH | app/api/admin/rfp-curation/[solId]/route.ts | rfp_admin | auth | — | 8×sql | 7 |
+| `/api/admin/rfp-curation/[solId]` | GET PATCH | app/api/admin/rfp-curation/[solId]/route.ts | rfp_admin | auth | — | 10×sql | 7 |
 | `/api/admin/rfp-curation/[solId]/amendments` | GET POST | app/api/admin/rfp-curation/[solId]/amendments/route.ts | rfp_admin | auth, requireAdmin | — | 3×sql | 7 |
 | `/api/admin/rfp-curation/[solId]/amendments/[amendmentId]` | POST | app/api/admin/rfp-curation/[solId]/amendments/[amendmentId]/route.ts | rfp_admin | auth | — | — | 3 |
 | `/api/admin/rfp-curation/[solId]/annotations` | GET POST | app/api/admin/rfp-curation/[solId]/annotations/route.ts | rfp_admin | auth | — | 3×sql | 6 |
@@ -277,7 +279,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/cms/revalidate` | POST | app/api/cms/revalidate/route.ts | — (public) | auth | — | — | 2 |
 | `/api/command/seen` | POST | app/api/command/seen/route.ts | — (public) | auth | — | — | 2 |
 | `/api/consent` | POST | app/api/consent/route.ts | — (public) | auth | — | — | 4 |
-| `/api/content/[slug]` | GET | app/api/content/[slug]/route.ts | — (public) | — | — | 1×sql | 1 |
+| `/api/content/[slug]` | GET | app/api/content/[slug]/route.ts | — (public) | — | — | — | 1 |
 | `/api/enter` | GET | app/api/enter/route.ts | — (public) | auth | — | — | 0 |
 | `/api/events` | GET POST | app/api/events/route.ts | — (public) | auth | — | 3×sql | 5 |
 | `/api/health` | GET | app/api/health/route.ts | — (public) | — | — | 1×sql | 3 |
@@ -447,7 +449,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/webhooks/postmark` | POST | app/api/webhooks/postmark/route.ts | — (public) | — | — | — | 3 |
 | `/blog/feed.xml` | GET | app/blog/feed.xml/route.ts | — (public) | — | — | — | 0 |
 
-## 4. Components — 178 files
+## 4. Components — 180 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -478,11 +480,13 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | components/admin/region-list.tsx | client | RegionList | — | n/a |
 | components/admin/source-card-actions.tsx | client | SourcesHub | — | n/a |
 | components/admin/stat-card.tsx | client | StatCard | — | n/a |
+| components/admin/suppression-list.tsx | client | SuppressionList | — | n/a |
 | components/admin/template-canvas-editor.tsx | client | TemplateCanvasEditor | — | n/a |
 | components/admin/template-picker.tsx | client | TemplatePicker | — | n/a |
 | components/admin/template-previewer.tsx | client | TemplatePreviewer | — | n/a |
 | components/admin/tenant-ai-config-card.tsx | client | TenantAiConfigCard | — | n/a |
 | components/admin/tenant-archive-control.tsx | client | TenantArchiveControl | — | n/a |
+| components/admin/tenant-details-editor.tsx | client | TenantDetailsEditor | — | n/a |
 | components/analytics/tracker.tsx | client | Tracker | — | n/a |
 | components/atomization/atom-bubble-rail.tsx | client | AtomBubbleRail | — | n/a |
 | components/auth/change-password-form.tsx | client | ChangePasswordForm | — | n/a |
@@ -661,7 +665,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 328 files
+## 6. Library modules — 329 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -703,7 +707,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/cards/card.ts | server | coerceOriginCard, getProposalCard, getComplianceSummary | 2 | vitest |
 | lib/cards/score-tenant.ts | server | scoreTenantCards | 1 | vitest |
 | lib/clean-text.ts | server | cleanText, deepCleanStrings, cleanNodes | — | **none** |
-| lib/cms.ts | server | getPublishedContent, getContentBySlug, getContentBySlugAdmin, getContentByIdAdmin, getContentBlocks, getPageBlocks +4 | 18 | **none** |
+| lib/cms.ts | server | getPublishedContent, getContentBySlug, getPageBlocks, buildLookup, single, many +1 | 6 | **none** |
 | lib/command/seen.ts | server | getCommandSeen, markCommandSeen, isNew, isValidScope, KNOWN_TABS | 2 | **none** |
 | lib/compliance-resolver.ts | server | resolveTopicCompliance | 7 | vitest |
 | lib/compliance/shred-audit.ts | server | splitSentences, salientTerms, auditShredCompleteness | 3 | **none** |
@@ -711,7 +715,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/content-canvas.ts | server | docBodyFromCanvas, parseBodyToNodes, canvasFromDocBody, newContentCanvas | — | vitest |
 | lib/crypto.ts | server | encryptApiKey, decryptApiKey, keyHint | — | **none** |
 | lib/curation/republish.ts | server | republishSolicitationCards, activateLateTopicIfReady | 4 | vitest |
-| lib/db.ts | server | enterTenant, enterBypass, sqlBypass, sql, getTenantBySlug, verifyTenantAccess +3 | 6 | vitest |
+| lib/db.ts | server | enterTenant, enterBypass, sqlBypass, sql, getTenantBySlug, verifyTenantAccess +2 | 5 | vitest |
 | lib/documents/atomize-on-export.ts | server | atomizeDocumentOnExport | 2 | **none** |
 | lib/documents/duplicate-past-proposal.ts | server | duplicatePastProposalAtoms | — | **none** |
 | lib/documents/lock-document.ts | server | lockDocumentAndPromote | — | **none** |
@@ -719,13 +723,13 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/email-templates.ts | server | applicationAcceptedEmail, applicationRejectedEmail, welcomeOnboardedEmail, adminNewApplicationAlert, spotlightDigestEmail, collaboratorInviteEmail +1 | — | **none** |
 | lib/email/drivers/gmail.ts | server | gmailDriver | — | vitest |
 | lib/email/drivers/postmark.ts | server | postmarkDriver | — | vitest |
-| lib/email/index.ts | server | EmailKind, EmailDriver, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult +8 | — | **none** |
-| lib/email/ledger.ts | server | normalizeAddress, suppressionFor, reserve, confirm, recordSuppressed, findSend +1 | 7 | vitest |
+| lib/email/index.ts | server | EmailKind, EmailDriver, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult +14 | — | **none** |
+| lib/email/ledger.ts | server | normalizeAddress, suppressionFor, reserve, confirm, recordSuppressed, findSend +5 | 11 | vitest |
 | lib/email/sender-identity.ts | server | isDefaultPlatformSender, resolveSender, formatFrom | — | vitest |
 | lib/email/types.ts | server | — | — | vitest |
 | lib/embeddings.ts | server | EMBED_DIM, activeEmbedModel, embeddingsEnabled, embedContentHash, toVectorLiteral, isUsableVector +3 | — | vitest |
 | lib/errors.ts | server | AppError, UnauthenticatedError, ForbiddenError, NotFoundError, ConflictError, ClaimConflictError +7 | — | vitest |
-| lib/event-labels.ts | server | describeEvent, eventHref, isNotifyWorthyPhase | — | vitest |
+| lib/event-labels.ts | server | describeEventOrNull, describeEvent, hasWrittenLabel, eventHref, isNotifyWorthyPhase | — | vitest |
 | lib/event-namespaces.ts | server | EVENT_NAMESPACES, FORBIDDEN_NAMESPACES | — | vitest |
 | lib/events.ts | server | EVENT_NAMESPACES, FORBIDDEN_NAMESPACES, EventNamespace, userActor, systemActor, pipelineActor +7 | 7 | vitest |
 | lib/export/artifact-export.ts | server | EXPORT_FORMATS, CONTENT_TYPE, resolveArtifactFormat, assembleArtifactCanvas, renderCanvas, assembleFittedArtifactCanvas | — | vitest |
@@ -739,6 +743,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/export/pptx-exporter.ts | server | exportToPptx | — | vitest |
 | lib/export/xlsx-exporter.ts | server | exportToXlsx | — | vitest |
 | lib/extract-topics.ts | server | extractTopicsForSolicitation | 3 | **none** |
+| lib/fmt.ts | server | fmtDate, fmtDateTime, fmtShortDateTime, fmtNum, fmtMoney | — | **none** |
 | lib/geoip.ts | server | isPublicIp, lookupIp | — | **none** |
 | lib/google-calendar.ts | server | createCalendarEvent, createDeadlineReminder | — | **none** |
 | lib/guardrail-defaults.ts | server | recommendedGuardrails | — | vitest |
@@ -1023,13 +1028,13 @@ statement is per-layer, not one number.
 
 | layer | population | reached by | not reached |
 |---|---:|---|---:|
-| pages | 119 | verify-surfaces (admin + portal trees) | 35 |
-| API routes (GET) | 155 | verify-api-contract | see that lens's own accounting |
-| API routes (write verbs) | 222 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 328 | vitest 189 · sweep-mold-quality 39 | 100 |
-| components | 204 | only transitively, via a page that renders them | not measured |
+| pages | 120 | verify-surfaces (admin + portal trees) | 35 |
+| API routes (GET) | 156 | verify-api-contract | see that lens's own accounting |
+| API routes (write verbs) | 223 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
+| lib modules | 329 | vitest 189 · sweep-mold-quality 39 | 101 |
+| components | 206 | only transitively, via a page that renders them | not measured |
 
-**The write verbs are the real gap.** 222 routes expose a POST/PATCH/PUT/DELETE and no lens
+**The write verbs are the real gap.** 223 routes expose a POST/PATCH/PUT/DELETE and no lens
 walks them: `verify-api-contract` is GET-only by construction (calling every write verb would
 mutate the box it is measuring), and `verify-db-crud` proves a hand-picked set of invariants
 rather than enumerating routes. That is a defensible design and an unstated scope — written
@@ -1043,7 +1048,6 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/content-admin.ts` — 515 lines
 - `lib/email-templates.ts` — 385 lines
 - `lib/pdf/page-capture.ts` — 363 lines
-- `lib/cms.ts` — 357 lines
 - `lib/vaults/vaults.ts` — 339 lines
 - `lib/scout/candidates.ts` — 320 lines
 - `lib/proposal-ai-review.ts` — 315 lines
@@ -1051,13 +1055,14 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/admin/review-queue.ts` — 294 lines
 - `lib/extract-topics.ts` — 277 lines
 - `lib/opportunity-pin.ts` — 275 lines
+- `lib/cms.ts` — 267 lines
 - `lib/proposal/volume-facts.ts` — 248 lines
 - `lib/api-helpers.ts` — 246 lines
-- `lib/projects/project.ts` — 244 lines
 - `lib/tools/opportunity-update-topic.ts` — 239 lines
 - `lib/amendments.ts` — 238 lines
 - `lib/page-content/pricing.ts` — 238 lines
 - `lib/proposal/lock-section.ts` — 237 lines
+- `lib/projects/project.ts` — 236 lines
 - `lib/page-content/theExpert.ts` — 235 lines
 - `lib/calendar.ts` — 231 lines
 - `lib/ingest/materialize.ts` — 223 lines
@@ -1066,17 +1071,17 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/tools/curation-memory.ts` — 204 lines
 - `lib/provisioning/release-portal.ts` — 200 lines
 - `lib/tools/opportunity-add-topic.ts` — 198 lines
-- `lib/projects/task-attachments.ts` — 193 lines
 - `lib/atomize-capture.ts` — 192 lines
-- `lib/projects/clins.ts` — 192 lines
 - `lib/tools/memory-search.ts` — 191 lines
 - `lib/analytics-admin.ts` — 188 lines
+- `lib/projects/clins.ts` — 188 lines
 - `lib/automation/triggers.ts` — 187 lines
 - `lib/tenants/create-tenant.ts` — 187 lines
 - `lib/projects/traceability.ts` — 186 lines
-- `lib/projects/closeout.ts` — 185 lines
 - `lib/proposal-visual-review.ts` — 185 lines
+- `lib/projects/task-attachments.ts` — 183 lines
 - `lib/tools/library-search-atoms.ts` — 182 lines
+- `lib/projects/closeout.ts` — 177 lines
 - `lib/page-content/howItWorks.ts` — 176 lines
 - `lib/tools/memory-write.ts` — 175 lines
 - `lib/proposal-archive.ts` — 174 lines
@@ -1108,6 +1113,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/template-stable-sync.ts` — 90 lines
 - `lib/export/pdf-exporter.ts` — 85 lines
 - `lib/projects/narrative-read.ts` — 81 lines
+- `lib/fmt.ts` — 80 lines
 - `lib/documents/duplicate-past-proposal.ts` — 75 lines
 - `lib/library/starter-offer.ts` — 75 lines
 - `lib/import/xlsx-reader.ts` — 73 lines

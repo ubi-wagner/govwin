@@ -14,7 +14,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-buckets__vp-phone-open.jpg",
-   "bytes": 48425
+   "bytes": 48411
   },
   {
    "lane": "tenant",
@@ -78,7 +78,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-workflows__vp-phone-open.jpg",
-   "bytes": 1537399
+   "bytes": 1657749
   },
   {
    "lane": "admin",
@@ -86,7 +86,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-agents__vp-phone-open.jpg",
-   "bytes": 604013
+   "bytes": 603880
   },
   {
    "lane": "admin",
@@ -94,7 +94,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-templates__vp-phone-open.jpg",
-   "bytes": 73732
+   "bytes": 73463
   }
  ],
  "summary": [
@@ -104,10 +104,10 @@
    "status": 200,
    "probed": true,
    "opened": 37,
-   "candidates": 235,
+   "candidates": 238,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 341
+   "smallTargets": 345
   },
   {
    "lane": "tenant",
@@ -202,11 +202,11 @@
    "route": "/admin/workflows",
    "status": 200,
    "probed": true,
-   "opened": 20,
-   "candidates": 225,
+   "opened": 23,
+   "candidates": 243,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 302
+   "smallTargets": 320
   },
   {
    "lane": "admin",

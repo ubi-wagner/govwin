@@ -4,7 +4,6 @@
  *
  * Auth: master_admin or rfp_admin.
  *
- * V1 TODO (P2-23): Implement tenant CRUD.
  */
 
 import { NextResponse } from 'next/server';

@@ -6,7 +6,6 @@
  *
  * Auth: master_admin or rfp_admin.
  *
- * V1 TODO (P2-21): Implement agent monitoring queries.
  */
 
 import { NextResponse } from 'next/server';
