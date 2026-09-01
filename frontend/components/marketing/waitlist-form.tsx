@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { visitorSessionId } from '@/lib/visitor-session';
 
 /**
  * Soft lead-capture for not-ready prospects — posts to /api/waitlist (public).
@@ -30,7 +31,10 @@ export function WaitlistForm({
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), company_name: company.trim() || null, notes: `source: ${source}` }),
+        // session_id carries the campaign across the sever (migration 242) — see
+        // lib/visitor-session.ts for why this line is load-bearing.
+        body: JSON.stringify({ email: email.trim(), company_name: company.trim() || null,
+          notes: `source: ${source}`, session_id: visitorSessionId() }),
       });
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {

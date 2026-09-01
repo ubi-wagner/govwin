@@ -10,6 +10,7 @@ import { scoreTenantCards } from '@/lib/cards/score-tenant';
 import { offerStarterSet } from '@/lib/library/starter-offer';
 import { copyStarterSetToTenant } from '@/lib/library/foundation';
 import { backfillTenantTemplates } from '@/lib/template-bridge';
+import { seedProfileFromApplication } from '@/lib/onboarding';
 import { isRole, type Role } from '@/lib/rbac';
 import { closeTasksForEntity } from '@/lib/tasks/tasks';
 import bcrypt from 'bcryptjs';
@@ -285,6 +286,22 @@ export async function POST(request: Request, ctx: RouteContext) {
       if (closed.failed) console.error('[api/admin/applications/accept] some triage ToDos did not close', closed);
     } catch (taskErr) {
       console.error('[api/admin/applications/accept] ToDo close failed (non-fatal):', taskErr);
+    }
+
+    // Carry the application's own answers into the company profile, so the bucket form's
+    // "start from your company profile" button has something to copy. Without this the button
+    // tells a brand-new customer to go and type, on the Profile page, what they typed on the
+    // application ten minutes ago — and until they do, they author no bucket, /cards falls back to
+    // recency, and the ranking engine is inert on day one. NON-DESTRUCTIVE and idempotent: it
+    // fills only empty columns. It does NOT create buckets — those stay the customer's to author
+    // (see the note above). Best-effort, like every other step in this tail.
+    try {
+      const seed = await seedProfileFromApplication(tenantId, id);
+      if (!seed.seeded && seed.reason && seed.reason !== 'nothing_to_copy') {
+        console.error(`[api/admin/applications/accept] profile seed skipped: ${seed.reason}`);
+      }
+    } catch (seedErr) {
+      console.error('[api/admin/applications/accept] profile seed failed (non-fatal):', seedErr);
     }
 
     let cardsBackfilled = 0;

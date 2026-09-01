@@ -70,21 +70,27 @@ From the RFP Pipeline homepage, click **Apply for Early Access** and fill in the
 
 | Field | What to enter |
 |---|---|
-| Company Name | Your legal business name |
-| Contact Email | Your primary email |
-| Phone | Business phone |
-| DUNS / UEI | Your SAM.gov unique entity identifier |
-| CAGE Code | If you have one |
-| NAICS Codes | Comma-separated, the codes you perform under |
-| SAM Registration | Whether you're registered on SAM.gov |
-| Company Size | Number of employees |
-| Years in Business | How long you've been operating |
-| Clearance Level | Highest facility clearance |
-| Tech Focus Areas | Your core capabilities — "additive construction, robotics, materials science" |
-| Target Agencies | DoD, DOE, NASA, NIH, NSF … |
-| Target Program Types | SBIR Phase I, SBIR Phase II, STTR, BAA, CSO, OTA |
-| Past Performance Summary | Relevant past contracts, briefly |
-| Why RFP Pipeline | What you want out of the platform |
+| Full name · Email · Title/Role · Phone | Your details. The email becomes your sign-in. |
+| Company name · Website · Company size · State | Your legal business name and where you operate. |
+| SAM.gov registered? | Yes/No. Not a gate — it tells us how much runway you need before a submission. |
+| CAGE code · UEI/DUNS | If you have them. Blank is fine for a first-time applicant. |
+| Previous federal proposals submitted · awards received | Counts, not narratives. Zero is a normal answer. |
+| Previous award programs | If any — SBIR Phase I, STTR, and so on. |
+| Technology summary | 2–4 sentences. "Additive construction for expeditionary basing", not a capability statement. |
+| Tech areas | Multi-select. These become the first draft of your ranking buckets. |
+| Target programs | Multi-select: SBIR Phase I/II, STTR, BAA, CSO, OTA, grants. |
+| Target agencies | Multi-select: DoD, DOE, NASA, NIH, NSF, state programs. |
+| Desired outcomes | What you want out of the platform. |
+| What's driving your interest right now? | Free text — a closing solicitation, a partner deadline, a new hire. |
+| How did you hear about us? | Free text. It is also what we can attribute you by if you arrived without a tracked link. |
+
+You also sign the Terms: type your contact email into the signature box. The form refuses a
+signature that doesn't match the email above it, so use the same address in both places.
+
+> ⚠️ Verified against the shipped form 2026-09-01. An earlier version of this table listed NAICS
+> codes, years in business, clearance level and a past-performance summary. **The form does not ask
+> for any of those** — telling a company to prepare them and then asking for something else is a bad
+> first minute, and this guide is read aloud during a guided onboarding.
 
 An admin reviews applications within 24–48 hours. Acceptance creates your company workspace and your
 user account.
