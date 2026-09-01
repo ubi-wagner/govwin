@@ -14,7 +14,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-buckets__vp-phone-open.jpg",
-   "bytes": 48404
+   "bytes": 48376
   },
   {
    "lane": "tenant",
@@ -70,7 +70,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-rfp-curation__vp-phone-open.jpg",
-   "bytes": 230612
+   "bytes": 223418
   },
   {
    "lane": "admin",
@@ -78,7 +78,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-workflows__vp-phone-open.jpg",
-   "bytes": 1742654
+   "bytes": 1740224
   },
   {
    "lane": "admin",
@@ -86,7 +86,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-agents__vp-phone-open.jpg",
-   "bytes": 603907
+   "bytes": 604094
   },
   {
    "lane": "admin",
@@ -104,10 +104,10 @@
    "status": 200,
    "probed": true,
    "opened": 39,
-   "candidates": 247,
+   "candidates": 250,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 357
+   "smallTargets": 361
   },
   {
    "lane": "tenant",
@@ -191,11 +191,11 @@
    "route": "/admin/rfp-curation",
    "status": 200,
    "probed": true,
-   "opened": 2,
-   "candidates": 22,
+   "opened": 1,
+   "candidates": 32,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 73
+   "smallTargets": 83
   },
   {
    "lane": "admin",
