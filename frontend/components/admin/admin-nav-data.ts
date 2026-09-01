@@ -45,27 +45,49 @@ export const ADMIN_NAV: AdminNavSection[] = [
       { href: '/admin/guardrail-defaults', label: 'Guardrail Defaults' },
     ],
   },
+  // ── ONE BANNER OVER THE FUNNEL ──────────────────────────────────────────────────────────────
+  // Content, audience and outbound were three separate sections — 'Content' (the marketing site),
+  // 'Customers' (waitlist and applications, filed beside billing), and 'CRM' (a placeholder). They
+  // are not three capabilities. They are one: what attracts somebody, who arrives, how we reach
+  // them, and whether any of it worked.
+  //
+  // Splitting them is what let the funnel stay severed in the middle — the site captures a visitor
+  // session with its referrer and UTM, the application captures a contact, and nothing joins the
+  // two, so "which campaign produced this customer" has never been answerable. Nobody looks for a
+  // missing join between two things filed under different headings.
+  //
+  // Ordered as the funnel runs, not alphabetically: reach → arrive → convert → measure.
+  {
+    title: 'Marketing & Sales',
+    items: [
+      { href: '/admin/site', label: 'Site Content' },
+      { href: '/admin/crm', label: 'Outbound Mail' },
+      { href: '/admin/waitlist', label: 'Waitlist' },
+      { href: '/admin/applications', label: 'Applications' },
+    ],
+  },
+  // What happens AFTER somebody buys. The dividing line is the purchase: above it we are trying to
+  // be chosen, below it we are delivering.
   {
     title: 'Customers',
     items: [
-      { href: '/admin/applications', label: 'Applications' },
       { href: '/admin/tenants', label: 'Tenants' },
       { href: '/admin/billing', label: 'Billing' },
-      { href: '/admin/waitlist', label: 'Waitlist' },
       { href: '/admin/purchases', label: 'Purchases' },
       { href: '/admin/proposals', label: 'Proposals' },
-      // Post-award. It sits under Customers, next to Proposals, because that is the shape of the
-      // customer's life: a build becomes a contract becomes a project, and an admin who can see
-      // the first two and not the third loses the customer exactly when the money starts.
+      // Post-award. It sits next to Proposals, because that is the shape of the customer's life: a
+      // build becomes a contract becomes a project, and an admin who can see the first two and not
+      // the third loses the customer exactly when the money starts.
       { href: '/admin/projects', label: 'Projects' },
       { href: '/admin/provisioning', label: 'Releases & SLA' },
       { href: '/admin/expert-time', label: 'Expert Time' },
     ],
   },
+  // Internal authoring and object storage — tooling, not marketing. They were under 'Content' only
+  // because the word fits both, which is the same naming collision that hid the CMS migration.
   {
-    title: 'Content',
+    title: 'Workspace tools',
     items: [
-      { href: '/admin/site', label: 'Site Content' },
       { href: '/admin/documents', label: 'Document Builder' },
       { href: '/admin/storage', label: 'S3 Storage' },
     ],
@@ -97,10 +119,7 @@ export const ADMIN_NAV: AdminNavSection[] = [
       { href: '/admin/architecture', label: 'Architecture' },
     ],
   },
-  // Named for what the page IS. It was 'CRM Console' pointing at a placeholder that linked out
-  // to a separate application; it is now outbound mail — the send ledger and the suppression
-  // list — served from the main database inside this admin.
-  { title: 'CRM', items: [{ href: '/admin/crm', label: 'Outbound Mail' }] },
+
 ];
 
 /** Every nav item, parents AND children, flattened — for label lookup + tests. */
