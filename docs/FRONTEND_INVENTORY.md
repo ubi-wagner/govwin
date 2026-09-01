@@ -13,21 +13,21 @@
 
 | kind | files | lines |
 |---|---:|---:|
-| api-route | 285 | 43,199 |
+| api-route | 285 | 43,262 |
 | app-boundary | 5 | 132 |
 | app-component | 26 | 9,173 |
 | auth | 2 | 241 |
-| component | 180 | 46,141 |
+| component | 180 | 46,152 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 461 |
-| lib | 329 | 69,083 |
+| lib | 330 | 69,424 |
 | middleware | 1 | 330 |
 | other | 4 | 157 |
-| page | 120 | 19,201 |
-| script | 208 | 32,308 |
+| page | 122 | 19,664 |
+| script | 209 | 32,673 |
 | server-action | 1 | 45 |
-| test | 240 | 33,565 |
-| **total** | **1488** | **263,900** |
+| test | 242 | 33,726 |
+| **total** | **1494** | **265,304** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -50,19 +50,21 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/admin/billing` | app/admin/billing/page.tsx | server | — | rfp_admin | auth | — | StatCard, Link | yes |
 | `/admin/cards` | app/admin/cards/page.tsx | server | — | rfp_admin | auth | — | IntakeStageStrip, MasterCards | yes |
 | `/admin/command` | app/admin/command/page.tsx | server | — | rfp_admin | auth | — | EmptyLane, Link, OpportunityLanes, TaskQueue, TenantSurfacedList, OpsDigestCard, SystemList, CommandTabs | yes |
+| `/admin/contacts` | app/admin/contacts/page.tsx | server | — | rfp_admin | auth | — | Cell, Link | yes |
 | `/admin/crm` | app/admin/crm/page.tsx | server | — | rfp_admin | auth | — | SuppressionList | yes |
 | `/admin/dashboard` | app/admin/dashboard/page.tsx | server | — | rfp_admin | auth | — | StatCard, TaskQueue, Link | yes |
 | `/admin/documents` | app/admin/documents/page.tsx | server | — | rfp_admin | auth | — | DocumentListClient | yes |
 | `/admin/documents/[documentId]` | app/admin/documents/[documentId]/page.tsx | client | [documentId] | rfp_admin | — | — | CanvasEditor | yes |
 | `/admin/events` | app/admin/events/page.tsx | server | — | rfp_admin | auth | — | Link, EventStreamClient | yes |
 | `/admin/expert-time` | app/admin/expert-time/page.tsx | client | — | rfp_admin | — | — | — | yes |
+| `/admin/funnel` | app/admin/funnel/page.tsx | server | — | rfp_admin | auth | — | Rate, Link, Stage | yes |
 | `/admin/guardrail-defaults` | app/admin/guardrail-defaults/page.tsx | server | — | rfp_admin | auth | — | GuardrailDefaults | yes |
 | `/admin/intake` | app/admin/intake/page.tsx | server | — | rfp_admin | auth | — | IntakeStageStrip, IntakeForm | yes |
 | `/admin/opportunities` | app/admin/opportunities/page.tsx | server | — | rfp_admin | auth | — | Stage, OppWatchToggle | yes |
 | `/admin/pipeline` | app/admin/pipeline/page.tsx | server | — | rfp_admin | auth | — | — | yes |
 | `/admin/process` | app/admin/process/page.tsx | server | — | rfp_admin | auth | — | Link, ProcessMonitorClient | yes |
 | `/admin/processes` | app/admin/processes/page.tsx | server | — | rfp_admin | auth | — | AdminProcessesClient | yes |
-| `/admin/projects` | app/admin/projects/page.tsx | server | — | rfp_admin | auth | runInTenant | Link, Measure | yes |
+| `/admin/projects` | app/admin/projects/page.tsx | server | — | rfp_admin | auth | runInTenant | Measure | yes |
 | `/admin/proposals` | app/admin/proposals/page.tsx | server | — | rfp_admin | auth | — | Link | yes |
 | `/admin/provisioning` | app/admin/provisioning/page.tsx | server | — | rfp_admin | auth | — | Link, SlaCountdown, InstantReleaseButton | yes |
 | `/admin/provisioning/[portalId]` | app/admin/provisioning/[portalId]/page.tsx | server | [portalId] | rfp_admin | auth | — | StatusBadge, ReadinessBars, SlaBlock, ReleasePanel, CurationNotesPanel, Row, SlaCountdown | yes |
@@ -445,7 +447,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/stripe/webhook` | POST | app/api/stripe/webhook/route.ts | — (public) | — | — | 5×sql | 12 |
 | `/api/tools/[name]` | POST | app/api/tools/[name]/route.ts | — (public) | withHandler | — | — | 0 |
 | `/api/uploads/[...key]` | GET | app/api/uploads/[...key]/route.ts | — (public) | — | — | — | 1 |
-| `/api/waitlist` | GET POST | app/api/waitlist/route.ts | — (public) | — | — | 1×sql | 4 |
+| `/api/waitlist` | GET POST | app/api/waitlist/route.ts | — (public) | — | — | 2×sql | 5 |
 | `/api/webhooks/postmark` | POST | app/api/webhooks/postmark/route.ts | — (public) | — | — | — | 3 |
 | `/blog/feed.xml` | GET | app/blog/feed.xml/route.ts | — (public) | — | — | — | 0 |
 
@@ -665,7 +667,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 329 files
+## 6. Library modules — 330 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -711,6 +713,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/command/seen.ts | server | getCommandSeen, markCommandSeen, isNew, isValidScope, KNOWN_TABS | 2 | **none** |
 | lib/compliance-resolver.ts | server | resolveTopicCompliance | 7 | vitest |
 | lib/compliance/shred-audit.ts | server | splitSentences, salientTerms, auditShredCompleteness | 3 | **none** |
+| lib/contacts.ts | server | recordContact, RATE_FLOOR, conversionRate, funnelBySource, funnelTotals, listContacts | 5 | vitest |
 | lib/content-admin.ts | server | listPages, ensurePageSeeded, getPage, saveDraft, publishPage, getVersions +6 | 9 | **none** |
 | lib/content-canvas.ts | server | docBodyFromCanvas, parseBodyToNodes, canvasFromDocBody, newContentCanvas | — | vitest |
 | lib/crypto.ts | server | encryptApiKey, decryptApiKey, keyHint | — | **none** |
@@ -723,8 +726,8 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/email-templates.ts | server | applicationAcceptedEmail, applicationRejectedEmail, welcomeOnboardedEmail, adminNewApplicationAlert, spotlightDigestEmail, collaboratorInviteEmail +1 | — | **none** |
 | lib/email/drivers/gmail.ts | server | gmailDriver | — | vitest |
 | lib/email/drivers/postmark.ts | server | postmarkDriver | — | vitest |
-| lib/email/index.ts | server | EmailKind, EmailDriver, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult +14 | — | **none** |
-| lib/email/ledger.ts | server | normalizeAddress, suppressionFor, reserve, confirm, recordSuppressed, findSend +5 | 11 | vitest |
+| lib/email/index.ts | server | EmailKind, EmailDriver, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult +16 | — | **none** |
+| lib/email/ledger.ts | server | normalizeAddress, suppressionFor, reserve, confirm, recordSuppressed, findSend +6 | 12 | vitest |
 | lib/email/sender-identity.ts | server | isDefaultPlatformSender, resolveSender, formatFrom | — | vitest |
 | lib/email/types.ts | server | — | — | vitest |
 | lib/embeddings.ts | server | EMBED_DIM, activeEmbedModel, embeddingsEnabled, embedContentHash, toVectorLiteral, isUsableVector +3 | — | vitest |
@@ -1028,10 +1031,10 @@ statement is per-layer, not one number.
 
 | layer | population | reached by | not reached |
 |---|---:|---|---:|
-| pages | 120 | verify-surfaces (admin + portal trees) | 35 |
+| pages | 122 | verify-surfaces (admin + portal trees) | 35 |
 | API routes (GET) | 156 | verify-api-contract | see that lens's own accounting |
 | API routes (write verbs) | 223 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 329 | vitest 189 · sweep-mold-quality 39 | 101 |
+| lib modules | 330 | vitest 190 · sweep-mold-quality 39 | 101 |
 | components | 206 | only transitively, via a page that renders them | not measured |
 
 **The write verbs are the real gap.** 223 routes expose a POST/PATCH/PUT/DELETE and no lens

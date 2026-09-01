@@ -171,7 +171,12 @@ const LABELLED_SESSIONS = (days: number) => sqlBypass`
  * capability could produce. On a box that has never tagged a campaign, that row IS the funnel.
  */
 export async function funnelBySource(days = 90): Promise<FunnelBucket[]> {
-  const rows = await sqlBypass<FunnelBucket[]>`
+  // ⚠️ The ROW type is not `FunnelBucket`: `revenue_cents` is `::bigint`, and postgres.js returns
+  // int8 as a STRING. Declaring it `number` here would compile — tsc trusts the assertion — and
+  // then `revenueCents.toLocaleString()` would run on a string, `> 0` would compare a string to a
+  // number, and the value would RENDER, wrongly. That is the half of the sql<T> trap a wrong NAME
+  // does not have: a wrong name is `undefined` and throws. The conversion happens below.
+  const rows = await sqlBypass<(Omit<FunnelBucket, 'revenueCents'> & { revenueCents: string })[]>`
     WITH labelled AS (${LABELLED_SESSIONS(days)}),
     -- Attribute every downstream stage through the CONTACT's first-touch session, so one person
     -- lands in exactly one bucket however many times they came back.

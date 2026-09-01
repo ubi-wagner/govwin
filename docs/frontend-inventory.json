@@ -5,7 +5,7 @@
   {
    "kind": "api-route",
    "files": 285,
-   "lines": 43199
+   "lines": 43262
   },
   {
    "kind": "app-boundary",
@@ -25,7 +25,7 @@
   {
    "kind": "component",
    "files": 180,
-   "lines": 46141
+   "lines": 46152
   },
   {
    "kind": "e2e",
@@ -39,8 +39,8 @@
   },
   {
    "kind": "lib",
-   "files": 329,
-   "lines": 69083
+   "files": 330,
+   "lines": 69424
   },
   {
    "kind": "middleware",
@@ -54,13 +54,13 @@
   },
   {
    "kind": "page",
-   "files": 120,
-   "lines": 19201
+   "files": 122,
+   "lines": 19664
   },
   {
    "kind": "script",
-   "files": 208,
-   "lines": 32308
+   "files": 209,
+   "lines": 32673
   },
   {
    "kind": "server-action",
@@ -69,8 +69,8 @@
   },
   {
    "kind": "test",
-   "files": 240,
-   "lines": 33565
+   "files": 242,
+   "lines": 33726
   }
  ],
  "records": [
@@ -5513,6 +5513,55 @@
     "expect(emitEventStartMock).toHaveBeenCalledWith",
     "expect.objectContaining",
     "expect(emitEventEndMock).toHaveBeenCalledWith"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/funnel-rate-floor.test.ts",
+   "kind": "test",
+   "lines": 56,
+   "bytes": 2741,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/contacts",
+     "names": [
+      "conversionRate",
+      "RATE_FLOOR"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "expect(conversionRate(0, 3)).toBeNull",
+    "expect",
+    "conversionRate",
+    "expect(conversionRate(1, 3)).toBeNull",
+    "expect(conversionRate(0, RATE_FLOOR - 1)).toBeNull",
+    "expect(conversionRate(0, RATE_FLOOR)).toBe",
+    "expect(conversionRate(5, 20)).toBe",
+    "expect(conversionRate(1, 200)).toBeCloseTo",
+    "expect(conversionRate(0, 500)).toBe",
+    "expect(conversionRate(1, 0)).toBeNull",
+    "expect(conversionRate(Number.NaN, 100)).toBeNull",
+    "expect(conversionRate(1, Number.NaN)).toBeNull",
+    "expect(conversionRate(1, Number.POSITIVE_INFINITY)).toBeNull",
+    "expect(RATE_FLOOR).toBeGreaterThan"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -11639,6 +11688,76 @@
     "q.includes",
     "expect(\n      txSql.some((q) => q.includes('INSERT INTO proposal_sections') && q.includes('artifact_id')),\n    ).toBe",
     "expect(emitEventSingleMock).toHaveBeenCalledWith"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/prospect-tables-admin-only.test.ts",
+   "kind": "test",
+   "lines": 105,
+   "bytes": 4952,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readdirSync",
+      "readFileSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "process.cwd",
+    "join",
+    "readdirSync",
+    "e.isDirectory",
+    "walk",
+    "/\\.tsx?$/.test",
+    "out.push",
+    "statSync(dir).isDirectory",
+    "statSync",
+    "readFileSync(f, 'utf8').replace(/\\/\\*[\\s\\S]*?\\*\\//g, '').replace",
+    "readFileSync(f, 'utf8').replace",
+    "readFileSync",
+    "describe",
+    "it",
+    "TENANT_TREES.flatMap",
+    "filesUnder",
+    "expect(files.length, 'no files found — the scan roots are wrong').toBeGreaterThan",
+    "expect",
+    "expect(tableRef(t).test(`SELECT * FROM ${t} WHERE id = 1`),\n        `the rule for ${t} does not match its own example`).toBe",
+    "tableRef(t).test",
+    "tableRef",
+    "expect(tableRef('applications').test('const applications = await listApplications()')).toBe",
+    "tableRef('applications').test",
+    "expect(tableRef('applications').test('// grant applications are reviewed by an admin')).toBe",
+    "expect(tableRef('contacts').test('router.push(\"/admin/contacts\")')).toBe",
+    "tableRef('contacts').test",
+    "code",
+    "offenders.push",
+    "f.replace",
+    "expect(\n      offenders,\n      'these tables have no tenant_id and therefore no RLS predicate: a tenant-reachable route '\n      + 'that queries one returns every prospect on the platform, with a 200 and no audit trail. '\n      + 'Read them from an rfp_admin surface (lib/contacts.ts) instead.',\n    ).toEqual"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -20842,6 +20961,85 @@
    "params": []
   },
   {
+   "file": "app/admin/contacts/page.tsx",
+   "kind": "page",
+   "lines": 166,
+   "bytes": 8135,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "AdminContactsPage",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "redirect"
+     ]
+    },
+    {
+     "spec": "next/link",
+     "names": [
+      "Link"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/contacts",
+     "names": [
+      "listContacts",
+      "ContactRow"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "new Date(d).toISOString().slice",
+    "new Date(d).toISOString",
+    "auth",
+    "redirect",
+    "hasRoleAtLeast",
+    "listContacts",
+    "console.error",
+    "rows.filter",
+    "rows.length.toLocaleString",
+    "rows.map",
+    "day",
+    "encodeURIComponent"
+   ],
+   "jsx": [
+    "Cell",
+    "Link"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [],
+   "route": "/admin/contacts",
+   "dynamic": true,
+   "params": []
+  },
+  {
    "file": "app/admin/crm/page.tsx",
    "kind": "page",
    "lines": 211,
@@ -21549,6 +21747,96 @@
    "jsonResponses": [],
    "route": "/admin/expert-time",
    "dynamic": false,
+   "params": []
+  },
+  {
+   "file": "app/admin/funnel/page.tsx",
+   "kind": "page",
+   "lines": 294,
+   "bytes": 15149,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "AdminFunnelPage",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "redirect"
+     ]
+    },
+    {
+     "spec": "next/link",
+     "names": [
+      "Link"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/contacts",
+     "names": [
+      "funnelBySource",
+      "funnelTotals",
+      "conversionRate",
+      "RATE_FLOOR",
+      "FunnelBucket",
+      "FunnelTotals"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "(cents / 100).toLocaleString",
+    "conversionRate",
+    "r.toFixed",
+    "n.toLocaleString",
+    "auth",
+    "redirect",
+    "hasRoleAtLeast",
+    "[30, 90, 365].includes",
+    "Number",
+    "Promise.all",
+    "funnelTotals",
+    "funnelBySource",
+    "console.error",
+    "buckets.filter",
+    "buckets.find",
+    "[30, 90, 365].map",
+    "money",
+    "attributable.map"
+   ],
+   "jsx": [
+    "Rate",
+    "Link",
+    "Stage"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [],
+   "route": "/admin/funnel",
+   "dynamic": true,
    "params": []
   },
   {
@@ -22335,8 +22623,8 @@
   {
    "file": "app/admin/projects/page.tsx",
    "kind": "page",
-   "lines": 246,
-   "bytes": 12883,
+   "lines": 249,
+   "bytes": 13224,
    "client": false,
    "exports": [
     {
@@ -22361,12 +22649,6 @@
      "spec": "next/navigation",
      "names": [
       "redirect"
-     ]
-    },
-    {
-     "spec": "next/link",
-     "names": [
-      "Link"
      ]
     },
     {
@@ -22400,7 +22682,7 @@
    "sqlTags": [
     {
      "tag": "sqlBypass",
-     "line": 87
+     "line": 86
     }
    ],
    "calls": [
@@ -22420,7 +22702,6 @@
     "iso"
    ],
    "jsx": [
-    "Link",
     "Measure"
    ],
    "snakeRowTypes": [],
@@ -26693,8 +26974,8 @@
   {
    "file": "app/api/admin/applications/[id]/accept/route.ts",
    "kind": "api-route",
-   "lines": 377,
-   "bytes": 16472,
+   "lines": 383,
+   "bytes": 16951,
    "client": false,
    "exports": [
     {
@@ -26876,12 +27157,12 @@
     {
      "arg": "{\n      data: {\n        tenantId: tenantId,\n        tenantSlug: finalSlug,\n        userId: newUserId,\n        contactEmail: app.contactEmail,\n        contactName: app.contactName,\n        companyName: app.companyName,\n        emailSent: emailResult.accepted,\n        emailProvider: emailResult.provider,\n        emailFailed: !!emailResult.error,\n        // The admin UI relays these to the customer w",
      "opts": "",
-     "line": 346
+     "line": 352
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 371
+     "line": 377
     }
    ],
    "route": "/api/admin/applications/[id]/accept",
@@ -41255,8 +41536,8 @@
   {
    "file": "app/api/applications/route.ts",
    "kind": "api-route",
-   "lines": 237,
-   "bytes": 9825,
+   "lines": 260,
+   "bytes": 11239,
    "client": false,
    "exports": [
     {
@@ -41313,25 +41594,31 @@
      "names": [
       "adminNewApplicationAlert"
      ]
+    },
+    {
+     "spec": "@/lib/contacts",
+     "names": [
+      "recordContact"
+     ]
     }
    ],
    "tryCount": 3,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 87
+     "line": 97
     },
     {
      "tag": "sql",
-     "line": 108
+     "line": 118
     },
     {
      "tag": "sql",
-     "line": 123
+     "line": 133
     },
     {
      "tag": "sql",
-     "line": 139
+     "line": 162
     }
    ],
    "calls": [
@@ -41369,6 +41656,8 @@
     "z.literal",
     "z.string().email().max(200).optional",
     "z.string().max(50).default",
+    "z.string().max(120).nullable().optional",
+    "z.string().max(120).nullable",
     "request.json",
     "NextResponse.json",
     "ApplicationSchema.safeParse",
@@ -41382,6 +41671,7 @@
     "emailDomain.replace",
     "request.headers.get('user-agent').slice",
     "request.headers.get",
+    "recordContact",
     "sql.json",
     "emitEventSingle",
     "randomUUID",
@@ -41398,42 +41688,42 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_JSON' }",
      "opts": "{ status: 400 }",
-     "line": 61
+     "line": 71
     },
     {
      "arg": "{\n        error: 'Please check the form and fix the highlighted issues.',\n        code: 'VALIDATION_ERROR',\n        details: parsed.error.issues.map((i) => ({ path: i.path, message: i.message })),\n      }",
      "opts": "{ status: 422 }",
-     "line": 69
+     "line": 79
     },
     {
      "arg": "{\n        error: 'An account with this email already exists. Log in at /login or email eric@rfppipeline.com for help.',\n        code: 'EMAIL_EXISTS_USER',\n      }",
      "opts": "{ status: 409 }",
-     "line": 91
+     "line": 101
     },
     {
      "arg": "{\n          error: 'An application from this organization already exists. RFP Pipeline allows one administrator per company. Please contact your organization\\'s existing administrator to be added as a team member, or email eric@rfppipeline.com if this is a different company.',\n          code: 'DOMAIN_MATCH',\n        }",
      "opts": "{ status: 409 }",
-     "line": 116
+     "line": 126
     },
     {
      "arg": "{\n          error: 'Your organization already has an account on RFP Pipeline. Please contact your organization\\'s administrator to be added as a team member, or email eric@rfppipeline.com if this is a different company.',\n          code: 'DOMAIN_MATCH_USER',\n        }",
      "opts": "{ status: 409 }",
-     "line": 130
+     "line": 140
     },
     {
      "arg": "{ data: { id: rows[0].id } }",
      "opts": "{ status: 201 }",
-     "line": 216
+     "line": 239
     },
     {
      "arg": "{\n          error:\n            'An application with this email already exists. If you need to update your submission, email eric@rfppipeline.com.',\n          code: 'DUPLICATE_EMAIL',\n        }",
      "opts": "{ status: 409 }",
-     "line": 221
+     "line": 244
     },
     {
      "arg": "{ error: 'Something went wrong. Please try again or email eric@rfppipeline.com.', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 231
+     "line": 254
     }
    ],
    "route": "/api/applications",
@@ -69792,8 +70082,8 @@
   {
    "file": "app/api/waitlist/route.ts",
    "kind": "api-route",
-   "lines": 105,
-   "bytes": 3365,
+   "lines": 139,
+   "bytes": 5102,
    "client": false,
    "exports": [
     {
@@ -69826,13 +70116,23 @@
       "emitEventSingle",
       "systemActor"
      ]
+    },
+    {
+     "spec": "@/lib/contacts",
+     "names": [
+      "recordContact"
+     ]
     }
    ],
-   "tryCount": 4,
+   "tryCount": 5,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 65
+     "line": 74
+    },
+    {
+     "tag": "sql",
+     "line": 100
     }
    ],
    "calls": [
@@ -69840,11 +70140,14 @@
     "request.json",
     "emailRegex.test",
     "sql.json",
+    "body.session_id.trim",
+    "body.session_id.trim().slice",
     "body.email.toLowerCase().trim",
     "body.email.toLowerCase",
+    "recordContact",
+    "console.error",
     "emitEventSingle",
-    "systemActor",
-    "console.error"
+    "systemActor"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -69853,37 +70156,37 @@
     {
      "arg": "{ error: 'Use POST to join waitlist', code: 'NOT_IMPLEMENTED' }",
      "opts": "{ status: 501 }",
-     "line": 15
+     "line": 16
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 33
+     "line": 36
     },
     {
      "arg": "{ error: 'email is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 41
+     "line": 44
     },
     {
      "arg": "{ error: 'Invalid email format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 50
+     "line": 53
     },
     {
      "arg": "{ data: { id: entry.id, message: 'Successfully joined waitlist' } }",
      "opts": "{ status: 201 }",
-     "line": 86
+     "line": 120
     },
     {
      "arg": "{ error: 'Failed to join waitlist', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 92
+     "line": 126
     },
     {
      "arg": "{ error: 'Failed to process request', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 99
+     "line": 133
     }
    ],
    "route": "/api/waitlist",
@@ -75937,8 +76240,8 @@
   {
    "file": "components/admin/admin-nav-data.ts",
    "kind": "component",
-   "lines": 176,
-   "bytes": 7901,
+   "lines": 187,
+   "bytes": 8515,
    "client": false,
    "exports": [
     {
@@ -99504,6 +99807,117 @@
    "jsonResponses": []
   },
   {
+   "file": "lib/contacts.ts",
+   "kind": "lib",
+   "lines": 306,
+   "bytes": 15346,
+   "client": false,
+   "exports": [
+    {
+     "name": "ContactSource",
+     "form": "type"
+    },
+    {
+     "name": "recordContact",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "RATE_FLOOR",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "conversionRate",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "FunnelBucket",
+     "form": "type"
+    },
+    {
+     "name": "FunnelTotals",
+     "form": "type"
+    },
+    {
+     "name": "funnelBySource",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "funnelTotals",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "ContactRow",
+     "form": "type"
+    },
+    {
+     "name": "listContacts",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql",
+      "sqlBypass"
+     ]
+    },
+    {
+     "spec": "@/lib/email",
+     "names": [
+      "mailStateFor"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 60
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 142
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 179
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 237
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 283
+    }
+   ],
+   "calls": [
+    "v.trim",
+    "v.trim().slice",
+    "input.email.trim().toLowerCase",
+    "input.email.trim",
+    "cleanSession",
+    "console.error",
+    "Number.isFinite",
+    "LABELLED_SESSIONS",
+    "rows.map",
+    "Number",
+    "mailStateFor",
+    "mail.get"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "lib/content-admin.ts",
    "kind": "lib",
    "lines": 515,
@@ -100469,7 +100883,7 @@
    "file": "lib/email/index.ts",
    "kind": "lib",
    "lines": 207,
-   "bytes": 8913,
+   "bytes": 8945,
    "client": false,
    "exports": [
     {
@@ -100533,6 +100947,10 @@
      "form": "re-export"
     },
     {
+     "name": "mailStateFor",
+     "form": "re-export"
+    },
+    {
      "name": "LedgerSend",
      "form": "re-export"
     },
@@ -100542,6 +100960,10 @@
     },
     {
      "name": "LedgerRow",
+     "form": "re-export"
+    },
+    {
+     "name": "AddressMailState",
      "form": "re-export"
     },
     {
@@ -100645,8 +101067,8 @@
   {
    "file": "lib/email/ledger.ts",
    "kind": "lib",
-   "lines": 342,
-   "bytes": 14140,
+   "lines": 377,
+   "bytes": 15774,
    "client": false,
    "exports": [
     {
@@ -100716,6 +101138,15 @@
      "async": true
     },
     {
+     "name": "AddressMailState",
+     "form": "type"
+    },
+    {
+     "name": "mailStateFor",
+     "form": "function",
+     "async": true
+    },
+    {
      "name": "suppress",
      "form": "function",
      "async": true
@@ -100735,7 +101166,7 @@
      ]
     }
    ],
-   "tryCount": 10,
+   "tryCount": 11,
    "sqlTags": [
     {
      "tag": "sqlBypass",
@@ -100779,7 +101210,11 @@
     },
     {
      "tag": "sqlBypass",
-     "line": 331
+     "line": 345
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 366
     }
    ],
    "calls": [
@@ -100788,7 +101223,10 @@
     "normalizeAddress",
     "console.error",
     "sqlBypass.json",
-    "String"
+    "String",
+    "emails.map(normalizeAddress).filter",
+    "emails.map",
+    "out.set"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -127743,6 +128181,181 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 9,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-commercial-path.mts",
+   "kind": "script",
+   "lines": 365,
+   "bytes": 22178,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "./lib/scenario.mts",
+     "names": [
+      "scenario"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 116
+    },
+    {
+     "tag": "sql",
+     "line": 124
+    },
+    {
+     "tag": "sql",
+     "line": 159
+    },
+    {
+     "tag": "sql",
+     "line": 164
+    },
+    {
+     "tag": "sql",
+     "line": 172
+    },
+    {
+     "tag": "sql",
+     "line": 179
+    },
+    {
+     "tag": "sql",
+     "line": 184
+    },
+    {
+     "tag": "sql",
+     "line": 199
+    },
+    {
+     "tag": "sql",
+     "line": 217
+    },
+    {
+     "tag": "sql",
+     "line": 248
+    },
+    {
+     "tag": "sql",
+     "line": 264
+    },
+    {
+     "tag": "sql",
+     "line": 268
+    },
+    {
+     "tag": "sql",
+     "line": 272
+    },
+    {
+     "tag": "sql",
+     "line": 283
+    },
+    {
+     "tag": "sql",
+     "line": 284
+    },
+    {
+     "tag": "sql",
+     "line": 294
+    },
+    {
+     "tag": "sql",
+     "line": 327
+    },
+    {
+     "tag": "sql",
+     "line": 337
+    },
+    {
+     "tag": "sql",
+     "line": 349
+    }
+   ],
+   "calls": [
+    "console.error",
+    "process.exit",
+    "postgres",
+    "console.log",
+    "Date.now",
+    "scenario",
+    "chromium.launch",
+    "browser.newContext",
+    "ctx.newPage",
+    "page.request.post",
+    "ok",
+    "res.status",
+    "note",
+    "(await res.text()).slice",
+    "res.text",
+    "JSON.stringify",
+    "page.goto",
+    "page.waitForSelector",
+    "page.fill",
+    "page.click",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "page.evaluate",
+    "document.querySelector",
+    "listed.status",
+    "listText.includes",
+    "accept.ok",
+    "accept.status",
+    "(await accept.text()).slice",
+    "accept.text",
+    "String(welcome.error).slice",
+    "String",
+    "bcrypt.hash",
+    "ctx2.newPage",
+    "p2.goto",
+    "p2.waitForSelector",
+    "p2.fill",
+    "p2.click",
+    "p2.waitForLoadState('networkidle').catch",
+    "p2.waitForLoadState",
+    "p2.waitForTimeout",
+    "p2.url",
+    "landed.includes",
+    "p2.evaluate",
+    "/password/i.test",
+    "/reset|password/i.test",
+    "ctx2.close",
+    "sc.track",
+    "CONTACT.toLowerCase",
+    "funnelBySource",
+    "buckets.find",
+    "buckets.reduce",
+    "ctx.close",
+    "sc.trackTenantPurge",
+    "sc.dispose",
+    "browser.close",
+    "sql.end",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 19,
    "jsonResponses": []
   },
   {
