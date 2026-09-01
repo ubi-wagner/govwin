@@ -269,7 +269,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="commercial-path pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
+SCENARIO_DRIVES="commercial-path application-intake pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -447,6 +447,15 @@ DRIVES=(
   # welcome that carries the way in, and the first sign-in. Every defect found in the 2026-08-31
   # sweep lived in a join nobody walked, and these were the joins nobody walked.
   "commercial-path|scripts/drive-commercial-path.mts"
+  # THE PUBLIC→PRIVATE NOTIFICATION, on its own, because it is the minimum viable path into
+  # the business and its failure is silent and total: the applicant sees a success page and
+  # nobody is ever told. commercial-path asserts the application and the EMAIL; this asserts
+  # the ToDo, which is the half that survives a mail outage — and asserts it the only way
+  # that means anything, by calling the same listOpenTasksForActor the ToDo surface calls
+  # and requiring the row to come back. A task created into a bucket nobody queries is the
+  # same as no task, and RLS cannot catch that because a platform row is readable from
+  # everywhere; the app-layer predicate is what decides whether a person is told.
+  "application-intake|scripts/drive-application-intake.mts"
   # THE SPEND GUARDRAILS, both directions. Eleven cases: the tenant budget refuses and allows, a
   # monthly_budget of 0 disables, the platform cap refuses even when the tenant has headroom, the
   # kill switch stops everything, the hourly rate limit refuses and allows, and the framework

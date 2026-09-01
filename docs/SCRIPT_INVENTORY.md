@@ -24,7 +24,7 @@ a stale green nobody re-checks. The live answer is `bash scripts/run-branch-driv
 table is the record. Everything in **SUITE** below ran in that suite; everything else did not.
 
 
-## SUITE — 58
+## SUITE — 59
 
 Runs on every `run-branch-drives.sh`. This is the regression net.
 
@@ -37,6 +37,7 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `close-e2e-cms.mjs` | — | 2026-08-30 |
 | `demo-canvas-capabilities.mts` | — | 2026-08-24 |
 | `drive-admin-demand.mts` | — | 2026-08-31 |
+| `drive-application-intake.mts` | — | — |
 | `drive-atomization.mts` | — | 2026-08-30 |
 | `drive-award-to-contract.mts` | — | 2026-08-24 |
 | `drive-bridge-buckets.mjs` | — | 2026-08-30 |
@@ -137,7 +138,7 @@ Imported by other scripts; never run directly.
 | `lib/mobile-measure.mts` | — | 2026-08-31 |
 | `lib/scenario.mts` | — | 2026-08-24 |
 
-## CALLED-BY-ANOTHER — 25
+## CALLED-BY-ANOTHER — 28
 
 Invoked by another script rather than by a person.
 
@@ -162,10 +163,13 @@ Invoked by another script rather than by a person.
 | `inventory-frontend.mjs` | — | 2026-08-28 | audit-pipeline-coherence.mjs, reconcile-capability.mjs |
 | `measure-char-width.mts` | — | 2026-08-23 | calibrate-page-ruler.mts |
 | `probe-node-vocabulary.mts` | — | 2026-08-23 | drive-canvas-authoring.mts |
+| `reconcile-capability.mjs` | — | 2026-08-30 | audit-producer-consumer.mjs |
 | `rehydrate-sandbox.sh` | — | 2026-09-01 | health-manager.sh, sandbox-heartbeat.sh |
 | `run-branch-drives.sh` | — | 2026-09-01 | audit-pinned-fixtures.mjs, inventory-scripts.mjs |
+| `sandbox-heartbeat.sh` | — | 2026-09-01 | audit-producer-consumer.mjs |
 | `seed-isolation-fixture.mts` | 1 | 2026-08-24 | drive-agent-flows.mjs |
 | `seed-project-scenario.mjs` | — | 2026-08-28 | verify-ui-vs-db.mjs |
+| `seed-sheet-doc.mts` | — | 2026-08-11 | audit-producer-consumer.mjs |
 | `stage-collaborator-fixture.mts` | 1 | 2026-08-31 | capture-collab.mjs |
 | `verify-scorer-parity.mjs` | — | 2026-08-29 | run-branch-drives.sh |
 
@@ -177,7 +181,7 @@ Reachable via `npm run` — package.json names it.
 |---|---|---|
 | `sync-pdf-worker.mjs` | — | 2026-08-18 |
 
-## DOCUMENTED — 96
+## DOCUMENTED — 95
 
 No code references it, but a document tells someone to run it.
 
@@ -186,6 +190,7 @@ No code references it, but a document tells someone to run it.
 | `audit-automation-spine.mjs` | — | 2026-08-28 |
 | `audit-doc-currency.mjs` | — | 2026-09-01 |
 | `audit-env-parity.mjs` | — | 2026-08-29 |
+| `audit-producer-consumer.mjs` | — | 2026-09-01 |
 | `backfill-buckets.mts` | — | 2026-08-15 |
 | `bug-log-status.mjs` | — | 2026-08-24 |
 | `capture-guides.mjs` | — | 2026-08-30 |
@@ -245,10 +250,8 @@ No code references it, but a document tells someone to run it.
 | `probe-project-mobile.mts` | — | 2026-08-31 |
 | `probe-style-matrix.mts` | — | 2026-08-24 |
 | `prove-pdf-export.mts` | — | 2026-08-15 |
-| `reconcile-capability.mjs` | — | 2026-08-30 |
 | `render-artifact-pages.mts` | — | 2026-08-24 |
 | `render-tv-preview.mjs` | — | 2026-07-20 |
-| `sandbox-heartbeat.sh` | — | 2026-09-01 |
 | `seed-cuas-immobileyes.mts` | 1 | 2026-08-18 |
 | `seed-dsip-opps.mts` | — | 2026-07-19 |
 | `seed-followon-guides.mts` | 1 | 2026-08-24 |
@@ -280,13 +283,13 @@ No code references it, but a document tells someone to run it.
 | `verify-write-contract.mjs` | — | 2026-08-30 |
 | `write-ui-docs.mjs` | — | 2026-08-31 |
 
-## UNREFERENCED — 95
+## UNREFERENCED — 94
 
 Nothing references it and it holds no dead identifier. It may still work — nobody knows. **Needs a call.**
 
 | script | rot | touched |
 |---|---|---|
-| `audit-dead-code.mjs` | — | — |
+| `audit-dead-code.mjs` | — | 2026-09-01 |
 | `audit-ranking-readiness.mjs` | — | 2026-08-30 |
 | `audit-wipe-impact.mjs` | — | 2026-08-29 |
 | `backfill-corpus-verbatim.mts` | — | 2026-08-19 |
@@ -342,7 +345,6 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `seed-house-library.mts` | — | 2026-07-25 |
 | `seed-librarian-catalog.mjs` | — | 2026-08-11 |
 | `seed-review-junk.mjs` | — | 2026-08-11 |
-| `seed-sheet-doc.mts` | — | 2026-08-11 |
 | `seed-slide-deck.mts` | — | 2026-08-11 |
 | `setup-tw11-browser-portal.mts` | — | 2026-08-15 |
 | `shoot-immobileyes.mjs` | — | 2026-08-30 |
@@ -416,13 +418,13 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 
 | class | count |
 |---|---|
-| SUITE | 58 |
+| SUITE | 59 |
 | LENS | 4 |
 | CROSS-CHECK | 2 |
 | RULER | 7 |
 | LIBRARY | 7 |
-| CALLED-BY-ANOTHER | 25 |
+| CALLED-BY-ANOTHER | 28 |
 | NPM-WIRED | 1 |
-| DOCUMENTED | 96 |
-| UNREFERENCED | 95 |
-| **total** | **295** |
+| DOCUMENTED | 95 |
+| UNREFERENCED | 94 |
+| **total** | **297** |
