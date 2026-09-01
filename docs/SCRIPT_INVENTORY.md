@@ -37,7 +37,7 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `close-e2e-cms.mjs` | — | 2026-08-30 |
 | `demo-canvas-capabilities.mts` | — | 2026-08-24 |
 | `drive-admin-demand.mts` | — | 2026-08-31 |
-| `drive-application-intake.mts` | — | — |
+| `drive-application-intake.mts` | — | 2026-09-01 |
 | `drive-atomization.mts` | — | 2026-08-30 |
 | `drive-award-to-contract.mts` | — | 2026-08-24 |
 | `drive-bridge-buckets.mjs` | — | 2026-08-30 |
@@ -283,7 +283,7 @@ No code references it, but a document tells someone to run it.
 | `verify-write-contract.mjs` | — | 2026-08-30 |
 | `write-ui-docs.mjs` | — | 2026-08-31 |
 
-## UNREFERENCED — 94
+## UNREFERENCED — 95
 
 Nothing references it and it holds no dead identifier. It may still work — nobody knows. **Needs a call.**
 
@@ -343,6 +343,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `repair-truncated-source-text.mts` | — | 2026-08-20 |
 | `seed-demo-automation.mts` | — | 2026-07-19 |
 | `seed-house-library.mts` | — | 2026-07-25 |
+| `seed-launch-todos.mts` | — | — |
 | `seed-librarian-catalog.mjs` | — | 2026-08-11 |
 | `seed-review-junk.mjs` | — | 2026-08-11 |
 | `seed-slide-deck.mts` | — | 2026-08-11 |
@@ -426,5 +427,5 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 | CALLED-BY-ANOTHER | 28 |
 | NPM-WIRED | 1 |
 | DOCUMENTED | 95 |
-| UNREFERENCED | 94 |
-| **total** | **297** |
+| UNREFERENCED | 95 |
+| **total** | **298** |

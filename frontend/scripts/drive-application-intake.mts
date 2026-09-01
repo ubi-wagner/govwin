@@ -1,6 +1,11 @@
 /**
  * drive-application-intake — the public→private notification, driven as a stranger.
  *
+ * TWO public capture pages, not one: the founding-cohort application (/apply) and the
+ * waitlist (on /federal-rd-101). Both are ways a stranger raises a hand, and both have to
+ * reach a human. The waitlist was silent until 2026-09-01 — row written, contact recorded,
+ * `capture:waitlist.joined` emitted, and nothing consuming any of it.
+ *
  * ── WHY THIS IS ITS OWN DRIVE ────────────────────────────────────────────────────────────────
  * This is the minimum viable path into the business: somebody who has never heard of us fills in a
  * form on the open internet, and a human on our side has to find out. Everything else in the
@@ -77,6 +82,8 @@ async function main() {
   const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
   let appId: string | null = null;
   let contactId: string | null = null;
+  let wlId: string | null = null;
+  let wlEmail: string | null = null;
 
   try {
     // ══ 1 · A STRANGER APPLIES ════════════════════════════════════════════════════════════════
@@ -295,6 +302,38 @@ async function main() {
       }
     }
 
+    // ══ 5 · THE OTHER PUBLIC CAPTURE PAGE ═══════════════════════════════════════════════════
+    // The waitlist is the second way a stranger raises a hand, and it was silent: row written,
+    // contact recorded, event emitted, nobody told. Same assertion shape as the application.
+    console.log('\n5 · The waitlist — the other public form, and the other way to be told');
+    const WL_EMAIL = `waitlist.probe.${STAMP}@${DOMAIN}`;
+    wlEmail = WL_EMAIL;
+    const wlStatus = await page.evaluate(async (p) => {
+      const r = await fetch('/api/waitlist', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: p.email, company_name: p.company, notes: 'source: intake probe',
+          session_id: (() => { try { return sessionStorage.getItem('_rfp_sid'); } catch { return null; } })() }),
+      });
+      return r.status;
+    }, { email: WL_EMAIL, company: `${COMPANY} (waitlist)` });
+    ok(wlStatus >= 200 && wlStatus < 300, 'the waitlist form accepts a sign-up', `HTTP ${wlStatus}`);
+
+    const [wl] = await sql<{ id: string; sessionId: string | null; contactId: string | null }[]>`
+      SELECT id, session_id, contact_id FROM waitlist WHERE email = ${WL_EMAIL}`;
+    wlId = wl?.id ?? null;
+    ok(!!wlId, 'it lands as a waitlist row', wlId ?? 'no row');
+    ok(!!wl?.contactId, 'linked to a person', wl?.contactId ? 'contact linked' : 'no contact');
+    ok(wl?.sessionId === sid, 'carrying the session that brought them', wl?.sessionId ?? 'null');
+
+    const [wlTask] = await sql<{ id: string; assigneeRole: string | null; tenantId: string | null; title: string }[]>`
+      SELECT id, assignee_role, tenant_id, title FROM tasks
+       WHERE entity_type = 'waitlist' AND entity_id = ${wlId}`;
+    ok(!!wlTask, 'AND A HUMAN IS TOLD — a ToDo is raised for it too',
+       wlTask ? wlTask.title : 'NO TASK — a stranger raised a hand and nobody found out');
+    ok(wlTask?.assigneeRole === 'rfp_admin' && wlTask?.tenantId === null,
+       'assigned to rfp_admin at platform scope',
+       wlTask ? `${wlTask.assigneeRole} · ${wlTask.tenantId === null ? 'NULL' : wlTask.tenantId}` : '—');
+
     await page.close();
   } finally {
     // Teardown: only what this drive made.
@@ -312,6 +351,11 @@ async function main() {
         await sql`DELETE FROM system_events WHERE payload->>'applicationId' = ${appId}`;
         await sql`DELETE FROM applications WHERE id = ${appId}::uuid`;
       }
+      if (wlId) {
+        await sql`DELETE FROM tasks WHERE entity_type = 'waitlist' AND entity_id = ${wlId}`;
+        await sql`DELETE FROM waitlist WHERE id = ${wlId}::uuid`;
+      }
+      if (wlEmail) await sql`DELETE FROM contacts WHERE email = ${wlEmail}`;
       if (contactId) await sql`DELETE FROM contacts WHERE id = ${contactId}::uuid`;
       await sql`DELETE FROM page_views     WHERE utm_campaign = 'production-lock'`;
       await sql`DELETE FROM visitor_sessions WHERE session_id NOT IN (SELECT session_id FROM page_views)
