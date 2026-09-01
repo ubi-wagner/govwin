@@ -13,21 +13,21 @@
 
 | kind | files | lines |
 |---|---:|---:|
-| api-route | 285 | 43,262 |
+| api-route | 285 | 43,316 |
 | app-boundary | 5 | 132 |
 | app-component | 26 | 9,173 |
 | auth | 2 | 241 |
-| component | 180 | 46,152 |
+| component | 180 | 46,165 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 461 |
-| lib | 330 | 69,424 |
+| lib | 333 | 69,975 |
 | middleware | 1 | 330 |
 | other | 4 | 157 |
-| page | 122 | 19,664 |
-| script | 209 | 32,673 |
+| page | 123 | 19,911 |
+| script | 177 | 30,573 |
 | server-action | 1 | 45 |
-| test | 242 | 33,726 |
-| **total** | **1494** | **265,304** |
+| test | 244 | 33,926 |
+| **total** | **1468** | **264,269** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -60,6 +60,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/admin/funnel` | app/admin/funnel/page.tsx | server | — | rfp_admin | auth | — | Rate, Link, Stage | yes |
 | `/admin/guardrail-defaults` | app/admin/guardrail-defaults/page.tsx | server | — | rfp_admin | auth | — | GuardrailDefaults | yes |
 | `/admin/intake` | app/admin/intake/page.tsx | server | — | rfp_admin | auth | — | IntakeStageStrip, IntakeForm | yes |
+| `/admin/observe` | app/admin/observe/page.tsx | server | — | rfp_admin | auth | — | Link, Card, Empty | yes |
 | `/admin/opportunities` | app/admin/opportunities/page.tsx | server | — | rfp_admin | auth | — | Stage, OppWatchToggle | yes |
 | `/admin/pipeline` | app/admin/pipeline/page.tsx | server | — | rfp_admin | auth | — | — | yes |
 | `/admin/process` | app/admin/process/page.tsx | server | — | rfp_admin | auth | — | Link, ProcessMonitorClient | yes |
@@ -171,7 +172,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/admin/agents/platform-config` | GET PATCH | app/api/admin/agents/platform-config/route.ts | rfp_admin | auth | — | 12×sql | 5 |
 | `/api/admin/agents/usage` | GET | app/api/admin/agents/usage/route.ts | rfp_admin | auth | — | 4×sql | 5 |
 | `/api/admin/agents/workforce` | GET | app/api/admin/agents/workforce/route.ts | rfp_admin | auth | — | 2×sql | 3 |
-| `/api/admin/applications/[id]/accept` | POST | app/api/admin/applications/[id]/accept/route.ts | rfp_admin | auth | — | 1×sql | 10 |
+| `/api/admin/applications/[id]/accept` | POST | app/api/admin/applications/[id]/accept/route.ts | rfp_admin | auth | — | 1×sql | 11 |
 | `/api/admin/applications/[id]/reject` | POST | app/api/admin/applications/[id]/reject/route.ts | rfp_admin | auth | — | 2×sql | 6 |
 | `/api/admin/applications/[id]/status` | POST | app/api/admin/applications/[id]/status/route.ts | rfp_admin | auth | — | 2×sql | 4 |
 | `/api/admin/architecture/schema` | GET | app/api/admin/architecture/schema/route.ts | rfp_admin | auth | — | — | 1 |
@@ -447,7 +448,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | `/api/stripe/webhook` | POST | app/api/stripe/webhook/route.ts | — (public) | — | — | 5×sql | 12 |
 | `/api/tools/[name]` | POST | app/api/tools/[name]/route.ts | — (public) | withHandler | — | — | 0 |
 | `/api/uploads/[...key]` | GET | app/api/uploads/[...key]/route.ts | — (public) | — | — | — | 1 |
-| `/api/waitlist` | GET POST | app/api/waitlist/route.ts | — (public) | — | — | 2×sql | 5 |
+| `/api/waitlist` | GET POST | app/api/waitlist/route.ts | — (public) | — | — | 2×sql | 6 |
 | `/api/webhooks/postmark` | POST | app/api/webhooks/postmark/route.ts | — (public) | — | — | — | 3 |
 | `/blog/feed.xml` | GET | app/blog/feed.xml/route.ts | — (public) | — | — | — | 0 |
 
@@ -667,7 +668,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 330 files
+## 6. Library modules — 333 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -726,8 +727,8 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/email-templates.ts | server | applicationAcceptedEmail, applicationRejectedEmail, welcomeOnboardedEmail, adminNewApplicationAlert, spotlightDigestEmail, collaboratorInviteEmail +1 | — | **none** |
 | lib/email/drivers/gmail.ts | server | gmailDriver | — | vitest |
 | lib/email/drivers/postmark.ts | server | postmarkDriver | — | vitest |
-| lib/email/index.ts | server | EmailKind, EmailDriver, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult +16 | — | **none** |
-| lib/email/ledger.ts | server | normalizeAddress, suppressionFor, reserve, confirm, recordSuppressed, findSend +6 | 12 | vitest |
+| lib/email/index.ts | server | EmailKind, EmailDriver, OutboundMessage, ResolvedMessage, SenderIdentity, SendResult +17 | — | **none** |
+| lib/email/ledger.ts | server | normalizeAddress, suppressionFor, reserve, confirm, recordSuppressed, findSend +7 | 13 | vitest |
 | lib/email/sender-identity.ts | server | isDefaultPlatformSender, resolveSender, formatFrom | — | vitest |
 | lib/email/types.ts | server | — | — | vitest |
 | lib/embeddings.ts | server | EMBED_DIM, activeEmbedModel, embeddingsEnabled, embedContentHash, toVectorLiteral, isUsableVector +3 | — | vitest |
@@ -787,6 +788,8 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/markdown.ts | server | renderMarkdown | — | **none** |
 | lib/memberships.ts | server | getActiveMemberships, hasActiveMembership | 2 | **none** |
 | lib/numeric-cell.ts | server | parseNumericText, isNumericCell, NUMBER_FORMATS, formatByCode, formatCellDisplay | — | vitest |
+| lib/observe.ts | server | clampWindow, observe, findDiscrepancies | 4 | vitest |
+| lib/onboarding.ts | server | seedProfileFromApplication | 4 | **none** |
 | lib/opportunity-bridge.ts | server | BridgeEventType, buildCardSnapshot, normalizeCard, publishToBridge, copyCorpusInward, fanOutBridgeEvent +5 | 9 | vitest |
 | lib/opportunity-context.ts | server | opportunityContextSlugs | — | vitest |
 | lib/opportunity-pin.ts | server | pinCard, resyncPinnedCard, unpinCard | 3 | **none** |
@@ -1001,6 +1004,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/validation.ts | server | zUuid, isValidUUID, zEmail, zTenantSlug, zDottedName, zPassword +3 | — | vitest |
 | lib/vaults/vaults.ts | server | TENANT_RIGHTS, COLLAB_RIGHTS, resolveVaultAccess, createVault, getVault, listVaults +11 | 17 | **none** |
 | lib/vision.ts | server | describeImage, describeImages | — | vitest |
+| lib/visitor-session.ts | server | VISITOR_SESSION_KEY, visitorSessionId | — | vitest |
 
 ## 7. Framework surfaces (middleware · auth · layouts · boundaries · server actions)
 
@@ -1031,10 +1035,10 @@ statement is per-layer, not one number.
 
 | layer | population | reached by | not reached |
 |---|---:|---|---:|
-| pages | 122 | verify-surfaces (admin + portal trees) | 35 |
+| pages | 123 | verify-surfaces (admin + portal trees) | 35 |
 | API routes (GET) | 156 | verify-api-contract | see that lens's own accounting |
 | API routes (write verbs) | 223 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 330 | vitest 190 · sweep-mold-quality 39 | 101 |
+| lib modules | 333 | vitest 192 · sweep-mold-quality 39 | 102 |
 | components | 206 | only transitively, via a page that renders them | not measured |
 
 **The write verbs are the real gap.** 223 routes expose a POST/PATCH/PUT/DELETE and no lens
@@ -1086,6 +1090,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/tools/library-search-atoms.ts` — 182 lines
 - `lib/projects/closeout.ts` — 177 lines
 - `lib/page-content/howItWorks.ts` — 176 lines
+- `lib/terms.ts` — 176 lines
 - `lib/tools/memory-write.ts` — 175 lines
 - `lib/proposal-archive.ts` — 174 lines
 - `lib/proposal/section-todo.ts` — 160 lines
@@ -1095,6 +1100,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/compliance/shred-audit.ts` — 145 lines
 - `lib/pdf/figure-harvest.ts` — 143 lines
 - `lib/rfp-filename-parser.ts` — 137 lines
+- `lib/onboarding.ts` — 135 lines
 - `lib/page-content/infosec.ts` — 134 lines
 - `lib/automation/prestage-todos.ts` — 127 lines
 - `lib/types/source-anchor.ts` — 126 lines
@@ -1108,7 +1114,6 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/portal-workflow-recommend.ts` — 104 lines
 - `lib/library/house-docs.ts` — 97 lines
 - `lib/provisioning/complete.ts` — 97 lines
-- `lib/terms.ts` — 96 lines
 - `lib/toast.tsx` — 95 lines
 - `lib/page-content/features.ts` — 93 lines
 - `lib/documents/atomize-on-export.ts` — 92 lines
@@ -1121,6 +1126,7 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/library/starter-offer.ts` — 75 lines
 - `lib/import/xlsx-reader.ts` — 73 lines
 - `lib/pdf-parse-quiet.ts` — 72 lines
+- `lib/crypto.ts` — 68 lines
 - `lib/export/chromium.ts` — 68 lines
 - `lib/projects/status-report-data.ts` — 66 lines
 - `lib/proposal-package-review.ts` — 64 lines
@@ -1132,7 +1138,6 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/import/index.ts` — 55 lines
 - `lib/page-content/federal-rd-101.ts` — 54 lines
 - `lib/page-content/customers.ts` — 51 lines
-- `lib/crypto.ts` — 46 lines
 - `lib/page-content/index.ts` — 43 lines
 - `lib/admin/intake-stage-counts.ts` — 42 lines
 - `lib/clean-text.ts` — 40 lines

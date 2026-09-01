@@ -355,6 +355,26 @@ export async function mailStateFor(emails: string[]): Promise<Map<string, Addres
   return out;
 }
 
+/** What was sent in a time window — the observation window's mail panel (lib/observe.ts).
+ *
+ *  Here rather than there because the boundary test means it: the two ledger tables are queried in
+ *  exactly one directory. `/admin/observe` needs the rows; it asks for the rows, not the table.
+ *  Migration 215 also denies both tables to the app role, so a query written elsewhere fails at run
+ *  time in whatever request reached it — which during a live drive is the worst possible moment. */
+export async function sendsSince(since: Date, limit = 100): Promise<Array<{
+  toEmail: string; template: string | null; status: string; createdAt: Date;
+}>> {
+  try {
+    return await sqlBypass`
+      SELECT to_email, template, status, created_at
+        FROM email_send_ledger WHERE created_at >= ${since}
+       ORDER BY created_at DESC LIMIT ${limit}`;
+  } catch (err) {
+    console.error('[email/ledger] sendsSince failed:', err);
+    return [];
+  }
+}
+
 /** Add an address to the suppression list. Idempotent — a second bounce is not an error. */
 export async function suppress(params: {
   email: string;
