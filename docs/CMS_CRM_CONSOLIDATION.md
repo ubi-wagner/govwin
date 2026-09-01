@@ -119,7 +119,19 @@ Two structural facts decide the shape of the merge:
    out when `CMS_PUBLIC_URL` is set. There is no API call, and the pipeline has none either.
 
 The CRM is therefore separable in a way the content half is not: its *engine* can stay where it is,
-and its *subject* belongs beside the ledger. That is docs/CRM_MIGRATION_PLAN.md, unchanged.
+and its *subject* belongs beside the ledger.
+
+**The subject now exists — migration 243, `contacts`, in the main database beside the ledger.** A
+person by normalised email, whether or not they ever convert, written by one function
+(`lib/contacts.ts`) called by both capture routes, and surfaced at `/admin/contacts`. It carries
+deliberately **no `tenant_id` and no `status`**: conversion is derived through
+`applications.contact_id → applications.tenant_id`, because a copy of a fact another table owns is
+the copy that goes stale — and because a `tenant_id` here would expose every un-converted prospect
+to every tenant through the `OR tenant_id IS NULL` arm of `tenant_isolation_select`. Companies and
+deals are not built: a company is `tenants` once they buy and `contacts.company_name` before that,
+and there is no deal stage to model while the sale is one comp code. Canonical:
+**docs/MARKETING_SALES_SYSTEM.md**, which supersedes the forward half of
+docs/CRM_MIGRATION_PLAN.md.
 
 ---
 
@@ -236,11 +248,16 @@ Two guards caught mistakes in this work, both worth recording:
   for the repo's own reason: it scanned raw source, so a header comment *naming* the tables failed
   the check. It strips comments now, and was re-verified against a real query.
 
-### Phase 4 — the CRM's own consolidation
+### Phase 4 — the CRM's own consolidation — **the subject half is DONE**
 
-docs/CRM_MIGRATION_PLAN.md, unchanged and still correct: contacts/companies/deals in the main DB
-beside the ledger; RLS on the seven tenant-bearing CRM tables that have none; retire the 48
-endpoints with no caller or give them a console.
+**Done:** `contacts` in the main DB beside the ledger (mig 243), with the attribution chain already
+attached (mig 242) and read end to end at `/admin/funnel`. Companies and deals were dropped from
+scope rather than deferred — see §2 for why neither has anything to model yet.
+
+**Still open:** RLS on the seven tenant-bearing tables in `cms-postgres` that have none; retire the
+48 endpoints with no caller or give them a console; and the *sending* half — an audience exists and
+nothing composes a campaign against it. Bodies, templates and sequences stay in `cms-postgres`,
+which is what it is good at; every send goes through the one `lib/email` seam.
 
 ### Phase 5 — rename, so the tree stops lying
 
