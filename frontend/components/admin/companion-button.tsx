@@ -49,7 +49,10 @@ export default function CompanionButton({ minutes }: { minutes: number }) {
       {msg && <p className={`mt-2 text-xs ${state === 'error' ? 'text-rose-700' : 'text-gray-500'}`}>{msg}</p>}
       <p className="mt-2 text-xs text-gray-400">
         Advisory only — it reads, it never acts. It will not tell you things are fine: an empty
-        window means nothing happened, not that nothing is wrong.
+        window means nothing happened, not that nothing is wrong. It answers with a{' '}
+        <span className="font-medium text-gray-500">mechanism and a change</span>, never a filename
+        it was not shown. How to ask well, how to read the report and what it cannot see:{' '}
+        <span className="font-mono text-gray-500">docs/OPS_COMPANION_MANUAL.md</span>.
       </p>
     </div>
   );

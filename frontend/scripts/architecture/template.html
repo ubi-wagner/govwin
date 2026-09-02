@@ -445,9 +445,10 @@ function renderLive(){
         <button id="ask-go">Ask the companion (60m)</button>
       </div>
       <p class="askmsg" id="ask-msg" style="color:var(--faint)">Advisory only: it reads the same
-        telemetry window you can see at <code>/admin/observe</code>, plus this activity picture, and
-        says what counting cannot catch. It will not tell you things are fine — an empty window
-        means nothing happened, not that nothing is wrong.</p>
+        telemetry window you can see at <code>/admin/observe</code>, plus this activity picture and
+        the findings the arithmetic already computed, and answers with a MECHANISM and a CHANGE. It
+        will not tell you things are fine — an empty window means nothing happened, not that nothing
+        is wrong. Manual: <code>docs/OPS_COMPANION_MANUAL.md</code>.</p>
     </div>
     <p class="hint">Counters from pg_stat_user_tables. Reads include our own harnesses and lenses —
       a table can look busy because a sweep walked it.</p>`;
