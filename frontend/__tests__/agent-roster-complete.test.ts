@@ -66,9 +66,15 @@ describe('the companion carries a manual, and the manual is not allowed to lie',
   const agent = () => readFileSync(
     join(process.cwd(), '..', 'pipeline', 'src', 'agents', 'archetypes', 'ops_companion.py'), 'utf8');
 
-  it('exists, and the roster points at it', () => {
+  it('exists, and the operator is sent to the ON-PAGE guide rather than a repo path', () => {
     expect(manual().length).toBeGreaterThan(2000);
-    expect(readFileSync(ROSTER_FILE, 'utf8')).toContain('docs/OPS_COMPANION_MANUAL.md');
+    // The roster used to cite `docs/OPS_COMPANION_MANUAL.md`. An rfp_admin has a browser, not a
+    // checkout — pointing the product at a file the product cannot open is the same
+    // producer/consumer defect the roster gap itself was. The repo manual stays as the long
+    // version for whoever maintains it; the roster sends a person to the page.
+    const roster = readFileSync(ROSTER_FILE, 'utf8');
+    expect(roster).not.toContain('docs/OPS_COMPANION_MANUAL.md');
+    expect(roster).toMatch(/guide on Observe/);
   });
 
   /**

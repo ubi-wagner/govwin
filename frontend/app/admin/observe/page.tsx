@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { observe, clampWindow, type Observation } from '@/lib/observe';
 import CompanionButton from '@/components/admin/companion-button';
+import CompanionGuide from './companion-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,6 +107,10 @@ export default async function ObservePage({
         <>
           {/* The companion sits ABOVE the arithmetic, because it reads what counting cannot
               catch — and below the window's own findings, because those are free and always right. */}
+          {/* The guide sits ABOVE the ask, because everything in it is something you want to
+              know BEFORE you spend a call — how to phrase the "doing" line, and what the answer
+              will and will not cover. Collapsed by default; it is a reference, not a banner. */}
+          <CompanionGuide />
           <div className="mb-5"><CompanionButton minutes={mins} /></div>
 
           {/* ── the discrepancies, first, because they are the point ─────────────────────── */}

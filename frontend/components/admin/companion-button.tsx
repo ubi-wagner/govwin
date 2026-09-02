@@ -51,8 +51,9 @@ export default function CompanionButton({ minutes }: { minutes: number }) {
         Advisory only — it reads, it never acts. It will not tell you things are fine: an empty
         window means nothing happened, not that nothing is wrong. It answers with a{' '}
         <span className="font-medium text-gray-500">mechanism and a change</span>, never a filename
-        it was not shown. How to ask well, how to read the report and what it cannot see:{' '}
-        <span className="font-mono text-gray-500">docs/OPS_COMPANION_MANUAL.md</span>.
+        it was not shown. How to ask well, how to read the
+        report and what it cannot see is in{' '}
+        <span className="font-medium text-gray-500">How the companion works</span>, above.
       </p>
     </div>
   );
