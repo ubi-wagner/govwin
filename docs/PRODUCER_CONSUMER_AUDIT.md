@@ -88,6 +88,53 @@ here so a future run does not re-open it.
 
 ---
 
+## The live counterpart — the same question asked of the database
+
+**Added 2026-09-02.** This audit reads **source**: it decides a column is written by finding code
+that writes it. That is its strength (it names the file) and its blind spot (a writer that only runs
+under a condition nobody triggers still counts as a writer, and a `SELECT *` counts as reading
+everything).
+
+`/admin/architecture` → **Live** asks the same question of the running database instead, from
+`pg_stat_user_tables`, and the two disagree in useful ways:
+
+|  | this audit | the Live tab |
+|---|---|---|
+| evidence | code that mentions the column | counters the database kept |
+| grain | per **column** | per **table** |
+| blind to | a writer that never actually runs | which column, and who wrote it |
+| verdict | "no code writes this" | "nothing wrote this in the last N" |
+
+The four classes it paints are **live** (written and read), **read only**, **written and never
+read** — the producer-with-no-consumer shape stated by Postgres rather than inferred — and
+**untouched**. Implementation and the exact predicates: `frontend/lib/architecture-live.ts`.
+
+**The epoch is the whole instrument, and it is usually missing.** Those counters run from
+`pg_stat_database.stats_reset`, which is frequently NULL — Postgres is not saying how far back they
+go, and statistics do not survive a crash or a `pg_dump`. So "untouched" means *untouched since an
+unknown moment*, which is a different claim from "nothing writes this". The endpoint returns
+`anchored: false` in that case and the tab renders coverage language ("not touched in this reading")
+rather than finding language. When it IS anchored, the tab states the span exactly and judges
+nothing — after a full lane sweep a quiet table is a finding, eight minutes after a reset it is a
+short reading, and no threshold in the code can tell those apart.
+
+Anchor it deliberately and it becomes a **coverage map for a drive**:
+
+```
+psql "$DATABASE_URL_OWNER" -c 'SELECT pg_stat_reset()'   # mark the start
+…drive the product…                                      # a lane, a lens, a customer journey
+open /admin/architecture → Live                          # what the drive never reached
+```
+
+First run of exactly that: `verify-surfaces` renders all 86 addressable admin and portal surfaces,
+and afterwards **38 tables had still not been touched** — among them `canvas_versions`,
+`proposal_comments`, `proposal_artifacts` and `proposal_stage_history` (they need actions, not page
+loads), the four agent-memory tables (no agent ran), and `atom_embeddings` (the embed engine was
+off). That is a precise statement of what a render sweep is and is not evidence for, which no
+source-reading instrument can produce.
+
+---
+
 ## How to read a run
 
 * **§1 read, never written** — the dangerous cell. A consumer waiting for a producer. Check whether

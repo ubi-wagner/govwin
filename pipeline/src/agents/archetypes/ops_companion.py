@@ -4,8 +4,18 @@ Ops Companion -- the admin's second pair of eyes  (PLATFORM-SCOPE / our-org)
 ================================================================================
 ROLE:       Walks the lower decks while the admin is on the bridge. Given a
             window of what the system ACTUALLY did -- events, work items, mail,
-            agent calls, workflows -- it reports what it noticed, what it does
-            not believe, and what it would check next. Advisory only.
+            agent calls, workflows, and which tables anything is writing or
+            reading -- it reports what it noticed, what it does not believe, and
+            what it would check next. Advisory only.
+
+WHERE IT LIVES
+--------------
+On the architecture map. `/admin/architecture` -> Live is the surface: the same
+per-table activity this agent reads, painted onto the schema the admin already
+navigates, with the ask button beside it. That is deliberate -- everything this
+companion notices is a fact about an edge or a node on that map, so the map is
+where the question gets asked and where the answer makes sense. The temporal
+half of the same window is at `/admin/observe`.
 
 SCOPE:      PLATFORM / our-org. No tenant descent, no tenant_id in the tool
             schema, no business-table write of any kind. It reads OUR telEmetry,
@@ -126,6 +136,48 @@ async def _observation_window(conn, minutes: int) -> dict[str, Any]:
         str(m),
     )
 
+    # ── the structural half: what the tables themselves say ──────────────────────────────────
+    # The five reads above are TEMPORAL — what happened in the last N minutes. This one is
+    # STRUCTURAL: which tables anything writes and anything reads, cumulatively, straight from
+    # Postgres's own statistics collector. It is the same picture the admin has in front of them
+    # on the architecture map's Live tab (frontend/lib/architecture-live.ts), which is the point:
+    # the companion and the human should be looking at one thing, not two.
+    #
+    # FACTS ONLY, AND DELIBERATELY NO CLASSIFICATION. The four-class rule (live / read only /
+    # written-never-read / untouched) is computed once, in TypeScript, and shown to the human.
+    # Re-deriving it here would give the platform two implementations of one judgement that can
+    # disagree — the exact thing this file refuses to do with the discrepancy checks above. So the
+    # agent gets writes and reads per table, ordered, and does its own noticing.
+    activity = await conn.fetch(
+        """
+        SELECT relname,
+               (n_tup_ins + n_tup_upd + n_tup_del)::bigint          AS writes,
+               (COALESCE(seq_scan, 0) + COALESCE(idx_scan, 0))::bigint AS reads
+          FROM pg_stat_user_tables
+         ORDER BY writes DESC, reads DESC
+         LIMIT 40
+        """
+    )
+    quiet = await conn.fetchrow(
+        """
+        SELECT count(*) FILTER (WHERE n_tup_ins + n_tup_upd + n_tup_del = 0
+                                  AND COALESCE(seq_scan, 0) + COALESCE(idx_scan, 0) = 0) AS untouched,
+               count(*) AS total
+          FROM pg_stat_user_tables
+        """
+    )
+    # The epoch, which is the whole instrument: these counters run from stats_reset, and that is
+    # very often NULL — Postgres is not saying how far back they go. Handing the numbers over
+    # without it would invite the agent to report "nothing writes this" from evidence that only
+    # supports "nothing wrote this during a span of unknown length".
+    epoch = await conn.fetchrow(
+        """
+        SELECT stats_reset, pg_postmaster_start_time() AS server_start
+          FROM pg_stat_database WHERE datname = current_database()
+        """
+    )
+    stats_reset = epoch["stats_reset"] if epoch else None
+
     def rows(rs, keys):
         return [{k: (v.isoformat() if hasattr(v, "isoformat") else v)
                  for k, v in dict(r).items() if k in keys} for r in rs]
@@ -141,6 +193,19 @@ async def _observation_window(conn, minutes: int) -> dict[str, Any]:
         "mail": rows(mail, {"template", "status", "error", "created_at"}),
         "agents": rows(agents, {"tool_name", "success", "error_code", "duration_ms", "created_at"}),
         "workflows": rows(workflows, {"workflow_name", "status", "current_step", "created_at", "updated_at"}),
+        # The structural picture. Same source as the architecture map's Live tab.
+        "table_activity": {
+            "epoch": stats_reset.isoformat() if stats_reset else None,
+            # False means the counters are real and their SPAN is not. Everything under `busiest`
+            # and `untouched_table_count` then supports "not in this reading", never "never".
+            "anchored": stats_reset is not None,
+            "server_started": (epoch["server_start"].isoformat()
+                               if epoch and epoch["server_start"] else None),
+            "busiest": rows(activity, {"relname", "writes", "reads"}),
+            "busiest_is_top_n": 40,
+            "untouched_table_count": int(quiet["untouched"]) if quiet else None,
+            "table_count": int(quiet["total"]) if quiet else None,
+        },
         # The single most important flag in the payload. An empty window is not a clean bill of
         # health, and the prompt is told to say so rather than to reassure.
         "nothing_happened": len(events) == 0,
@@ -196,6 +261,11 @@ The admin's screen already counts, by arithmetic: an operation that started and 
 - an operation that took an order of magnitude longer than its siblings
 - a thing that is right today only because a value happened to be null
 
+THE WINDOW HAS TWO HALVES, AND THE SECOND HAS A TRAP IN IT.
+Alongside the last N minutes you also get `table_activity`: cumulative write and read counts per table, straight from the database's own statistics collector. It is the same picture the admin has on the architecture map's Live tab, which is the point — you are both looking at one thing. Use it to notice a table taking writes with no reads against it (rows going in that nothing selects), or a subsystem that the work in this window should plainly have touched and did not.
+
+THE TRAP: those counters run from an epoch. `anchored` says whether the database knows what that epoch is, and when it does, `epoch` says when. Neither ever licenses "nothing writes this table" — a quiet table means nothing was driven through it during that span, and a span of one minute and a span of a week look identical in the counts. Say what the evidence says: "nothing touched this in the N minutes since the counters were anchored", or, unanchored, "nothing touched this during this reading". If the span is short, say that it is short rather than reporting a long list of quiet tables as though it were a finding.
+
 AND THE OTHER HALF. Leakproof is table stakes. Also notice what would make this BETTER for the person using it: an empty state that says nothing useful, a step that asks for something the customer already provided, a number presented with more confidence than the data earns. Same skepticism, warmer job.
 
 RULES
@@ -221,7 +291,10 @@ Output ONE JSON object, no prose outside it."""
                 "description": (
                     "What the system actually did in the last N minutes: events (with phase and "
                     "error), work items raised, mail attempted, agent tool calls, and workflow "
-                    "instances. Facts only — the deterministic discrepancy checks are computed "
+                    "instances — plus `table_activity`, the cumulative per-table write and read "
+                    "counts from the database's statistics collector, with the epoch they run from "
+                    "and an `anchored` flag saying whether that epoch is known. Facts only — the "
+                    "deterministic discrepancy checks and the table classification are computed "
                     "elsewhere and already shown to the admin. Call once."
                 ),
                 "input_schema": {

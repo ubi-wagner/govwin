@@ -32,7 +32,7 @@ def test_registered_and_action_mapped():
     assert "amendment_monitor" in fabric._archetypes
     assert TOOL_ACTION_TO_ARCHETYPE.get("tool.solicitation.amendment_delta") == "amendment_monitor"
     # roster unchanged — this wakes an existing archetype, it does not add one
-    assert len(_ARCHETYPE_CLASSES) == 38   # +project_manager (A1)
+    assert len(_ARCHETYPE_CLASSES) == 39   # +ops_companion (admin companion)
 
 
 # ── Trigger handling ─────────────────────────────────────────────────────────

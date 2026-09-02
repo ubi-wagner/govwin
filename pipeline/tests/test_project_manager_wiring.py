@@ -40,7 +40,7 @@ def test_registered_and_action_mapped():
     assert "project_manager" in fabric._archetypes
     assert TOOL_ACTION_TO_ARCHETYPE.get("tool.project.assess_health") == "project_manager"
     # project_manager was the 37th; status_narrator (A2) then made it 38
-    assert len(_ARCHETYPE_CLASSES) == 38
+    assert len(_ARCHETYPE_CLASSES) == 39
 
 
 def test_step_only_never_event_dispatched():

@@ -147,6 +147,46 @@ the guardrail gate. A bespoke chat endpoint would have to re-earn every one of t
 
 ---
 
+## 4a. Where it lives: on the architecture map
+
+**Decided and built 2026-09-02.** The companion's home is `/admin/architecture` → **Live**, not a
+button on a page of its own.
+
+The reason is that everything this companion notices is a fact about an **edge or a node on that
+map**. A producer with no consumer is a one-way edge. A table taking writes nobody reads is a node
+with one wire. A workflow that started and never advanced is a stalled trace. Put the ask button
+anywhere else and it is a chat box; put it on the map and the question has a subject.
+
+The explorer had three layers, all of which describe what the system **is**: the extracted schema
+(140 tables, 309 FKs), the curated meaning (subsystems, traces, the UI map), and the deep links
+between them. None of them said whether any of it was **doing anything**. The Live layer is the
+fourth, and it is the one the companion and the human share:
+
+```
+   /api/admin/architecture/live  ──┬──▶  the Live tab       (a human reads the map)
+   pg_stat_user_tables            └──▶  ops_companion       (the agent reads the same numbers)
+```
+
+**One picture, two readers.** That is the "you hear like we do" principle made literal: the agent is
+not given a private view it can report from and nobody can check. Its window carries the same
+per-table write/read counts, the same epoch, and the same `anchored` flag the tab renders.
+
+**But only one of them classifies.** The four-class rule — live / read only / written-never-read /
+untouched — is computed once, in `frontend/lib/architecture-live.ts`, and shown to the human. The
+agent gets ordered facts and does its own noticing. Re-deriving the classification in Python would
+give the platform two implementations of one judgement that can drift apart, and an assistant that
+disagrees with the screen it is assisting with is worse than none. `test_ops_companion_scope.py`
+asserts the Python side stays fact-only.
+
+**What the map refuses to say.** The counters run from an epoch that Postgres often does not know,
+so the tab renders "not touched in this reading" rather than "nothing writes this", and when the
+epoch IS known it states the span and judges nothing — a first draft called a quiet table a finding
+"in a span this long", and the very first anchored reading was one minute old with 121 quiet tables
+sitting under that sentence. There is no principled threshold: whether silence means anything
+depends entirely on what was driven. The prompt carries the same instruction.
+
+---
+
 ## 4b. The curation loop — the machine reports, the human curates, the board keeps
 
 **Decided 2026-09-01.** The nightly verification run and the notes board are deliberately NOT

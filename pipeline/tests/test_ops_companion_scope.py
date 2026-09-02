@@ -65,6 +65,28 @@ def test_the_window_query_selects_no_tenant_id_and_no_recipient() -> None:
     )
 
 
+def test_the_structural_half_carries_its_epoch_and_classifies_nothing() -> None:
+    """The table-activity read is FACTS. Two properties keep it honest.
+
+    First, the epoch travels with the numbers. `pg_stat` counters run from `stats_reset`, which is
+    frequently NULL — so a table with no writes may simply not have been written *during a span of
+    unknown length*. Handing over the counts without `anchored` would invite the agent to report
+    "nothing writes this" from evidence that only supports "nothing wrote this recently", which is
+    exactly the confident wrongness this whole role exists to catch.
+
+    Second, it does NOT re-derive the four-class rule. That classification is computed once in
+    `frontend/lib/architecture-live.ts` and shown to the human on the architecture map; a second
+    implementation here could disagree with the admin's own screen, and a diagnostic that disagrees
+    with the surface it is diagnosing is worse than none.
+    """
+    src = inspect.getsource(_observation_window)
+    assert "pg_stat_user_tables" in src, "the structural half must read the statistics collector"
+    assert '"anchored"' in src and "stats_reset" in src, "the epoch must travel with the counters"
+    # Ordering and zero-tests are fine; a class vocabulary here would mean a second implementation.
+    for word in ("written_unread", "read_only", "klass"):
+        assert word not in src, f"ops_companion is re-deriving the UI's classification: {word}"
+
+
 def test_the_tool_result_is_fenced() -> None:
     src = inspect.getsource(OpsCompanionArchetype.execute_tool)
     assert "untrusted_window" in src, "the payload must be named as untrusted"
