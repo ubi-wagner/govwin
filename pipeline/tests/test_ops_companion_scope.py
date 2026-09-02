@@ -140,6 +140,55 @@ def test_the_warm_half_is_structural_and_cannot_be_dropped() -> None:
     )
 
 
+def test_the_findings_are_handed_over_and_the_job_is_the_fix() -> None:
+    """Detection is counted; diagnosis is this agent. The cut used to be in the wrong place.
+
+    The first version told the agent to IGNORE the deterministic findings and notice something
+    else. But counting is good at establishing THAT something is wrong and has nothing to say
+    about WHY or WHAT TO CHANGE — which is the whole of the work, and exactly what a person does
+    with those findings by hand.
+
+    So the doorbell route computes them ONCE, in `lib/observe.ts`, and passes them in the payload.
+    Two properties are asserted: they arrive as settled facts the agent must not restate, and the
+    report's required output is a FIX — a mechanism and a change — not another observation.
+    """
+    a = OpsCompanionArchetype()
+    finding = {"severity": "finding", "what": "operation started and never finished — x:y",
+               "detail": "by kate", "meaning": "a throw walked out of the bracket"}
+    ask = "\n".join(m["content"] for m in
+                    a.build_messages({"payload": {"minutes": 30, "findings": [finding]}}, []))
+
+    assert "operation started and never finished" in ask, "the handed findings never reached the ask"
+    assert "<findings" in ask, "the findings must be delimited — they are facts, not the question"
+    assert "not restate" in ask.lower() or "do not restate" in ask.lower()
+    assert "MECHANISM" in ask and "CHANGE" in ask, "the ask must name what the answer has to contain"
+
+    for field in ('"fixes"', '"why_it_happens"', '"change"', '"how_to_settle_it"', '"unexplained"'):
+        assert field in ask, f"{field} is not in the output schema — the report is still an observation"
+
+    # An empty findings list must not read as health, and a failure to compute them must not
+    # read as health either. Both are gaps in what the agent can see, and both are said out loud.
+    clean = "\n".join(m["content"] for m in a.build_messages({"payload": {"minutes": 30}}, []))
+    assert "not a clean bill" in clean.lower(), "an empty findings list is being presented as health"
+    broken = "\n".join(m["content"] for m in
+                       a.build_messages({"payload": {"minutes": 30, "findingsError": "db down"}}, []))
+    assert "could_not_see" in broken, "a failure to compute the findings must land in could_not_see"
+
+
+def test_it_never_invents_a_location_it_was_not_shown() -> None:
+    """It has no source tree, and a plausible wrong path costs more than an honest description.
+
+    A fix that names `lib/proposal-advance.ts:214` reads as authoritative and sends the reader to a
+    line that may have nothing to do with it. The telemetry DOES carry enough to name a mechanism —
+    an event type, a workflow step, a table, a task role — so the instruction is to use those.
+    """
+    p = OpsCompanionArchetype().system_prompt
+    assert "never invent a filename" in p.lower()
+    assert "do not have the source tree" in p.lower() or "no source tree" in p.lower()
+    ask = "\n".join(m["content"] for m in OpsCompanionArchetype().build_messages({"payload": {}}, []))
+    assert "NEVER a filename you were not shown" in ask
+
+
 def test_it_claims_no_write_capability() -> None:
     """Advisory means advisory: no write tool, and nothing in the class that mutates."""
     a = OpsCompanionArchetype()

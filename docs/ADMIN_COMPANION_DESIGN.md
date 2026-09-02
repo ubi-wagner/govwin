@@ -187,6 +187,72 @@ depends entirely on what was driven. The prompt carries the same instruction.
 
 ---
 
+## 4d. Detection is counted; diagnosis is the agent
+
+**Changed 2026-09-02.** The cut between the arithmetic and the companion was in the wrong place.
+
+The first version told the agent to **ignore** the deterministic findings and notice something
+else. But counting is good at establishing *that* something is wrong and has nothing whatever to
+say about *why* or *what to change* — and that is the whole of the work. It is exactly what a
+person does with those findings by hand.
+
+So the doorbell route (`POST /api/admin/observe`, which both the `/admin/observe` button and the
+architecture map's **Live** tab post to) now runs `observe(minutes)` itself and **hands the
+findings over in the event payload**:
+
+```
+  lib/observe.ts  ──arithmetic──▶  the admin's screen
+        │                                              ONE implementation, so the agent
+        └──────event payload──────▶  ops_companion      can never contradict the screen
+```
+
+The report's required output is a **fix**, not another observation:
+
+```json
+"fixes": [{ "what": …, "where": "the mechanism — an event type, a workflow step, a table,
+                                  a task role. NEVER a filename you were not shown",
+            "why_it_happens": "the mechanism, not the symptom",
+            "change": "concrete enough to act on without a second conversation",
+            "confidence": …, "how_to_settle_it": "the one check that would confirm or kill this" }],
+"unexplained": ["a finding it could NOT reach the mechanism for — naming it beats a guess"]
+```
+
+**It has no source tree, and that is stated rather than papered over.** A fix that names
+`lib/proposal-advance.ts:214` reads as authoritative and may send the reader to an unrelated line.
+The telemetry carries enough to name a mechanism precisely — so "the step that waits on
+`proposal.section_locked`" is required and a guessed path is forbidden.
+
+**An empty findings list is not health, and neither is a failed one.** Three states, three
+messages: findings handed over as settled facts; "the deterministic checks found nothing — that
+means nothing they can *count* went wrong"; and "the findings could not be computed, which is a gap
+in what you can see". `test_ops_companion_scope.py` asserts all three, red-tested against the
+previous agent.
+
+### The first thing the loop caught was the loop itself
+
+Wiring the doorbell to hand findings over immediately surfaced one — `finder:ingest.run.start`
+"started and never finished" — and it was **false**. There are two bracket conventions in this
+codebase:
+
+| | shape | where |
+|---|---|---|
+| one type, two phases | `type='x'`, `phase` start\|end | the TS spine (`withEventBracket`) |
+| two types, two phases | `x.start` / `x.end` | `pipeline/src/ingest/base.py` |
+
+`findDiscrepancies` keyed on `namespace:type` and knew only the first, so **all 28 balanced
+`finder:ingest.run` pairs read as 28 unclosed brackets** — and had, for as long as the check
+existed. Noise on a screen; a *false fact stated with authority* the moment it started feeding an
+agent that would then diagnose a mechanism for it. **An instrument that feeds another instrument
+has to be right about more than the average case.**
+
+Fixed by normalising the `.start`/`.end` suffix, with a control test proving a genuinely open
+bracket still reports. The same finding also now carries **how long it has been open**, because a
+window is `[now-N, now]` and an operation still in flight is indistinguishable from one that threw
+— there is no honest threshold (a 6-minute export in a 5-minute window is legitimately open), so
+the age is stated and the reader judges. Same rule as the Live tab's epoch.
+
+---
+
 ## 4c. The two halves: never-trust on our side, luxury on theirs
 
 **Decided and built 2026-09-02.** Leakproof is table stakes — a hull that does not leak is what

@@ -31,10 +31,41 @@ describe('observation window · discrepancies', () => {
     expect(run([ev({}), ev({ type: 'section.locked' })])).toEqual([]);
   });
 
+  it('THE FALSE POSITIVE: the two-TYPE bracket convention closes too', () => {
+    // `pipeline/src/ingest/base.py` emits `ingest.run.start` and `ingest.run.end` as two different
+    // TYPES, each with its matching phase — not one type with two phases, which is what the TS
+    // spine does. Keying on `namespace:type` matched only the second convention, so 28 balanced
+    // pairs in the live database read as 28 unclosed brackets, every time, for as long as this
+    // check has existed. It became urgent the moment the doorbell began HANDING FINDINGS TO THE
+    // AGENT: noise is one thing, a false fact stated with authority for a model to diagnose is
+    // another.
+    const closed = run([
+      ev({ namespace: 'finder', phase: 'start', type: 'ingest.run.start' }),
+      ev({ namespace: 'finder', phase: 'end', type: 'ingest.run.end' }),
+    ]);
+    expect(closed).toEqual([]);
+  });
+
+  it('…and normalising the suffix does not make a genuinely open bracket disappear', () => {
+    // The control. A fix that suppresses the false positive by suppressing the check is not a fix.
+    const open = run([ev({ namespace: 'finder', phase: 'start', type: 'ingest.run.start' })]);
+    expect(open).toHaveLength(1);
+    expect(open[0].what).toMatch(/finder:ingest\.run$/);
+  });
+
+  it('reports how long it has been open, because "still running" looks identical', () => {
+    // A window is [now-N, now]: an operation that began inside it and has not finished yet is
+    // indistinguishable from one that threw. There is no honest threshold — a 6-minute export in a
+    // 5-minute window is legitimately open — so the age is stated and the reader judges.
+    const open = run([ev({ phase: 'start', type: 'package.requested', createdAt: new Date(Date.now() - 300_000) })]);
+    expect(open[0].detail).toMatch(/open for 5m/);
+    expect(open[0].meaning).toMatch(/still\s+running/);
+  });
+
   it('a start with no end is a finding; a matched pair is not', () => {
     const unclosed = run([ev({ phase: 'start', type: 'package.requested' })]);
     expect(unclosed.map((d) => d.severity)).toContain('finding');
-    expect(unclosed[0].what).toMatch(/started and never finished/);
+    expect(unclosed[0].what).toMatch(/started and has not finished/);
 
     const closed = run([
       ev({ phase: 'start', type: 'package.requested' }),

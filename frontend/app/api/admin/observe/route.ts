@@ -15,7 +15,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { withEventBracket, userActor } from '@/lib/events';
-import { clampWindow } from '@/lib/observe';
+import { clampWindow, observe } from '@/lib/observe';
 
 export async function POST(request: Request) {
   try {
@@ -37,6 +37,31 @@ export async function POST(request: Request) {
     // by the agent as a CLAIM to check rather than a description to accept.
     const doing = typeof body.doing === 'string' ? body.doing.trim().slice(0, 500) : null;
 
+    /**
+     * HAND THE AGENT THE FINDINGS — do not make it re-derive them.
+     *
+     * The arithmetic that spots an unclosed event bracket, a mail row reserved and never
+     * confirmed, a workflow that never advanced, a task raised into a role no queue reads, lives
+     * in `lib/observe.ts` and runs HERE, in TypeScript, once. It travels in the payload.
+     *
+     * The earlier version told the agent to ignore all of that and notice something else. That was
+     * the wrong division: the arithmetic is good at finding THAT something is wrong and has
+     * nothing to say about WHY or WHAT TO CHANGE — which is the whole of the work. Recomputing it
+     * on the Python side would have given the platform two implementations of one judgement that
+     * can disagree with the admin's own screen; passing it means there is exactly one.
+     *
+     * Failure here is non-fatal on purpose: a companion asked for a read should still get one, and
+     * a null `findings` is a smaller loss than no read at all. It is said out loud either way.
+     */
+    let findings: unknown[] = [];
+    let findingsError: string | null = null;
+    try {
+      findings = (await observe(minutes)).discrepancies;
+    } catch (e) {
+      console.error('[admin/observe] could not compute findings for the companion:', e);
+      findingsError = 'the deterministic findings could not be computed for this request';
+    }
+
     // withEventBracket, not a hand-rolled start/end pair. The event-contract test caught the
     // hand-rolled version here: its catch returned without closing the bracket, so a throw would
     // have left the start row unterminated forever. That is B139 — 31 handlers shipped with
@@ -46,12 +71,12 @@ export async function POST(request: Request) {
         namespace: 'system',
         type: 'observation.requested',
         actor: userActor(su.id!, su.email),
-        payload: { minutes, doing },
+        payload: { minutes, doing, findings, findingsError },
       },
-      async () => ({ result: { minutes, requested: true }, value: null }),
+      async () => ({ result: { minutes, requested: true, findingCount: findings.length }, value: null }),
     );
 
-    return NextResponse.json({ data: { minutes, requested: true } });
+    return NextResponse.json({ data: { minutes, requested: true, findingCount: findings.length } });
   } catch (error) {
     console.error('[admin/observe] error:', error);
     return NextResponse.json({ error: 'Failed to request the read', code: 'DB_ERROR' }, { status: 500 });

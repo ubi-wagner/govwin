@@ -138,16 +138,36 @@ export function findDiscrepancies(
   // ── a bracket that opened and never closed ────────────────────────────────────────────────
   // `emitEventStart` must be matched by an `end` on EVERY exit path. 31 handlers once returned
   // from a catch without closing (B139), which is invisible except by counting.
+  //
+  // ⚠️ THERE ARE TWO BRACKET CONVENTIONS AND THIS ONCE KNEW ONLY ONE.
+  //   · the TS spine: one type, `phase` start|end        (`withEventBracket`)
+  //   · the Python ingest spine: TWO types, `ingest.run.start` / `ingest.run.end`, each with its
+  //     matching phase                                    (`pipeline/src/ingest/base.py`)
+  //
+  // Keying on `namespace:type` matched only the first, so all 28 balanced `finder:ingest.run`
+  // pairs read as 28 unclosed brackets. It had been reporting that for as long as it existed, and
+  // the moment the doorbell started HANDING FINDINGS TO THE AGENT it got worse than noise: a false
+  // fact stated with authority, which the companion would then diagnose a mechanism for. An
+  // instrument that feeds another instrument has to be right about more than the average case.
+  const bracketKey = (e: ObservedEvent) => `${e.namespace}:${e.type.replace(/\.(start|end)$/, '')}`;
   const starts = new Map<string, ObservedEvent>();
-  for (const e of events) if (e.phase === 'start') starts.set(`${e.namespace}:${e.type}`, e);
-  for (const e of events) if (e.phase === 'end') starts.delete(`${e.namespace}:${e.type}`);
+  for (const e of events) if (e.phase === 'start') starts.set(bracketKey(e), e);
+  for (const e of events) if (e.phase === 'end') starts.delete(bracketKey(e));
   for (const [key, e] of starts) {
+    // AND THE SECOND CAUSE, SAID OUT LOUD. A window is [now-N, now]; an operation that began
+    // inside it and has not finished yet looks identical to one that threw. There is no
+    // non-arbitrary threshold that separates them — a 6-minute export in a 5-minute window is
+    // legitimately open — so the age is reported and the reader judges, the same rule the
+    // architecture map's Live tab follows for its epoch.
+    const ageSec = Math.max(0, Math.round((Date.now() - e.createdAt.getTime()) / 1000));
     out.push({
       severity: 'finding',
-      what: `operation started and never finished — ${key}`,
-      detail: `by ${e.actorEmail ?? 'system'} at ${e.createdAt.toISOString().slice(11, 19)}`,
-      meaning: 'a throw walked out of the event bracket, so the operation has no recorded outcome. '
-        + 'Use withEventBracket() — see docs/AUTOMATION_SPINE_AUDIT.md (B139).',
+      what: `operation started and has not finished — ${key}`,
+      detail: `by ${e.actorEmail ?? 'system'} at ${e.createdAt.toISOString().slice(11, 19)}`
+        + ` · open for ${ageSec < 90 ? `${ageSec}s` : `${Math.round(ageSec / 60)}m`}`,
+      meaning: 'either a throw walked out of the event bracket, so the operation has no recorded '
+        + 'outcome (use withEventBracket() — docs/AUTOMATION_SPINE_AUDIT.md, B139), or it is still '
+        + 'running. The age above is what separates them, and only you know how long this one takes.',
     });
   }
 
