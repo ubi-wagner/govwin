@@ -41,7 +41,7 @@
 import type { Page } from 'playwright';
 
 export interface Finding {
-  kind: 'brokenValue' | 'identifier' | 'jargon' | 'deadEnd';
+  kind: 'brokenValue' | 'identifier' | 'jargon' | 'deadEnd' | 'rawTimestamp' | 'unlabeledControl' | 'brokenLink';
   /** The offending text, trimmed to something a human can recognise on the page. */
   text: string;
   /** Where it sits, as a coarse selector path — enough to find it, not a brittle locator. */
@@ -64,6 +64,15 @@ async function proseNodes(page: Page): Promise<Array<{ text: string; where: stri
     // Both loops below are written out for that reason, not for want of a helper.
     const SKIP_TAG = new Set(['PRE', 'CODE', 'KBD', 'SAMP', 'SCRIPT', 'STYLE', 'NOSCRIPT',
       'INPUT', 'TEXTAREA', 'SELECT', 'OPTION', 'SVG', 'PATH']);
+    // `data-user-content` marks text a PERSON wrote that the page is displaying — a note, a
+    // comment, an application. It is the same structural discriminator B127 forced on
+    // `error-surface.mjs`: an event monitor rendering an error is not a broken page, and a notes
+    // board where somebody wrote "the counters read NaN" is not a page with a NaN on it. The first
+    // version reported exactly that, on notes written an hour earlier by this session.
+    //
+    // The marker is on the PRODUCT, not in a list here, and that is deliberate: a surface that
+    // renders user text and does not say so is itself the finding — nobody downstream can tell
+    // our prose from theirs, and neither can an injection fence.
     const out: Array<{ text: string; where: string }> = [];
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
@@ -75,6 +84,7 @@ async function proseNodes(page: Page): Promise<Array<{ text: string; where: stri
       for (let a: Element | null = el; a; a = a.parentElement) {
         const font = getComputedStyle(a).fontFamily.toLowerCase();
         if (SKIP_TAG.has(a.tagName) || a.getAttribute('aria-hidden') === 'true'
+          || a.hasAttribute('data-user-content')
           || font.includes('mono') || font.includes('courier') || font.includes('consolas')) {
           excluded = true; break;
         }
@@ -136,10 +146,20 @@ export async function visibleJargon(page: Page): Promise<Finding[]> {
   const nodes = await proseNodes(page);
   const TOKEN = /(?:^|[\s(])([a-z][a-z0-9]*(?:[_.][a-z0-9]+){1,4})(?=$|[\s.,;:)])/;
   const ALLOW = /\.(com|org|net|io|gov|edu|pdf|docx|pptx|xlsx|csv|md|json)$/;
+  // Abbreviations are PROSE. The first version reported `e.g` three times, from our own template
+  // placeholder copy ("[drivers — e.g., procurement reform]") — copy somebody wrote deliberately,
+  // in the one place on the tenant surface where guidance text lives. A rule that fires on good
+  // writing is not a stricter rule, it is a broken one: it would have pushed the next person to
+  // reword a helpful placeholder to satisfy a check.
+  const ABBREV = new Set(['e.g', 'i.e', 'etc', 'vs', 'viz', 'cf', 'et.al', 'a.m', 'p.m',
+    'u.s', 'u.k', 'ph.d', 'no', 'approx', 'est']);
   const out: Finding[] = [];
   for (const n of nodes) {
     const m = TOKEN.exec(n.text);
-    if (!m || ALLOW.test(m[1])) continue;
+    if (!m || ALLOW.test(m[1]) || ABBREV.has(m[1])) continue;
+    // A dotted token whose every segment is one or two letters is an abbreviation nobody has
+    // listed yet, not an identifier — `sam_gov` and `workflow_manager` both survive this.
+    if (m[1].includes('.') && m[1].split('.').every((seg) => seg.length <= 2)) continue;
     out.push({ kind: 'jargon', text: `${m[1]} — “${n.text.slice(0, 80)}”`, where: n.where });
   }
   return out;
@@ -179,10 +199,99 @@ export async function deadEndPage(page: Page): Promise<Finding[]> {
   });
 }
 
-/** All four, in one pass, in a stable order. */
+/**
+ * A machine timestamp shown to a person: `2026-09-02T00:01:33.433Z`, or a bare epoch.
+ *
+ * The product has `<TimeAgo>` and `isoDate()` for this, and a raw ISO string beside them reads as a
+ * field somebody forgot to format. Deliberately narrow — a plain `2026-09-02` is a date a person
+ * can read, so only the T-and-offset form counts.
+ */
+export async function rawTimestamps(page: Page): Promise<Finding[]> {
+  const nodes = await proseNodes(page);
+  const ISO = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?/;
+  const EPOCH = /(^|\s)1[6-9]\d{11}(\s|$)/;                 // ms since epoch, this decade
+  return nodes.filter((n) => ISO.test(n.text) || EPOCH.test(n.text))
+    .map((n) => ({ kind: 'rawTimestamp' as const, text: n.text.slice(0, 90), where: n.where }));
+}
+
+/**
+ * A control with no accessible name — an icon button nobody can describe.
+ *
+ * This is the finish defect that is also an accessibility defect: a screen reader announces
+ * "button", and a person using a pointer has to guess from a glyph. Counted only for controls that
+ * are actually visible, and only when there is NO name from any source — text, aria-label,
+ * aria-labelledby, title, or an image's alt.
+ */
+export async function unlabeledControls(page: Page): Promise<Finding[]> {
+  return page.evaluate(() => {
+    // No named helpers here — see the note in proseNodes.
+    const out: Array<{ kind: 'unlabeledControl'; text: string; where: string }> = [];
+    const els = document.querySelectorAll('button, a[href], [role="button"], input[type="submit"]');
+    for (const el of Array.from(els)) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      if (el.getAttribute('aria-hidden') === 'true') continue;
+      // EVERY source is considered, not the first truthy one. The control fixture caught the
+      // first version doing `textContent || ariaLabel || …`: an icon button reading "✕" with a
+      // perfectly good `aria-label="Dismiss"` never reached the label, because the glyph is
+      // truthy — so a correctly-labelled button was reported as unlabelled. A `||` chain is the
+      // wrong shape for "is it named ANYWHERE".
+      const sources = [
+        (el.textContent || '').trim(),
+        el.getAttribute('aria-label') || '',
+        el.getAttribute('title') || '',
+        el.getAttribute('alt') || '',
+        el.getAttribute('aria-labelledby')
+          ? (document.getElementById(el.getAttribute('aria-labelledby') as string)?.textContent || '').trim()
+          : '',
+        (el.querySelector('img[alt]')?.getAttribute('alt') || '').trim(),
+        (el.querySelector('svg title')?.textContent || '').trim(),
+      ];
+      // An emoji or a lone glyph is a picture, not a name — so each source is judged after the
+      // pictographs come out, and the control passes if ANY source leaves real characters behind.
+      let hasName = false;
+      for (const s of sources) {
+        if (s.replace(/[\p{Extended_Pictographic}\p{So}\s×✕✓·•←→↑↓…—–-]/gu, '').length > 0) { hasName = true; break; }
+      }
+      if (hasName) continue;
+      const named = sources.find(Boolean) || '';
+      const parts: string[] = [];
+      for (let a: Element | null = el; a && parts.length < 3 && a.tagName !== 'BODY'; a = a.parentElement) {
+        const cls = String(a.className || '').split(/\s+/).filter(Boolean).slice(0, 2).join('.');
+        parts.unshift(a.tagName.toLowerCase() + (cls ? '.' + cls : ''));
+      }
+      out.push({
+        kind: 'unlabeledControl',
+        text: `<${el.tagName.toLowerCase()}> shows “${String(named).slice(0, 20) || '(nothing)'}” and has no name`,
+        where: parts.join(' > '),
+      });
+    }
+    return out;
+  });
+}
+
+/** Every same-origin href on the page, deduplicated — the caller decides what to do with them. */
+export async function internalLinks(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out = new Set<string>();
+    for (const a of Array.from(document.querySelectorAll('a[href]'))) {
+      const raw = a.getAttribute('href') || '';
+      if (!raw || raw.startsWith('#') || /^(mailto|tel|javascript|data|blob):/i.test(raw)) continue;
+      try {
+        const u = new URL(raw, location.href);
+        if (u.origin !== location.origin) continue;
+        out.add(u.pathname + u.search);
+      } catch { /* an href the browser cannot parse is its own kind of finding, but not this one */ }
+    }
+    return [...out];
+  });
+}
+
+/** All six DOM measures, in one pass, in a stable order. Links are checked by the caller. */
 export async function measureFinish(page: Page): Promise<Finding[]> {
-  const [broken, ids, jargon, dead] = await Promise.all([
+  const [broken, ids, jargon, dead, stamps, unlabeled] = await Promise.all([
     brokenValues(page), visibleIdentifiers(page), visibleJargon(page), deadEndPage(page),
+    rawTimestamps(page), unlabeledControls(page),
   ]);
-  return [...broken, ...ids, ...jargon, ...dead];
+  return [...broken, ...ids, ...jargon, ...dead, ...stamps, ...unlabeled];
 }

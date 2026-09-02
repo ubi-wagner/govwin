@@ -198,7 +198,11 @@ export default async function NotesPage({
               <NoteActions id={n.id} state={n.state} />
             </div>
 
-            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800">{n.note}</p>
+            {/* `data-user-content`: this paragraph is a person's prose, displayed. A note may
+                legitimately contain the words NaN, null or a route that no longer exists, and a
+                lens that cannot tell our text from theirs reports the board as broken (B127's
+                lesson, one surface over). It is also the trust boundary — nothing here is ours. */}
+            <p data-user-content className="mt-2 whitespace-pre-wrap text-sm text-gray-800">{n.note}</p>
 
             <div className="mt-2 text-xs text-gray-400">
               {day(n.createdAt)}

@@ -394,7 +394,8 @@ export function ApplicationReview({ applications }: Props) {
                       <h4 className="font-medium text-gray-700 mb-1">
                         Technology Summary
                       </h4>
-                      <p className="text-gray-600 whitespace-pre-wrap">
+                      {/* data-user-content — the applicant wrote this. */}
+                      <p data-user-content className="text-gray-600 whitespace-pre-wrap">
                         {app.techSummary}
                       </p>
                     </div>

@@ -250,6 +250,10 @@ export function EventStreamClient({
         <div className="flex items-center gap-2 ml-auto">
           <label className="text-xs text-gray-500">Live</label>
           <button
+            type="button"
+            role="switch"
+            aria-checked={autoRefresh}
+            aria-label="Live auto-refresh"
             onClick={() => setAutoRefresh((v) => !v)}
             className={`w-10 h-5 rounded-full relative transition-colors ${autoRefresh ? 'bg-green-500' : 'bg-gray-300'}`}
             title="Auto-refresh every 10s"

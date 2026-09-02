@@ -173,6 +173,14 @@ export async function openEverything(page: Page): Promise<{ opened: number; cand
   // <details> is not a button and no click reaches it via the two loops above.
   for (const d of await page.locator('details:not([open]) > summary').all()) await click(d);
 
+  // TABS. Switching a tab shows a panel that already exists and writes nothing — the safest
+  // disclosure there is, and the one that reveals the most: the architecture explorer, the
+  // proposal workspace and half the admin consoles keep whole views behind one. Added after the
+  // finish probe reported "opened 19 of 1319 candidates" and the gap turned out to be structural
+  // rather than a shortage of named verbs. `aria-selected="false"` only, so the tab already
+  // showing is not clicked back and forth.
+  for (const t of await page.locator('[role="tab"][aria-selected="false"]').all()) await click(t);
+
   await page.waitForTimeout(500);
 
   // ── WHY THE SECOND NUMBER EXISTS ────────────────────────────────────────────────────────────

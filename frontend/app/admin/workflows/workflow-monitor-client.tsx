@@ -436,7 +436,7 @@ export function WorkflowMonitorClient({
         </button>
         <div className="flex items-center gap-2 ml-auto">
           <label className="text-xs text-gray-500">Live</label>
-          <button onClick={() => setLiveOn((v) => !v)} className={`w-10 h-5 rounded-full relative transition-colors ${liveOn ? 'bg-green-500' : 'bg-gray-300'}`} title="Auto-refresh every 10s">
+          <button type="button" role="switch" aria-checked={liveOn} aria-label="Live auto-refresh" onClick={() => setLiveOn((v) => !v)} className={`w-10 h-5 rounded-full relative transition-colors ${liveOn ? 'bg-green-500' : 'bg-gray-300'}`} title="Auto-refresh every 10s">
             <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${liveOn ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </button>
           {liveOn && <span className="text-xs text-green-600 font-medium">10s</span>}

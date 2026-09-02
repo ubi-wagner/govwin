@@ -35,7 +35,11 @@ export default function CompanionButton({ minutes }: { minutes: number }) {
         <input
           value={doing} onChange={(e) => setDoing(e.target.value)}
           placeholder="what you were just doing (optional, but it is the most useful thing here)"
-          className="min-w-[22rem] flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm"
+          // `min-w-0` first: a flex item's default `min-width:auto` refuses to shrink below its
+          // content, and a flat `min-w-[22rem]` (352px + padding) ran to 409px inside a 390px
+          // viewport — unreachable, because the container clips. The wide floor is restored from
+          // `sm` up, where there is room for it. Caught by probe-interaction-mobile.
+          className="w-full min-w-0 flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm sm:min-w-[22rem]"
         />
         <button onClick={ask} disabled={state === 'busy'}
           className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40">

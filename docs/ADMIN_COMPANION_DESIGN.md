@@ -247,11 +247,66 @@ implementation: `lib/humanize.ts` (+ `lib/agent-labels.ts`, `describeActor` in `
   drift read exactly like a partial fix.** A measurement of an unknown build is not a weaker
   measurement — it is a measurement of something else.
 
+### Driven to the ground — four lanes, seven checks, overlays open
+
+The first pass measured 32 tenant routes at rest. The second closed every gap the first one
+reported about itself:
+
+| | first pass | now |
+|---|---|---|
+| lanes | tenant only | **tenant · top-up tenant · admin · partner** |
+| routes | 32 | **89** |
+| states | at rest | at rest **and with every disclosure, tab and read-only modal opened** |
+| checks | 4 | **7** — added `rawTimestamp`, `unlabeledControl`, `brokenLink` |
+| tenant choice | hardcoded `foundation` | **chosen by coverage**, with a top-up lane per unbound param |
+
+**The lane decides the severity, and that is not a softening.** `/admin/events` exists to show you
+`proposal.section_saved` and a row id; grading that like a customer's activity feed would bury the
+real findings under the consoles built to display exactly this — the same failure B127 records for
+error text and `probe-project-mobile` records for touch targets. So `identifier` · `jargon` ·
+`rawTimestamp` are **defects on a customer surface, informational on an operator console**;
+`brokenValue` · `deadEnd` · `unlabeledControl` · `brokenLink` are defects everywhere, because
+nobody at any privilege level benefits from a `NaN`, a link that 404s, or a button with no name.
+
+**Second-pass findings, all fixed:** an auto-refresh toggle on four pages that was a bare `<button>`
+whose only state signal was colour (now `role="switch"` + `aria-checked` + a name); six identical
+`×` buttons in one workflow list that a screen reader read identically (now named by which to-do);
+a modal close that was a glyph; and a `role="switch"` on the source crawl setting that announced
+its state and never its subject — "switch, off" tells you nothing about what is off.
+
+**Three things the second pass taught the instrument, each by being wrong first:**
+
+* **`e.g.` is prose.** The jargon detector reported it three times, from our own template
+  placeholder copy — the one place on the tenant surface where guidance text lives. A rule that
+  fires on good writing is not stricter, it is broken: it would have pushed the next person to
+  reword a helpful placeholder to satisfy a check.
+* **`data-user-content` is a structural marker, not a convenience.** The detector read this
+  session's own notes — prose that legitimately discusses `NaN` and `null` — as defects on
+  `/admin/notes`. B127's lesson one surface over: the discriminator has to be structural. The
+  marker now sits on the notes board, project comments and application answers, and it doubles as
+  the trust boundary those strings sit on. **A surface that renders user text and does not say so
+  is itself the finding** — nobody downstream can tell our prose from theirs, and neither can an
+  injection fence.
+* **A tenant lane can only address its own rows.** Pinning `foundation` reported three routes as
+  "no value for `[documentId]`/`[vaultId]`/`[foundationId]`" while every one of those rows existed,
+  in a different tenant. Uncovered was true and the reason was wrong — the kind of finding that
+  gets closed as a fixture problem and never looked at again.
+
+Widening `openEverything` with `[role="tab"]` (a tab switch shows a panel that already exists and
+writes nothing) lifted the tenant lane from 19 to 25 opened controls and the admin lane from 32 to
+36. Both probes that share it were re-run and still pass.
+
 ### What it cannot see, stated so nobody mistakes silence for health
 
 Copy that is wrong rather than malformed, a layout that is ugly, a flow that asks for something
-twice, anything behind a click, and six routes it could not address. That residue is the
-companion's half of the job: the page that is technically finished and still reads as unfinished.
+twice, and any state behind a control `openEverything` declines to click **because clicking it
+would write** — the open rate is 25 of 1,303 candidates on the tenant lane, and that second number
+exists so the gap is a number rather than an impression. One route stays unaddressable:
+`/portal/[tenantSlug]/documents/[documentId]`, because no tenant with a signed-in-able admin owns a
+`tenant_documents` row. Uncovered, not passing.
+
+That residue is the companion's half of the job: the page that is technically finished and still
+reads as unfinished.
 
 ---
 

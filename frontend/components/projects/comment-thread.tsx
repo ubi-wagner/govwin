@@ -125,7 +125,9 @@ export function CommentThread({
           </span>
         )}
       </div>
-      <p className="mt-0.5 whitespace-pre-wrap text-sm text-gray-800">{withMentions(c.body)}</p>
+      {/* data-user-content — a teammate's own words. The finish probe must not read them as
+          our copy, and the marker doubles as the trust boundary this text sits on. */}
+      <p data-user-content className="mt-0.5 whitespace-pre-wrap text-sm text-gray-800">{withMentions(c.body)}</p>
       {!isReply && (
         <div className="mt-1 flex gap-3">
           <button

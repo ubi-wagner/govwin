@@ -427,6 +427,9 @@ export default function AdminTemplatesPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="text-sm font-semibold text-gray-800">Template Preview</h2>
               <button
+                type="button"
+                aria-label="Close template preview"
+                title="Close preview"
                 onClick={() => setPreviewKey(null)}
                 className="text-gray-400 hover:text-gray-600 text-lg leading-none"
               >

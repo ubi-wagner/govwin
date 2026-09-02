@@ -348,8 +348,17 @@ export function ActivityStreamClient({
 
           {/* Auto-refresh */}
           <div className="flex items-center gap-2 ml-auto">
-            <label className="text-xs text-gray-500">Auto-refresh</label>
+            <label className="text-xs text-gray-500" id="auto-refresh-label">Auto-refresh</label>
+            {/* role="switch" + aria-checked, not a bare <button>. The state was carried by colour
+                alone: a screen reader announced "button" and nothing about whether it was on, and
+                the `<label>` beside it was not associated with anything. Found by
+                scripts/probe-customer-finish.mts. */}
             <button
+              type="button"
+              role="switch"
+              aria-checked={autoRefresh}
+              aria-labelledby="auto-refresh-label"
+              title={autoRefresh ? 'Auto-refresh is on' : 'Auto-refresh is off'}
               onClick={() => setAutoRefresh((v) => !v)}
               className={`w-10 h-5 rounded-full relative transition-colors ${
                 autoRefresh ? 'bg-green-500' : 'bg-gray-300'
