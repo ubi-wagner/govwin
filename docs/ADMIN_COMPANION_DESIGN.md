@@ -187,6 +187,74 @@ depends entirely on what was driven. The prompt carries the same instruction.
 
 ---
 
+## 4c. The two halves: never-trust on our side, luxury on theirs
+
+**Decided and built 2026-09-02.** Leakproof is table stakes — a hull that does not leak is what
+makes a ship a ship, not what makes it worth boarding. The companion's other half is whether this
+is the **luxury choice**, and that half had been one closing paragraph in its brief ("also notice
+what would make this better"), which is exactly the shape of an instruction a model satisfies with
+a sentence of praise and moves on.
+
+It is now **three named dimensions with required output fields**, and each can answer
+`"no evidence"` — which is a report, where an omission would have read as approval:
+
+| dimension | the question | who counts it |
+|---|---|---|
+| **recency** | is what the customer sees current? | partly the observation window; the rest is judgement |
+| **effectiveness** | did the *customer's* job get done, or did the system merely finish? | the window's arithmetic covers the countable half |
+| **finish** | does what they see read as finished? | `scripts/probe-customer-finish.mts`, deterministically |
+
+`test_ops_companion_scope.py` asserts all three are named in the brief, are required output fields,
+and that the `no evidence` escape exists — because without it the pressure runs the other way: a
+required field with nothing to say gets filled with something reassuring, and reassurance is the
+one output this role exists to refuse.
+
+### The finish probe, and why it is not a SQL lens
+
+**Two database-shaped versions were written first and both were phantom.** Cards past their close
+date still marked open: 21 rows, and the cards API says in its own comment that the date-derived
+closure is filtered client-side, which `pipeline-cards.tsx:393` does. Tenants holding opportunities
+with no ranking lens: 6 rows, and `spotlight-buckets.tsx:339` carries an empty state written for
+exactly that customer, explaining what a bucket is and stating the fallback.
+
+Both were the places somebody had already thought hardest about. That is the same shape CLAUDE.md
+records for text-searching a bug pattern — **an instrument aimed at the wrong layer reports the most
+defects exactly where the most care was taken.** Luxury is a property of the rendered page, so it is
+measured on the rendered page.
+
+`scripts/probe-customer-finish.mts` reads prose off 32 customer-facing routes as a tenant_admin and
+counts four things: `brokenValue` (NaN · undefined · null · [object Object] · Invalid Date),
+`identifier` (a UUID a customer can read), `jargon` (a raw `snake_case` token in prose), `deadEnd`
+(a main region that says there is nothing here and offers no way to change that).
+
+**First run: 116 findings.** All fixed, all in one class — a customer's own activity stream naming
+them `bd101904-582d-44db-ac2e-ce63eb341979` and `workflow_manager`, their agent panel listing
+`outcome_analyst` (a display-name map written for 10 archetypes, four behind a roster of 39, with a
+silent `?? role` fallback), their opportunity card reading `· sbir_phase_1`, and their process
+monitor showing `wait_deadline_exceeded` as the entire error message. Four files, one rule, now one
+implementation: `lib/humanize.ts` (+ `lib/agent-labels.ts`, `describeActor` in `lib/event-labels.ts`).
+
+**Two guards, both added after the thing they guard against had already happened here:**
+
+* the **self-test** plants a defect every detector must see, *and* a control every detector must
+  ignore — a `<pre>` holding a real JSON payload with a literal `null`, a `<code>` holding an event
+  type, a mono span holding a UUID. It caught a defect in the detector before a single real page was
+  opened (`textContent` concatenates across elements, so `<h1>Documents</h1><p>No documents…` reads
+  `DocumentsNo documents…` and the word boundary fails).
+* the **build guard** refuses a verdict when the app is not serving the build on disk. A fix landed,
+  the staging step was killed mid-chain, and the re-run measured the old bundle: the counts moved
+  99 → 46 purely because the activity feed shows "the last N hours" and time had passed. **That
+  drift read exactly like a partial fix.** A measurement of an unknown build is not a weaker
+  measurement — it is a measurement of something else.
+
+### What it cannot see, stated so nobody mistakes silence for health
+
+Copy that is wrong rather than malformed, a layout that is ugly, a flow that asks for something
+twice, anything behind a click, and six routes it could not address. That residue is the
+companion's half of the job: the page that is technically finished and still reads as unfinished.
+
+---
+
 ## 4b. The curation loop — the machine reports, the human curates, the board keeps
 
 **Decided 2026-09-01.** The nightly verification run and the notes board are deliberately NOT

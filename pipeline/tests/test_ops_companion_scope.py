@@ -108,6 +108,38 @@ def test_the_prompt_refuses_to_reassure() -> None:
     assert "do not repeat" in p.lower() or "already" in p.lower()
 
 
+def test_the_warm_half_is_structural_and_cannot_be_dropped() -> None:
+    """Leakproof is table stakes; the rest is whether this is the luxury choice.
+
+    That half used to be one closing paragraph — "also notice what would make this better" — which
+    is exactly the shape of an instruction a model satisfies with a sentence of praise and moves on.
+    Three NAMED dimensions with REQUIRED output fields is the difference between a job and a
+    gesture: a dimension with no evidence has to say "no evidence", which is a report, where
+    silence would have read as approval.
+
+    The `no evidence` escape is asserted deliberately. Without it the pressure runs the other way —
+    a required field with nothing to say gets filled with something reassuring, and reassurance is
+    the one output this role exists to refuse.
+    """
+    a = OpsCompanionArchetype()
+    prompt = a.system_prompt
+    for dim in ("RECENCY", "EFFECTIVENESS", "FINISH"):
+        assert dim in prompt, f"the {dim} dimension is not named in the brief"
+
+    ask = "\n".join(m["content"] for m in a.build_messages({"payload": {"minutes": 15}}, []))
+    for field in ('"recency"', '"effectiveness"', '"finish"'):
+        assert field in ask, f"{field} is not a required output field — the warm half is optional again"
+    assert "no evidence" in ask, (
+        "a required dimension with nothing to say must be able to say 'no evidence' — otherwise the "
+        "field gets filled with reassurance, which is the failure mode this role exists to avoid"
+    )
+    # And it must still not re-derive what the platform already counts.
+    assert "probe-customer-finish" in prompt, (
+        "the brief should point at the deterministic finish measurement rather than inviting the "
+        "model to guess at it"
+    )
+
+
 def test_it_claims_no_write_capability() -> None:
     """Advisory means advisory: no write tool, and nothing in the class that mutates."""
     a = OpsCompanionArchetype()

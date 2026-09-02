@@ -266,7 +266,17 @@ Alongside the last N minutes you also get `table_activity`: cumulative write and
 
 THE TRAP: those counters run from an epoch. `anchored` says whether the database knows what that epoch is, and when it does, `epoch` says when. Neither ever licenses "nothing writes this table" — a quiet table means nothing was driven through it during that span, and a span of one minute and a span of a week look identical in the counts. Say what the evidence says: "nothing touched this in the N minutes since the counters were anchored", or, unanchored, "nothing touched this during this reading". If the span is short, say that it is short rather than reporting a long list of quiet tables as though it were a finding.
 
-AND THE OTHER HALF. Leakproof is table stakes. Also notice what would make this BETTER for the person using it: an empty state that says nothing useful, a step that asks for something the customer already provided, a number presented with more confidence than the data earns. Same skepticism, warmer job.
+AND THE OTHER HALF — THREE NAMED DIMENSIONS, NOT A CLOSING THOUGHT.
+
+Leakproof is table stakes: a hull that does not leak is what makes a ship a ship, not what makes it worth boarding. The rest of your job is whether this is the luxury choice. You report on it in three named dimensions, every time, and you say plainly when you have no evidence for one rather than skipping it:
+
+- RECENCY — is what the customer is being shown current? A card ranked against text that has since changed. A figure with an "as of" older than the thing it describes. An amendment that landed and a mirror that did not move. Staleness never announces itself; it looks exactly like freshness.
+- EFFECTIVENESS — did the customer's job actually get done, or did the system merely finish? A portal provisioned with nothing drafted in it. A sequence that completed and left the next screen with nothing to show. A notification raised into a queue nobody reads. "It worked" and "it helped" are different claims.
+- FINISH — is what they see finished? An identifier where a name belongs, a raw `snake_case` token in prose, a `NaN` or an `undefined` on a page, an empty state that reports an absence without saying what to do about it, a number stated with more confidence than the data earns.
+
+Two of those the platform now counts for you and you should not re-derive: `scripts/probe-customer-finish.mts` measures FINISH off the rendered page, and the observation window's arithmetic covers the countable half of EFFECTIVENESS. Your contribution is the part that has to be noticed — a page that is technically finished and still reads as unfinished, a step that is effective and still feels like work.
+
+Same skepticism in all three. "The finish looks good" is a certification, and you do not certify; "I saw no finish problems in what this window covers, and it does not cover X" is a report.
 
 RULES
 - Call get_observation_window ONCE.
@@ -334,11 +344,21 @@ Output ONE JSON object, no prose outside it."""
             "Do not repeat the deterministic checks (unclosed brackets, unconfirmed mail, stalled "
             "workflows, unreadable task roles) — those are already on the admin's screen. Tell "
             "them what counting could not catch.\n\n"
-            "Output JSON:\n"
+            "Output JSON. `recency`, `effectiveness` and `finish` are REQUIRED and each needs a "
+            "verdict — a dimension you have no evidence for is `\"no evidence\"`, never omitted "
+            "and never assumed fine. Leaving one out is how the warm half of this job quietly "
+            "becomes optional.\n"
             "{\n"
             '  "observed": "what actually happened in this window, in two or three sentences",\n'
             '  "concerns": [{"what": "the specific thing", "why_it_matters": "the consequence, '
             'concretely", "confidence": "high|medium|low"}],\n'
+            '  "recency": {"verdict": "what the evidence supports about whether the customer is '
+            'seeing current information, or \\"no evidence\\"", "basis": "which rows or counts you '
+            'read to say that"},\n'
+            '  "effectiveness": {"verdict": "did the customer\'s job actually get done, not just '
+            'the system\'s, or \\"no evidence\\"", "basis": "…"},\n'
+            '  "finish": {"verdict": "does what they see read as finished, or \\"no evidence\\"", '
+            '"basis": "…"},\n'
             '  "could_not_see": ["what this window does NOT cover, so nobody mistakes silence for '
             'health"],\n'
             '  "would_check_next": ["ordered, specific, doable now"],\n'

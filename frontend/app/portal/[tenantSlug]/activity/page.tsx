@@ -135,6 +135,40 @@ export default async function ActivityPage({
     console.error('[portal/activity] events query failed:', e);
   }
 
+  /**
+   * Put a NAME on the rows that only carry an id.
+   *
+   * 69 of 1,320 user events have an `actor_id` and no `actor_email`, and the feed was rendering the
+   * raw UUID — while every one of those ids resolves to a real person one join away. Found by
+   * `scripts/probe-customer-finish.mts`.
+   *
+   * ONE lookup after the fact, deliberately, rather than a join added to each of the four query
+   * branches above: four copies of a predicate is four chances for them to drift, and this asks a
+   * different question from the branches anyway.
+   *
+   * Scoped through `user_memberships` for THIS tenant — a name is a fact about a person, and the
+   * fact that they exist is not this customer's to learn. An actor outside the tenant stays
+   * unresolved, and `describeActor` says "Unknown" rather than inventing a person.
+   */
+  const idsToName = [...new Set(rows
+    .filter((r) => !r.actorEmail && r.actorId && /^[0-9a-f-]{36}$/i.test(r.actorId))
+    .map((r) => r.actorId as string))];
+  const nameById = new Map<string, string>();
+  if (idsToName.length) {
+    try {
+      const people = await sql<{ id: string; name: string | null; email: string }[]>`
+        SELECT u.id::text AS id, u.name, u.email
+          FROM users u
+          JOIN user_memberships m ON m.user_id = u.id
+         WHERE m.tenant_id = ${tenantId} AND u.id::text = ANY(${idsToName})`;
+      for (const p of people) nameById.set(p.id, p.name || p.email);
+    } catch (e) {
+      // Said out loud, and NOT fatal: an unresolved name degrades to "Unknown", which is the
+      // honest reading. Silently rendering the id again would restore the defect.
+      console.error('[portal/activity] actor name lookup failed:', e);
+    }
+  }
+
   const serialized = rows.map((r) => ({
     id: r.id,
     namespace: r.namespace,
@@ -143,6 +177,7 @@ export default async function ActivityPage({
     actorType: r.actorType,
     actorId: r.actorId,
     actorEmail: r.actorEmail,
+    actorName: (r.actorId && nameById.get(r.actorId)) || null,
     parentEventId: r.parentEventId,
     payload: r.payload,
     error: r.error,

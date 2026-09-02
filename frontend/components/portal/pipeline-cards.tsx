@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { hasRoleAtLeast, type Role } from '@/lib/rbac';
 import PurchaseModal from './purchase-modal';
 import { fmtDate, fmtMoney } from '@/lib/fmt';
+import { titleizeIdentifier } from '@/lib/humanize';
 
 /**
  * What this opportunity pays, said the way we came by it (mig 241).
@@ -451,7 +452,10 @@ export default function PipelineCards({ tenantSlug, role }: { tenantSlug: string
                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${STAGE_BADGE[c.submissionStage].cls}`}>{STAGE_BADGE[c.submissionStage].label}</span>
               )}
             </div>
-            <p className="text-xs text-gray-500">{str(c, 'agency') ?? '—'}{str(c, 'programType') ? ` · ${str(c, 'programType')}` : ''}</p>
+            {/* `titleizeIdentifier`, not the raw value: the stored vocabulary is sbir · sttr ·
+                tvsf · sbir_phase_1, and a customer was reading their own opportunity card as
+                "· sbir_phase_1". lib/humanize.ts. */}
+            <p className="text-xs text-gray-500">{str(c, 'agency') ?? '—'}{str(c, 'programType') ? ` · ${titleizeIdentifier(str(c, 'programType') as string)}` : ''}</p>
             {selectedBucketId && (
               <div className="mt-1.5">
                 <span className="inline-flex items-center gap-1 rounded bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white tabular-nums" title={`Score in the “${selectedBucketName}” bucket`}>

@@ -432,6 +432,14 @@ DRIVES=(
   # two actors and needs the app serving. It refuses a verdict when the app is serving no CSS,
   # which is the failure that once made it report 75 phantom findings across the whole tree.
   "mobile-interaction|scripts/probe-interaction-mobile.mts"
+  # FINISH — the same shape of question one layer up. The lenses ask whether a page renders and
+  # whether its envelope is well-formed; this asks whether what the customer READS is finished: an
+  # identifier where a name belongs, a raw snake_case token in prose, a NaN or an undefined, an
+  # empty state with no way forward. It found 116 of them across 32 tenant routes on its first run,
+  # including a customer's own activity stream naming them by UUID. Its self-test plants a defect
+  # every detector must see AND a control every detector must ignore, and it refuses a verdict when
+  # the app is not serving the build on disk — a staleness that once read as a partial fix.
+  "customer-finish|scripts/probe-customer-finish.mts"
   # THE TWO OPERATORS' CONSOLES. Every other lens asks whether a page renders or whether an
   # envelope is well-formed; this asks the question an operator asks — can I see the state of the
   # system, and is what I am shown TRUE — for rfp_admin and tenant_admin across system status,

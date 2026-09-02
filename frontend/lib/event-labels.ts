@@ -688,6 +688,89 @@ export function describeEvent(ev: EventLike): string {
   return describeEventOrNull(ev) ?? humanizeType(ev.type);
 }
 
+export interface ActorLike {
+  actorType?: string | null;
+  actorId?: string | null;
+  actorEmail?: string | null;
+  /** The person's display name, when the caller resolved the id against `users`. */
+  actorName?: string | null;
+}
+
+/**
+ * The system actors a customer can actually see in their own activity stream, in English.
+ *
+ * Measured, not imagined — these are the `actor_id` values present in `system_events`, and every
+ * one of them was being rendered raw. Anything unmapped falls through to the humanizer rather than
+ * to the token, so a new actor introduced tomorrow reads as "Some new worker", never
+ * `some_new_worker`.
+ */
+const ACTOR_LABELS: Record<string, string> = {
+  workflow_manager: 'Workflow automation',
+  lifecycle_scheduler: 'Scheduled job',
+  cron: 'Scheduled job',
+  worker: 'Pipeline worker',
+  fabric: 'Agent workforce',
+  bridge: 'Opportunity bridge',
+  'template-bridge': 'Template bridge',
+  'public-apply': 'Public application form',
+  claude_code: 'Claude Code session',
+};
+
+const ACTOR_TYPE_FALLBACK: Record<string, string> = {
+  system: 'Automation',
+  pipeline: 'Pipeline',
+  agent: 'Agent workforce',
+  user: 'A team member',
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Who did this, as a person would say it — and NEVER as an identifier.
+ *
+ * ── THE DEFECT THIS CLOSES ───────────────────────────────────────────────────────────────────
+ * The activity stream rendered `actorEmail ?? actorId ?? actorType ?? 'unknown'`, one line below
+ * the `describeEvent` call that had already been fixed for exactly this reason. So a customer read
+ * their own history as:
+ *
+ *     bd101904-582d-44db-ac2e-ce63eb341979 — Section saved
+ *     workflow_manager                     — Portal provisioned
+ *
+ * The sentences had been humanized; the name beside them had not. Found by
+ * `scripts/probe-customer-finish.mts`, which reads prose off the rendered page — 17 visible UUIDs
+ * and 99 raw system tokens on one customer-facing route.
+ *
+ * ── AN UNRESOLVED ID IS "UNKNOWN", NOT THE ID ────────────────────────────────────────────────
+ * Showing 36 hex characters to a customer who wants to know who touched their proposal tells them
+ * nothing that "Unknown" does not, and costs them the impression that the product knows its own
+ * business. The id is preserved in `title` — support keeps it, prose does not.
+ *
+ * Returns `{ label, title }`: `label` is always safe to render as text; `title` carries the raw
+ * identifier when there is one worth keeping, or null.
+ */
+export function describeActor(a: ActorLike): { label: string; title: string | null } {
+  const name = str(a.actorName);
+  if (name) return { label: name, title: str(a.actorEmail) };
+
+  const email = str(a.actorEmail);
+  if (email) return { label: email, title: null };
+
+  const id = str(a.actorId);
+  const type = str(a.actorType);
+
+  if (id && !UUID_RE.test(id)) {
+    const mapped = ACTOR_LABELS[id];
+    if (mapped) return { label: mapped, title: id };
+    // `ingest:sbir_gov` → "SBIR.gov ingest". One rule, not a second map to keep in step.
+    const ingest = /^ingest:(.+)$/.exec(id);
+    if (ingest) return { label: `${ingest[1].replace(/_/g, '.').toUpperCase()} ingest`, title: id };
+    return { label: humanizeType(id), title: id };
+  }
+
+  // A UUID (or nothing at all). Say what we know, keep what we cannot say.
+  return { label: (type && ACTOR_TYPE_FALLBACK[type]) ?? 'Unknown', title: id };
+}
+
 /**
  * Does this event type have a WRITTEN label, as opposed to falling through to the humanizer?
  *
