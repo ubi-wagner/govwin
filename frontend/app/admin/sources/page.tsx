@@ -9,6 +9,7 @@ import SourcesHub, {
 } from '@/components/admin/source-card-actions';
 import IntakeStageStrip from '@/components/admin/intake-stage-strip';
 import { loadIntakeStageCounts } from '@/lib/admin/intake-stage-counts';
+import SourcesGuide from './sources-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -176,6 +177,7 @@ export default async function SourcesPage() {
   return (
     <div>
       <IntakeStageStrip current="sources" counts={stageCounts} />
+      <SourcesGuide />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Opportunity Sources</h1>

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Insufficient permissions', code: 'FORBIDDEN' }, { status: 403 });
     }
 
-    let body: { note?: string; anchor?: string | null };
+    let body: { note?: string; anchor?: string | null; disposition?: string };
     try { body = await request.json(); } catch {
       return NextResponse.json({ error: 'Invalid JSON body', code: 'INVALID_BODY' }, { status: 400 });
     }
@@ -44,8 +44,29 @@ export async function POST(request: Request) {
     }
     const anchor = typeof body.anchor === 'string' && body.anchor.trim() ? body.anchor.trim() : null;
 
+    /**
+     * An optional DISPOSITION, whitelisted.
+     *
+     * Notes written from an in-page guide arrive in three kinds and they want different answers:
+     * `gap` — the guide is wrong or silent, and the fix is to edit the guide;
+     * `defect` — the product is wrong;
+     * `friction` — it works and should not be this hard.
+     *
+     * They are separated because during a first curation week most notes are `gap`, and a single
+     * bucket labelled "bug" means the guide never gets fixed and the board stops being read. It
+     * rides in `metadata` rather than a column: the board is human-read, this is a hint for
+     * triage, and a new column would need a migration to say something the note text already
+     * nearly says.
+     *
+     * Whitelisted, never passed through — an unknown value is dropped, not stored. Attribution
+     * stays server-derived, as below.
+     */
+    const DISPOSITIONS = ['gap', 'defect', 'friction'] as const;
+    const disposition = DISPOSITIONS.find((d) => d === body.disposition) ?? null;
+
     const id = await addNote({
       note, anchor, anchorKind: inferKind(anchor),
+      ...(disposition ? { metadata: { disposition } } : {}),
       // A human write is always attributed to the signed-in user, never to a client-supplied
       // value — the board's whole value is that you can trust who said what.
       author: 'human', authorEmail: su.email ?? null, actorId: su.id ?? null,
