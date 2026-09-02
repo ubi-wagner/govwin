@@ -42,6 +42,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bcryptjs ./node_modu
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/playwright ./node_modules/playwright
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/playwright-core ./node_modules/playwright-core
 
+# The guide-coverage registry, shipped the same way the migration SQL is: GENERATED IN THE REPO,
+# copied in. `/admin/guides` reads it at runtime, and it cannot be produced here — the builder stage
+# copies only `frontend/`, and the script needs a git history the image does not have. Without this
+# line the board renders its "artifact is not in this build" notice in production: honest, but dead.
+# Regenerate with `node frontend/scripts/catalog-guides.mjs` and commit it.
+COPY --chown=nextjs:nodejs docs/guide-coverage.json ./docs/guide-coverage.json
+
 # Migration files + entrypoint — run automatically on deploy
 COPY --chown=nextjs:nodejs db/migrations/*.sql ./db/migrations/
 COPY --chown=nextjs:nodejs db/migrations/migrate.mjs ./db/migrations/migrate.mjs
