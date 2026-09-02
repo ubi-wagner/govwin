@@ -32,12 +32,38 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import postgres from 'postgres';
 
 const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const ADMIN = 'eric@rfppipeline.com';
 const ADMIN_PW = process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!';
 const APP = path.join('/home/user/govwin/frontend', 'app/admin');
+const DB = process.env.GUIDE_DB || process.env.DATABASE_URL_OWNER
+  || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
+const sql = postgres(DB, { max: 2, onnotice: () => {} });
+
+/**
+ * Real ids for the dynamic segments.
+ *
+ * ── WHY THIS EXISTS ──────────────────────────────────────────────────────────────────────────
+ * Without it the lens loaded the literal `/admin/rfp-curation/[solId]`, which resolves to nothing,
+ * and then reported all ten controls the guide names as MISSING. Every one of them was on the real
+ * page — I had read them off it minutes earlier. An instrument that cannot reach a surface must say
+ * so; reporting unreachable as broken is the loudest possible way to be wrong, and it is the class
+ * this repo keeps finding.
+ *
+ * A route whose parameters cannot be bound is REPORTED as unaddressable and its controls are left
+ * unchecked. Uncovered is not passing — but it is also not a finding.
+ */
+async function bindings() {
+  const one = async (q) => { try { const [r] = await q; return r?.id ?? null; } catch { return null; } };
+  return {
+    solId: await one(sql`SELECT id FROM curated_solicitations ORDER BY created_at DESC LIMIT 1`),
+    portalId: await one(sql`SELECT id FROM proposal_portals ORDER BY created_at DESC LIMIT 1`),
+    profileId: await one(sql`SELECT id FROM source_profiles ORDER BY created_at DESC LIMIT 1`),
+  };
+}
 
 /** Every `*-guide.tsx` under app/admin — discovered, never registered, so a new guide is covered. */
 function guides(dir = APP, out = []) {
@@ -73,6 +99,10 @@ let unverifiable = 0;
 const ok = (m) => console.log(`    ✓ ${m}`);
 const no = (m) => { console.error(`    ✗ ${m}`); bad += 1; };
 
+const B = await bindings();
+const bind = (r) => r.replace(/\[(\w+)\]/g, (m, k) => B[k] ?? m);
+const unaddressable = [];
+
 const found = guides();
 if (!found.length) {
   console.error('✗ HARNESS DEFECT — no *-guide.tsx under app/admin. This lens would pass over nothing.');
@@ -105,7 +135,14 @@ for (const file of found.sort()) {
   console.log(`── ${rel}`);
   if (!controls.length) { console.log(`    · names no controls — nothing to check`); continue; }
 
-  await page.goto(BASE + route, { waitUntil: 'domcontentloaded' });
+  const url = bind(route);
+  if (/\[/.test(url)) {
+    console.log(`    · ${route} — no row to bind its parameter; ${controls.length} control(s) UNADDRESSABLE, not checked`);
+    unaddressable.push({ route, controls: controls.length });
+    continue;
+  }
+
+  await page.goto(BASE + url, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
   await page.waitForTimeout(800);
 
@@ -146,7 +183,7 @@ for (const file of found.sort()) {
     continue;
   }
   if (!hasGuide) {
-    console.log(`    · no [data-guide] on ${route} — the guide is not mounted here, or the page redirected`);
+    console.log(`    · no [data-guide] on ${url} — the guide is not mounted here, or the page redirected`);
   }
 
   for (const c of controls) {
@@ -156,14 +193,19 @@ for (const file of found.sort()) {
       // The second is still a gap in coverage, and it is reported as one rather than passed.
       const anywhere = (await page.content()).includes(c);
       if (anywhere) { console.log(`    · "${c}" is in the markup but not visible at rest — UNVERIFIED`); unverifiable += 1; }
-      else no(`"${c}" is named by the guide and is NOT on ${route}`);
+      else no(`"${c}" is named by the guide and is NOT on ${url}`);
     }
   }
 }
 
 await browser.close();
+await sql.end();
 
 console.log();
+if (unaddressable.length) {
+  console.log(`${unaddressable.length} route(s) UNADDRESSABLE — no row exists to bind their parameter:`);
+  for (const u of unaddressable) console.log(`  · ${u.route} (${u.controls} control(s) unchecked)`);
+}
 if (unverifiable) {
   console.log(`${unverifiable} control(s) could not be verified at rest — reported, not passed.`);
 }

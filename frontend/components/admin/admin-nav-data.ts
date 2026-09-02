@@ -131,7 +131,12 @@ export const ADMIN_NAV: AdminNavSection[] = [
         children: [{ href: '/admin/events', label: 'Event Stream' },
                    // The shared board sits with Observe: one says what happened, the other
                    // says what to watch for. During a drive you keep both open.
-                   { href: '/admin/notes', label: 'Notes' }] },
+                   { href: '/admin/notes', label: 'Notes' },
+                   // Guide coverage belongs with the board rather than with the guides it counts:
+                   // it is the ALARM, not the content. Its `stale` rows are what nobody thinks to
+                   // check, and they only get seen if the number sits next to the notes you already
+                   // open during a drive.
+                   { href: '/admin/guides', label: 'Guide Coverage' }] },
       { href: '/admin/agents', label: 'Agents' },
       // Analytics moved to Marketing & Sales — see the note there.
       { href: '/admin/architecture', label: 'Architecture' },

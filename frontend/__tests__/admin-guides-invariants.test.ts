@@ -30,6 +30,9 @@ const GUIDES = [
   { name: 'sources', guide: 'app/admin/sources/sources-guide.tsx', page: 'app/admin/sources/page.tsx', comp: 'SourcesGuide', canon: 'SCOUT_INTAKE_QUEUE' },
   { name: 'scouts', guide: 'app/admin/scouts/scouts-guide.tsx', page: 'app/admin/scouts/page.tsx', comp: 'ScoutsGuide', canon: 'SCOUT_INTAKE_QUEUE' },
   { name: 'intake', guide: 'app/admin/intake/intake-guide.tsx', page: 'app/admin/intake/page.tsx', comp: 'IntakeGuide', canon: 'INGEST_PROVENANCE' },
+  { name: 'triage', guide: 'app/admin/rfp-curation/curation-queue-guide.tsx', page: 'app/admin/rfp-curation/page.tsx', comp: 'CurationQueueGuide', canon: 'RFP_ADMIN_OPERATIONS_GUIDE' },
+  { name: 'curation', guide: 'app/admin/rfp-curation/[solId]/curation-guide.tsx', page: 'app/admin/rfp-curation/[solId]/page.tsx', comp: 'CurationGuide', canon: 'INGEST_PROVENANCE' },
+  { name: 'provisioning', guide: 'app/admin/provisioning/[portalId]/provisioning-guide.tsx', page: 'app/admin/provisioning/[portalId]/page.tsx', comp: 'ProvisioningGuide', canon: 'PROVISIONING_WORKSPACE_DESIGN' },
 ];
 
 describe('the discovery guides are mounted, anchored, and correctable', () => {
@@ -99,5 +102,64 @@ describe('the three things a first-time curator can be harmed by not knowing', (
     // curation week is either finished or dishonest, and it is much more likely to be the second.
     const anyUnwritten = GUIDES.some((g) => read(g.guide).includes('<Unwritten>'));
     expect(anyUnwritten).toBe(true);
+  });
+});
+
+describe('the two releases — the acts that reach customers and cannot be recalled', () => {
+  /**
+   * Read the guide as PROSE, with the JSX stripped.
+   *
+   * The first version matched the raw source and failed on `Push is <em>not</em> the
+   * proposal-portal release` — a claim the guide makes perfectly well, split by an emphasis tag.
+   * A test that pins markup makes the guide expensive to edit, which is precisely the opposite of
+   * what these guides are for: they are meant to be rewritten from what curation teaches.
+   */
+  const ENTITIES: Record<string, string> = {
+    '&rsquo;': '\u2019', '&lsquo;': '\u2018', '&ldquo;': '\u201c', '&rdquo;': '\u201d',
+    '&mdash;': '\u2014', '&ndash;': '\u2013', '&amp;': '&', '&nbsp;': ' ',
+  };
+  const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
+    .replace(/<\/?[A-Za-z][^>]*>/g, '')
+    .replace(/\{'\s*'\}/g, ' ')
+    // Entities too: the guide writes `tenant&rsquo;s`, a person reads `tenant's`, and a test that
+    // matched the entity would pin typography rather than the claim.
+    .replace(/&[a-z]+;/g, (m) => ENTITIES[m] ?? m)
+    .replace(/\s+/g, ' ');
+
+  it('release one: Push is forward-only and fans to EVERY tenant', () => {
+    const g = read('app/admin/rfp-curation/[solId]/curation-guide.tsx');
+    expect(g).toMatch(/one-way|forward-only/i);
+    expect(g).toMatch(/no un-push/i);
+    expect(g).toMatch(/every activated tenant/i);
+  });
+
+  it('release one is distinguished from release two — the commonest way to misread this screen', () => {
+    const g = read('app/admin/rfp-curation/[solId]/curation-guide.tsx');
+    expect(g).toMatch(/not the proposal-portal release/i);
+  });
+
+  it('curation: a default is never dressed as a reading', () => {
+    const g = read('app/admin/rfp-curation/[solId]/curation-guide.tsx');
+    expect(g).toMatch(/Default — unverified/);
+    expect(g).toMatch(/stronger source may overwrite/i);
+  });
+
+  it('curation: confirming an amendment reaches customers mid-build', () => {
+    const g = read('app/admin/rfp-curation/[solId]/curation-guide.tsx');
+    expect(g).toMatch(/every built proposal/i);
+    expect(g).toMatch(/not to clear a badge/i);
+  });
+
+  it('release two: one button, two blast radii — the shared master and the private portal', () => {
+    const g = read('app/admin/provisioning/[portalId]/provisioning-guide.tsx');
+    expect(g).toMatch(/every tenant.s mirror card/i);
+    expect(g).toMatch(/private/i);
+    expect(g).toMatch(/cannot be recalled/i);
+  });
+
+  it('the skeleton is on the shared master, not on the buyer', () => {
+    const g = read('app/admin/provisioning/[portalId]/provisioning-guide.tsx');
+    expect(g).toMatch(/shared\*{0,2} master/i);
+    expect(g).toMatch(/every future build/i);
   });
 });

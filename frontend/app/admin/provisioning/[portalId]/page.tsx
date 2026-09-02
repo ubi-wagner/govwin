@@ -14,6 +14,7 @@ import { sqlBypass as sql } from '@/lib/db';
 import { getBuildReadiness } from '@/lib/provisioning/readiness';
 import { ReleasePanel, SlaCountdown } from './release-panel';
 import { CurationNotesPanel } from '@/components/rfp-curation/curation-notes-panel';
+import ProvisioningGuide from './provisioning-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,6 +93,7 @@ export default async function ProvisioningCockpitPage({ params }: Props) {
 
   return (
     <div className="max-w-5xl">
+      <ProvisioningGuide />
       <div className="mb-2 text-sm text-gray-500">
         <a href="/admin/rfp-curation" className="hover:text-gray-700">RFP Curation</a>
         <span className="mx-2">/</span>

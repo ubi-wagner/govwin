@@ -6,6 +6,7 @@ import { TriageQueue } from '@/components/rfp-curation/triage-queue';
 import TriageTodos from './triage-todos';
 import IntakeStageStrip from '@/components/admin/intake-stage-strip';
 import { loadIntakeStageCounts } from '@/lib/admin/intake-stage-counts';
+import CurationQueueGuide from './curation-queue-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +88,7 @@ export default async function RFPCurationPage() {
   return (
     <div>
       <IntakeStageStrip current="curation" counts={stageCounts} />
+      <CurationQueueGuide />
       <TriageTodos />
       <div className="flex items-center justify-between mb-6">
         <div>
