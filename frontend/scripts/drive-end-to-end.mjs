@@ -52,11 +52,51 @@ const sql = postgres(process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL,
 });
 
 // ── journal ────────────────────────────────────────────────────────────────
-const journal = (!FRESH && existsSync(JOURNAL))
+const FRESH_JOURNAL = () => ({ started: new Date().toISOString(), stages: {}, ids: {} });
+let journal = (!FRESH && existsSync(JOURNAL))
   ? JSON.parse(readFileSync(JOURNAL, 'utf8'))
-  : { started: new Date().toISOString(), stages: {}, ids: {} };
+  : FRESH_JOURNAL();
 const save = () => { mkdirSync(RUN_DIR, { recursive: true }); writeFileSync(JOURNAL, JSON.stringify(journal, null, 2)); };
 const done = (name) => journal.stages[name]?.ok === true;
+
+/**
+ * THE JOURNAL LIVES OUTSIDE THE DATABASE, SO IT CAN OUTLIVE WHAT IT DESCRIBES.
+ *
+ * Restore a dump, drop a scenario, reseed — and this file still says "already proven,
+ * proposal=X". The drive then skipped ingest, curate, buy and author, jumped to the cross-plane
+ * verification, and reported SIX FAILURES against a proposal that no longer existed: four 403
+ * downloads, no locked sections, no events. Every one reads as a broken product. It is the class
+ * this repository keeps finding — two sides that agree only by convention — and the convention
+ * here is "the database has not changed under me", which is false on a box built to be reset.
+ *
+ * `drive-project-lifecycle.mts` already does this: it looks the journaled proposal up and returns
+ * null when the row is gone, so it falls back instead of failing. The CONSUMER of the journal
+ * validated it and the PRODUCER did not.
+ *
+ * A resume is only valid if the world it points at is still there. When it is not, this starts
+ * over rather than reporting the absence as a defect — and says so, because silently discarding a
+ * resume would make a 40-minute arc look like it hung.
+ */
+async function validateResume() {
+  const ids = journal.ids ?? {};
+  if (!ids.sol && !ids.proposal) return;               // nothing claimed — nothing to check
+  const missing = [];
+  const present = async (table, id) => {
+    if (!id) return true;
+    try { const [r] = await sql`SELECT 1 AS ok FROM ${sql(table)} WHERE id = ${id}::uuid`; return Boolean(r); }
+    catch { return false; }
+  };
+  if (!(await present('curated_solicitations', ids.sol))) missing.push(`solicitation ${ids.sol}`);
+  if (!(await present('proposals', ids.proposal))) missing.push(`proposal ${ids.proposal}`);
+  if (!missing.length) return;
+  console.log(`\n⟳ RESUME DISCARDED — the journal describes rows this database no longer has:`);
+  for (const m of missing) console.log(`    · ${m}`);
+  console.log(`  Starting the arc over. (The journal is not in the DB, so a restore or reseed`);
+  console.log(`  leaves it pointing at a world that is gone; resuming onto it reports the absence`);
+  console.log(`  as a product failure.)`);
+  journal = FRESH_JOURNAL();
+  save();
+}
 
 // ── verification ───────────────────────────────────────────────────────────
 let failures = 0;
@@ -147,6 +187,10 @@ async function login(page, email, password, { required = true } = {}) {
 const t0 = new Date().toISOString();
 console.log(`\n══ END-TO-END ARC ══  tenant=${TENANT}  out=${OUT}  ${FRESH ? '(fresh)' : '(resuming if possible)'}`);
 mkdirSync(OUT, { recursive: true });
+
+// Before ANY stage consults the journal — a resume onto rows that no longer exist reports their
+// absence as six product failures. See validateResume().
+await validateResume();
 
 // ═══ STAGE 1 · INGEST ═══════════════════════════════════════════════════════
 // A real BAA through the product's own upload form and async shred. Not a SQL seed: the point is
