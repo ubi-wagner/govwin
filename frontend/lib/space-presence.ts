@@ -215,11 +215,60 @@ export async function syncPortalPresence(
 }
 
 /**
+ * "I am still here" — refresh every open bracket this actor holds. Never opens one.
+ *
+ * ── WHY THIS IS NEEDED, AND WHY IT IS CLIENT-DRIVEN ──────────────────────────────────────────
+ * `last_seen_at` was only advanced by `openPresence`, i.e. by a portal LAYOUT render. In the App
+ * Router a shared layout is NOT re-executed on a soft navigation between sibling pages, so an
+ * actor could work inside a customer's workspace for the whole idle window without the layout
+ * running once — and the sweep would close their bracket as `timeout` while they were still
+ * sitting in it.
+ *
+ * That is a FALSE DEPARTURE written into a customer's audit trail, followed by a fresh arrival on
+ * their next hard load: a left-and-re-entered pair that never happened. It is the same class of
+ * defect as the missing exit — a confident wrong record — pointing the other way, and it was
+ * introduced by the fix for the first one.
+ *
+ * The ping comes from the browser because "the tab is still open" is not knowable anywhere else.
+ * This is NOT the client-owned emission that was removed from the shadow banner: that was a state
+ * TRANSITION the server must own, and it still does — the server owns the bracket, both events and
+ * every close. The client only reports liveness, which is the one fact it alone has.
+ *
+ * Degrades safely in every direction: if the ping never arrives (JS off, sleeping laptop, a failed
+ * request) the sweep closes the bracket exactly as it does today — never worse than before. If it
+ * arrives for a bracket that is already closed it matches no row, because this only ever touches
+ * `closed_at IS NULL`. It cannot resurrect a closed bracket and it cannot create one, so a
+ * heartbeat from a stale tab is inert rather than a way to reopen a customer's workspace.
+ *
+ * Throttled in SQL, not in JS: the `last_seen_at <` predicate makes a too-frequent ping a no-op at
+ * the index rather than a write, so the endpoint cannot be used to hammer the row.
+ */
+export async function touchPresence(actor: Actor, minIntervalSeconds = 60): Promise<number> {
+  try {
+    const rows = await runInBypass(async () => sql<{ id: string }[]>`
+      UPDATE space_presence
+         SET last_seen_at = now()
+       WHERE user_id = ${actor.id}::uuid
+         AND closed_at IS NULL
+         AND last_seen_at < now() - make_interval(secs => ${minIntervalSeconds})
+       RETURNING id`);
+    return rows.length;
+  } catch (e) {
+    console.error('[space-presence] touchPresence failed:', e);
+    return 0;
+  }
+}
+
+/**
  * The backstop: close brackets whose actor has not been seen for `idleMinutes`.
  *
  * This is the case the old code could not handle at all — the tab that was closed, the session that
  * lapsed, the laptop that was shut. Those are not rare, and every one of them left a customer's
  * trail asserting somebody was still in their workspace.
+ *
+ * The threshold has to stay comfortably ABOVE the heartbeat interval, or the sweep starts evicting
+ * live actors between pings — which is the false-departure defect `touchPresence` exists to remove.
+ * At a 2-minute ping and a 45-minute floor there are ~22 chances to be seen before eviction.
  *
  * Runs in bypass because it sweeps every tenant by definition; each close is written in its own
  * tenant's context via `closePresence`.

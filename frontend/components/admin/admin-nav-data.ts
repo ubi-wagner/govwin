@@ -136,7 +136,12 @@ export const ADMIN_NAV: AdminNavSection[] = [
                    // it is the ALARM, not the content. Its `stale` rows are what nobody thinks to
                    // check, and they only get seen if the number sits next to the notes you already
                    // open during a drive.
-                   { href: '/admin/guides', label: 'Guide Coverage' }] },
+                   { href: '/admin/guides', label: 'Guide Coverage' },
+                   // Who is inside a CUSTOMER's account right now. It belongs with Observe rather
+                   // than under Customers: it is a live-oversight question you ask about the
+                   // platform's own people, and the row you most need to see is the one nobody
+                   // went looking for.
+                   { href: '/admin/workspace-access', label: 'Workspace Access' }] },
       { href: '/admin/agents', label: 'Agents' },
       // Analytics moved to Marketing & Sales — see the note there.
       { href: '/admin/architecture', label: 'Architecture' },

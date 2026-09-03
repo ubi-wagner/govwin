@@ -88,6 +88,19 @@ async function events(type: string, actorId: string, tenantId: string, since: Da
   return r?.n ?? 0;
 }
 
+/**
+ * Reach "this actor holds nothing open", directly.
+ *
+ * Deliberately NOT via the sweep route: that needs a session or the cron bearer, and an
+ * unauthenticated fetch would 401 into a silent catch — leaving a bracket open and making the
+ * assertion that follows pass for the wrong reason. A fixture reaching a state is allowed to write
+ * the state; only the assertions have to go through the product.
+ */
+async function closeAllFor(userId: string) {
+  await sql`UPDATE space_presence SET closed_at = now(), close_reason = 'timeout'
+             WHERE user_id = ${userId}::uuid AND closed_at IS NULL`;
+}
+
 const browser = await launch();
 let adminId = '';
 try {
@@ -202,6 +215,35 @@ try {
   A(await events('shadow.ascended', adminId, A1.id, t0) === 1,
     'and the customer was told at the moment they logged out, not an hour later');
   A((await openRows(adminId)).length === 0, 'nothing is left open anywhere');
+
+  // ── 5b · THE HEARTBEAT — the sweep must NOT evict somebody who is still here ──────────────
+  //
+  // This is the defect the heartbeat exists for, and phase 4 above is its mirror: there, an idle
+  // bracket SHOULD be swept. Here an idle-looking bracket that has just reported liveness must
+  // survive. A drive that only checked phase 4 would pass with the heartbeat deleted.
+  phase('5b · heartbeat — a live actor survives the sweep');
+  await page.goto(`${BASE}/portal/${A1.slug}/dashboard`, { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle').catch(() => {});
+  A((await openRows(adminId)).length === 1, 'a bracket is open');
+  // Age it past the floor, exactly as phase 4 does — same state, and then one ping.
+  await sql`UPDATE space_presence SET last_seen_at = now() - interval '3 hours'
+             WHERE user_id = ${adminId}::uuid AND closed_at IS NULL`;
+  const hb = await page.request.post(`${BASE}/api/presence/heartbeat`, { data: {} });
+  A(hb.status() === 200, 'the heartbeat answers', `HTTP ${hb.status()}`);
+  A(((await hb.json())?.data?.touched ?? 0) === 1, 'and it touched the open bracket');
+  const sweep2 = await page.request.post(`${BASE}/api/admin/space-presence/sweep`, {
+    data: { idleMinutes: 30 },
+  });
+  A(sweep2.status() === 200, 'the sweep runs', `HTTP ${sweep2.status()}`);
+  A(((await sweep2.json())?.data?.closed ?? -1) === 0, 'and closes NOTHING — the actor is still here');
+  A((await openRows(adminId)).length === 1, 'the bracket survived', `${(await openRows(adminId)).length} open`);
+
+  // A heartbeat must never OPEN a bracket or reopen a closed one — otherwise a stale tab is a way
+  // back into a customer's workspace, and the ping stops being a report and becomes an action.
+  await closeAllFor(adminId);
+  const hb2 = await page.request.post(`${BASE}/api/presence/heartbeat`, { data: {} });
+  A(((await hb2.json())?.data?.touched ?? -1) === 0, 'a heartbeat with nothing open touches nothing');
+  A((await openRows(adminId)).length === 0, 'and did NOT open a bracket of its own');
 
   // ── 6 · THE INVARIANT, over the whole box ─────────────────────────────────────────────────
   phase('6 · no enter without an exit — every bracket, every tenant');

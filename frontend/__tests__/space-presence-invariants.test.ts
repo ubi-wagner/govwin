@@ -141,6 +141,70 @@ describe('the four ways out stay four distinct facts', () => {
     expect(lib).not.toMatch(/'expired'/);
   });
 
+  it('the heartbeat can REFRESH a bracket but never open or reopen one', () => {
+    // If a ping could open a bracket, a stale tab would be a way back into a customer's workspace
+    // and the heartbeat would stop being a report and become an action. The guard is in the SQL:
+    // an UPDATE scoped to `closed_at IS NULL` matches nothing when there is nothing open, and
+    // cannot resurrect a row that is closed.
+    const lib = read('lib/space-presence.ts');
+    const fn = lib.slice(lib.indexOf('export async function touchPresence'),
+                         lib.indexOf('export async function sweepStalePresence'));
+    expect(fn, 'touchPresence must not INSERT').not.toMatch(/INSERT/i);
+    expect(fn, 'must only touch open brackets').toMatch(/closed_at IS NULL/);
+    expect(fn, 'must not clear closed_at').not.toMatch(/closed_at\s*=\s*NULL/i);
+    // Throttled in SQL, not in JS: a too-frequent ping is a no-op at the index rather than a write.
+    expect(fn).toMatch(/last_seen_at <\s*now\(\)/);
+  });
+
+  it('the heartbeat interval stays well inside the sweep floor', () => {
+    // A ping slower than the idle floor would let the sweep evict a live actor between beats —
+    // the false-departure defect the heartbeat exists to remove, reintroduced by a constant.
+    const comp = read('components/portal/presence-heartbeat.tsx');
+    const mins = Number(/INTERVAL_MS = (\d+)/.exec(comp)?.[1]);
+    expect(mins, 'INTERVAL_MS shape changed').toBeGreaterThan(0);
+    const floor = Number(/idleMinutes = (\d+)/.exec(read('lib/space-presence.ts'))?.[1]);
+    expect(floor, 'sweep floor shape changed').toBeGreaterThan(0);
+    expect(mins * 2, 'ping interval is not comfortably inside the sweep floor').toBeLessThan(floor);
+  });
+
+  it('the heartbeat is mounted ONLY for an outside actor', () => {
+    // A normal customer session must ping nothing: it holds no bracket, so every request would be
+    // a write that matches no row, on the busiest surface in the product.
+    const layout = stripComments(read('app/portal/[tenantSlug]/layout.tsx'));
+    expect(layout).toMatch(/\(isShadowAdmin \|\| isDescendedPartner\) && <PresenceHeartbeat/);
+  });
+
+  it('the oversight surface renders written sentences, not the raw enum', () => {
+    // `left_space` is a database value. An operator console is milder than a customer page, but it
+    // is still read by people, and the map costs one object (B136).
+    const lib = read('lib/space-presence-oversight.ts');
+    for (const r of ['explicit', 'left_space', 'moved', 'signed_out', 'timeout']) {
+      expect(lib, `${r} has no written sentence`).toMatch(new RegExp(`${r}:\\s*'`));
+    }
+    // And it must not clip its tables: overflow-hidden on a rounded wrapper once made 63% of every
+    // admin row unreachable at 390px, while the body-scroll invariant still answered "no".
+    //
+    // STRIPPED FIRST, and this test failed until it was: the page names the bad class in the
+    // comment explaining why it does not use it. That is this repo's own lesson — a text search for
+    // a bug pattern finds the CHANGELOG of that bug, so it reports the most defects exactly where
+    // the most care was taken — and the test walked straight into it.
+    const page = stripComments(read('app/admin/workspace-access/page.tsx'));
+    expect(page).toMatch(/overflow-x-auto/);
+    expect(page).not.toMatch(/overflow-hidden/);
+  });
+
+  it('the oversight page computes durations from Dates, and does not read the clock in a client', () => {
+    // `timestamptz` arrives as a Date. `String(d).slice(0,10)` is "Tue Apr 28" and every arithmetic
+    // on it is NaN — which RENDERS ("NaN days early" shipped). And a client component reading the
+    // clock during render fails hydration while the route still answers 200 (React #418, eight
+    // occurrences). This page is a server component by construction.
+    const page = read('app/admin/workspace-access/page.tsx');
+    expect(page, 'must not be a client component').not.toMatch(/^'use client'/m);
+    const lib = read('lib/space-presence-oversight.ts');
+    expect(lib, 'duration must come from getTime(), not a sliced string').toMatch(/getTime\(\)/);
+    expect(lib).toMatch(/instanceof Date/);
+  });
+
   it('the cron path is in the middleware allowlist, or the bearer never reaches the handler', () => {
     // Documented trap, three prior occurrences: middleware requires a session and runs FIRST, so a
     // correctly-authenticated poke 401s before the route's own bearer check is reached.

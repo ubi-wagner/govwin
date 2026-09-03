@@ -7,6 +7,7 @@ import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
 import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
 import { syncPortalPresence } from '@/lib/space-presence';
+import { PresenceHeartbeat } from '@/components/portal/presence-heartbeat';
 import { getActiveMemberships, hasActiveMembership } from '@/lib/memberships';
 import { NavShell } from '@/components/ui/nav-shell';
 import type { Metadata } from 'next';
@@ -220,6 +221,10 @@ export default async function PortalLayout({
         </div>
       )}
       {isShadowAdmin && <ShadowSpaceBanner companyName={companyName} tenantId={tenantId} />}
+      {/* Liveness for the bracket this render opened. Only an OUTSIDE actor holds one, so a normal
+          customer session mounts nothing and pings nothing. Without it the sweep evicts an actor
+          who is still here — a soft navigation does not re-run this layout. */}
+      {(isShadowAdmin || isDescendedPartner) && <PresenceHeartbeat />}
       <div className="p-4 sm:p-6 lg:p-8">{children}</div>
     </NavShell>
   );
