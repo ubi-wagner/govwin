@@ -71,6 +71,23 @@ indistinguishable from the truth.
 consequence, and only as a boot-time echo nobody queries afterwards. The runtime consequence is now
 reported by `/api/health` (§2d) so the deploy gate can see it.
 
+### 1d. ⚠️ Four capabilities are wired, documented, and INERT until a variable is set
+
+Every one of these is honestly marked `○ **inert when unset**` in `RAILWAY_ENV_VARS.md`, which is
+the right way to document them and also the reason they are easy to miss: nothing is broken, the
+capability simply never runs, and there is no error to notice.
+
+| variable | what does not happen without it |
+| --- | --- |
+| `ANTHROPIC_API_KEY` **on the pipeline** | the entire agent fabric. `section_drafter`, the full-draft cohort, Studio, the project agents — all raise or safe-skip. The workforce is inert in production |
+| `SPACE_PRESENCE_SWEEP_URL` + `CRON_SECRET` | the **timeout** closer — the only presence closer that works when nobody is there to press exit. A shadowing admin who shuts the tab leaves "an RFP administrator opened your workspace" open in that customer's audit trail indefinitely |
+| `CARD_RECONCILE_URL` + `CRON_SECRET` | the only thing that heals a tenant who never opens their feed. Their digest and the admin rollups compute off a stale mirror |
+| `AGENT_GATE_SWEEP_URL` + `CRON_SECRET` | TW-8 AI-manager auto-advance |
+
+`CRON_SECRET` itself is `○`, so all three pokers are gated on one unset value. The pipeline reads
+these through `os.environ.get(url_var)` inside `_run_poker`, so there is no literal to grep for —
+which is why `audit-env-inventory.mjs` had to be taught about them specially.
+
 ### 1c. ◻ Self-serve payment — a decision, not a gap
 
 The purchase modal carries both paths and degrades honestly. The comp-code motion
@@ -193,6 +210,38 @@ It is **deliberately excluded from the top-level `ok`**, and that exclusion is s
 rather than left silent: a frontend whose bypass pool cannot bypass still serves every
 customer-facing surface correctly, and failing the Railway liveness probe would take the product
 down to report a degraded admin view. The deploy gate surfaces it as a warning naming the fix.
+
+---
+
+## 2e. Sessions — checked directly, because they were the parallel line's work
+
+**The model is: JWT for identity, the database for authority, re-read every request.** That is the
+right shape, and it holds:
+
+* `verifyTenantAccess` reads `user_memberships` JOIN `tenants` on **every** request. A revoked
+  membership or an archived tenant denies on the **next request**, not when the 8-hour token expires.
+* It **fails closed on role escalation** — the session's active role is capped to the role actually
+  granted at that tenant, so a stale higher role in a JWT buys nothing.
+* "Deactivate a person" in the product means *revoke the home membership*
+  (`DELETE …/team/[userId]`), and a role change writes to `user_memberships` too. Both are exactly
+  what gets re-read. There is no 8-hour window on the customer side.
+* The space-presence bracket (migs 246/247) has **all five closers wired** — `explicit`,
+  `left_space`, `moved`, `timeout`, `signed_out` — 4–5 call sites each, `signed_out` hanging off
+  NextAuth's `events.signOut` in `auth.ts`.
+
+⚠️ **The one real gap is staff, not customers.** `verifyTenantAccess` short-circuits
+`if (role === 'master_admin' || role === 'rfp_admin') return true` on the **session** role, and
+nothing re-reads `users.role` or `users.is_active` per request on that path. `app/admin/` has 38
+surfaces and no user-management one, so there is no in-product way to demote or disable a staff
+account at all. An admin who leaves or is compromised keeps full cross-tenant reach for up to the
+8-hour `maxAge`; the only lever is rotating `AUTH_SECRET`, which signs **everyone** out. Fine at
+current headcount, worth closing before staff churn — the fix is a DB read on the admin branch,
+which is one query on a path that already runs per request.
+
+*(A note on method: my first pass reported `signed_out` as a closer with no call site. It has five.
+I had grepped `app/`, `lib/` and `components/`, and `auth.ts` sits at the frontend root — the
+absence was my scope, not the code. Recorded because it is the same error class this document is
+mostly about: an instrument that cannot see a thing reports it as missing.)*
 
 ---
 
