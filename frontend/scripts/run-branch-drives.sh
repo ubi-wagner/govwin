@@ -16,6 +16,21 @@
 #
 #   ./scripts/run-branch-drives.sh            all drives
 #   ./scripts/run-branch-drives.sh amendment  only names matching a substring
+#
+# ── A FULL RUN TAKES OVER AN HOUR, SO PIN THE SCRIPT BEFORE STARTING ONE ────────────────────────
+#
+# Bash reads a script INCREMENTALLY, by byte offset. Any change to this file mid-run — your own
+# rebase, a `git pull`, a teammate's push landing in the working tree — shifts everything beneath a
+# live interpreter, and the run's exit code and late results are worthless (CONTINUATION.md §2,
+# trap 1). More than one session works this branch, so on a long run that is a real risk, not a
+# theoretical one; it happened at drive 20 of 63.
+#
+#   cp scripts/run-branch-drives.sh scripts/.run-pinned.sh && bash scripts/.run-pinned.sh
+#
+# IN THIS DIRECTORY, not /tmp. The script does `cd "$(dirname "$0")/.."`, so a copy under /tmp
+# resolves that to `/` — and the run then reported a cross-tenant invariant VIOLATION that was
+# really a broken working directory. A false alarm from the preflight whose whole job is to be
+# believed is worse than the mid-run edit it was working around. `.run-pinned.sh` is gitignored.
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 2
