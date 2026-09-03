@@ -282,12 +282,30 @@ async def main() -> None:
         behind = sum(1 for t in (d.get("perTenant") or []) if t.get("applied"))
         return f"caught up {applied} card(s) across {behind} tenant(s)"
 
+    # SPACE-PRESENCE SWEEP — close abandoned "somebody is in your workspace" brackets.
+    #
+    # An rfp_admin shadowing a customer, or a partner-manager descended into a client company, opens
+    # a bracket in `space_presence` (mig 246). Pressing exit closes it; so does turning up on the
+    # platform console, or inside a different company. None of those happen when the tab is simply
+    # CLOSED — and that is the case the customer's audit trail suffers most from, because it goes on
+    # asserting somebody is in their workspace forever. This is the only closer that does not need
+    # the person to still be there.
+    #
+    # Hourly, like the card reconcile and for the same reason: it is a backstop for the sessions
+    # nobody is driving, not a latency path for one somebody is. The route bounds `idleMinutes`
+    # itself (default 45), so an eviction can never be so eager that it writes a departure into a
+    # customer's trail while the admin is merely reading.
+    def _presence_report(d: dict) -> str | None:
+        closed = d.get("closed", 0)
+        return f"closed {closed} abandoned space presence(s)" if closed else None
+
     # Run the ingester consumer loop, workflow processor, health
     # server, lifecycle scheduler, and agent task queue consumer
     # concurrently. All manage their own resources and respect shutdown_event.
     await asyncio.gather(
         _run_poker('agent-gate auto-advance poker', 'AGENT_GATE_SWEEP_URL', 60, _gate_report),
         _run_poker('card reconcile sweep', 'CARD_RECONCILE_URL', 3600, _reconcile_report),
+        _run_poker('space presence sweep', 'SPACE_PRESENCE_SWEEP_URL', 3600, _presence_report),
         run_consumer_loop(
             database_url=DATABASE_URL,
             shutdown_event=shutdown_event,

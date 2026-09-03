@@ -129,4 +129,42 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       },
     }),
   ],
+
+  /**
+   * SIGNING OUT ENDS EVERY BRACKET — from wherever it happens.
+   *
+   * The four in-product exits (pressing exit, turning up outside, moving to another company, the
+   * idle sweep) all assume the person is still driving the product. Sign-out is the one that does
+   * not, and it can be pressed from INSIDE a customer's workspace — which is exactly where it
+   * matters, because at that instant the actor is unambiguously gone.
+   *
+   * Without this, a shadow admin who signed out of a customer's portal left the bracket open until
+   * the hourly sweep noticed, so that company's audit trail asserted an administrator was in their
+   * workspace at a moment when they had demonstrably logged out. That is worse than a missing
+   * record: it is a confident wrong one.
+   *
+   * Closes ALL open brackets, with no `except` — including the space they first landed in. There is
+   * no "current tenant" to preserve once the session is over.
+   *
+   * SESSION EXPIRY has no hook here and deliberately gets none: nothing fires when a JWT quietly
+   * expires, because there is no request to observe. The sweep's `timeout` is the honest record of
+   * that — "we stopped seeing them" — and inventing an `expired` reason would assert a moment
+   * nobody measured.
+   *
+   * Best-effort and never throwing: a failure here must not be able to prevent somebody signing
+   * out. The sweep remains the backstop.
+   */
+  events: {
+    async signOut(message) {
+      try {
+        const token = (message as { token?: { sub?: string; email?: string } }).token;
+        const id = token?.sub;
+        if (!id) return;
+        const { closePresence } = await import('@/lib/space-presence');
+        await closePresence({ id, email: token?.email ?? null }, 'signed_out');
+      } catch (e) {
+        console.error('[auth] signOut presence close failed:', e);
+      }
+    },
+  },
 });

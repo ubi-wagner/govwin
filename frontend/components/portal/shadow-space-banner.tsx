@@ -25,15 +25,25 @@ export function ShadowSpaceBanner({ companyName, tenantId }: { companyName: stri
     }).catch(() => {});
   }, [tenantId]);
 
+  /**
+   * THE MODAL ONLY. The descend EVENT is no longer emitted from here.
+   *
+   * It used to be, deduped by this same `sessionStorage` key — which is per TAB, so opening the
+   * customer's workspace in a second tab emitted a second `shadow.descended` that nothing would
+   * ever match with an ascend. The server now opens the bracket on render (`space_presence`,
+   * mig 246), idempotently and per (actor, tenant), which is the correct grain.
+   *
+   * The acknowledgment is still a per-tab thing — it exists so the admin cannot MISS which space
+   * they are in, and a new tab genuinely deserves to be told again.
+   */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const key = `shadow_ack_${tenantId}`;
     if (!sessionStorage.getItem(key)) {
       setAckOpen(true);
       sessionStorage.setItem(key, '1');
-      post('down'); // emit descended once per session-entry
     }
-  }, [tenantId, post]);
+  }, [tenantId]);
 
   const ascend = useCallback(() => {
     post('up');

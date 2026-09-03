@@ -13,7 +13,7 @@ import { auth, unstable_update } from '@/auth';
 import { sqlBypass } from '@/lib/db';
 import { isRole, canManagePartnerTenants, type Role } from '@/lib/rbac';
 import { partnerCanEnter } from '@/lib/partner/scope';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { openPresence } from '@/lib/space-presence';
 
 async function realRole(userId: string): Promise<Role | null> {
   try {
@@ -48,9 +48,11 @@ export async function GET(req: NextRequest) {
       user: { role: 'tenant_admin', tenantId: t.id, tenantSlug: slug, partnerHomeRole: rr, membershipPinned: true },
     } as unknown as Parameters<typeof unstable_update>[0]);
 
-    try {
-      await emitEventSingle({ namespace: 'finder', type: 'partner.entered', actor: userActor(u.id, u.email), tenantId: t.id, payload: { tenantId: t.id, slug } });
-    } catch { /* best-effort */ }
+    // ONE WRITER OWNS BOTH ENDS. The enter event is emitted by `openPresence` alongside the open
+    // bracket it belongs to — and only when it actually opens one, so re-entering a company the
+    // manager is already inside refreshes presence instead of emitting a second arrival with no
+    // second departure. That pairing is the whole fix; emitting here too would restore the split.
+    await openPresence({ id: u.id, email: u.email }, t.id, 'partner', { slug });
 
     // Optional landing target within the descended portal (the console's descend deep-links).
     // Whitelisted to a known set of portal sub-pages — never an open redirect (only a bare suffix,

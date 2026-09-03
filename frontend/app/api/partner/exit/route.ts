@@ -9,7 +9,7 @@ import { auth, unstable_update } from '@/auth';
 import { sqlBypass } from '@/lib/db';
 import { isRole, canManagePartnerTenants, type Role } from '@/lib/rbac';
 import { partnerOwnOrg } from '@/lib/partner/scope';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { closePresence } from '@/lib/space-presence';
 
 async function realRole(userId: string): Promise<Role | null> {
   try {
@@ -28,6 +28,17 @@ export async function GET(req: NextRequest) {
   if (!rr || !canManagePartnerTenants(rr)) return NextResponse.redirect(url('/login'));
 
   try {
+    /**
+     * CLOSE THE BRACKET BEFORE THE SESSION FORGETS WHICH COMPANY IT WAS.
+     *
+     * This route used to emit `partner.exited` with `tenantId: null` — so the departure landed in
+     * NO customer's audit trail, and the company that had been entered saw the arrival with no
+     * matching close. The tenant was right here in the session the whole time; it was simply not
+     * read. `closePresence` finds the open bracket by actor and closes it with the tenant it
+     * actually belongs to, so this works even if the session has already been rewritten below.
+     */
+    await closePresence({ id: u.id, email: u.email }, 'explicit');
+
     const own = await partnerOwnOrg(u.id);
     // Ascending RELEASES the company commitment that descending made: /api/partner/enter sets
     // membershipPinned, and leaving it set would weld the manager to the company they just left —
@@ -35,10 +46,6 @@ export async function GET(req: NextRequest) {
     await unstable_update({
       user: { role: rr, tenantId: own?.id ?? null, tenantSlug: own?.slug ?? null, partnerHomeRole: null, membershipPinned: false },
     } as unknown as Parameters<typeof unstable_update>[0]);
-
-    try {
-      await emitEventSingle({ namespace: 'finder', type: 'partner.exited', actor: userActor(u.id, u.email), tenantId: null, payload: {} });
-    } catch { /* best-effort */ }
 
     return NextResponse.redirect(url('/partner'));
   } catch (e) {

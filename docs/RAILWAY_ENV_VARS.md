@@ -49,6 +49,19 @@ Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` ser
 | `CLAUDE_MODEL` | agent model id | ○ (defaults to `claude-sonnet-4-20250514`) |
 | `AGENT_DATABASE_URL` | routes the agent pool through the **`rfp_agent` (NOBYPASSRLS)** role for agent-side RLS (defense-in-depth). **Unset today** → agents ride the pipeline `DATABASE_URL` connection; isolation is the app-layer `WHERE tenant_id` + fail-closed guards | ○ |
 | `SAM_GOV_API_KEY` · `MASTER_ADMIN_EMAIL` · `INITIAL_MASTER_ADMIN_PASSWORD` | SAM.gov ingest · first-admin seed | ○ |
+| `CARD_RECONCILE_URL` (+ `CRON_SECRET`) | hourly poke → `POST /api/admin/reconcile-cards`. The ONLY thing that heals a tenant who never opens their feed; without it their weekly digest and the admin rollups are computed off a stale mirror | ○ (**inert when unset**) |
+| `AGENT_GATE_SWEEP_URL` (+ `CRON_SECRET`) | 60s poke → `POST /api/admin/agent-gates/sweep`. TW-8 AI-manager auto-advance | ○ (**inert when unset**) |
+| `SPACE_PRESENCE_SWEEP_URL` (+ `CRON_SECRET`) | hourly poke → `POST /api/admin/space-presence/sweep`. Closes an abandoned "an RFP administrator opened your workspace" bracket when the admin/partner shut the tab instead of exiting — the one closer that does not need the person to still be there. Unset ⇒ those brackets stay open in the customer's audit trail indefinitely | ○ (**inert when unset**) |
+
+> **These three are read through a helper, not by name.** `pipeline/src/main.py` calls
+> `_run_poker('…', 'CARD_RECONCILE_URL', …)` and the helper does `os.environ.get(url_var)`, so no
+> `os.environ["CARD_RECONCILE_URL"]` exists anywhere to grep for. `audit-env-inventory.mjs` was
+> blind to all three until it learned the call-site idiom — which meant the audit built to catch
+> "a capability that silently does nothing in production" could not see its own best examples.
+> Each URL is the **full public** endpoint (e.g. `https://<frontend-domain>/api/admin/…`), and each
+> path must also be in `CRON_EXACT_PATHS` in `middleware.ts` or the bearer is rejected before the
+> handler runs — a 401 whose lowercase `{"error":"unauthenticated"}` body is the middleware's
+> wording, not the route's.
 
 ## rfp-crm (FastAPI — CRM, build-out later)
 

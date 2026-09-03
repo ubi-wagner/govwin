@@ -6,6 +6,7 @@ import { AdminNavTrail } from '@/components/admin/admin-nav-trail';
 import { visibleAdminNav } from '@/components/admin/admin-nav-data';
 import { isRole, type Role } from '@/lib/rbac';
 import { NavShell } from '@/components/ui/nav-shell';
+import { closePresence } from '@/lib/space-presence';
 
 export const metadata = { title: 'Admin' };
 
@@ -19,9 +20,26 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // The filter is DERIVED from requiredRoleForPath — the same table middleware enforces — rather
   // than a second minRole field to keep in sync. One authority, no drift.
   const session = await auth();
-  const su = session?.user as { role?: unknown } | undefined;
+  const su = session?.user as { id?: string; email?: string | null; role?: unknown } | undefined;
   const role: Role | null = isRole(su?.role) ? su.role : null;
   const nav = visibleAdminNav(role);
+
+  /**
+   * THEY TRAVERSED BACK UP AND OUT — close any customer workspace still held open.
+   *
+   * Rendering the platform console is proof the actor is no longer inside a tenant's space, and it
+   * is the ONLY proof that does not depend on them pressing something. `shadow.ascended` used to
+   * come exclusively from a "Return to platform" button posted by a client component, so an admin
+   * who typed a URL, followed a nav link, or closed the tab left the customer's audit trail saying
+   * they were still in there — permanently.
+   *
+   * This is the "left_space" reason specifically: distinct from pressing exit, from moving to
+   * another company, and from being timed out, because a customer reading their own trail should
+   * be told which of those four actually happened.
+   */
+  if (su?.id) {
+    await closePresence({ id: su.id, email: su.email }, 'left_space');
+  }
   return (
     <AdminNavProvider>
     <NavShell

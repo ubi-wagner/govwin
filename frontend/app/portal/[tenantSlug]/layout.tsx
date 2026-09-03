@@ -6,6 +6,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
 import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
+import { syncPortalPresence } from '@/lib/space-presence';
 import { getActiveMemberships, hasActiveMembership } from '@/lib/memberships';
 import { NavShell } from '@/components/ui/nav-shell';
 import type { Metadata } from 'next';
@@ -50,6 +51,7 @@ export default async function PortalLayout({
   const sessionUser = session.user as {
     id?: string;
     name?: string | null;
+    email?: string | null;
     role?: unknown;
     tenantId?: string | null;
     membershipPinned?: boolean;
@@ -90,6 +92,29 @@ export default async function PortalLayout({
   // workspace, so the shadow banner is suppressed there. Admins are the only accounts that
   // re-scope in-session, so they're EXEMPT from the singular-session pin either way.
   const isShadowAdmin = isAdmin && !(await hasActiveMembership(userId, tenantId));
+
+  /**
+   * THE OPEN HALF OF THE BRACKET, recorded by the SERVER on every render inside the space.
+   *
+   * Previously the descend event came from a client component's `useEffect`, deduped in
+   * `sessionStorage` — per TAB, so a second tab opened a second bracket. And nothing recorded that
+   * the actor was still here, so nothing could ever tell an abandoned session from a long one.
+   *
+   * This also closes the "moved" case in the same call: a manager who goes from company A straight
+   * into company B passes no exit control, and A is owed a departure. `syncPortalPresence` opens
+   * the current one and closes every other, which is only knowable from inside a render that has
+   * just established which tenant this is.
+   *
+   * Deliberately NOT awaited into the render path's critical section beyond its own try/catch — it
+   * is best-effort inside the helper, because an audit write must never take a customer's page
+   * down. The hourly sweep is the backstop for anything it misses.
+   */
+  await syncPortalPresence(
+    { id: userId, email: sessionUser.email },
+    tenantId,
+    isShadowAdmin ? 'shadow' : isDescendedPartner ? 'partner' : null,
+    { slug: tenantSlug },
+  );
 
   // Singular-session enforcement (non-admins). A session acts as exactly ONE
   // (company, role); the active membership is pinned onto the JWT when the user picks

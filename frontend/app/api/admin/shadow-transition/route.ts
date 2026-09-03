@@ -14,7 +14,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { openPresence, closePresence } from '@/lib/space-presence';
 
 export async function POST(request: Request) {
   try {
@@ -32,14 +32,32 @@ export async function POST(request: Request) {
     if (!direction) return NextResponse.json({ error: 'direction must be down|up', code: 'VALIDATION_ERROR' }, { status: 400 });
     const tenantId = typeof body.tenantId === 'string' && isValidUUID(body.tenantId) ? body.tenantId : null;
 
-    await emitEventSingle({
-      namespace: 'identity',
-      type: direction === 'down' ? 'shadow.descended' : 'shadow.ascended',
-      actor: userActor(u.id, u.email ?? undefined),
-      // The event belongs to the customer's audit trail (down) / the one just left (up).
-      tenantId,
-      payload: { direction, actingAs: 'tenant_admin', platform: 'RFP Pipeline' },
-    });
+    /**
+     * DELEGATED, not duplicated. Both events now come from `lib/space-presence`, which owns the
+     * open/closed bracket in `space_presence` (mig 246) — so the descend and the ascend cannot be
+     * emitted by different code with different scoping, which is exactly how the ascend went
+     * missing whenever this route was not called.
+     *
+     * This route remains the EXPLICIT door (the banner's "Return to platform"). It is no longer
+     * the only one: the portal layout opens on render, and the admin layout closes with
+     * `left_space` when the actor turns up on the console without pressing anything.
+     *
+     * `down` needs a tenant — an unscoped descend belongs in nobody's trail, and this route takes
+     * its tenantId from the CLIENT, so a missing one is refused rather than recorded as null.
+     * `up` needs none: the open bracket already knows which company it was.
+     */
+    const actor = { id: u.id, email: u.email ?? null };
+    if (direction === 'down') {
+      if (!tenantId) {
+        return NextResponse.json(
+          { error: 'tenantId is required to record a descent', code: 'VALIDATION_ERROR' },
+          { status: 400 },
+        );
+      }
+      await openPresence(actor, tenantId, 'shadow', { actingAs: 'tenant_admin', platform: 'RFP Pipeline' });
+    } else {
+      await closePresence(actor, 'explicit');
+    }
 
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {
