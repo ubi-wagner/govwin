@@ -42,10 +42,22 @@
  * 4. **The emulator returns a well-formed Anthropic message**, not merely a listening socket. A
  *    POST it must actually answer, with the response shape the SDK destructures.
  *
- * ── WHAT IT DELIBERATELY DOES NOT CLAIM ──────────────────────────────────────────────────────
+ * ── WHAT IT DELIBERATELY DOES NOT CLAIM, AND ONE HOLE WORTH NAMING ───────────────────────────
  * It does not prove the worker will process any PARTICULAR event, and it writes nothing to do so —
  * a preflight that enqueues work mutates the box it is measuring. It proves the worker is present,
  * healthy, singular and pointed at the right database. A drive that then fails is a finding.
+ *
+ * The hole: **`/healthz` opens its OWN connection**, so `db.ok` is true even when the consumer
+ * loops are wedged on a dead one. That is not hypothetical — a parallel line restarted Postgres
+ * under a running worker and watched it log `connection is closed` every ten seconds for four
+ * minutes while `/healthz` stayed green, and `drive-project-lifecycle` reported 13 broken links
+ * against an engine that was not there (commit fcc646ee). This preflight would have passed.
+ *
+ * What makes that acceptable rather than a known-broken check is that the same commit fixed the
+ * cause: all three consumer loops now ask `conn.is_closed()` each pass and reconnect, so the wedge
+ * self-heals instead of persisting. `db.ok` is a reasonable proxy BECAUSE of that fix, not
+ * independently of it. If the reconnect is ever removed, this check goes back to being blind and
+ * `pipeline/src/health.py` — which still cannot see a wedged loop — is where the fix belongs.
  *
  *   node scripts/check-async-workers.mjs   → exit 0 both up · 1 something is wrong · 2 cannot tell
  */
