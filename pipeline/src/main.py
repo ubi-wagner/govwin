@@ -78,7 +78,28 @@ async def run_agent_task_consumer(
             backoff = 30  # reset after a healthy connect
             log.info("agent task queue consumer connected to database")
 
+            # WHY the inner loop leaves has to be distinguishable. The `break` after it means
+            # "shutdown requested" and exits the consumer for good; a break for a dead connection
+            # must fall through to the OUTER loop's reconnect instead. Without this flag the fix
+            # for a lost connection would have shut the consumer down permanently — a worse
+            # failure than the one being fixed, and a silent one.
+            reconnect = False
             while not shutdown_event.is_set():
+                # BREAK OUT TO THE RECONNECT, don't spin on a dead connection.
+                #
+                # The outer loop already knows how to reconnect — but nothing ever reached it.
+                # `process_task_queue` catches its own claim failure and returns [], so the
+                # `except` below never fires, and the inner loop polled a closed connection every
+                # interval forever, logging "[process_task_queue] claim failed: connection is
+                # closed" and processing nothing. Observed for four minutes straight after the
+                # database was restarted under a running worker.
+                #
+                # Checking the connection is what makes this independent of which layer swallows
+                # the error, and of which asyncpg class it was.
+                if conn is None or conn.is_closed():
+                    log.warning("agent task queue: connection is closed — reconnecting")
+                    reconnect = True
+                    break
                 try:
                     results = await fabric.process_task_queue(conn)
                     if results:
@@ -97,6 +118,14 @@ async def run_agent_task_consumer(
                 except asyncio.TimeoutError:
                     pass  # Normal — poll interval elapsed
 
+            if reconnect:
+                try:
+                    if conn is not None and not conn.is_closed():
+                        await conn.close()
+                except Exception:
+                    pass
+                conn = None
+                continue  # outer loop reconnects
             break  # inner loop exited → shutdown requested
 
         except asyncio.CancelledError:

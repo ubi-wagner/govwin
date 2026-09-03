@@ -723,6 +723,36 @@ async def run_workflow_processor(
         log.info("workflow processor seeded last_processed_at = %s", last_processed_at)
 
         while not shutdown_event.is_set():
+            # ── RECONNECT IS A CONDITION, NOT AN EXCEPTION TAXONOMY ──────────────────────────
+            #
+            # The handler below catches `asyncpg.PostgresConnectionError`, which is the SERVER
+            # side of a connection failure (SQLSTATE class 08). A client-side drop — the socket
+            # going away under us — raises `asyncpg.InterfaceError("connection is closed")`,
+            # which is an unrelated class, so it fell through to the generic `except Exception`
+            # that only LOGS. The processor then polled every ten seconds forever, failing every
+            # time, while staying alive.
+            #
+            # Observed directly: the database was restarted under a running worker and it emitted
+            # `workflow processor poll error: connection is closed` on a loop for four minutes
+            # without ever recovering. No workflow instance was created in that window, so every
+            # engine-dependent check measured an engine that was not there — and a suite run had
+            # to be discarded because of it.
+            #
+            # `/healthz` cannot see this: `health.check_db()` opens a FRESH connection to answer,
+            # so it reports ok while this long-lived one is dead. A liveness probe therefore
+            # never restarts the worker either. Asking the connection whether it is closed is
+            # immune to both problems — a new asyncpg error class cannot defeat it.
+            if conn is None or conn.is_closed():
+                try:
+                    conn = await asyncpg.connect(database_url)
+                    log.info("workflow processor reconnected to DB")
+                except Exception as reconn_exc:
+                    log.error("workflow processor reconnect failed: %s", reconn_exc)
+                    try:
+                        await asyncio.wait_for(shutdown_event.wait(), timeout=poll_interval)
+                        break
+                    except asyncio.TimeoutError:
+                        continue
             try:
                 events = await conn.fetch(
                     """
@@ -950,9 +980,19 @@ async def run_workflow_processor(
                     except Exception as e:
                         log.error("poll_retrying_instances failed: %s", e)
 
-            except asyncpg.PostgresConnectionError as exc:
+            # `InterfaceError` is the CLIENT-side half ("connection is closed", "connection was
+            # closed in the middle of operation") and is NOT a subclass of PostgresConnectionError,
+            # which is why the old handler could not see the commonest case. OSError covers the
+            # socket itself. The guard at the top of the loop is the real safety net; this arm just
+            # reconnects immediately instead of losing one poll interval.
+            except (asyncpg.PostgresConnectionError, asyncpg.InterfaceError, OSError) as exc:
                 log.error("workflow processor lost DB connection: %s", exc)
                 # Try to reconnect
+                try:
+                    if conn is not None and not conn.is_closed():
+                        await conn.close()
+                except Exception:
+                    pass
                 try:
                     conn = await asyncpg.connect(database_url)
                     log.info("workflow processor reconnected to DB")

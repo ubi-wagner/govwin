@@ -563,6 +563,20 @@ async def run_consumer_loop(
 
         last_tick = 0.0
         while not shutdown_event.is_set():
+            # Same reconnect guard as workflows/processor.py, and for the same reason: a
+            # client-side drop raises asyncpg.InterfaceError("connection is closed"), which the
+            # generic handler below logs and sleeps through — forever. This loop is the INGEST
+            # consumer, so the failure mode is a scout queue that stops draining silently while
+            # the process stays alive and /healthz (which opens its own connection) reports ok.
+            # Asking the connection whether it is closed cannot be defeated by an error class.
+            if conn is None or conn.is_closed():
+                try:
+                    conn = await asyncpg.connect(database_url)
+                    log.info("consumer loop reconnected to DB")
+                except Exception as reconn_exc:
+                    log.error("consumer loop reconnect failed: %s", reconn_exc)
+                    await asyncio.sleep(10)
+                    continue
             # get_RUNNING_loop, not get_event_loop: we are inside a coroutine, so the running
             # loop is the one we want, and the deprecated spelling raises on 3.12 whenever no
             # loop happens to be set for the thread.
