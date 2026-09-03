@@ -110,7 +110,26 @@ export default async function GuideCoveragePage() {
                   </span>
                 </td>
                 <td className="px-4 py-2.5">
-                  <Link href={r.route} className="font-mono text-[12px] text-blue-700 hover:underline">{r.route}</Link>
+                  {/*
+                    A PARAMETERISED ROUTE IS NOT A DESTINATION. `/admin/rfp-curation/[solId]` has no
+                    meaning until a row binds `[solId]`, so linking it offers the reader a click that
+                    can only 404 — which `probe-customer-finish` found here, four times, and which is
+                    the same mistake `verify-guide-controls.mjs` made when it loaded the literal
+                    segment and reported ten present controls as missing. The route is still the
+                    useful information, so it is still shown; what is removed is the promise that it
+                    goes somewhere. Offering a dead link is worse than offering none: it reads as a
+                    broken product rather than as a route that needs a subject.
+                  */}
+                  {r.route.includes('[') ? (
+                    <span
+                      className="font-mono text-[12px] text-gray-600"
+                      title="Needs a specific record — open one from its list page"
+                    >
+                      {r.route}
+                    </span>
+                  ) : (
+                    <Link href={r.route} className="font-mono text-[12px] text-blue-700 hover:underline">{r.route}</Link>
+                  )}
                   {r.live === 'stale' && (
                     <span className="ml-2 text-[11px] text-red-700">changed after the guide was written</span>
                   )}

@@ -32,6 +32,11 @@
 import { chromium } from 'playwright';
 import postgres from 'postgres';
 import { scenario } from './lib/scenario.mts';
+// IMPORTED, never retyped. `applications.terms_version` is the evidence of what somebody agreed
+// to, and a literal here would be a second copy of that value which drifts the first time the
+// terms are bumped — recording an agreement to text the signer never saw, which is precisely the
+// failure the route's schema comment says it removed `.default('v1')` to prevent.
+import { TERMS_VERSION } from '../lib/terms';
 
 const BASE = process.env.GUIDE_BASE || 'http://localhost:3000';
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
@@ -103,7 +108,14 @@ async function main() {
         referralSource: 'harness',
         // The session the browser would have. Migration 242 carries it across the sever.
         sessionId: SESSION,
+        // The three terms fields the REAL form sends (application-form.tsx). This drive sent only
+        // `termsAccepted` and the route answered 422 naming `termsVersion` — the route being
+        // right: it was made required, with no default, so that a submission can never record an
+        // agreement to a version the signer was not shown. A prospect driven without them is not
+        // walking the funnel a prospect actually walks.
         termsAccepted: true,
+        termsSignature: CONTACT,
+        termsVersion: TERMS_VERSION,
       },
     });
     ok(res.status() >= 200 && res.status() < 300, 'the public application form accepts a submission',

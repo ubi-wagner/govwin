@@ -50,12 +50,53 @@ export interface DecomposedArtifact {
 // (a bare heading is a label, not a standalone reusable atom).
 const STRUCTURAL_NODES: ReadonlySet<string> = new Set(['heading', 'toc', 'page_break', 'spacer', 'divider']);
 
-function nodeLabel(n: CanvasNode): { title: string; content: string } {
+/**
+ * A HUMAN NAME FOR A NODE TYPE — the last resort, and never the raw token.
+ *
+ * `probe-customer-finish` found 48 atoms in customers' libraries titled `bulleted_list`: the old
+ * fallback returned `n.type` verbatim, so every list, image, link, caption and footnote atom was
+ * named after the system's own vocabulary. It is the B136 class in a different surface — a term
+ * from the implementation shown to the company that bought a proposal portal — and it never looked
+ * broken, which is why it survived. A library is browsed by title; a shelf of identical
+ * `bulleted_list` entries is not searchable by the person who owns it.
+ */
+const NODE_NOUN: Record<string, string> = {
+  bulleted_list: 'Bulleted list', numbered_list: 'Numbered list', image: 'Image',
+  url: 'Link', caption: 'Caption', footnote: 'Footnote', chart: 'Chart', code: 'Code',
+};
+const humanNode = (t: string) => NODE_NOUN[t] ?? (t.charAt(0).toUpperCase() + t.slice(1)).replace(/_/g, ' ');
+
+/** First non-empty string, trimmed and capped — the title is a label, not the content. */
+function firstText(...vals: unknown[]): string | null {
+  for (const v of vals) {
+    const s = typeof v === 'string' ? v.trim() : '';
+    if (s) return s.slice(0, 60);
+  }
+  return null;
+}
+
+/** Exported for `__tests__/atom-titles.test.ts` — the invariant is "no atom is named after a node
+ *  type", and that is only checkable at this function. Not part of the module's public surface. */
+export function nodeLabel(n: CanvasNode): { title: string; content: string } {
   const c = (n.content ?? {}) as Record<string, unknown>;
   if (n.type === 'heading') { const t = String(c.text ?? ''); return { title: t.slice(0, 120) || 'Heading', content: t }; }
   if (n.type === 'text_block') { const t = String(c.text ?? ''); return { title: t.slice(0, 60) || 'Text', content: t }; }
   if (n.type === 'table') { const s = String(c.sheet_name ?? 'Table'); return { title: s.slice(0, 60), content: JSON.stringify(c).slice(0, 4000) }; }
-  return { title: n.type, content: typeof c === 'object' ? JSON.stringify(c).slice(0, 4000) : String(c) };
+
+  // Name the atom from its OWN content, exactly as the three cases above do — a list by its first
+  // item, an image by its caption or alt text, a link by what it displays. Only when the node
+  // carries no text at all does the type appear, and then as a noun a person would write.
+  const items = Array.isArray(c.items) ? (c.items as Array<{ text?: unknown }>) : [];
+  const fromContent = firstText(
+    items[0]?.text,          // bulleted_list · numbered_list
+    c.caption, c.alt_text,   // image
+    c.display_text, c.href,  // url
+    c.text,                  // caption · footnote
+  );
+  return {
+    title: fromContent ?? humanNode(n.type),
+    content: typeof c === 'object' ? JSON.stringify(c).slice(0, 4000) : String(c),
+  };
 }
 
 /** The taxonomy tag set for a foundation + all its grains (collection · doc=slug · kind · form · format · context). */

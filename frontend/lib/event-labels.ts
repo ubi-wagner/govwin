@@ -177,6 +177,30 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
 
   'shadow.descended': 'An RFP administrator opened your workspace to assist',
   'shadow.ascended': 'An RFP administrator left your workspace',
+
+  // ── The partner-manager family — the SAME gap, found by drive-oversight-surfaces ────
+  //
+  // `finder:partner.entered` reached a customer's Activity feed as "Partner entered": B136 again,
+  // in a namespace the earlier sweep did not cover. It is the partner analogue of
+  // `shadow.descended` and deserves the same plainness — somebody outside this company opened its
+  // workspace, and that is the single most important line in a customer's audit trail.
+  //
+  // The drive found ONE because one is all that has fired. The other four are tenant-scoped in
+  // code (verified at each emit site: portal team/managers routes, manager-request, and the
+  // application accept all pass a real `tenantId`), so each is the identical finding waiting for
+  // its first row. Wording follows what the product already calls these people to the customer —
+  // team-invite-form.tsx: "a Manager is an existing partner organization you grant admin-level
+  // access to build on your behalf."
+  //
+  // ⚠️ ASYMMETRY, DELIBERATELY LEFT: `partner.exited` is emitted with `tenantId: null` (it happens
+  // in the partner console, which is not in any tenant's scope), so a customer sees the entry and
+  // never the departure. That is a scope question, not a wording one, and it is not fixed here —
+  // recorded so the next reader finds it stated rather than rediscovering it.
+  'partner.entered': 'A manager from your partner organization opened your workspace',
+  'partner.manager_granted': 'Manager access granted to a partner organization',
+  'partner.manager_revoked': 'Manager access revoked from a partner organization',
+  'partner.manager_requested': 'A partner organization requested manager access',
+  'partner.company_registered': 'Your company was registered by a partner organization',
   'card.applied': 'Opportunity added to your board',
   'card.scored': 'Opportunity ranked against your buckets',
   'tenant.rescored': 'Opportunities re-ranked against your buckets',
