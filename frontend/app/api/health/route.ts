@@ -20,6 +20,7 @@ import { NextResponse } from 'next/server';
 import { sql, sqlBypass } from '@/lib/db';
 import { pingS3 } from '@/lib/storage/s3-client';
 import { createLogger } from '@/lib/logger';
+import { ABSOLUTE_MAX_MS, IDLE_MS } from '@/lib/session-policy';
 
 const log = createLogger('health');
 
@@ -34,6 +35,24 @@ interface HealthResponse {
   release: string;
   environment: string;
   uptimeMs: number;
+  /**
+   * The session bounds THIS process is actually enforcing.
+   *
+   * Not a secret — a session length is a stated policy, and publishing it is how an operator
+   * verifies the deployed bound matches the intended one instead of reading a constant in a repo
+   * and assuming the running build agrees.
+   *
+   * It also makes `scripts/prove-session-cap.mts` self-validating, which it was not: that proof
+   * ran twice against a server whose cap was the 12-hour default while asserting against a 25-second
+   * override that had never reached the process (the launch failed to bind and the previous server
+   * kept serving). Both runs reported "the session survived past the cap" — a finding about the
+   * harness, printed as a finding about the product. The proof now reads this field and REFUSES to
+   * run unless the bound it is measuring against is the bound in force.
+   */
+  session: {
+    absoluteMaxMs: number;
+    idleMs: Record<string, number>;
+  };
   checks: {
     db: CheckResult;
     s3: CheckResult;
@@ -80,6 +99,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     release: RELEASE,
     environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.NODE_ENV ?? 'unknown',
     uptimeMs: Date.now() - BOOTED_AT,
+    session: { absoluteMaxMs: ABSOLUTE_MAX_MS, idleMs: IDLE_MS },
     checks: { db, s3, bypass },
   };
 

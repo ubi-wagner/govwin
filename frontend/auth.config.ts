@@ -33,11 +33,24 @@
  */
 import type { NextAuthConfig } from 'next-auth';
 import type { Role } from './lib/rbac';
+import { sessionEndReason } from './lib/session-policy';
 
 export const authConfig: NextAuthConfig = {
   session: {
     strategy: 'jwt',
-    maxAge: 8 * 60 * 60, // 8 hours
+    /**
+     * THE COOKIE'S OWN LIFETIME — and it is NOT the session bound.
+     *
+     * Measured, not assumed (`scripts/probe-session-lifecycle.mts`): on the JWT strategy every
+     * session read re-signs the token with a fresh expiry, so this value is a SLIDING idle window
+     * and an active session renews forever. The real bounds — an absolute cap from sign-in, and a
+     * per-role idle window — are enforced in the `jwt` callback below against `lib/session-policy`.
+     *
+     * This stays at 8h as the outer bound on the cookie itself. It must not be SHORTER than the
+     * longest role idle window, or the cookie would expire before the callback could say why, and
+     * "you were signed out for inactivity" would degrade to "please sign in" with no reason.
+     */
+    maxAge: 8 * 60 * 60,
   },
   pages: {
     signIn: '/login',
@@ -45,6 +58,34 @@ export const authConfig: NextAuthConfig = {
   providers: [], // Credentials provider is added in auth.ts
   callbacks: {
     async jwt({ token, user, trigger, session }) {
+      /**
+       * THE TWO SESSION BOUNDS. This runs on EVERY token read, which is what makes it the only
+       * place either bound can be enforced — and returning `null` here makes `@auth/core` clean
+       * the session cookie, which is the whole mechanism.
+       *
+       * Ordering is load-bearing and easy to get backwards:
+       *   1. ADOPT a token that predates this code (stamp it) — before any check, or the deploy
+       *      signs out every live session at once.
+       *   2. CHECK the bounds against the stamps as they were on arrival.
+       *   3. ADVANCE `lastSeenAt` — AFTER the check. Advancing first would refresh the very value
+       *      the idle rule reads, and the idle window could never elapse. That is exactly the
+       *      defect this replaces: the presence heartbeat renewed the session it was watching.
+       */
+      const now = Date.now();
+      if (user) token.sessionStartedAt = now;          // a real sign-in starts a new clock
+      else if (typeof token.sessionStartedAt !== 'number') token.sessionStartedAt = now; // adopt
+
+      const end = sessionEndReason(
+        { startedAt: token.sessionStartedAt, lastSeenAt: token.lastSeenAt },
+        token.role,
+        now,
+      );
+      // `null` ends the session: @auth/core takes the `else` branch of `if (token !== null)` in its
+      // session action and pushes `sessionStore.clean()`, removing the cookie.
+      if (end) return null;
+
+      token.lastSeenAt = now;
+
       // First sign-in: copy the custom fields from the authorize()
       // return value onto the token so they persist across requests.
       if (user) {
