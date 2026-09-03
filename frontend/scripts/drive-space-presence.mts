@@ -198,30 +198,12 @@ try {
   A(await events('shadow.ascended', adminId, A1.id, t0) === 1,
     'and the customer was told, even though nobody pressed anything');
 
-  // ── 5 · SIGNED OUT — from INSIDE the workspace, which is where it matters ─────────────────
-  phase('5 · signed out while still inside a customer workspace');
-  await page.goto(`${BASE}/portal/${A1.slug}/dashboard`, { waitUntil: 'domcontentloaded' });
-  await page.waitForLoadState('networkidle').catch(() => {});
-  A((await openRows(adminId)).length === 1, 'a bracket is open, and the actor is inside it');
-  t0 = new Date();
-  // The real control, not a direct POST: this is the button a person presses, and the whole point
-  // is that it can be pressed from in here rather than after walking back out.
-  await page.click('button:has-text("Sign out")').catch(() => {});
-  await page.waitForLoadState('networkidle').catch(() => {});
-  await new Promise((r) => setTimeout(r, 1500));
-  const a4 = await latest(adminId, A1.id);
-  A(a4?.closedAt && a4.closeReason === 'signed_out', 'the bracket closed as "signed_out"',
-    a4?.closeReason ?? 'still open');
-  A(await events('shadow.ascended', adminId, A1.id, t0) === 1,
-    'and the customer was told at the moment they logged out, not an hour later');
-  A((await openRows(adminId)).length === 0, 'nothing is left open anywhere');
-
-  // ── 5b · THE HEARTBEAT — the sweep must NOT evict somebody who is still here ──────────────
+  // ── 4b · THE HEARTBEAT — the sweep must NOT evict somebody who is still here ──────────────
   //
   // This is the defect the heartbeat exists for, and phase 4 above is its mirror: there, an idle
   // bracket SHOULD be swept. Here an idle-looking bracket that has just reported liveness must
   // survive. A drive that only checked phase 4 would pass with the heartbeat deleted.
-  phase('5b · heartbeat — a live actor survives the sweep');
+  phase('4b · heartbeat — a live actor survives the sweep');
   await page.goto(`${BASE}/portal/${A1.slug}/dashboard`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => {});
   A((await openRows(adminId)).length === 1, 'a bracket is open');
@@ -244,6 +226,28 @@ try {
   const hb2 = await page.request.post(`${BASE}/api/presence/heartbeat`, { data: {} });
   A(((await hb2.json())?.data?.touched ?? -1) === 0, 'a heartbeat with nothing open touches nothing');
   A((await openRows(adminId)).length === 0, 'and did NOT open a bracket of its own');
+
+  // ── 5 · SIGNED OUT — from INSIDE the workspace, which is where it matters ─────────────────
+  // LAST of the acting phases, and that ORDER IS LOAD-BEARING: this ends the session, so every
+  // request after it answers 401. Placing the heartbeat phase after this one made all seven of its
+  // checks fail against a working product — a harness ordering bug that reads exactly like a
+  // defect.
+  phase('5 · signed out while still inside a customer workspace');
+  await page.goto(`${BASE}/portal/${A1.slug}/dashboard`, { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle').catch(() => {});
+  A((await openRows(adminId)).length === 1, 'a bracket is open, and the actor is inside it');
+  t0 = new Date();
+  // The real control, not a direct POST: this is the button a person presses, and the whole point
+  // is that it can be pressed from in here rather than after walking back out.
+  await page.click('button:has-text("Sign out")').catch(() => {});
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await new Promise((r) => setTimeout(r, 1500));
+  const a4 = await latest(adminId, A1.id);
+  A(a4?.closedAt && a4.closeReason === 'signed_out', 'the bracket closed as "signed_out"',
+    a4?.closeReason ?? 'still open');
+  A(await events('shadow.ascended', adminId, A1.id, t0) === 1,
+    'and the customer was told at the moment they logged out, not an hour later');
+  A((await openRows(adminId)).length === 0, 'nothing is left open anywhere');
 
   // ── 6 · THE INVARIANT, over the whole box ─────────────────────────────────────────────────
   phase('6 · no enter without an exit — every bracket, every tenant');
