@@ -52,6 +52,7 @@ Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` ser
 | `CARD_RECONCILE_URL` (+ `CRON_SECRET`) | hourly poke → `POST /api/admin/reconcile-cards`. The ONLY thing that heals a tenant who never opens their feed; without it their weekly digest and the admin rollups are computed off a stale mirror | ○ (**inert when unset**) |
 | `AGENT_GATE_SWEEP_URL` (+ `CRON_SECRET`) | 60s poke → `POST /api/admin/agent-gates/sweep`. TW-8 AI-manager auto-advance | ○ (**inert when unset**) |
 | `SPACE_PRESENCE_SWEEP_URL` (+ `CRON_SECRET`) | hourly poke → `POST /api/admin/space-presence/sweep`. Closes an abandoned "an RFP administrator opened your workspace" bracket when the admin/partner shut the tab instead of exiting — the one closer that does not need the person to still be there. Unset ⇒ those brackets stay open in the customer's audit trail indefinitely | ○ (**inert when unset**) |
+| `TASK_CLAIM_SWEEP_URL` (+ `CRON_SECRET`) | 30-min poke → `POST /api/admin/tasks/sweep-claims`. Returns an abandoned ToDo claim to the queue when the person who started it was signed out mid-task. NOT optional alongside the session bounds — those GUARANTEE people are signed out mid-task, so unset ⇒ the queue fills with claims nobody holds and nobody else will pick up | ○ (**inert when unset**) |
 
 > **These three are read through a helper, not by name.** `pipeline/src/main.py` calls
 > `_run_poker('…', 'CARD_RECONCILE_URL', …)` and the helper does `os.environ.get(url_var)`, so no

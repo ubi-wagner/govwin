@@ -422,6 +422,12 @@ DRIVES=(
   # splits the clocks; this drives the gate. Phases 3 and 4 only mean something as a pair: without
   # 4, deleting descent entirely would pass.
   "descent-timeout|scripts/drive-descent-timeout.mts"
+  # A ToDo CAN NOW BE CLAIMED, and a claim expires. `tasks.status` allowed 'in_progress' since the
+  # table existed and nothing ever wrote it (open 47 · completed 65 · expired 2 · in_progress 0), so
+  # the queue could not tell an item somebody had begun from one nobody had touched. That matters
+  # MORE once sessions end on time, not less: P1/P2 guarantee people are signed out mid-task. Check
+  # 6 is the pairing that keeps it honest — a claim must not BLOCK completion, or it is a lock.
+  "task-claim|scripts/drive-task-claim.mts"
   "shadow-tenant-admin|scripts/drive-shadow-tenant-admin.mts"
   "rls-app|scripts/drive-rls-app.mjs"
   "rls-admin|scripts/drive-rls-admin.mjs"

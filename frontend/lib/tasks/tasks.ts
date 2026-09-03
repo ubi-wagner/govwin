@@ -13,7 +13,7 @@ import { sql, sqlBypass } from '@/lib/db';
 import { runInBypass } from '@/lib/tenant-context';
 import { forceAdvanceProcess } from '@/lib/process/force-advance';
 import { hasRoleAtLeast, isRole, type Role } from '@/lib/rbac';
-import { emitEventSingle, userActor } from '@/lib/events';
+import { emitEventSingle, userActor, systemActor } from '@/lib/events';
 
 export interface TaskRow {
   id: string;
@@ -34,6 +34,13 @@ export interface TaskRow {
   /** For a broadcast: result.chain[] is the message thread (typed, timestamped entries). */
   result: Record<string, unknown> | null;
   createdAt: string;
+  /** Claim (mig 249). `claimedByName` is joined from `users`, which carries no RLS — a claim that
+   *  could not name its holder would render "Someone is on this" and lose the feature's whole
+   *  point, which is telling a reader WHO is already doing it. */
+  claimedBy: string | null;
+  claimedAt: string | null;
+  claimedByName: string | null;
+  resumeHref: string | null;
 }
 
 /**
@@ -66,22 +73,25 @@ export async function listOpenTasksForActor(opts: {
     if (tenantId) {
       try {
         return await sql<TaskRow[]>`
-          SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
-                 description, entity_type, entity_id, process_instance_id, step_name,
-                 status, due_at, nudge_schedule, params, result, created_at
-          FROM tasks
-          WHERE status IN ('open', 'in_progress')
+          SELECT t.id, t.tenant_id, t.assignee_role, t.assignee_user_id, t.task_type, t.title,
+                 t.description, t.entity_type, t.entity_id, t.process_instance_id, t.step_name,
+                 t.status, t.due_at, t.nudge_schedule, t.params, t.result, t.created_at,
+                 t.claimed_by, t.claimed_at, t.resume_href,
+                 COALESCE(cu.name, cu.email) AS claimed_by_name
+          FROM tasks t
+          LEFT JOIN users cu ON cu.id = t.claimed_by
+          WHERE t.status IN ('open', 'in_progress')
             AND (
-              (assignee_role IN ('rfp_admin', 'master_admin') AND (tenant_id IS NULL OR tenant_id = ${tenantId}::uuid))
-              OR (assignee_role IN ('tenant_admin', 'tenant_user', 'partner_user') AND tenant_id = ${tenantId}::uuid)
-              OR assignee_user_id = ${userId}::uuid
+              (t.assignee_role IN ('rfp_admin', 'master_admin') AND (t.tenant_id IS NULL OR t.tenant_id = ${tenantId}::uuid))
+              OR (t.assignee_role IN ('tenant_admin', 'tenant_user', 'partner_user') AND t.tenant_id = ${tenantId}::uuid)
+              OR t.assignee_user_id = ${userId}::uuid
               -- A descended shadow admin RECEIVES this tenant's broadcasts as though they were its admin
               -- (thread stays visible; single-ack drops once they post). Bounded to the descended tenant.
-              OR (tenant_id = ${tenantId}::uuid AND assignee_role IS NULL AND assignee_user_id IS NULL
-                  AND (params->>'kind' = 'thread'
-                       OR NOT (COALESCE(result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${userId}::text)))))
+              OR (t.tenant_id = ${tenantId}::uuid AND t.assignee_role IS NULL AND t.assignee_user_id IS NULL
+                  AND (t.params->>'kind' = 'thread'
+                       OR NOT (COALESCE(t.result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${userId}::text)))))
             )
-          ORDER BY due_at ASC NULLS LAST, created_at ASC
+          ORDER BY t.due_at ASC NULLS LAST, t.created_at ASC
           LIMIT 200
         `;
       } catch (e) {
@@ -92,13 +102,16 @@ export async function listOpenTasksForActor(opts: {
     // Admin dashboard (no tenant in context) — admin-bucket across all tenants + own-id tasks.
     try {
       return await sql<TaskRow[]>`
-        SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
-               description, entity_type, entity_id, process_instance_id, step_name,
-               status, due_at, nudge_schedule, params, result, created_at
-        FROM tasks
-        WHERE status IN ('open', 'in_progress')
-          AND (assignee_role IN ('rfp_admin', 'master_admin') OR assignee_user_id = ${userId}::uuid)
-        ORDER BY due_at ASC NULLS LAST, created_at ASC
+        SELECT t.id, t.tenant_id, t.assignee_role, t.assignee_user_id, t.task_type, t.title,
+               t.description, t.entity_type, t.entity_id, t.process_instance_id, t.step_name,
+               t.status, t.due_at, t.nudge_schedule, t.params, t.result, t.created_at,
+               t.claimed_by, t.claimed_at, t.resume_href,
+               COALESCE(cu.name, cu.email) AS claimed_by_name
+        FROM tasks t
+        LEFT JOIN users cu ON cu.id = t.claimed_by
+        WHERE t.status IN ('open', 'in_progress')
+          AND (t.assignee_role IN ('rfp_admin', 'master_admin') OR t.assignee_user_id = ${userId}::uuid)
+        ORDER BY t.due_at ASC NULLS LAST, t.created_at ASC
         LIMIT 200
       `;
     } catch (e) {
@@ -113,20 +126,23 @@ export async function listOpenTasksForActor(opts: {
   // drops from THIS actor's queue once they've posted to result.chain (no clearing for anyone else).
   try {
     return await sql<TaskRow[]>`
-      SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
-             description, entity_type, entity_id, process_instance_id, step_name,
-             status, due_at, nudge_schedule, params, result, created_at
-      FROM tasks
-      WHERE status IN ('open', 'in_progress')
-        AND tenant_id = ${tenantId}::uuid
+      SELECT t.id, t.tenant_id, t.assignee_role, t.assignee_user_id, t.task_type, t.title,
+             t.description, t.entity_type, t.entity_id, t.process_instance_id, t.step_name,
+             t.status, t.due_at, t.nudge_schedule, t.params, t.result, t.created_at,
+             t.claimed_by, t.claimed_at, t.resume_href,
+             COALESCE(cu.name, cu.email) AS claimed_by_name
+      FROM tasks t
+      LEFT JOIN users cu ON cu.id = t.claimed_by
+      WHERE t.status IN ('open', 'in_progress')
+        AND t.tenant_id = ${tenantId}::uuid
         AND (
-          assignee_role = ANY(${visibleTenantRoles})
-          OR assignee_user_id = ${userId}::uuid
-          OR (assignee_role IS NULL AND assignee_user_id IS NULL
-              AND (params->>'kind' = 'thread'
-                   OR NOT (COALESCE(result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${userId}::text)))))
+          t.assignee_role = ANY(${visibleTenantRoles})
+          OR t.assignee_user_id = ${userId}::uuid
+          OR (t.assignee_role IS NULL AND t.assignee_user_id IS NULL
+              AND (t.params->>'kind' = 'thread'
+                   OR NOT (COALESCE(t.result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${userId}::text)))))
         )
-      ORDER BY due_at ASC NULLS LAST, created_at ASC
+      ORDER BY t.due_at ASC NULLS LAST, t.created_at ASC
       LIMIT 200
     `;
   } catch (e) {
@@ -150,14 +166,17 @@ export async function listOpenTasksForActor(opts: {
  */
 export async function listOpenAdminTriageTasks(limit = 50): Promise<TaskRow[]> {
   return await sql<TaskRow[]>`
-    SELECT id, tenant_id, assignee_role, assignee_user_id, task_type, title,
-           description, entity_type, entity_id, process_instance_id, step_name,
-           status, due_at, nudge_schedule, params, result, created_at
-    FROM tasks
-    WHERE status IN ('open', 'in_progress')
-      AND assignee_role IN ('rfp_admin', 'master_admin')
-      AND (tenant_id IS NULL OR task_type = 'proposal_setup')
-    ORDER BY due_at ASC NULLS LAST, created_at ASC
+    SELECT t.id, t.tenant_id, t.assignee_role, t.assignee_user_id, t.task_type, t.title,
+           t.description, t.entity_type, t.entity_id, t.process_instance_id, t.step_name,
+           t.status, t.due_at, t.nudge_schedule, t.params, t.result, t.created_at,
+           t.claimed_by, t.claimed_at, t.resume_href,
+           COALESCE(cu.name, cu.email) AS claimed_by_name
+    FROM tasks t
+    LEFT JOIN users cu ON cu.id = t.claimed_by
+    WHERE t.status IN ('open', 'in_progress')
+      AND t.assignee_role IN ('rfp_admin', 'master_admin')
+      AND (t.tenant_id IS NULL OR t.task_type = 'proposal_setup')
+    ORDER BY t.due_at ASC NULLS LAST, t.created_at ASC
     LIMIT ${limit}
   `;
 }
@@ -393,7 +412,7 @@ export async function completeTask(opts: {
         await sql`
           UPDATE tasks
           SET result = jsonb_set(COALESCE(result, '{}'::jsonb), '{chain}',
-                COALESCE(result->'chain', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                COALESCE(t.result->'chain', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
                   'by', ${actor.id}::text, 'name', ${name}::text, 'at', now(),
                   'type', ${entryType}::text, 'text', ${memoText}::text, 'disposition', ${disposition}::text))),
               updated_at = now()
@@ -404,12 +423,12 @@ export async function completeTask(opts: {
         await sql`
           UPDATE tasks
           SET result = jsonb_set(COALESCE(result, '{}'::jsonb), '{chain}',
-                COALESCE(result->'chain', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+                COALESCE(t.result->'chain', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
                   'by', ${actor.id}::text, 'name', ${name}::text, 'at', now(),
                   'type', ${entryType}::text, 'text', ${memoText}::text, 'disposition', ${disposition}::text))),
               updated_at = now()
           WHERE id = ${taskId}::uuid AND status IN ('open', 'in_progress')
-            AND NOT (COALESCE(result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${actor.id}::text)))
+            AND NOT (COALESCE(t.result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${actor.id}::text)))
         `;
       }
     } catch (e) {
@@ -580,4 +599,198 @@ export async function closeTasksForEntity(opts: {
     }
   }
   return out;
+}
+
+/**
+ * ══ CLAIMS ═══════════════════════════════════════════════════════════════════════════════════
+ *
+ * `tasks.status` has permitted 'in_progress' since the table existed and NOTHING ever wrote it
+ * (measured: open 47 · completed 65 · expired 2 · in_progress 0). So a ToDo was binary, and the
+ * queue could not tell an item somebody had begun from one nobody had touched.
+ *
+ * That gap costs most exactly where P1 and P2 now bite: a session that ends ON TIME strands more
+ * in-flight work than one that never ends. A claim is the record that work started, and
+ * `resume_href` is what makes coming back cheap instead of starting over.
+ *
+ * A CLAIM IS NOT A LOCK. It cannot block anyone — `completeTask` is unchanged and still accepts any
+ * authorised assignee. It expires on a sweep rather than waiting to be released. The thing being
+ * protected is attention, not correctness: two people drafting one section is waste, two people
+ * blocked on a stuck lock is an outage.
+ */
+
+/** How long a claim survives without being renewed. Deliberately longer than the descent window
+ *  (30m) and shorter than the shortest session idle window (2h): a claim should outlive a coffee
+ *  break and never outlive the session that took it. */
+export const CLAIM_STALE_MINUTES = 90;
+
+export interface ClaimResult {
+  ok: boolean;
+  status: number;
+  error?: string;
+  code?: string;
+  data?: { taskId: string; claimedBy: string | null; resumeHref: string | null };
+}
+
+/**
+ * Take a claim on a ToDo.
+ *
+ * The authority predicate is COPIED FROM `completeTask` rather than re-derived: same cross-tenant
+ * guard, same hierarchical role match, same named-user match. A claim that a wider set of people
+ * could take than could complete would let someone park an item they cannot finish.
+ *
+ * Compare-and-swap on `status = 'open'`, so a second claimant loses cleanly rather than overwriting
+ * the first. `AND (claimed_by IS NULL OR claimed_by = actor)` lets the holder re-claim to RENEW,
+ * which is what keeps a long piece of work from being swept out from under someone.
+ */
+export async function claimTask(opts: {
+  taskId: string;
+  actor: { id: string; email: string | null; role: Role; tenantId: string | null };
+}): Promise<ClaimResult> {
+  const { taskId, actor } = opts;
+  let task: {
+    id: string; status: string; tenantId: string | null; assigneeRole: string | null;
+    assigneeUserId: string | null; claimedBy: string | null; resumeHref: string | null;
+  } | undefined;
+  try {
+    [task] = await sql<{
+      id: string; status: string; tenantId: string | null; assigneeRole: string | null;
+      assigneeUserId: string | null; claimedBy: string | null; resumeHref: string | null;
+    }[]>`
+      SELECT id, status, tenant_id, assignee_role, assignee_user_id,
+             claimed_by AS "claimedBy", resume_href AS "resumeHref"
+        FROM tasks WHERE id = ${taskId}::uuid`;
+  } catch (e) {
+    console.error('[tasks] claimTask lookup failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
+  if (!task) return { ok: false, status: 404, error: 'Task not found', code: 'NOT_FOUND' };
+  if (task.status === 'completed' || task.status === 'cancelled' || task.status === 'expired') {
+    return { ok: false, status: 409, error: `Task is already ${task.status}`, code: 'TASK_CLOSED' };
+  }
+
+  const isAdmin = hasRoleAtLeast(actor.role, 'rfp_admin');
+  if (!isAdmin && task.tenantId !== actor.tenantId) {
+    return { ok: false, status: 403, error: 'Not an assignee of this task', code: 'FORBIDDEN' };
+  }
+  const roleAssignee =
+    !!task.assigneeRole && isRole(task.assigneeRole) && hasRoleAtLeast(actor.role, task.assigneeRole);
+  const userAssignee = !!task.assigneeUserId && task.assigneeUserId === actor.id;
+  if (!roleAssignee && !userAssignee) {
+    return { ok: false, status: 403, error: 'Not an assignee of this task', code: 'FORBIDDEN' };
+  }
+
+  // Somebody else already holds it. 409 with WHO, because "someone is on this" is the entire value
+  // of the feature — a refusal that does not name the holder just looks like a broken button.
+  if (task.claimedBy && task.claimedBy !== actor.id) {
+    let holder = 'someone else';
+    try {
+      const [u] = await runInBypass(async () => sql<{ email: string | null; name: string | null }[]>`
+        SELECT email, name FROM users WHERE id = ${task.claimedBy}::uuid`);
+      holder = u?.name || u?.email || holder;
+    } catch { /* the name is a courtesy; the refusal stands without it */ }
+    return {
+      ok: false, status: 409, code: 'ALREADY_CLAIMED',
+      error: `${holder} is already working on this.`,
+    };
+  }
+
+  try {
+    const rows = await sql<{ id: string; resumeHref: string | null }[]>`
+      UPDATE tasks
+         SET status = 'in_progress', claimed_by = ${actor.id}::uuid, claimed_at = now(),
+             updated_at = now()
+       WHERE id = ${taskId}::uuid
+         AND status IN ('open', 'in_progress')
+         AND (claimed_by IS NULL OR claimed_by = ${actor.id}::uuid)
+       RETURNING id, resume_href AS "resumeHref"`;
+    if (rows.length === 0) {
+      // The CAS lost — somebody claimed or closed it between the read and the write.
+      return { ok: false, status: 409, error: 'Someone else just took this.', code: 'ALREADY_CLAIMED' };
+    }
+    await emitEventSingle({
+      type: 'task.claimed',
+      namespace: 'system',
+      tenantId: task.tenantId,
+      actor: userActor(actor.id, actor.email ?? undefined),
+      payload: { taskId, entityType: 'task', entityId: taskId },
+    }).catch(() => {});
+    return { ok: true, status: 200, data: { taskId, claimedBy: actor.id, resumeHref: rows[0].resumeHref } };
+  } catch (e) {
+    console.error('[tasks] claimTask failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
+}
+
+/**
+ * Put a claimed ToDo back. Only the holder, or an admin unsticking a queue.
+ *
+ * Back to 'open' rather than to nothing: the task returns to the queue exactly as it arrived, which
+ * is the state every other reader already understands.
+ */
+export async function releaseTask(opts: {
+  taskId: string;
+  actor: { id: string; email: string | null; role: Role; tenantId: string | null };
+}): Promise<ClaimResult> {
+  const { taskId, actor } = opts;
+  const isAdmin = hasRoleAtLeast(actor.role, 'rfp_admin');
+  try {
+    const rows = await sql<{ id: string; tenantId: string | null }[]>`
+      UPDATE tasks
+         SET status = 'open', claimed_by = NULL, claimed_at = NULL, updated_at = now()
+       WHERE id = ${taskId}::uuid
+         AND status = 'in_progress'
+         AND (${isAdmin} OR claimed_by = ${actor.id}::uuid)
+       RETURNING id, tenant_id AS "tenantId"`;
+    if (rows.length === 0) {
+      return { ok: false, status: 409, error: 'Not claimed by you, or not in progress.', code: 'NOT_CLAIMED' };
+    }
+    await emitEventSingle({
+      type: 'task.released',
+      namespace: 'system',
+      tenantId: rows[0].tenantId,
+      actor: userActor(actor.id, actor.email ?? undefined),
+      payload: { taskId, entityType: 'task', entityId: taskId },
+    }).catch(() => {});
+    return { ok: true, status: 200, data: { taskId, claimedBy: actor.id, resumeHref: null } };
+  } catch (e) {
+    console.error('[tasks] releaseTask failed:', e);
+    return { ok: false, status: 500, error: 'Internal error', code: 'DB_ERROR' };
+  }
+}
+
+/**
+ * Return abandoned claims to the queue.
+ *
+ * This is the half that makes a claim safe to take. Without it, a person signed out mid-task —
+ * which P1 and P2 now guarantee happens — leaves the queue asserting indefinitely that somebody is
+ * working on something they were ejected from, and nobody else will pick it up.
+ *
+ * Emits per row rather than one summary event: "which ToDo went back" is the question anyone asks
+ * afterwards, and a count cannot answer it.
+ */
+export async function sweepStaleClaims(staleMinutes = CLAIM_STALE_MINUTES): Promise<number> {
+  try {
+    const rows = await runInBypass(async () => sql<{
+      id: string; tenantId: string | null; claimedBy: string; title: string;
+    }[]>`
+      UPDATE tasks
+         SET status = 'open', claimed_by = NULL, claimed_at = NULL, updated_at = now()
+       WHERE status = 'in_progress'
+         AND claimed_at IS NOT NULL
+         AND claimed_at < now() - make_interval(mins => ${staleMinutes})
+       RETURNING id, tenant_id AS "tenantId", claimed_by AS "claimedBy", title`);
+    for (const r of rows) {
+      await emitEventSingle({
+        type: 'task.claim_expired',
+        namespace: 'system',
+        tenantId: r.tenantId,
+        actor: systemActor('claim-sweep'),
+        payload: { taskId: r.id, entityType: 'task', entityId: r.id, title: r.title, staleMinutes },
+      }).catch(() => {});
+    }
+    return rows.length;
+  } catch (e) {
+    console.error('[tasks] sweepStaleClaims failed:', e);
+    return 0;
+  }
 }

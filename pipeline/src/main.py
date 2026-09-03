@@ -299,6 +299,19 @@ async def main() -> None:
         closed = d.get("closed", 0)
         return f"closed {closed} abandoned space presence(s)" if closed else None
 
+    # ABANDONED ToDo CLAIMS. A claim (mig 249) records that somebody started a ToDo; this returns
+    # one to the queue when they did not finish. It is the half that makes claiming safe to do at
+    # all — and it is NOT optional decoration on the session work, it is the consequence of it: the
+    # absolute cap and the descent gate GUARANTEE people are signed out mid-task, which is their
+    # whole point. Without this sweep a security improvement becomes a stalled queue, with the queue
+    # asserting work is under way that nobody is doing.
+    #
+    # Half-hourly rather than hourly: the default staleness is 90 minutes, so a claim is released
+    # within ~30 minutes of going stale instead of drifting toward two hours.
+    def _claims_report(d: dict) -> str | None:
+        released = d.get("released", 0)
+        return f"returned {released} abandoned ToDo claim(s) to the queue" if released else None
+
     # Run the ingester consumer loop, workflow processor, health
     # server, lifecycle scheduler, and agent task queue consumer
     # concurrently. All manage their own resources and respect shutdown_event.
@@ -306,6 +319,7 @@ async def main() -> None:
         _run_poker('agent-gate auto-advance poker', 'AGENT_GATE_SWEEP_URL', 60, _gate_report),
         _run_poker('card reconcile sweep', 'CARD_RECONCILE_URL', 3600, _reconcile_report),
         _run_poker('space presence sweep', 'SPACE_PRESENCE_SWEEP_URL', 3600, _presence_report),
+        _run_poker('stale ToDo claim sweep', 'TASK_CLAIM_SWEEP_URL', 1800, _claims_report),
         run_consumer_loop(
             database_url=DATABASE_URL,
             shutdown_event=shutdown_event,
