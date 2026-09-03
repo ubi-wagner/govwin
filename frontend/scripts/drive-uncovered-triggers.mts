@@ -81,7 +81,12 @@ try {
   } else {
     note(`host = ${host.slug} · proposal ${host.proposalId.slice(0, 8)}…`);
     const bc = await signIn(browser, host.email, process.env.TENANT_PW || 'DemoPass123!');
-    const invitee = `trigger.probe.${TAG}@ext.test`;
+    // HYPHENS, not dots. `trigger.probe.${TAG}@ext.test` reads as the dotted token `trigger.probe`
+    // in the customer's Activity feed ("Collaborator invited: …"), and `probe-customer-finish`
+    // reported it as jargon on a customer surface — correctly. The collaborator and its events
+    // outlive this run, so the harness was seeding a permanent finding into the very surface the
+    // next probe measures.
+    const invitee = `trigger-probe-${TAG}@ext.test`;
     const r = await bc.request.post(
       `${BASE}/api/portal/${host.slug}/proposals/${host.proposalId}/collaborators`,
       { data: { email: invitee, name: `trigger probe ${TAG}`, role: 'external', permission: 'view' } });

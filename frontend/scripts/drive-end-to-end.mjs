@@ -199,7 +199,12 @@ if (done('ingest')) {
   console.log(`\n1. INGEST — already proven (sol=${journal.ids.sol})`);
 } else {
   console.log('\n1. INGEST — upload a real BAA, shred it');
-  const title = `E2E ARC ${Date.now()}`;
+  // BASE-36, not the epoch. `E2E ARC ${Date.now()}` put a bare 13-digit millisecond stamp into a
+  // solicitation title, which is then the card title, the pipeline row and the spotlight heading a
+  // CUSTOMER reads — `probe-customer-finish` reported it nine times as a raw timestamp, and it was
+  // right: 1788403626167 is not a name. Base-36 keeps the run unique (the reason the stamp was
+  // there) while reading as an id, and it cannot match the probe's `1[6-9]\d{11}` epoch rule.
+  const title = `End-to-End Arc ${Date.now().toString(36)}`;
   const out = sh('node', ['scripts/drive-ingest-scenario.mjs', title, 'baa', '2026-12-15', SOURCE_PDF]);
   const sol = (out.match(/SCENARIO SOL=([0-9a-f-]{36})/) || [])[1];
   prove('database', 'the shred produced a solicitation', !!sol, sol || out.slice(-200));

@@ -14,7 +14,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-buckets__vp-phone-open.jpg",
-   "bytes": 48380
+   "bytes": 48372
   },
   {
    "lane": "tenant",
@@ -22,7 +22,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-atoms__vp-phone-open.jpg",
-   "bytes": 2231224
+   "bytes": 2233449
   },
   {
    "lane": "tenant",
@@ -30,7 +30,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-library__vp-phone-open.jpg",
-   "bytes": 2231224
+   "bytes": 2233449
   },
   {
    "lane": "tenant",
@@ -78,7 +78,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-workflows__vp-phone-open.jpg",
-   "bytes": 947452
+   "bytes": 946996
   },
   {
    "lane": "admin",
@@ -86,7 +86,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-agents__vp-phone-open.jpg",
-   "bytes": 637668
+   "bytes": 637532
   },
   {
    "lane": "admin",
@@ -94,7 +94,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-templates__vp-phone-open.jpg",
-   "bytes": 73732
+   "bytes": 73463
   }
  ],
  "summary": [
@@ -103,11 +103,11 @@
    "route": "/portal/foundation/cards",
    "status": 200,
    "probed": true,
-   "opened": 36,
-   "candidates": 230,
+   "opened": 35,
+   "candidates": 221,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 334
+   "smallTargets": 322
   },
   {
    "lane": "tenant",
