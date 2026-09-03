@@ -185,8 +185,26 @@ try {
   A(await events('shadow.ascended', adminId, A1.id, t0) === 1,
     'and the customer was told, even though nobody pressed anything');
 
-  // ── 5 · THE INVARIANT, over the whole box ─────────────────────────────────────────────────
-  phase('5 · no enter without an exit — every bracket, every tenant');
+  // ── 5 · SIGNED OUT — from INSIDE the workspace, which is where it matters ─────────────────
+  phase('5 · signed out while still inside a customer workspace');
+  await page.goto(`${BASE}/portal/${A1.slug}/dashboard`, { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle').catch(() => {});
+  A((await openRows(adminId)).length === 1, 'a bracket is open, and the actor is inside it');
+  t0 = new Date();
+  // The real control, not a direct POST: this is the button a person presses, and the whole point
+  // is that it can be pressed from in here rather than after walking back out.
+  await page.click('button:has-text("Sign out")').catch(() => {});
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await new Promise((r) => setTimeout(r, 1500));
+  const a4 = await latest(adminId, A1.id);
+  A(a4?.closedAt && a4.closeReason === 'signed_out', 'the bracket closed as "signed_out"',
+    a4?.closeReason ?? 'still open');
+  A(await events('shadow.ascended', adminId, A1.id, t0) === 1,
+    'and the customer was told at the moment they logged out, not an hour later');
+  A((await openRows(adminId)).length === 0, 'nothing is left open anywhere');
+
+  // ── 6 · THE INVARIANT, over the whole box ─────────────────────────────────────────────────
+  phase('6 · no enter without an exit — every bracket, every tenant');
   const leaks = await sql<{ n: number }[]>`
     SELECT count(*)::int AS n FROM space_presence
     WHERE closed_at IS NULL AND last_seen_at < now() - interval '1 day'`;

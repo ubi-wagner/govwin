@@ -368,6 +368,11 @@ DRIVES=(
   "partner-invite|scripts/drive-p3-invite.mts"
   "starter-offer|scripts/drive-starter-offer.mts"
   "copy-starter|scripts/drive-copy-starter.mts"
+  # Every way OUT of a customer's workspace, driven as the actor who leaves. Registered WITH the
+  # feature rather than after it: this file's own header says a drive run by hand or not at all is
+  # how one quietly stops being run, and the thing it guards — an "opened your workspace" with no
+  # matching close — is invisible on every surface until somebody reads a customer's audit trail.
+  "space-presence|scripts/drive-space-presence.mts"
   "shadow-tenant-admin|scripts/drive-shadow-tenant-admin.mts"
   "rls-app|scripts/drive-rls-app.mjs"
   "rls-admin|scripts/drive-rls-admin.mjs"
