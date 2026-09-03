@@ -85,6 +85,25 @@ export const IDLE_MS: Record<string, number> = {
   partner_user: 4 * HOUR,
 };
 
+/**
+ * How long an OUTSIDE ACTOR may sit idle INSIDE a customer's workspace before the descent is
+ * refused — shorter than any session window, and deliberately so.
+ *
+ * Three clocks now, nested, and the nesting is the design:
+ *
+ *   descent idle (30m)  <  admin session idle (2h)  <  absolute cap (12h)
+ *
+ * Being signed in and being inside somebody else's account are different privileges, and the
+ * narrower one should lapse first. An admin who walks away comes back to their own console rather
+ * than to a customer's workspace, and re-entering is one deliberate click — the cost is trivial,
+ * and it is paid by the person who left rather than by the customer whose audit trail would
+ * otherwise record an administrator sitting in their account overnight.
+ *
+ * Enforced against `space_presence.last_interaction_at` (mig 248), NOT `last_seen_at`: the latter
+ * is advanced by the 2-minute heartbeat, so a gate reading it could never fire on an open tab.
+ */
+export const DESCENT_IDLE_MS = 30 * MINUTE;
+
 /** The fallback is the SHORTEST window, not the longest: an unrecognised role is not a licence. */
 export const IDLE_DEFAULT_MS = 2 * HOUR;
 

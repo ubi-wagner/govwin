@@ -415,6 +415,13 @@ DRIVES=(
   # how one quietly stops being run, and the thing it guards — an "opened your workspace" with no
   # matching close — is invisible on every surface until somebody reads a customer's audit trail.
   "space-presence|scripts/drive-space-presence.mts"
+  # THE DESCENT EXPIRES BEFORE THE SESSION DOES. space_presence had one liveness column and two
+  # things advanced it: a person working, and a 2-minute heartbeat on a visible tab. So an
+  # unattended tab held a descent — and, since the heartbeat route calls auth(), a session — open
+  # forever, while the customer's trail asserted an administrator was in their account. Mig 248
+  # splits the clocks; this drives the gate. Phases 3 and 4 only mean something as a pair: without
+  # 4, deleting descent entirely would pass.
+  "descent-timeout|scripts/drive-descent-timeout.mts"
   "shadow-tenant-admin|scripts/drive-shadow-tenant-admin.mts"
   "rls-app|scripts/drive-rls-app.mjs"
   "rls-admin|scripts/drive-rls-admin.mjs"

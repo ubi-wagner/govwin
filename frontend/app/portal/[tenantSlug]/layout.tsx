@@ -6,7 +6,8 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
 import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
-import { syncPortalPresence } from '@/lib/space-presence';
+import { syncPortalPresence, idleDescent, closePresence, noteInteraction } from '@/lib/space-presence';
+import { DESCENT_IDLE_MS } from '@/lib/session-policy';
 import { PresenceHeartbeat } from '@/components/portal/presence-heartbeat';
 import { getActiveMemberships, hasActiveMembership } from '@/lib/memberships';
 import { NavShell } from '@/components/ui/nav-shell';
@@ -110,12 +111,48 @@ export default async function PortalLayout({
    * is best-effort inside the helper, because an audit write must never take a customer's page
    * down. The hourly sweep is the backstop for anything it misses.
    */
+  const outsideKind = isShadowAdmin ? 'shadow' : isDescendedPartner ? 'partner' : null;
+
+  /**
+   * THE DESCENT IDLE GATE — checked BEFORE the bracket is synced, and that order matters.
+   *
+   * `syncPortalPresence` advances liveness, so running it first would refresh the very value this
+   * reads and the gate could never fire. Same shape as the ordering bug in the `jwt` callback, one
+   * layer up.
+   *
+   * WHY A GATE AND NOT A STATE RESET. An rfp_admin has nothing to ascend FROM: `isShadowAdmin` is
+   * computed per render as "is an admin AND is not a member here", so being on this URL *is* the
+   * descent. There is no flag to clear, which is why the sweep — which closes the ROW — never
+   * removed anybody's access. Refusing here is the only thing that does.
+   *
+   * The bracket is closed as `timeout` on the way out so the customer's trail records the departure
+   * at the moment access actually ended, rather than up to an hour later when the sweep runs.
+   */
+  if (outsideKind) {
+    const idle = await idleDescent(userId, tenantId, DESCENT_IDLE_MS / 60_000);
+    if (idle) {
+      // No `exceptTenantId`: an idle person is idle everywhere, so every open bracket they hold
+      // closes. In practice `syncPortalPresence` keeps that to one, but a timeout that left a
+      // second workspace asserting a presence would be the same defect one company over.
+      await closePresence({ id: userId, email: sessionUser.email }, 'timeout');
+      // `/admin/dashboard`, NOT `/admin`: the latter is a bare `redirect('/admin/dashboard')` and a
+      // redirect DROPS the query string, so the person arrived with no idea why they had been
+      // moved. The drive caught exactly that — "no reason is carried" — which is why the reason
+      // travels to the page that actually renders.
+      redirect(isShadowAdmin ? '/admin/dashboard?descent=timeout' : '/partner?descent=timeout');
+    }
+  }
+
   await syncPortalPresence(
     { id: userId, email: sessionUser.email },
     tenantId,
-    isShadowAdmin ? 'shadow' : isDescendedPartner ? 'partner' : null,
+    outsideKind,
     { slug: tenantSlug },
   );
+
+  // A person navigated INSIDE the space — advance the interaction clock the gate above reads.
+  // Deliberately after the sync, and deliberately not in the heartbeat route.
+  if (outsideKind) await noteInteraction({ id: userId, email: sessionUser.email });
 
   // Singular-session enforcement (non-admins). A session acts as exactly ONE
   // (company, role); the active membership is pinned onto the JWT when the user picks

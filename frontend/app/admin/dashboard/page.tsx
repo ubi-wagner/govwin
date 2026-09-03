@@ -1,4 +1,5 @@
 import { auth } from '@/auth';
+import { DescentTimeoutNotice } from '@/components/admin/descent-timeout-notice';
 import { redirect } from 'next/navigation';
 // Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
 import { sqlBypass as sql } from '@/lib/db';
@@ -61,7 +62,13 @@ async function safeCount(query: Promise<{ count: number }[]>): Promise<number> {
   }
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage(
+  { searchParams }: { searchParams?: Promise<{ descent?: string }> },
+) {
+  // Carried by the descent idle gate (portal layout). Without it a person ejected from a
+  // customer's workspace lands here with no explanation and simply walks back in.
+  const sp = (await searchParams) ?? {};
+  const descentTimedOut = sp.descent === 'timeout';
   const session = await auth();
   if (!session?.user) redirect('/login');
 
@@ -145,6 +152,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
+      {descentTimedOut ? <DescentTimeoutNotice where="admin" /> : null}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">System overview</p>

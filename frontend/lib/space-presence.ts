@@ -245,6 +245,10 @@ export async function syncPortalPresence(
  */
 export async function touchPresence(actor: Actor, minIntervalSeconds = 60): Promise<number> {
   try {
+    // `last_seen_at` ONLY. Advancing `last_interaction_at` here is the whole bug this split
+    // removes: the heartbeat is a timer on a visible tab, not evidence that a person is working,
+    // and a column that both signals write cannot tell an administrator at their desk from a lit
+    // monitor in an empty room. See `noteInteraction` for the other half.
     const rows = await runInBypass(async () => sql<{ id: string }[]>`
       UPDATE space_presence
          SET last_seen_at = now()
@@ -256,6 +260,69 @@ export async function touchPresence(actor: Actor, minIntervalSeconds = 60): Prom
   } catch (e) {
     console.error('[space-presence] touchPresence failed:', e);
     return 0;
+  }
+}
+
+/**
+ * A PERSON did something inside this space — advance BOTH clocks.
+ *
+ * Called from the portal layout, which renders on a real navigation. It is deliberately not called
+ * from the heartbeat: `last_interaction_at` is the one signal the descent gate trusts, and the
+ * moment a timer can advance it the gate can never fire.
+ *
+ * Throttled in SQL like `touchPresence`, for the same reason — a person clicking quickly should not
+ * turn every render into a write.
+ */
+export async function noteInteraction(actor: Actor, minIntervalSeconds = 30): Promise<number> {
+  try {
+    const rows = await runInBypass(async () => sql<{ id: string }[]>`
+      UPDATE space_presence
+         SET last_seen_at = now(), last_interaction_at = now()
+       WHERE user_id = ${actor.id}::uuid
+         AND closed_at IS NULL
+         AND last_interaction_at < now() - make_interval(secs => ${minIntervalSeconds})
+       RETURNING id`);
+    return rows.length;
+  } catch (e) {
+    console.error('[space-presence] noteInteraction failed:', e);
+    return 0;
+  }
+}
+
+/**
+ * Has this actor's DESCENT gone idle — has a person stopped working in this customer's space?
+ *
+ * Distinct from the sweep in both its question and its consequence. The sweep asks whether the TAB
+ * is gone and closes the bracket so the customer's audit trail stops asserting a presence that
+ * ended. This asks whether the PERSON is gone and is used to REFUSE the descent, which is the thing
+ * that actually removes the access.
+ *
+ * Returns the bracket that has gone idle, or null. Null on error is deliberate and is the opposite
+ * choice from `blockingReview`: a gate that cannot read its own state must not fail open, but this
+ * one's failure mode is ejecting a working administrator out of a customer's workspace on a
+ * transient database blip, which is a worse and much more likely outcome than one extra idle
+ * minute. The sweep remains the backstop, and it fails the safe way.
+ */
+export async function idleDescent(
+  userId: string,
+  tenantId: string,
+  idleMinutes: number,
+): Promise<{ id: string; lastInteractionAt: Date } | null> {
+  try {
+    const [row] = await runInBypass(async () => sql<{
+      id: string; lastInteractionAt: Date;
+    }[]>`
+      SELECT id, last_interaction_at AS "lastInteractionAt"
+        FROM space_presence
+       WHERE user_id = ${userId}::uuid
+         AND tenant_id = ${tenantId}::uuid
+         AND closed_at IS NULL
+         AND last_interaction_at < now() - make_interval(mins => ${idleMinutes})
+       LIMIT 1`);
+    return row ?? null;
+  } catch (e) {
+    console.error('[space-presence] idleDescent failed:', e);
+    return null;
   }
 }
 
