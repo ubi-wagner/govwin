@@ -242,8 +242,35 @@ else
 fi
 echo
 
+# The two ASYNCHRONOUS dependencies. This preflight is the newest, and it is here because its
+# absence had already cost a full run: five drives reported FAIL, every failing assertion naming a
+# shred that never ran or an agent that never fired, and the cause was that a container restart had
+# taken the worker. The requirement was documented — twice, in the DRIVES comments below — and
+# documentation is not a check. An environmental absence that prints as five product defects is the
+# most expensive kind of wrong, because someone then goes looking for the defects.
+WORKER_OK=1
+if node scripts/check-async-workers.mjs > "$OUT/async-workers.log" 2>&1; then
+  echo "Async workers: pipeline worker + Claude emulator up (steps will actually run)"
+else
+  WORKER_OK=0
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ WORKER OR EMULATOR DOWN — the drives that wait on them are CANT-RUN, not run. Every   ║"
+  echo "║ one of them asserts that something HAPPENED asynchronously; with nothing to process   ║"
+  echo "║ the event they all time out, and a timeout is indistinguishable from a broken         ║"
+  echo "║ product. Five drives read as product FAILs this way on 2026-09-02.                    ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/async-workers.log" | head -8
+fi
+echo
+
 # Drives that need a real Office engine to mean anything. Without one they measure nothing.
 OFFICE_DRIVES="deck-overlap"
+
+# Drives whose assertions are about something happening ASYNCHRONOUSLY — a shred rolling up, a
+# process_instance appearing from an event, an agent invocation landing. Each waits on the pipeline
+# worker, and the AI ones additionally on the emulator. Without them the wait expires and the drive
+# reports the thing it was waiting for as missing, which is exactly what a real defect looks like.
+WORKER_DRIVES="real-solicitation curate-baa end-to-end opp-scout project-lifecycle full-draft full-build-cost"
 
 # Drives whose entire value is an isolation claim. Meaningless in the wrong posture.
 # Drives whose entire value is an isolation claim MADE THROUGH THE DATABASE. Meaningless in the
@@ -546,6 +573,11 @@ for entry in "${DRIVES[@]}"; do
 
   if [ "$OFFICE_OK" -eq 0 ] && [[ " $OFFICE_DRIVES " == *" $label "* ]]; then
     printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "no LibreOffice Impress filter — nothing independent to measure against"
+    cantrun=$((cantrun+1)); FAILED+=("$label"); continue
+  fi
+
+  if [ "$WORKER_OK" -eq 0 ] && [[ " $WORKER_DRIVES " == *" $label "* ]]; then
+    printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "worker/emulator down — its waits would expire and read as product failures"
     cantrun=$((cantrun+1)); FAILED+=("$label"); continue
   fi
 

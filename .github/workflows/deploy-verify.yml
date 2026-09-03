@@ -73,13 +73,44 @@ jobs:
           fail=0
           versions=""
 
-          # ── Frontend (required): /api/health → { version, db:{ok}, s3:{ok} } ──
+          # ── Frontend (required) ────────────────────────────────────────────────────────────
+          #
+          # /api/health → { ok, version, checks: { db:{ok}, s3:{ok}, bypass:{ok} } }
+          #
+          # THE CHECKS ARE UNDER `.checks`, AND THIS READ WAS WRONG UNTIL 2026-09-03. It read
+          # `.db.ok`, which is the PIPELINE's shape (see the /healthz block below) — against the
+          # frontend that is `null`, so `[ "$FDB" = "true" ]` was false on a perfectly healthy
+          # deployment and this gate could never pass. Verified against a live body:
+          #   .db.ok → null   ·   .checks.db.ok → true
+          # Two services, two shapes, one jq path: the gate reported the frontend's database as
+          # down every time it ran, which is the failure mode where a red gate teaches people to
+          # ignore the gate.
           if [ -z "${FRONTEND_URL:-}" ]; then echo "::error::PROD_FRONTEND_URL repo variable not set"; exit 1; fi
           FB=$(curl -fsS --max-time 20 "${FRONTEND_URL%/}/api/health") || { echo "::error::frontend unreachable at ${FRONTEND_URL}"; exit 1; }
-          FV=$(jq -r '.version' <<<"$FB"); FDB=$(jq -r '.db.ok' <<<"$FB"); FS3=$(jq -r '.s3.ok' <<<"$FB")
-          echo "frontend: version=$FV db.ok=$FDB s3.ok=$FS3"
-          [ "$FDB" = "true" ] || { echo "::error::frontend DB not ok"; fail=1; }
-          [ "$FS3" = "true" ] || { echo "::warning::frontend S3 not ok"; }
+          FV=$(jq -r '.version' <<<"$FB")
+          FDB=$(jq -r '.checks.db.ok' <<<"$FB")
+          FS3=$(jq -r '.checks.s3.ok' <<<"$FB")
+          FBP=$(jq -r '.checks.bypass.ok' <<<"$FB")
+          echo "frontend: version=$FV db.ok=$FDB s3.ok=$FS3 bypass.ok=$FBP"
+          # `null` means the FIELD IS ABSENT, not that the check failed — the body shape moved
+          # again. Report that as unresolved rather than as a fault, or the next shape change
+          # produces a confident, wrong error exactly like the one this replaced.
+          case "$FDB" in
+            true)  ;;
+            null)  echo "::error::frontend health body has no .checks.db.ok — the response shape changed; this gate is not checking what it claims"; fail=1 ;;
+            *)     echo "::error::frontend DB not ok ($FDB)"; fail=1 ;;
+          esac
+          [ "$FS3" = "true" ] || { echo "::warning::frontend S3 not ok ($FS3)"; }
+          # A WARNING, not an error, and deliberately: the customer-facing product is entirely
+          # fine on a frontend whose bypass pool cannot bypass RLS. Only the admin cross-tenant
+          # consoles are degraded — and they degrade to EMPTY rather than to an error, which is
+          # why it needs saying out loud here. Cause is almost always an unset DATABASE_URL_OWNER
+          # on the frontend service. `null` = an older build that predates the check.
+          case "$FBP" in
+            true)  ;;
+            null)  echo "::warning::frontend does not report .checks.bypass — build predates the bypass check" ;;
+            *)     echo "::warning::frontend bypass pool CANNOT bypass RLS ($(jq -r '.checks.bypass.detail // "no detail"' <<<"$FB")) — admin cross-tenant consoles will read EMPTY, not error. Set DATABASE_URL_OWNER on the frontend service." ;;
+          esac
           versions="$versions frontend=$FV"
 
           # ── CMS (required): /health → { version, database:'connected' } ──

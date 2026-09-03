@@ -23,6 +23,14 @@ jobs:
       - run: npm run type-check
       - run: npm run lint
       - run: npm test
+      # Does every file the app OPENS BY PATH at runtime actually ship in the image? Next's
+      # standalone tracer follows imports, so a `readFileSync(join(process.cwd(), …))` lands in the
+      # image only if a human wrote a COPY line — and when they forget, nothing crashes: the
+      # capability just quietly does nothing in production. Two shipped that way (the guide-coverage
+      # board rendered its own "not in this build" notice; `ocr-data/` meant atom OCR was off
+      # entirely). Cheap, no services, self-tests before it reports.
+      - name: Runtime assets ship in the image
+        run: node scripts/audit-runtime-assets.mjs
       - run: npm run build
         env:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake

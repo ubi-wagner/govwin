@@ -17,7 +17,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
 import { pingS3 } from '@/lib/storage/s3-client';
 import { createLogger } from '@/lib/logger';
 
@@ -37,6 +37,7 @@ interface HealthResponse {
   checks: {
     db: CheckResult;
     s3: CheckResult;
+    bypass: CheckResult;
   };
 }
 
@@ -57,13 +58,21 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
   // The checks still run and report status for observability.
   let db: CheckResult = { ok: false, detail: 'not checked' };
   let s3: CheckResult = { ok: false, detail: 'not checked' };
+  let bypass: CheckResult = { ok: false, detail: 'not checked' };
 
   try {
-    [db, s3] = await Promise.all([checkDb(), checkS3()]);
+    [db, s3, bypass] = await Promise.all([checkDb(), checkS3(), checkBypass()]);
   } catch (err) {
     log.warn({ err }, 'health checks threw during startup');
   }
 
+  // `bypass` is DELIBERATELY NOT in this conjunction, and a check excluded without a stated
+  // reason is its own trap — so: a frontend whose bypass pool cannot bypass still serves every
+  // customer-facing surface correctly. Only the admin consoles are degraded. Failing the Railway
+  // liveness probe over that would take the whole product down to report a misconfigured admin
+  // view, which is a worse outcome than the fault. It is reported in `checks` and logged at ERROR;
+  // the pipeline's own role preflight (pipeline/src/db_role_preflight.py) takes the same stance for
+  // the same reason — name it loudly, keep running.
   const allOk = db.ok && s3.ok;
   const body: HealthResponse = {
     ok: allOk,
@@ -71,7 +80,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     release: RELEASE,
     environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.NODE_ENV ?? 'unknown',
     uptimeMs: Date.now() - BOOTED_AT,
-    checks: { db, s3 },
+    checks: { db, s3, bypass },
   };
 
   if (allOk) {
@@ -101,6 +110,74 @@ async function checkDb(): Promise<CheckResult> {
       ok: false,
       detail: truncateDetail(err instanceof Error ? err.message : String(err)),
     };
+  }
+}
+
+/**
+ * CAN THE PRIVILEGED POOL ACTUALLY BYPASS RLS?
+ *
+ * This box carefully asserts that the SCOPED pool is scoped — `check-rls-posture.mjs` refuses to
+ * let an isolation drive report a verdict from a superuser connection. Nothing asserted the other
+ * half: that `sqlBypass` is genuinely privileged. Both are load-bearing and only one was guarded.
+ *
+ * THE FAILURE. `sqlBypass` falls back to `DATABASE_URL` when `DATABASE_URL_OWNER` is unset
+ * (lib/db.ts) — correct locally, where both are the owner. In production `DATABASE_URL` is
+ * `govtech_app`, which is NOBYPASSRLS. So a deploy that forgets one environment variable gets a
+ * "bypass" pool that bypasses nothing: every legitimate cross-tenant admin read — the agent-workforce
+ * rollup, Customer Interest, the funnel, the outbound-mail console, the project explorer — runs with
+ * no tenant context against FORCE-RLS tables, matches zero rows, and returns **empty**.
+ *
+ * Empty is the problem. There is no error, no 500, no slow query and no log line; the console
+ * renders its own no-data state, which on a new deployment is indistinguishable from the truth.
+ * That is the failure shape this repo spends the most effort against, and it was reachable by
+ * omitting a single variable.
+ *
+ * WHY THE ROLE AND NOT A QUERY. Asking whether some cross-tenant read returned rows needs fixture
+ * data and would report "no rows yet" as a fault on a fresh install. The capability is the honest
+ * question, and the database can answer it directly. `rolsuper` is checked as well as
+ * `rolbypassrls` because a superuser bypasses RLS with `rolbypassrls = f` — the exact trap
+ * `check-rls-posture` documents in the other direction. Owning the table is NOT sufficient here:
+ * migs 212/213 FORCE row security, and FORCE applies to the owner too.
+ *
+ * Cached after the first answer: a role's capability cannot change without an ALTER ROLE, and the
+ * env-var fix this exists to prompt requires a redeploy — a new process, and a fresh check.
+ */
+let bypassCache: CheckResult | null = null;
+
+async function checkBypass(): Promise<CheckResult> {
+  if (bypassCache) return bypassCache;
+  try {
+    const rows = await sqlBypass<{ role: string; rolsuper: boolean; rolbypassrls: boolean }[]>`
+      SELECT current_user AS role, rolsuper, rolbypassrls
+        FROM pg_roles WHERE rolname = current_user`;
+    const r = rows[0];
+    if (!r) return { ok: false, detail: 'could not read the connected role' };
+
+    if (r.rolsuper || r.rolbypassrls) {
+      bypassCache = { ok: true, detail: `role=${r.role}` };
+      return bypassCache;
+    }
+
+    const detail =
+      `role=${r.role} cannot bypass RLS — `
+      + (process.env.DATABASE_URL_OWNER
+        ? 'DATABASE_URL_OWNER is set but points at an unprivileged role'
+        : 'DATABASE_URL_OWNER is not set, so sqlBypass fell back to DATABASE_URL');
+    log.error(
+      { role: r.role, ownerConfigured: Boolean(process.env.DATABASE_URL_OWNER) },
+      'BYPASS POOL CANNOT BYPASS RLS — admin cross-tenant consoles will read EMPTY, not error. '
+      + 'Set DATABASE_URL_OWNER on this service to the owner connection string.',
+    );
+    bypassCache = { ok: false, detail };
+    return bypassCache;
+  } catch (err) {
+    // Not cached: a connection failure during startup is transient, and pinning it would report a
+    // healthy pool as broken for the life of the process.
+    log.error(
+      { err: err instanceof Error ? { message: err.message } : err },
+      'bypass pool health check failed',
+    );
+    return { ok: false, detail: truncateDetail(err instanceof Error ? err.message : String(err)) };
   }
 }
 
