@@ -153,6 +153,36 @@ const CASES = [
     why: 'a literal cwd join is extracted as its first segment',
     ok: () => cwdAssets(`readFileSync(path.join(process.cwd(), 'ocr-data', 'x.gz'))`)[0] === 'ocr-data',
   },
+  // ── the build-context half. THE REGRESSION, pinned both ways ──────────────────────────────
+  {
+    why: 'THE REGRESSION: a bare `docs/` swallows the file a later `!` tries to rescue',
+    ok: () => {
+      const v = ignoreVerdict(['docs/', '!docs/guide-coverage.json'], 'docs/guide-coverage.json');
+      return v.excluded === true && v.rescuable === false;
+    },
+  },
+  {
+    why: 'and `docs/*` + the same `!` DOES rescue it — the fix must read as fixed',
+    ok: () => !ignoreVerdict(['docs/*', '!docs/guide-coverage.json'], 'docs/guide-coverage.json').excluded,
+  },
+  {
+    why: 'the working `scripts/*` rule is not reported — a check that flags everything is useless',
+    ok: () => !ignoreVerdict(
+      ['scripts/*', '!scripts/seed_dev_accounts.mjs'], 'scripts/seed_dev_accounts.mjs',
+    ).excluded,
+  },
+  {
+    why: 'a path no rule mentions is in the context',
+    ok: () => !ignoreVerdict(['docs/*', 'pipeline/'], 'db/migrations/migrate.mjs').excluded,
+  },
+  {
+    why: 'a `--from=` COPY is NOT a context read — it cannot be broken by .dockerignore',
+    ok: () => {
+      const df = 'FROM node AS b\nFROM node AS r\nCOPY --from=b /app/ocr-data ./ocr-data\nCOPY docs/x.json ./docs/x.json\n';
+      const s = contextCopySources(df);
+      return s.length === 1 && s[0] === 'docs/x.json';
+    },
+  },
   {
     why: 'a non-literal first segment is reported as unresolvable, not dropped',
     ok: () => cwdAssets('join(process.cwd(), dir, "x")')[0] === null,
@@ -275,12 +305,115 @@ if (unresolved.length) {
   console.log('  (uncovered, not passing — read these by hand)');
 }
 
+// ── THE OTHER HALF: a COPY whose SOURCE is not in the build context ──────────────────────────
+//
+// Everything above asks whether a COPY line EXISTS. It never asks whether that line can run. A
+// context COPY (one with no `--from=`) reads from the build context, and `.dockerignore` decides
+// what is in it — so an excluded source is not a quiet gap like the ones above, it is
+//
+//     ERROR: failed to compute cache key: "/docs/guide-coverage.json": not found
+//
+// …which fails the IMAGE BUILD. Nothing deploys at all. This is strictly louder than a missing
+// asset and was strictly less checked, because the fix for the missing asset (add a COPY) is
+// exactly what creates it.
+//
+// THE TRAP, and it is why the bug survived review: excluding a DIRECTORY is not the same as
+// excluding its CONTENTS. `docs/` cannot be rescued by a later `!docs/guide-coverage.json`;
+// `docs/*` can. This repo already learned that on `scripts/` and wrote it in a comment two lines
+// below the rule that then repeated it.
+const CONTEXT_ROOT = path.join(FRONTEND, '..');
+
+/** Sources of final-stage COPY lines that read the BUILD CONTEXT (no `--from=`). */
+function contextCopySources(dockerfile) {
+  const lines = dockerfile.split('\n');
+  let start = 0;
+  lines.forEach((l, i) => { if (/^\s*FROM\s/i.test(l)) start = i; });
+  const out = [];
+  for (const l of lines.slice(start)) {
+    const line = l.replace(/#.*$/, '');
+    const m = line.match(/^\s*COPY\s+(.*)$/i);
+    if (!m) continue;
+    if (/--from=/i.test(line)) continue;                       // comes from a stage, not the context
+    const args = m[1].replace(/--[a-z-]+(=\S+)?/gi, '').trim().split(/\s+/).filter(Boolean);
+    if (args.length < 2) continue;
+    out.push(...args.slice(0, -1));
+  }
+  return out;
+}
+
+/**
+ * Would `.dockerignore` keep `rel` out of the build context?
+ *
+ * Deliberately CONSERVATIVE about the parent-directory case: a bare directory exclusion is treated
+ * as unrescuable by a later `!`. Some BuildKit versions are more permissive, and that is exactly
+ * why the conservative rule is the right one to encode — a check written to the permissive
+ * semantics would have passed the configuration that broke, and `docs/*` + `!docs/…` is correct
+ * under either reading. Encode the rule that keeps both true.
+ */
+function ignoreVerdict(rules, rel) {
+  const parts = rel.split('/');
+  const ancestors = parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join('/'));
+  for (const raw of rules) {
+    const r = raw.trim();
+    if (!r || r.startsWith('#') || r.startsWith('!')) continue;
+    const dir = r.replace(/\/$/, '');
+    // A bare directory rule (`docs/`, `docs`) with no glob swallows everything beneath it.
+    if (!/[*?]/.test(dir) && ancestors.includes(dir)) {
+      return { excluded: true, rule: raw.trim(), rescuable: false };
+    }
+  }
+  // Otherwise last-match-wins over glob rules, where `!` can rescue.
+  let excluded = false;
+  let rule = null;
+  for (const raw of rules) {
+    const r = raw.trim();
+    if (!r || r.startsWith('#')) continue;
+    const neg = r.startsWith('!');
+    const pat = (neg ? r.slice(1) : r).replace(/\/$/, '');
+    const rx = new RegExp('^' + pat
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*\*/g, ' ')
+      .replace(/\*/g, '[^/]*')
+      .replace(/ /g, '.*')
+      .replace(/\?/g, '[^/]') + '(/.*)?$');
+    if (rx.test(rel)) { excluded = !neg; rule = raw.trim(); }
+  }
+  return { excluded, rule, rescuable: true };
+}
+
+const IGNORE_FILE = path.join(CONTEXT_ROOT, '.dockerignore');
+const ignoreRules = existsSync(IGNORE_FILE)
+  ? readFileSync(IGNORE_FILE, 'utf8').split('\n')
+  : [];
+
+const sources = contextCopySources(readFileSync(DOCKERFILE, 'utf8'));
+console.log(`\n── ${sources.length} context COPY source(s) in the final stage, vs .dockerignore ──\n`);
+const unbuildable = [];
+for (const src of sources) {
+  // A glob source (`db/migrations/*.sql`) is checked at its directory, which is what an
+  // exclusion would actually swallow.
+  const probe = /[*?]/.test(src) ? path.posix.dirname(src) : src;
+  const v = ignoreVerdict(ignoreRules, probe);
+  if (v.excluded) {
+    console.log(`  ✗ ${src}`);
+    console.log(`      excluded from the build context by \`${v.rule}\`${v.rescuable ? '' : ' — a bare directory rule, which a later `!` cannot rescue'}`);
+    unbuildable.push({ src, rule: v.rule });
+  } else {
+    console.log(`  ✓ ${src.padEnd(38)} in the context`);
+  }
+}
+
 console.log();
 if (missing.length) {
   console.error(`✗ ${missing.length} runtime asset(s) are read from disk and never shipped: ${missing.join(', ')}`);
   console.error('  Next traces imports, not paths. Add a COPY line to the FINAL Dockerfile stage.');
   console.error('  The symptom is not a crash — it is a capability that quietly does nothing in production.');
-  process.exit(1);
 }
-console.log('✓ every runtime-read asset directory is copied into the runtime image.');
+if (unbuildable.length) {
+  console.error(`✗ ${unbuildable.length} COPY source(s) are excluded from the build context — THE IMAGE BUILD FAILS.`);
+  for (const u of unbuildable) console.error(`    ${u.src}  ←  ${u.rule}`);
+  console.error('  Exclude the CONTENTS (`dir/*`) and re-include the file, never the bare directory.');
+}
+if (missing.length || unbuildable.length) process.exit(1);
+console.log('✓ every runtime-read asset ships, and every COPY source is in the build context.');
 process.exit(0);
