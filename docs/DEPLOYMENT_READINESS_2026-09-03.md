@@ -298,6 +298,23 @@ interrupted is uncovered in exactly the same way.
 
 ---
 
+## 5b. The two lens gaps, re-measured 2026-09-04
+
+Both were reported as standing gaps and neither survived being re-checked on a current build. Worth
+recording, because "a known issue" that nobody re-measures becomes a permanent one.
+
+* **`verify-surfaces`' tenant lane is NOT blocked.** It was refusing a verdict — its detector
+  preflight could not see the known-broken control page — and that was true of the build serving at
+  the time, not of the code. On the rebuilt tree the preflight passes and both lanes run: **90
+  surfaces driven, 89 clean.** The one undriven route is `/admin/documents/[documentId]`, addressed
+  by the object-storage index rather than a table row, and correctly REPORTED rather than skipped.
+* **`/admin` React #418 is the documented intermittent, not a regression.** It appeared once and was
+  absent on the next two runs of the same build. That matches the earlier root-cause on this box:
+  the rendered body is byte-identical across concurrent fetches while the RSC preamble ordering
+  varies. Attribution matters here — the same symptom was misattributed to a clock-in-render bug
+  earlier in this work, five components were changed for it, and a later sweep hit a page none of
+  them touched.
+
 ## 6. Not blocking, worth knowing
 
 * **The guide notes are the instrument for next week.** Every guide step has a note box with three
