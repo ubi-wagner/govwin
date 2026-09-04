@@ -30,6 +30,37 @@ function relDue(iso: string | null): { text: string; overdue: boolean } {
   return { text: overdue ? `${label} overdue` : `due in ${label}`, overdue };
 }
 
+/**
+ * What a ToDo is ABOUT, in the reader's words.
+ *
+ * `entityType` is the internal name of the row a task points at, and it was rendered raw — a
+ * customer's automation panel read `· project_modification`. That is the same defect as 48 library
+ * atoms titled `bulleted_list` and a `doc:<uuid>` chip: our vocabulary on their screen, in a place
+ * they are meant to read rather than debug. The `customer-finish` probe grades it as `jargon`.
+ *
+ * Unknown types fall back to the token with its underscores opened out — a noun a person can at
+ * least read — rather than being hidden. Hiding would make a new entity type silently lose its
+ * label, and a missing word is harder to notice than an ugly one.
+ */
+const ENTITY_NOUN: Record<string, string> = {
+  proposal: 'proposal',
+  proposal_section: 'section',
+  solicitation: 'solicitation',
+  opportunity: 'opportunity',
+  project: 'project',
+  project_milestone: 'milestone',
+  project_deliverable: 'deliverable',
+  project_modification: 'contract modification',
+  project_invoice: 'invoice',
+  contract: 'contract',
+  library_atom: 'library item',
+  task: 'to-do',
+};
+
+function entityNoun(t: string): string {
+  return ENTITY_NOUN[t] ?? t.replace(/_/g, ' ');
+}
+
 export function AutomationOverviewCard({ tenantSlug }: { tenantSlug: string }) {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,7 +140,7 @@ export function AutomationOverviewCard({ tenantSlug }: { tenantSlug: string }) {
                     <div className="text-sm text-gray-800 truncate">{t.title}</div>
                     <div className="text-[11px] text-gray-400">
                       {t.assigneeRole ? t.assigneeRole.replace('_', ' ') : 'unassigned'}
-                      {t.entityType ? ` · ${t.entityType}` : ''}
+                      {t.entityType ? ` · ${entityNoun(t.entityType)}` : ''}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
