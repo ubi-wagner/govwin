@@ -84,6 +84,18 @@ export async function openPresence(
       // "opened" from "refreshed" — and the ENTER event hangs entirely on that distinction.
       // (Kept out of the SQL text: a backtick inside a tagged template TERMINATES it, and a `--`
       //  comment there is invisible to every JS tool that might have caught it.)
+      //
+      // HOW IT PRESENTS, because knowing the rule did not stop it happening twice more on
+      // 2026-09-04 — both times quoting a FILENAME in backticks inside a SQL comment. The literal
+      // ends at that backtick and everything after is parsed as code, so tsc reports
+      //   Cannot find name 'admin'      ·   ';' expected
+      // at a COLUMN INSIDE PROSE, pointing nowhere near the cause. If a tsc error lands in the
+      // middle of an English sentence inside a sql`` block, look for a backtick before it.
+      //
+      // A test for this was written and DELETED: it failed its own self-test on the exact planted
+      // defect and reported 24 offenders in a tree tsc compiles cleanly — wrong in both directions.
+      // tsc already catches the fault; what was missing was knowing how to read it, which is why
+      // this is a note and not an instrument.
       const rows = await sql<{ id: string }[]>`
         INSERT INTO space_presence (user_id, tenant_id, kind)
         VALUES (${actor.id}::uuid, ${tenantId}::uuid, ${kind})

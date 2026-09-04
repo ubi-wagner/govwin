@@ -176,6 +176,18 @@ export async function listOpenAdminTriageTasks(limit = 50): Promise<TaskRow[]> {
     WHERE t.status IN ('open', 'in_progress')
       AND t.assignee_role IN ('rfp_admin', 'master_admin')
       AND (t.tenant_id IS NULL OR t.task_type = 'proposal_setup')
+      -- A ToDo whose SOLICITATION is gone is not a task an operator can do. completers.ts deep-
+      -- links entity_type 'solicitation' at /admin/rfp-curation/<id>, so such a row is a 404 in the
+      -- one list that is supposed to be their next actions -- customer-finish grades it a
+      -- brokenLink, and it is the same finding as the amendments queue one table over.
+      --
+      -- Filtered where the list is BUILT, not by chasing every path that could delete a
+      -- solicitation: nothing deletes one in production, harnesses do, and either way the queue
+      -- must not offer work that cannot be performed. Only 'solicitation' is checked -- every other
+      -- entity type is left exactly as it was.
+      AND (t.entity_type IS DISTINCT FROM 'solicitation'
+           OR t.entity_id IS NULL
+           OR EXISTS (SELECT 1 FROM curated_solicitations cs WHERE cs.id = t.entity_id))
     ORDER BY t.due_at ASC NULLS LAST, t.created_at ASC
     LIMIT ${limit}
   `;
