@@ -5,7 +5,7 @@ per service, so future changes reference the exact names Railway provides. Value
 NOT recorded here. Deploy flow is **merge → Railway build/deploy → migrations**; nobody edits services
 or the DB directly.
 
-Legend: **✅ set in Railway** · **➕ recommended to add** · **○ optional / feature-gated** · **⚙️ Railway auto-injected** · **💤 read by no code (safe to leave/prune)**
+Legend: **✅ set in Railway** · **⛔ required — the service will not start without it** · **➕ recommended to add** · **○ optional / feature-gated** · **⚙️ Railway auto-injected** · **💤 read by no code (safe to leave/prune)**
 
 Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` services · `Postgres`
 (main `govtech_intel`, shared by frontend+pipeline) · `cms-postgres` (rfp-crm's DB) · `rfp-pipeline-bucket`
@@ -18,7 +18,7 @@ Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` ser
 | Variable | Purpose | Status |
 |---|---|---|
 | `DATABASE_URL` | main DB — the **`govtech_app` (NOBYPASSRLS)** role, so RLS is live | ✅ |
-| `DATABASE_URL_OWNER` | owner/superuser connection for `sqlBypass` — the legit **admin/CMS cross-tenant reads** (agent-workforce rollup, rfp-curation "Customer Interest"). Unset → those reads run as govtech_app and return **0 rows** under RLS | **➕ ADD** (reference the `Postgres` service's own connection URL) |
+| `DATABASE_URL_OWNER` | owner/superuser connection. Two jobs: `entrypoint.sh` **migrates** with it, and `sqlBypass` uses it for the legit **admin/CMS cross-tenant reads** (agent-workforce rollup, rfp-curation "Customer Interest"). Unset → `migrate.mjs` refuses to run as a role that cannot bypass RLS and `set -e` **stops the boot** (see §"Migrations at boot"); if it ever did serve, those reads would return **0 rows** with no error | **⛔ REQUIRED — the container will not start without it** (reference the `Postgres` service's own connection URL) |
 | `API_KEY_ENCRYPTION_SECRET` | AES-256 key for DB-stored API keys — **must match the pipeline's value** | ✅ |
 | `AUTH_SECRET` | NextAuth session secret | ✅ |
 | `AUTH_URL` | canonical app URL; NextAuth + all invite/reset/notification link-builders use it (code falls back to it from `NEXTAUTH_URL`) | ✅ |

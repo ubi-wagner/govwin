@@ -9,20 +9,26 @@ set -e
 # ⚠️ THE ROLE MATTERS, AND GETTING IT WRONG CRASH-LOOPS THE DEPLOY.
 #
 # `migrate.mjs` reads DATABASE_URL, and on this service DATABASE_URL is `govtech_app` — the
-# NOBYPASSRLS application role, which is correct for serving and WRONG for migrating. Any migration
-# that references a table the app role does not own fails with:
+# NOBYPASSRLS application role, which is correct for serving and WRONG for migrating.
 #
-#     permission denied for table tenants
+# This used to surface as `permission denied for table tenants` — a DDL migration hitting a table
+# the app role does not own, reading like a problem with `tenants`. That was never the worst case.
+# A DATA-REPAIR migration needs no privilege at all: under FORCE-RLS with no tenant context its
+# UPDATE matches zero rows, raises nothing, and is recorded as applied — permanently. Migration 245
+# was lost exactly that way. So `migrate.mjs` now REFUSES up front as any role that can neither
+# `rolsuper` nor `rolbypassrls`, and with `set -e` above that refusal stops the boot.
 #
-# …which reads like a problem with `tenants`. Migrations 215, 216 and 217 all carry
-# `REFERENCES tenants(id)`, so without the owner connection the next deploy does not come up.
+# Read that consequence plainly: with DATABASE_URL_OWNER unset, THIS DEPLOY DOES NOT START. That is
+# the intended outcome — a schema silently half-applied is worse — but it means the variable is a
+# hard prerequisite, not a nice-to-have that merely dims the admin consoles.
 #
 # So: migrate as the OWNER, serve as the app role. Same split scripts/sandbox-env.sh documents.
 MIGRATE_URL="${DATABASE_URL_OWNER:-$DATABASE_URL}"
 if [ -z "$DATABASE_URL_OWNER" ]; then
-  echo "[entrypoint] ⚠️  DATABASE_URL_OWNER is NOT SET — migrating as the application role."
-  echo "[entrypoint]    Any migration needing an owner privilege will fail with a message about"
-  echo "[entrypoint]    the wrong table. Set DATABASE_URL_OWNER on this service."
+  echo "[entrypoint] ⛔ DATABASE_URL_OWNER is NOT SET — migrating as the application role."
+  echo "[entrypoint]    migrate.mjs refuses to run as a role that cannot bypass RLS, so the next"
+  echo "[entrypoint]    line is a refusal and THIS CONTAINER WILL NOT START. That is deliberate."
+  echo "[entrypoint]    Set DATABASE_URL_OWNER on this service to the owner connection string."
 fi
 
 if [ -f /app/db/migrations/migrate.mjs ]; then

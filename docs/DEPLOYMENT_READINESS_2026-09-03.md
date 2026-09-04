@@ -17,6 +17,11 @@ Everything else on the readiness list is now verified, and the four defects foun
 were all in the *verification machinery* rather than in the product — which is its own finding,
 because a broken instrument is how a real defect gets to stay.
 
+> **Update 2026-09-04.** One of those two variables is no longer optional-ish. `DATABASE_URL_OWNER`
+> unset now means **the container does not start** (§1b) — a fix landed elsewhere and converted a
+> silent degradation into a crash-loop. Set it before deploying. The migration count in §5 also
+> moved: 244 → **253**, nine migrations, one of which needs the owner privilege for real.
+
 ---
 
 ## 1. What only the operator can do
@@ -49,7 +54,39 @@ and it is the first thing a customer experiences.
 `/admin/crm` shows the moment it is on: transport in force, 30-day sent/failed, rows reserved and
 never confirmed, webhook callbacks, and the blocked list.
 
-### 1b. ⚠️ `DATABASE_URL_OWNER` on the frontend service
+### 1b. ⛔ `DATABASE_URL_OWNER` on the frontend service — now a HARD blocker
+
+> **Severity changed after this section was written — 2026-09-04.** This was a silent degradation.
+> It is now a **crash-loop**: the container does not start. Nothing about the variable changed; a
+> fix landed elsewhere and turned a quiet failure into a loud one, which is the right trade and also
+> a different deploy instruction.
+>
+> `migrate.mjs` now **refuses to run** as any role that is neither `rolsuper` nor `rolbypassrls`
+> (migration 245 was applied by such a role, matched zero rows under FORCE-RLS, raised nothing, and
+> was recorded as applied permanently — commit `1c69563a`). `entrypoint.sh` falls back to
+> `DATABASE_URL` when the owner variable is unset, and runs `set -e`. Those three facts compose:
+> **unset ⇒ the refusal exits 1 ⇒ `exec node server.js` is never reached.**
+>
+> Measured, not reasoned — a faithful copy of the entrypoint's migration block with the variable
+> unset and `DATABASE_URL` pointing at `govtech_app`:
+>
+> ```
+> [entrypoint] ⛔ DATABASE_URL_OWNER is NOT SET — migrating as the application role.
+> [entrypoint] Running database migrations...
+> [migrate] ✗ REFUSING TO RUN as govtech_app — this role cannot bypass RLS.
+> ENTRYPOINT_EXIT=1          ← server.js never ran
+> ```
+>
+> And as the owner on the same box, the nine outstanding migrations applied cleanly (244 → 253).
+>
+> No single file states this. `migrate.mjs` knows about roles, `entrypoint.sh` knows about the
+> fallback, and neither mentions the other. `__tests__/deployment-migrations.test.ts` now pins the
+> composition, and the `RAILWAY_ENV_VARS.md` table row — which said **➕ recommended to add**, the
+> marking an operator defers — now reads **⛔ REQUIRED**. The prose 130 lines below that row had
+> called it a hard requirement since the day it was written; the row and the prose disagreed, and
+> the row is the part people read.
+
+The original runtime consequence, still true if it ever did serve:
 
 `sqlBypass` falls back to `DATABASE_URL` when this is unset (`lib/db.ts`). In production
 `DATABASE_URL` is `govtech_app`, which is `NOBYPASSRLS`. So the "bypass" pool bypasses nothing, and
@@ -283,9 +320,10 @@ interrupted is uncovered in exactly the same way.
 
 ## 5. Deploy order
 
-1. Set **`DATABASE_URL_OWNER`** on the frontend service. Cheapest, and it silently degrades the
-   admin consoles until it is done.
-2. Deploy the branch. `entrypoint.sh` migrates 244 automatically.
+1. Set **`DATABASE_URL_OWNER`** on the frontend service. **Do this first: without it the container
+   does not start at all** — see §1b, whose severity changed after this section was written.
+2. Deploy the branch. `entrypoint.sh` migrates **244 → 253** automatically (nine migrations; 246
+   carries `FORCE ROW LEVEL SECURITY`, `CREATE POLICY` and `GRANT`, so it genuinely needs the owner).
 3. `GET /api/health` — require `checks.db.ok`, `checks.s3.ok` **and `checks.bypass.ok`**. The third
    is the one that was previously unobservable.
 4. Run **Deploy Verify** from the Actions tab. It now checks the right jq paths, so a green means
