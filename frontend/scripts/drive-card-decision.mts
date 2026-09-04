@@ -289,14 +289,37 @@ async function main() {
       ok('the authoring form exposes keyword + NAICS fields', false, 'could not address them — check UNCOVERED');
     } else {
       ok('the composition line still states the shares', /Scores on \d+ signal/.test(panel), panel.split('\n')[0] ?? '');
-      ok(`NAICS reported as reaching 0 of ${feed.n}`, new RegExp(`NAICS codes 0/${feed.n}`).test(panel),
+
+      /**
+       * ASSERT THE RELATIONSHIP, NOT A COUNT CAPTURED EARLIER.
+       *
+       * This used to require the panel to say exactly `feed.n`, read from the database at the top
+       * of the drive. The worker's card-reconcile sweep is live during a suite run, so a card can
+       * arrive between that read and this render — and it did: the drive held 81, the page
+       * correctly said 82, and three checks failed against a page that was right.
+       *
+       * The claim this drive exists for is not "the feed has N cards". It is that a criterion the
+       * feed CANNOT satisfy is reported as reaching NONE of them, while one it CAN is not reported
+       * dead. Both are properties of the panel's own numbers, so they are read from the panel — and
+       * the denominator is then checked for AGREEMENT with the database rather than equality with a
+       * stale snapshot, which is the part that was actually racy.
+       */
+      const reach = panel.match(/NAICS codes 0\/(\d+)/);
+      ok('NAICS reported as reaching 0 of the feed', !!reach,
         panel.match(/Reach:[^\n]*/)?.[0] ?? panel.slice(0, 120));
+      const shown = Number(reach?.[1] ?? -1);
+      // A denominator that has DRIFTED is fine (the sweep adds cards); one that is absent or
+      // smaller than the snapshot is not — that would mean the page is under-counting the feed.
+      ok('and the denominator is at least the feed we measured', shown >= feed.n,
+        `page ${shown} · measured ${feed.n}`);
       ok('and called out as carried by the other signals',
-        new RegExp(`None of your ${feed.n} opportunities carry NAICS codes`).test(panel),
+        new RegExp(`None of your ${shown} opportunities carry NAICS codes`).test(panel),
         panel.match(/[^\n]*None of your[^\n]*/)?.[0] ?? '');
       // RED HALF — a signal the feed DOES carry must not be reported as dead.
       if (typedAgency && liveAgency) {
-        ok(`agency NOT reported dead (feed carries it on ${feed.n})`, new RegExp(`agency ${feed.n}/${feed.n}`).test(panel),
+        // Same reasoning: agency must reach ALL of whatever the page counts, not a stale number.
+        ok('agency NOT reported dead (the feed carries it on every card)',
+          new RegExp(`agency ${shown}/${shown}`).test(panel),
           panel.match(/agency \d+\/\d+/)?.[0] ?? '');
       } else {
         ok('a live signal is measured too', false, 'no agency on this feed — the discriminating half is UNCOVERED');

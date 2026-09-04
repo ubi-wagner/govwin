@@ -197,6 +197,11 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
   // never the departure. That is a scope question, not a wording one, and it is not fixed here —
   // recorded so the next reader finds it stated rather than rediscovering it.
   'partner.entered': 'A manager from your partner organization opened your workspace',
+  // The EXIT half. `space_presence` (migs 246/247) made partner.exited tenant-scoped, so it now
+  // reaches the customer's feed — where it rendered as its own de-punctuated type. An arrival with
+  // no departure is the worse half of a bracket to leave unwritten: the trail then asserts somebody
+  // is still in the workspace, in the plainest words it has, and never takes it back.
+  'partner.exited': 'The partner manager left your workspace',
   'partner.manager_granted': 'Manager access granted to a partner organization',
   'partner.manager_revoked': 'Manager access revoked from a partner organization',
   'partner.manager_requested': 'A partner organization requested manager access',
@@ -651,6 +656,29 @@ export function describeEventOrNull(ev: EventLike): string | null {
 
   // Closed-loop system events (email/notification delivery, failures)
   if (namespace === 'system') {
+    /**
+     * The ToDo CLAIM events (mig 249). Written here because `oversight-surfaces` asks the question
+     * that catches the omission: every event type a CUSTOMER sees must have a sentence, not a
+     * de-punctuated type. `system:task.claimed` shipped without one and rendered as its own token —
+     * the same "internal vocabulary on a customer's screen" defect as the 48 atoms titled
+     * `bulleted_list`, one namespace over.
+     */
+    if (type === 'task.claimed') {
+      const t = str(payload.title);
+      return t ? `Someone started "${t}"` : 'Someone started a to-do';
+    }
+    if (type === 'task.released') {
+      const t = str(payload.title);
+      return t ? `"${t}" was put back in the queue` : 'A to-do was put back in the queue';
+    }
+    if (type === 'task.claim_expired') {
+      const t = str(payload.title);
+      // Says what happened to the WORK, not what happened to the row: the person who left it is not
+      // the reader, and the reader's question is whether it still needs doing.
+      return t
+        ? `"${t}" went back to the queue — nobody finished it`
+        : 'A to-do went back to the queue — nobody finished it';
+    }
     if (type === 'content_pipeline.post.publish_completed') {
       const title = str(payload.title) ?? str(payload.slug) ?? 'post';
       return `Blog post "${title}" published`;
