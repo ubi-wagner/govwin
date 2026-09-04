@@ -91,6 +91,14 @@ export async function listOpenTasksForActor(opts: {
                   AND (t.params->>'kind' = 'thread'
                        OR NOT (COALESCE(t.result->'chain', '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('by', ${userId}::text)))))
             )
+          -- A ToDo whose SOLICITATION is gone is a 404 in an operator's next-actions list:
+          -- completers.ts deep-links entity_type 'solicitation' at /admin/rfp-curation/<id>.
+          -- Repeated per branch rather than composed, matching this file's stated house style --
+          -- postgres.js fragment composition needs an explicit client (the Proxy trap), and the
+          -- three admin branches are read by three different surfaces.
+          AND (t.entity_type IS DISTINCT FROM 'solicitation'
+               OR t.entity_id IS NULL
+               OR EXISTS (SELECT 1 FROM curated_solicitations cs WHERE cs.id = t.entity_id))
           ORDER BY t.due_at ASC NULLS LAST, t.created_at ASC
           LIMIT 200
         `;
@@ -111,6 +119,12 @@ export async function listOpenTasksForActor(opts: {
         LEFT JOIN users cu ON cu.id = t.claimed_by
         WHERE t.status IN ('open', 'in_progress')
           AND (t.assignee_role IN ('rfp_admin', 'master_admin') OR t.assignee_user_id = ${userId}::uuid)
+          -- Same guard as the shadow-admin branch above: the admin dashboard's TaskQueue reads
+          -- THIS query, which is why filtering only listOpenAdminTriageTasks left the dead link on
+          -- /admin exactly where it was.
+          AND (t.entity_type IS DISTINCT FROM 'solicitation'
+               OR t.entity_id IS NULL
+               OR EXISTS (SELECT 1 FROM curated_solicitations cs WHERE cs.id = t.entity_id))
         ORDER BY t.due_at ASC NULLS LAST, t.created_at ASC
         LIMIT 200
       `;
