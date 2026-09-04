@@ -980,7 +980,8 @@ class AgentFabric:
                 WHERE status = 'running'
                   AND picked_at IS NOT NULL
                   AND picked_at < now() - make_interval(mins => $1)
-                RETURNING id, tenant_id, agent_role, worker_id
+                RETURNING id, tenant_id, agent_role, worker_id,
+                          requested_by, source_task_id
                 """,
                 STALE_TASK_MINUTES,
             )
@@ -1010,6 +1011,14 @@ class AgentFabric:
                         "workerId": r["worker_id"],
                         "staleMinutes": STALE_TASK_MINUTES,
                         "reason": "no worker completed this task within the ceiling",
+                        # WHO ASKED, and WHAT IS STILL WAITING (mig 251). Without these the event
+                        # says which task was dropped and for which customer, and still cannot say
+                        # whose action it was — leaving the one person who could decide whether to
+                        # re-run it unnamed. `sourceTaskId` names the ToDo that is otherwise still
+                        # sitting in somebody's queue waiting on work that already failed.
+                        # Null is a real answer here: nothing human queued it.
+                        "requestedBy": str(r["requested_by"]) if r["requested_by"] else None,
+                        "sourceTaskId": str(r["source_task_id"]) if r["source_task_id"] else None,
                     },
                 )
         except Exception as exc:

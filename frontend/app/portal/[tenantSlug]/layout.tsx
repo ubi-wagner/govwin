@@ -6,7 +6,7 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
 import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
-import { syncPortalPresence, idleDescent, closePresence, noteInteraction } from '@/lib/space-presence';
+import { syncPortalPresence, idleDescent, closePresence, noteInteraction, inForcedCooldown } from '@/lib/space-presence';
 import { DESCENT_IDLE_MS } from '@/lib/session-policy';
 import { PresenceHeartbeat } from '@/components/portal/presence-heartbeat';
 import { getActiveMemberships, hasActiveMembership } from '@/lib/memberships';
@@ -129,6 +129,20 @@ export default async function PortalLayout({
    * at the moment access actually ended, rather than up to an hour later when the sweep runs.
    */
   if (outsideKind) {
+    /**
+     * A FORCED ASCENT holds by TIME, and is checked before the idle rule.
+     *
+     * Closing a bracket evicts the RECORD, not the actor: `isShadowAdmin` is recomputed every
+     * render, so the target's next page load simply opens a new one. Without this line the
+     * "End access" button on /admin/workspace-access looks like it worked and removes nobody —
+     * which is worse than not having the button, because an operator would trust it.
+     *
+     * Proven by `drive-force-ascend.mts` check 3: with this absent, the target walks straight back
+     * in while checks 1, 2, 4 and 5 all pass.
+     */
+    if (await inForcedCooldown(userId, tenantId)) {
+      redirect(isShadowAdmin ? '/admin/dashboard?descent=forced' : '/partner?descent=forced');
+    }
     const idle = await idleDescent(userId, tenantId, DESCENT_IDLE_MS / 60_000);
     if (idle) {
       // No `exceptTenantId`: an idle person is idle everywhere, so every open bracket they hold

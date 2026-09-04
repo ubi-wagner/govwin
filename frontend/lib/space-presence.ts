@@ -37,7 +37,12 @@ import { runInTenant, runInBypass } from '@/lib/tenant-context';
 import { emitEventSingle, userActor } from '@/lib/events';
 
 export type PresenceKind = 'shadow' | 'partner';
-export type CloseReason = 'explicit' | 'left_space' | 'moved' | 'timeout' | 'signed_out';
+export type CloseReason =
+  | 'explicit' | 'left_space' | 'moved' | 'timeout' | 'signed_out'
+  /** Another operator ended it from /admin/workspace-access (mig 250). The only closer that is not
+   *  the actor or the clock — which is exactly why the customer's trail needs it distinct from
+   *  `timeout`: "the clock ended it" and "a named person ended it" are different facts. */
+  | 'forced';
 
 /** The event pair per door. Kept together so a new door cannot add one half. */
 const EVENTS: Record<PresenceKind, { enter: string; exit: string }> = {
@@ -358,5 +363,79 @@ export async function sweepStalePresence(idleMinutes = 45): Promise<number> {
   } catch (e) {
     console.error('[space-presence] sweepStalePresence failed:', e);
     return 0;
+  }
+}
+
+
+/**
+ * How long a forced ascent keeps somebody out.
+ *
+ * A COOLDOWN, not a ban. An rfp_admin has no descent flag to clear — being on the portal URL *is*
+ * the descent — so closing the bracket evicts the record and not the actor; their next render just
+ * opens a new one. Time is the only mechanism that holds without inventing a grant model.
+ *
+ * Thirty minutes matches the descent idle window, so an operator ejecting somebody and the clock
+ * ejecting them produce the same shape of interruption rather than two rules to remember.
+ */
+export const FORCED_ASCENT_COOLDOWN_MS = 30 * 60_000;
+
+/**
+ * End somebody else's presence in a customer's workspace, now.
+ *
+ * `/admin/workspace-access` could see an open bracket and do nothing about it. This is the act that
+ * page was missing. Returns how many brackets closed — 0 means they were not in there, which is a
+ * legitimate outcome and not an error.
+ */
+export async function forceAscend(
+  target: Actor,
+  opts: { tenantId?: string | null } = {},
+): Promise<number> {
+  try {
+    const rows = await runInBypass(async () => (opts.tenantId
+      ? sql<{ id: string }[]>`
+          UPDATE space_presence SET closed_at = now(), close_reason = 'forced'
+           WHERE user_id = ${target.id}::uuid AND tenant_id = ${opts.tenantId}::uuid
+             AND closed_at IS NULL
+           RETURNING id`
+      : sql<{ id: string }[]>`
+          UPDATE space_presence SET closed_at = now(), close_reason = 'forced'
+           WHERE user_id = ${target.id}::uuid AND closed_at IS NULL
+           RETURNING id`));
+    return rows.length;
+  } catch (e) {
+    console.error('[space-presence] forceAscend failed:', e);
+    return 0;
+  }
+}
+
+/**
+ * Is this actor inside a forced-ascent cooldown for this tenant?
+ *
+ * Reads only the MOST RECENT bracket: an old `forced` from last month must not keep somebody out,
+ * and a later legitimate visit means the cooldown was already served.
+ *
+ * Returns false on error — deliberately, and for the same reason `idleDescent` does. This gate's
+ * failure mode is ejecting a working administrator from a customer's workspace on a transient
+ * database blip, which is worse and far likelier than one person getting back in a few minutes
+ * early. The operator can force them out again; a page that cannot be opened has no such recovery.
+ */
+export async function inForcedCooldown(
+  userId: string,
+  tenantId: string,
+  cooldownMs = FORCED_ASCENT_COOLDOWN_MS,
+): Promise<boolean> {
+  try {
+    const [row] = await runInBypass(async () => sql<{ reason: string | null; closedAt: Date | null }[]>`
+      SELECT close_reason AS "reason", closed_at AS "closedAt"
+        FROM space_presence
+       WHERE user_id = ${userId}::uuid AND tenant_id = ${tenantId}::uuid
+       ORDER BY entered_at DESC LIMIT 1`);
+    if (!row || row.reason !== 'forced' || !row.closedAt) return false;
+    // `closed_at` is a timestamptz and arrives as a JS Date. `.getTime()`, never a string slice —
+    // slicing the string form yields NaN, and NaN survives every comparison by picking a branch.
+    return Date.now() - row.closedAt.getTime() < cooldownMs;
+  } catch (e) {
+    console.error('[space-presence] inForcedCooldown failed:', e);
+    return false;
   }
 }

@@ -19,17 +19,28 @@
  * time in this message on purpose: "30 minutes" is the policy, not a countdown.
  */
 
-export function DescentTimeoutNotice({ where }: { where: 'admin' | 'partner' }) {
+export function DescentTimeoutNotice(
+  { where, reason = 'timeout' }: { where: 'admin' | 'partner'; reason?: 'timeout' | 'forced' },
+) {
+  // Two different facts, and a person acts differently on each: "you went idle" invites walking
+  // back in, "somebody ended your access" does not. Collapsing them into one message would send a
+  // person straight back into a workspace an operator had just removed them from.
+  const forced = reason === 'forced';
   return (
     <div
       role="status"
       className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm
                  text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100"
     >
-      <p className="font-medium">You were returned to your own console.</p>
+      <p className="font-medium">
+        {forced
+          ? 'Your access to that workspace was ended by another administrator.'
+          : 'You were returned to your own console.'}
+      </p>
       <p className="mt-1">
-        Your access to that customer&rsquo;s workspace timed out after 30 minutes without activity,
-        and their record shows you left at that moment rather than staying open.{' '}
+        {forced
+          ? 'Their record shows the moment it ended and who ended it. You can enter again in a short while; if that was unexpected, ask before you do.'
+          : 'Your access to that customer\u2019s workspace timed out after 30 minutes without activity, and their record shows you left at that moment rather than staying open.'}{' '}
         {where === 'admin'
           ? 'Open the company again from Tenants to continue.'
           : 'Open the company again from your console to continue.'}

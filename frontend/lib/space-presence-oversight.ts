@@ -24,6 +24,10 @@ import { sqlBypass } from '@/lib/db';
 export interface PresenceRow {
   id: string;
   kind: 'shadow' | 'partner';
+  /** The ids the "End access" action needs. Names and emails render; only ids act — and passing an
+   *  email to a route that takes a uuid is how an action ends up targeting the wrong person. */
+  userId: string;
+  tenantId: string;
   actorEmail: string | null;
   actorName: string | null;
   tenantName: string;
@@ -60,6 +64,7 @@ export async function openPresences(): Promise<PresenceRow[]> {
   try {
     return (await sqlBypass<PresenceRow[]>`
       SELECT p.id, p.kind,
+             p.user_id AS "userId", p.tenant_id AS "tenantId",
              u.email AS "actorEmail", u.name AS "actorName",
              t.name AS "tenantName", t.slug AS "tenantSlug",
              p.entered_at AS "enteredAt", p.last_seen_at AS "lastSeenAt",
@@ -80,6 +85,7 @@ export async function recentPresences(limit = 50): Promise<PresenceRow[]> {
   try {
     return (await sqlBypass<PresenceRow[]>`
       SELECT p.id, p.kind,
+             p.user_id AS "userId", p.tenant_id AS "tenantId",
              u.email AS "actorEmail", u.name AS "actorName",
              t.name AS "tenantName", t.slug AS "tenantSlug",
              p.entered_at AS "enteredAt", p.last_seen_at AS "lastSeenAt",

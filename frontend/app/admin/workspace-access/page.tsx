@@ -23,6 +23,7 @@
  * see it. Eight occurrences in this repo. This page is a server component and stays one.
  */
 import { auth } from '@/auth';
+import { EndAccessButton } from './end-access-button';
 import { redirect } from 'next/navigation';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import {
@@ -84,6 +85,7 @@ export default async function WorkspaceAccessPage() {
                   <th className="px-4 py-3 font-medium">As</th>
                   <th className="px-4 py-3 font-medium">In for</th>
                   <th className="px-4 py-3 font-medium">Last seen</th>
+                  <th className="px-4 py-3 font-medium"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -108,6 +110,14 @@ export default async function WorkspaceAccessPage() {
                             past the {SWEEP_IDLE_MINUTES}m idle floor — is the sweep running?
                           </span>
                         )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <EndAccessButton
+                          userId={p.userId}
+                          tenantId={p.tenantId}
+                          who={p.actorEmail ?? p.actorName ?? 'this person'}
+                          company={p.tenantName}
+                        />
                       </td>
                     </tr>
                   );

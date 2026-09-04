@@ -422,6 +422,11 @@ DRIVES=(
   # splits the clocks; this drives the gate. Phases 3 and 4 only mean something as a pair: without
   # 4, deleting descent entirely would pass.
   "descent-timeout|scripts/drive-descent-timeout.mts"
+  # AN OPERATOR CAN END SOMEBODY'S ACCESS, and it actually removes them. Closing a bracket evicts
+  # the RECORD, not the actor — isShadowAdmin is recomputed per render, so the target's next page
+  # load opens a new one. Check 3 is the whole drive: with the cooldown gate absent, checks 1, 2, 4
+  # and 5 all pass while the target walks straight back in.
+  "force-ascend|scripts/drive-force-ascend.mts"
   # A ToDo CAN NOW BE CLAIMED, and a claim expires. `tasks.status` allowed 'in_progress' since the
   # table existed and nothing ever wrote it (open 47 · completed 65 · expired 2 · in_progress 0), so
   # the queue could not tell an item somebody had begun from one nobody had touched. That matters

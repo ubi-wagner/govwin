@@ -68,7 +68,8 @@ export default async function DashboardPage(
   // Carried by the descent idle gate (portal layout). Without it a person ejected from a
   // customer's workspace lands here with no explanation and simply walks back in.
   const sp = (await searchParams) ?? {};
-  const descentTimedOut = sp.descent === 'timeout';
+  const descentEnded = sp.descent === 'timeout' || sp.descent === 'forced';
+  const descentReason = sp.descent === 'forced' ? 'forced' as const : 'timeout' as const;
   const session = await auth();
   if (!session?.user) redirect('/login');
 
@@ -152,7 +153,7 @@ export default async function DashboardPage(
 
   return (
     <div>
-      {descentTimedOut ? <DescentTimeoutNotice where="admin" /> : null}
+      {descentEnded ? <DescentTimeoutNotice where="admin" reason={descentReason} /> : null}
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Admin Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">System overview</p>

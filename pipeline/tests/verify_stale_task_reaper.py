@@ -22,6 +22,7 @@ which a row stuck in 'running' quietly corrupts.
   2 a task abandoned INSIDE the ceiling is LEFT ALONE
   3 a 'pending' task is untouched — the reaper must not eat the queue it protects
   4 the reap is AUDITED — one `tool:agent.task_abandoned` per row, not a log line
+  5 and the audit says WHO ASKED (mig 251), so the dropped work is attributable
 
 (2) is what stops this being a guard that eats live work: without it, a reaper with the comparison
 inverted — or a ceiling of zero — would pass (1) and (3) while killing every task in flight. A guard
@@ -86,6 +87,12 @@ async def main() -> None:
         await conn.close()
         cannot("no tenant fixture")
 
+    # A real person to attribute the fixture to. Attribution is the whole of P6: without it the
+    # event names the task and the customer and still cannot name whose action it was.
+    requester = await conn.fetchval(
+        "SELECT id FROM users WHERE is_active ORDER BY created_at LIMIT 1"
+    )
+
     async def make(status: str, picked_minutes_ago: int | None) -> uuid.UUID:
         picked = (
             None
@@ -95,13 +102,15 @@ async def main() -> None:
         row = await conn.fetchrow(
             f"""
             INSERT INTO agent_task_queue
-                (tenant_id, agent_role, task_type, input, status, worker_id, picked_at)
+                (tenant_id, agent_role, task_type, input, status, worker_id, picked_at,
+                 requested_by)
             VALUES ($1, 'section_drafter', 'reaper_fixture', '{{}}'::jsonb, $2,
-                    'fabric-deadbeef', {picked or 'NULL'})
+                    'fabric-deadbeef', {picked or 'NULL'}, $3)
             RETURNING id
             """,
             tenant,
             status,
+            requester,
         )
         made.append(row["id"])
         return row["id"]
@@ -168,6 +177,24 @@ async def main() -> None:
             ok("`tool:agent.task_abandoned` was emitted for the reaped task")
         else:
             no("the reap is SILENT — nothing in system_events", "a log line is not an audit trail")
+
+        print("\n══ 5 · the audit names who asked")
+        # A column nothing reads is the shape this repo keeps finding — `in_progress` sat unwritten
+        # for the life of the tasks table, and editing_by is cleared in five places and set nowhere.
+        # Asserting the value reaches the EVENT is what stops requested_by becoming the next one.
+        who = await conn.fetchval(
+            """
+            SELECT payload->>'requestedBy' FROM system_events
+             WHERE namespace = 'tool' AND type = 'agent.task_abandoned'
+               AND payload->>'taskId' = $1
+             ORDER BY created_at DESC LIMIT 1
+            """,
+            str(stale_id),
+        )
+        if who and str(requester) == who:
+            ok("the abandoned-task event names the requester", who[:8] + "…")
+        else:
+            no("the event cannot say whose work was dropped", f"requestedBy={who}")
 
         print("\n══ 4 · a pending task is untouched")
         st3, _ = after.get(pending_id, ("?", None))

@@ -283,7 +283,7 @@ new one — and the note box on the curation guide is where that evidence should
   `_recover_orphaned_instances` and stale-heartbeat handling, and the sandbox holds zero stuck
   `running` rows.
 
-### P5 — Make the state knowable: extend the operator surface
+### P5 — Make the state knowable: extend the operator surface  ✅ SHIPPED
 
 `/admin/workspace-access` answers the descent question well. Extend the same page (do not build a
 second one) with:
@@ -296,7 +296,7 @@ second one) with:
 * **Act on it** — force-ascend an actor (close the bracket + refuse the descent until re-entry), and
   release a held claim or lock. Today the page can only *observe*.
 
-### P6 — Agents are sessions too
+### P6 — Agents are sessions too  ✅ SHIPPED
 
 An agent has no session, but it has the same lifecycle question: *issued → running → completed*, and
 the same failure — issued work with nothing watching it. P4 gives it a reaper. Beyond that, the
@@ -328,3 +328,50 @@ never ends.
 * Not covered: concurrent sessions per user across devices (no session table, so not observable
   today — P5 would make it so), and CSRF/cookie flags, which are NextAuth defaults and were not
   re-audited here.
+
+
+---
+
+## 8. P5 and P6, as built
+
+### P5 — `/admin/workspace-access` can now ACT (mig 250)
+
+The page could see somebody inside a customer's account and do nothing about it. Every closer
+`space_presence` had was the actor themselves or the clock — `explicit` · `left_space` · `moved` ·
+`signed_out` · `timeout`. **`forced` is the sixth, and the only one a second person can cause.**
+
+**It is a cooldown, not a ban, and that is forced by the architecture rather than chosen.** An
+rfp_admin has no descent flag to clear — being on the portal URL *is* the descent — so closing the
+bracket evicts the RECORD and not the actor: their next render calls `syncPortalPresence` and opens
+a new one. A flag cleared only by the explicit door would not hold either, because the portal layout
+opens on render and bypasses that door. Time is the only mechanism that holds without inventing a
+grant model this product does not have, so the gate refuses for 30 minutes and the confirm dialog
+says so — an operator who believed they had permanently removed somebody would be wrong in a way
+that matters.
+
+`timeout` is deliberately not reused: *"the clock ended it"* and *"a named person ended it"* are
+different facts, and the customer's audit trail is where that difference matters most. The ejected
+person is told which one happened, because "you went idle" invites walking back in and "an
+administrator ended your access" does not.
+
+*Proven:* `drive-force-ascend.mts`, six checks. **Check 3 is the drive** — the target must actually
+be REFUSED afterwards. Checks 1, 2, 4 and 5 all passed against a version where the cooldown gate was
+missing and the target walked straight back in, which is precisely the trap: a button that closes a
+row, looks like it worked, and removes nobody.
+
+### P6 — agent work is attributable (mig 251)
+
+`agent_task_queue` recorded the tenant, the archetype, the proposal and the section, and never who
+ASKED. Tolerable while a stuck task was invisible; not tolerable once P4's reaper started failing
+abandoned work — the event could say which task was dropped and for which customer, and still not
+whose action it was, leaving the one person who could decide whether to re-run it unnamed.
+
+`requested_by` and `source_task_id` now travel from the single queue writer through to the
+`tool:agent.task_abandoned` payload. **NULL is a real answer** and is deliberately not filled with a
+service account: automated work must stay distinguishable from a person's, and a name on a decision
+nobody made is worse than no name. `source_task_id` is the other half — it reconnects an abandoned
+agent task to the ToDo still sitting in somebody's queue waiting on work that already failed.
+
+The drive asserts the value reaches the EVENT, not merely the column. A column nothing reads is the
+shape this repo keeps finding: `in_progress` sat unwritten for the life of the `tasks` table, and
+`editing_by` is cleared in five places and set nowhere.
