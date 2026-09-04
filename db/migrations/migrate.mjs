@@ -74,7 +74,62 @@ const sql = postgres(CONN, {
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
+/**
+ * REFUSE TO MIGRATE AS A ROLE THAT CANNOT SEE THE DATA.
+ *
+ * The existing 42501 handler below only fires once a migration needs an owner PRIVILEGE. A
+ * data-repair migration needs none — and under a NOBYPASSRLS role with no tenant context, its
+ * UPDATE matches zero rows on a FORCE-RLS table, raises nothing, and is recorded as ✓ applied.
+ * It can then never be re-run, because `_migration_history` says it is done.
+ *
+ * That is not hypothetical. Migration 245 repaired 48 `library_atoms` titled `bulleted_list` — an
+ * internal node type shown to customers on a shelf they browse BY TITLE. It was applied here as
+ * `govtech_app`, which sees 0 of 1242 atoms. It updated nothing, reported success, and the 48 rows
+ * are still there: the customer-finish probe counted them as 34 live jargon defects a day later.
+ *
+ * So the check is BEFORE anything runs, and it is about capability rather than error codes: can
+ * this role bypass RLS? A superuser can (with `rolbypassrls = f` — the trap `check-rls-posture`
+ * documents in the other direction), so both are asked.
+ *
+ * `MIGRATE_ALLOW_SCOPED_ROLE=1` exists for the one legitimate case — a deployment where the
+ * migrating role is neither superuser nor BYPASSRLS but IS the table owner and RLS is not forced.
+ * It prints what it is overriding, because an unexplained escape hatch is how this comes back.
+ */
+async function assertOwnerRole() {
+  let row;
+  try {
+    [row] = await sql`
+      SELECT current_user AS role, rolsuper, rolbypassrls
+        FROM pg_roles WHERE rolname = current_user`;
+  } catch (err) {
+    console.error('[migrate] could not read the connected role:', err.message);
+    await sql.end();
+    process.exit(1);
+  }
+  if (row?.rolsuper || row?.rolbypassrls) return;
+
+  const who = row?.role ?? '?';
+  if (process.env.MIGRATE_ALLOW_SCOPED_ROLE === '1') {
+    console.error(`[migrate] ⚠ running as ${who}, which cannot bypass RLS —`
+      + ' MIGRATE_ALLOW_SCOPED_ROLE=1 is set, so continuing.');
+    console.error('[migrate]   A data-repair migration may silently update ZERO rows and still be'
+      + ' recorded as applied.');
+    return;
+  }
+  console.error(`[migrate] ✗ REFUSING TO RUN as ${who} — this role cannot bypass RLS.`);
+  console.error('[migrate]');
+  console.error('[migrate]   A DDL migration would fail loudly here. A DATA-REPAIR migration would');
+  console.error('[migrate]   not: its UPDATE matches zero rows on a FORCE-RLS table, raises no');
+  console.error('[migrate]   error, and is recorded as applied — so it can never run again.');
+  console.error('[migrate]   Migration 245 was lost exactly this way.');
+  console.error('[migrate]');
+  console.error('[migrate]   DATABASE_URL="$DATABASE_URL_OWNER" node db/migrations/migrate.mjs');
+  await sql.end();
+  process.exit(1);
+}
+
 async function run() {
+  await assertOwnerRole();
   // Ensure tracking table
   await sql`
     CREATE TABLE IF NOT EXISTS _migration_history (
