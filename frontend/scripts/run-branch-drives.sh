@@ -428,6 +428,10 @@ DRIVES=(
   # MORE once sessions end on time, not less: P1/P2 guarantee people are signed out mid-task. Check
   # 6 is the pairing that keeps it honest — a claim must not BLOCK completion, or it is a lock.
   "task-claim|scripts/drive-task-claim.mts"
+  # AN ABANDONED AGENT TASK COMES BACK. `agent_task_queue` moved a row to 'running' and nothing ever
+  # moved it back, so a worker that died mid-task left it there forever — no error, no retry, the
+  # work simply never finished. Python, dispatched by extension like `spend-guardrails`.
+  "stale-agent-tasks|../pipeline/tests/verify_stale_task_reaper.py"
   "shadow-tenant-admin|scripts/drive-shadow-tenant-admin.mts"
   "rls-app|scripts/drive-rls-app.mjs"
   "rls-admin|scripts/drive-rls-admin.mjs"

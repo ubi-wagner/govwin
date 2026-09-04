@@ -107,10 +107,10 @@ it has to start over again.* Here is what each kind of in-flight work actually d
 
 | in-flight work | survives a session break? | why |
 | --- | --- | --- |
-| **A platform ToDo** | ⚠ **no record it was ever started** | `tasks.status` allows `in_progress` and **nothing writes it.** Live distribution on this box: `open: 47 · completed: 65 · expired: 2` — zero `in_progress`, ever. A ToDo is binary |
+| **A platform ToDo** | ✓ claimable (P3) — was: **no record it was ever started** | `tasks.status` allows `in_progress` and **nothing writes it.** Live distribution on this box: `open: 47 · completed: 65 · expired: 2` — zero `in_progress`, ever. A ToDo is binary |
 | **A section being edited** | ✓ recovered | `canvas-editor.tsx` autosaves to `localStorage` and offers recovery on return; `canvas_versions` holds the last committed state |
-| **A locked section** | ⚠ stays locked | `locked_by` / `locked_at` are set on lock and cleared on unlock. Nothing releases a lock whose holder's session ended |
-| **An agent task** | ⚠ stuck | `agent_task_queue.status` allows `running`; **there is no reaper.** A task the worker died mid-way through stays `running` forever, and nothing notices |
+| **A locked section** | ✓ correctly kept | CORRECTED: this is not an editing lock. Locking is the deliberate accept stricture — it advances the compliance matrix, snapshots the canvas and harvests to the library. It SHOULD survive. `editing_by`/`editing_since` exist but are set nowhere and read by nothing; the editor uses optimistic concurrency instead |
+| **An agent task** | ✓ reaped (P4) | Was stuck: nothing ever moved a `running` row back. Now failed with a stated reason after 30m, by the consumer itself before it claims anything new |
 | **A paused workflow instance** | ✓ by design | HITL instances wait for a human indefinitely — correct, but see §5 |
 | **A presence bracket** | ✓ *if the sweep is enabled* | gated on `SPACE_PRESENCE_SWEEP_URL` + `CRON_SECRET`, both unset today |
 
@@ -195,17 +195,32 @@ started, and the resume link is what makes returning cheap.
 *Check:* claim → let it expire → assert it is `open` again, with the event, and that a second person
 could not claim it while it was held.
 
-### P4 — Release what a dead session was holding
+### P4 — Release what a dead session was holding  ✅ SHIPPED, and one third of it was wrong
 
-One sweep, three things, all currently unbounded:
+**Corrected on contact with the code.** This step listed three things; only two were real.
 
-* **Section locks** whose holder has no live session → released, `proposal:section.lock_expired`.
-* **Agent tasks** `running` past a ceiling → `failed` with a reason, so the runaway-bound and the
-  spend ledger stay truthful. (Note the interaction: the parallel line's `conn.is_closed()`
-  reconnect fix means the *worker* recovers, but a row it abandoned mid-flight does not.)
-* **Claims**, per P3.
+* ~~**Section locks** whose holder has no live session → released.~~ **Wrong, and dangerous.** A
+  section lock is not an editing lock — it is the deliberate accept/lock stricture
+  (`lib/proposal/lock-section.ts`): it advances the compliance matrix, snapshots the canvas version,
+  harvests to the atom library and rolls up the volume. The 65 locked sections on the sandbox, oldest
+  from 2026-08-01, are *correctly* locked. Reaping them would have destroyed accepted work. This is
+  verification rule 4 — *assert the contract the system HAS* — and the plan asserted one it does not.
+* **There is no editing lock to reap either.** `proposal_sections` carries `editing_by` /
+  `editing_since`, cleared in five places and **set nowhere**, read by nothing, held by zero rows —
+  the same declared-and-never-written shape `in_progress` had. The editor uses optimistic
+  concurrency instead (local autosave plus a 409 on a stale `baseVersion`), which needs no reaper.
+  Left as a documented dead pair rather than built on.
+* **Agent tasks** `running` past a ceiling → `failed` with a reason. **This one was real and is
+  done.** Nothing ever moved a `running` row back, so a worker that died mid-task left it there
+  forever — no error, no retry, the work simply never finished. `failed` rather than re-queued to
+  `pending`: an invocation costs money and may already have had side effects, so silently re-running
+  would bill twice and could land two drafts.
+* **Claims**, per P3 — shipped with it, since a claim without an expiry is a stalled queue.
 
-*Check:* red-first — kill a worker mid-task, assert the row is reaped rather than `running` forever.
+*Proven:* `pipeline/tests/verify_stale_task_reaper.py`, red then green, driving the REAL consumer
+rather than a copy of its SQL. Its second check is the pairing that matters — a task still inside the
+ceiling must be **left alone**, or an inverted comparison would pass every other check while killing
+the live queue.
 
 ### P5 — Make the state knowable: extend the operator surface
 
