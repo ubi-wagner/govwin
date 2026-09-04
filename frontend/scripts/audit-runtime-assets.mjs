@@ -381,10 +381,20 @@ function ignoreVerdict(rules, rel) {
   return { excluded, rule, rescuable: true };
 }
 
+// A MISSING .dockerignore MUST NOT READ AS "nothing is excluded".
+//
+// It would: empty rules make every source pass, and this section would print six ticks and a green
+// summary while measuring nothing — the exact shape this repo calls worse than not scanning. The
+// file's absence is far more likely to mean this script is looking in the wrong place (it resolves
+// the context root as `frontend/..`, and CI runs it with working-directory: frontend) than to mean
+// somebody deleted it. Refuse the verdict.
 const IGNORE_FILE = path.join(CONTEXT_ROOT, '.dockerignore');
-const ignoreRules = existsSync(IGNORE_FILE)
-  ? readFileSync(IGNORE_FILE, 'utf8').split('\n')
-  : [];
+if (!existsSync(IGNORE_FILE)) {
+  console.error(`\n✗ HARNESS DEFECT — no .dockerignore at ${IGNORE_FILE}.`);
+  console.error('  Every context COPY below would pass for free. Refusing to report a verdict.');
+  process.exit(2);
+}
+const ignoreRules = readFileSync(IGNORE_FILE, 'utf8').split('\n');
 
 const sources = contextCopySources(readFileSync(DOCKERFILE, 'utf8'));
 console.log(`\n── ${sources.length} context COPY source(s) in the final stage, vs .dockerignore ──\n`);
