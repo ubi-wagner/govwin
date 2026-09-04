@@ -107,8 +107,25 @@ export const DESCENT_IDLE_MS = 30 * MINUTE;
 /** The fallback is the SHORTEST window, not the longest: an unrecognised role is not a licence. */
 export const IDLE_DEFAULT_MS = 2 * HOUR;
 
+/**
+ * Test-only shortening of the idle window, guarded exactly like the absolute cap: it may only ever
+ * make the window SHORTER, and it is ignored outright in production.
+ *
+ * It exists because the idle rule had never been driven on a running server — only unit tests, and
+ * a unit test is handed the stamps directly, so it cannot catch the one bug that matters: advancing
+ * `lastSeenAt` before checking it refreshes the value the rule reads, and the window can then never
+ * elapse while every unit test still passes.
+ */
+function idleOverrideMs(): number | null {
+  if (process.env.NODE_ENV === 'production') return null;
+  const raw = Number(process.env.SESSION_IDLE_MS_OVERRIDE);
+  return Number.isFinite(raw) && raw > 0 ? raw : null;
+}
+
 export function idleLimitFor(role: unknown): number {
-  return typeof role === 'string' && role in IDLE_MS ? IDLE_MS[role] : IDLE_DEFAULT_MS;
+  const base = typeof role === 'string' && role in IDLE_MS ? IDLE_MS[role] : IDLE_DEFAULT_MS;
+  const override = idleOverrideMs();
+  return override === null ? base : Math.min(override, base);
 }
 
 /** Why a session ended. Carried to the login screen so a person is told which one happened. */

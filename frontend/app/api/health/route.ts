@@ -20,7 +20,7 @@ import { NextResponse } from 'next/server';
 import { sql, sqlBypass } from '@/lib/db';
 import { pingS3 } from '@/lib/storage/s3-client';
 import { createLogger } from '@/lib/logger';
-import { ABSOLUTE_MAX_MS, IDLE_MS } from '@/lib/session-policy';
+import { ABSOLUTE_MAX_MS, IDLE_MS, idleLimitFor } from '@/lib/session-policy';
 
 const log = createLogger('health');
 
@@ -99,7 +99,12 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
     release: RELEASE,
     environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.NODE_ENV ?? 'unknown',
     uptimeMs: Date.now() - BOOTED_AT,
-    session: { absoluteMaxMs: ABSOLUTE_MAX_MS, idleMs: IDLE_MS },
+    // EFFECTIVE windows, not the table: a test-only override shortens them, and reporting
+    // the unshortened table would let the proof assert against a bound not in force.
+    session: {
+      absoluteMaxMs: ABSOLUTE_MAX_MS,
+      idleMs: Object.fromEntries(Object.keys(IDLE_MS).map((r) => [r, idleLimitFor(r)])),
+    },
     checks: { db, s3, bypass },
   };
 

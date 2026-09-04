@@ -68,6 +68,13 @@ const EXEMPT = {
   PLAYWRIGHT_BROWSERS_PATH: 'test harness only — the sandbox browser location',
   PLAYWRIGHT_CHROMIUM_EXECUTABLE: 'test harness only',
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 'test harness only',
+  // Both are TEST-ONLY session-bound shorteners, refused when NODE_ENV === 'production' and able
+  // only to make a bound SHORTER (lib/session-policy.ts, pinned in __tests__/session-policy.test.ts).
+  // Exempt rather than documented BECAUSE they must never appear on an operator's checklist: a
+  // variable in RAILWAY_ENV_VARS.md reads as one somebody may set, and these two exist purely so
+  // scripts/prove-session-cap.mts can drive a 12-hour cap and a 2-hour idle window in 90 seconds.
+  SESSION_CAP_MS_OVERRIDE: 'test harness only — refused in production, and can only shorten a bound',
+  SESSION_IDLE_MS_OVERRIDE: 'test harness only — refused in production, and can only shorten a bound',
 };
 
 function walk(p, out = []) {

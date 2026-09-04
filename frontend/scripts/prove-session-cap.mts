@@ -46,8 +46,8 @@ let bad = 0;
 const ok = (m: string, d = '') => console.log(`  ✓ ${m}${d ? ` — ${d}` : ''}`);
 const no = (m: string, d = '') => { console.log(`  ✗ ${m}${d ? ` — ${d}` : ''}`); bad += 1; };
 
-const [admin] = await sql<{ email: string }[]>`
-  SELECT email FROM users WHERE role IN ('rfp_admin','master_admin') AND is_active
+const [admin] = await sql<{ email: string; role: string }[]>`
+  SELECT email, role FROM users WHERE role IN ('rfp_admin','master_admin') AND is_active
    ORDER BY (role = 'rfp_admin') DESC, created_at LIMIT 1`;
 if (!admin) { console.error('CANNOT RUN\n  no admin fixture'); await sql.end(); process.exit(2); }
 
@@ -153,6 +153,61 @@ try {
   if (diedAfterMs !== null) {
     if (stillHeld) no('the session cookie is still in the jar after the cap fired', 'expect it cleaned');
     else ok('the session cookie was cleaned, not just refused');
+  }
+
+  // ── AND THE IDLE WINDOW, WHICH IS A DIFFERENT BOUND ───────────────────────────────────────
+  //
+  // The absolute cap and the idle window are separate rules with separate failure modes, and until
+  // this was added only the cap had ever been driven on a running server — the idle side was unit
+  // tests alone. A unit test cannot catch the ordering bug that matters here: if the callback
+  // advanced `lastSeenAt` BEFORE checking it, the idle rule would read a value it had just
+  // refreshed and could never fire, while every unit test of `sessionEndReason` still passed
+  // because it is handed the stamps directly.
+  //
+  // Driven by going QUIET rather than by ageing a claim: the whole property is "no requests for
+  // long enough", and a proof that reached into the token to fake it would not be testing the
+  // product's own clock. That means it needs SESSION_IDLE_MS_OVERRIDE to be short, and it refuses
+  // to run rather than guess if the server is not enforcing what this expects.
+  if (diedAfterMs === null) {
+    console.log('    (idle phase skipped: the cap never fired, so the session state is not sound)');
+  } else {
+    // Read the EFFECTIVE window for THIS actor's role off /api/health — the same self-validation
+    // the cap uses. Reading SESSION_IDLE_MS_OVERRIDE from our own environment instead would assert
+    // against a value that may never have reached the server, which is precisely the mistake that
+    // made the first two cap runs measure nothing.
+    const idleMs = Number(hb?.session?.idleMs?.[admin.role] ?? 0);
+    if (!idleMs || idleMs > 120_000) {
+      console.log(`    · idle window is ${idleMs ? Math.round(idleMs / 1000) + 's' : 'unset'} — too long to drive here.`);
+      console.log('      UNCOVERED, not passing: run with SESSION_IDLE_MS_OVERRIDE to exercise it.');
+    } else {
+      const c2 = await browser.newContext();
+      const p2 = await c2.newPage();
+      await p2.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+      await p2.waitForSelector('#email', { timeout: 30_000 });
+      await p2.fill('#email', admin.email);
+      await p2.fill('#password', PW);
+      await p2.click('button[type="submit"]');
+      await p2.waitForLoadState('networkidle').catch(() => {});
+      await p2.waitForTimeout(1500);
+      const alive = async () => {
+        const r = await c2.request.get(`${BASE}/api/admin/notes`, { failOnStatusCode: false });
+        return r.status() !== 401 && r.status() !== 403;
+      };
+      if (!(await alive())) {
+        no('the idle phase could not establish a session');
+      } else {
+        // GO QUIET. No requests at all for longer than the window.
+        await new Promise((r) => setTimeout(r, idleMs + 4000));
+        if (await alive()) {
+          no('an IDLE session survived its window', `${Math.round(idleMs / 1000)}s with no requests`);
+          console.log('      The likely cause is ordering: advancing lastSeenAt before the check');
+          console.log('      refreshes the value the idle rule reads, so it can never elapse.');
+        } else {
+          ok('an idle session ended on its own window', `${Math.round(idleMs / 1000)}s quiet`);
+        }
+      }
+      await c2.close();
+    }
   }
 
   // ── A FRESH SIGN-IN STILL WORKS ───────────────────────────────────────────────────────────

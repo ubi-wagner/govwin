@@ -128,6 +128,22 @@ describe('the test-only cap override cannot become a hole', () => {
     expect(wide.ABSOLUTE_MAX_MS).toBe(12 * HOUR);        // clamped, never widened
   });
 
+  it('the IDLE override is ignored in production too', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('SESSION_IDLE_MS_OVERRIDE', '1000');
+    vi.resetModules();
+    const prod = await import('@/lib/session-policy');
+    expect(prod.idleLimitFor('rfp_admin')).toBe(2 * HOUR);
+  });
+
+  it('and the IDLE override can only shorten, never widen', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('SESSION_IDLE_MS_OVERRIDE', String(99 * HOUR));
+    vi.resetModules();
+    const wide = await import('@/lib/session-policy');
+    expect(wide.idleLimitFor('rfp_admin')).toBe(2 * HOUR);   // clamped to the role's own window
+  });
+
   it('but shortening IS allowed, which is what makes the live proof possible', async () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('SESSION_CAP_MS_OVERRIDE', '25000');
