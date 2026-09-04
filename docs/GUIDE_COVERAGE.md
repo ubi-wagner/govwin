@@ -8,7 +8,7 @@
 > the guide last did, which is the "new features, spin it up again" signal and does not depend
 > on anyone noticing. Unresolved notes are live and shown on `/admin/guides`, not here.
 
-**52 admin surfaces · 1 ready · 6 open · 0 stale · 45 with no guide at all.**
+**53 admin surfaces · 1 ready · 6 open · 0 stale · 46 with no guide at all.**
 
 Uncovered is not passing. The `none` rows are the queue.
 
@@ -66,4 +66,5 @@ Uncovered is not passing. The `none` rows are the queue.
 | `none` | `/admin/tenants/[tenantId]` | — |  |  |  |
 | `none` | `/admin/waitlist` | — |  |  |  |
 | `none` | `/admin/workflows` | — |  |  |  |
+| `none` | `/admin/workspace-access` | — |  |  |  |
 

@@ -1,8 +1,8 @@
 {
- "generatedAt": "2026-09-02T21:22:28.790Z",
+ "generatedAt": "2026-09-04T16:05:36.835Z",
  "summary": {
-  "surfaces": 52,
-  "none": 45,
+  "surfaces": 53,
+  "none": 46,
   "open": 6,
   "ready": 1,
   "stale": 0
@@ -769,6 +769,18 @@
   {
    "route": "/admin/workflows",
    "dir": "app/admin/workflows",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/workspace-access",
+   "dir": "app/admin/workspace-access",
    "guide": null,
    "state": "none",
    "steps": [],
