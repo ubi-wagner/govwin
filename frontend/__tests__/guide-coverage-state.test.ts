@@ -23,7 +23,44 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { effectiveState, type CoverageRow } from '@/lib/guides/coverage';
 
-const REPO = '/home/user/govwin';
+/**
+ * DERIVED, NEVER HARD-CODED. This was `'/home/user/govwin'` — the absolute path of the sandbox it
+ * was written in. Every assertion below passed there and could not pass anywhere else: on a CI
+ * runner the checkout is `/home/runner/work/govwin/govwin`, so both `readFileSync`s raised ENOENT
+ * against a path the error message printed verbatim (which reads like a missing FILE, not a wrong
+ * ROOT), and `execFileSync(..., { cwd: REPO })` ran git somewhere else entirely and returned 0 —
+ * five failures, one cause, and the one that blocked a deploy.
+ *
+ * This file lives at <repo>/frontend/__tests__/, so the root is two levels up.
+ */
+const REPO = join(__dirname, '..', '..');
+
+const git = (args: string[]) => execFileSync('git', args, { cwd: REPO, encoding: 'utf8' }).trim();
+
+/**
+ * CAN GIT ANSWER THIS QUESTION HERE? — which is NOT the same as "is the clone shallow".
+ *
+ * `actions/checkout` fetches depth 1 by default, and `git log -- <path>` lists only commits that
+ * TOUCHED that path, so on a CI runner it is empty for every path the one fetched commit did not
+ * change and the timestamp assertions below fail on a perfectly good tree.
+ *
+ * The first guard I wrote for that asked `rev-parse --is-shallow-repository` and skipped on true.
+ * It reported TRUE on this box — which carries 1,274 commits and answers the path query with a real
+ * timestamp. So it skipped two tests it could have run: a false skip, which is the same sin as a
+ * false pass wearing different clothes, and it hid the tests exactly where they work.
+ *
+ * The distinction that matters is between two different zeros:
+ *   · git works here but this path has no commit in the fetched history  → environmental, SKIP
+ *   · git does not work here at all (wrong root, no repo)                → the defect, FAIL LOUDLY
+ * The second is what a hard-coded REPO produced, and it must never be skipped past.
+ */
+const gitWorksHere = (() => {
+  try { return Number(git(['log', '-1', '--format=%ct'])) > 0; } catch { return false; }
+})();
+const historyReaches = (() => {
+  try { return Number(git(['log', '-1', '--format=%ct', '--', 'frontend/app/admin/scouts'])) > 0; }
+  catch { return false; }
+})();
 const row = (over: Partial<CoverageRow>): CoverageRow => ({
   route: '/admin/x', dir: 'app/admin/x', guide: 'app/admin/x/x-guide.tsx',
   state: 'ready', steps: [], controls: [], unwritten: 0, canon: null,
@@ -64,11 +101,18 @@ describe('the git derivation the catalog depends on', () => {
     } catch { return 0; }
   };
 
-  it('git answers for a tracked surface at all — a 0 would make every guide look fresh', () => {
+  it('git works at the resolved repo root at all — a wrong root reads as every guide being fresh', () => {
+    // NOT skippable. This is the assertion a hard-coded REPO failed, and the whole reason the
+    // derivation above exists: if git cannot run here, every timestamp is 0 and the catalog would
+    // silently mark every guide fresh forever.
+    expect(gitWorksHere, `git could not answer in ${REPO} — the repo root is wrong`).toBe(true);
+  });
+
+  it.skipIf(!historyReaches)('git answers for a tracked surface — a 0 would make every guide look fresh', () => {
     expect(at('frontend/app/admin/scouts')).toBeGreaterThan(0);
   });
 
-  it('EXCLUDES the guide from the surface timestamp — the trap that would hide every stale row', () => {
+  it.skipIf(!historyReaches)('EXCLUDES the guide from the surface timestamp — the trap that would hide every stale row', () => {
     const dir = 'frontend/app/admin/scouts';
     const withGuide = at(dir);
     const withoutGuide = at(dir, `:(exclude)${dir}/*-guide.tsx`);
