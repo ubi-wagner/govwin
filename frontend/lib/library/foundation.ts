@@ -99,11 +99,36 @@ export function nodeLabel(n: CanvasNode): { title: string; content: string } {
   };
 }
 
+/**
+ * A `doc` tag a PERSON can read.
+ *
+ * The tag is rendered on the library shelf as `doc:<value>`, so the value is customer-facing. Some
+ * callers pass an identifier where a slug belongs, and 76 atoms across four tenant routes ended up
+ * showing `doc:01b85d14-4a4e-494f-9122-d50cb75e3060` — an id that resolves to no document in any
+ * table, so it is not even useful to us. The other 909 doc tags are proper slugs.
+ *
+ * Normalised HERE rather than in each caller, for the same reason `nodeLabel` falls back to
+ * `humanNode` instead of trusting the atomizer: this is the one place the value is written, so it
+ * is the one place the invariant can hold no matter who calls.
+ *
+ * The title is the fallback because it is what the foundation is actually called — the four atoms
+ * sharing that uuid were all titled "CDR walkthrough with the COR", which is exactly the name that
+ * should have been on the chip.
+ */
+function readableDocSlug(meta: FoundationMeta): string {
+  const raw = (meta.slug ?? '').trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw);
+  if (raw && !isUuid) return raw;
+  const fromTitle = (meta.title ?? '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  return fromTitle || 'document';
+}
+
 /** The taxonomy tag set for a foundation + all its grains (collection · doc=slug · kind · form · format · context). */
 function foundationTags(meta: FoundationMeta): AtomTagInput[] {
   return [
     { dimension: 'collection', value: meta.collection ?? HOUSE_COLLECTION, source: 'admin', confirmed: true },
-    { dimension: 'doc', value: meta.slug, source: 'admin', confirmed: true },
+    { dimension: 'doc', value: readableDocSlug(meta), source: 'admin', confirmed: true },
     { dimension: 'kind', value: meta.kind ?? 'document', source: 'admin', confirmed: true },
     { dimension: 'form', value: meta.form, source: 'admin', confirmed: true },
     { dimension: 'format', value: ARTIFACT_FORMAT[meta.form], source: 'admin', confirmed: true },
