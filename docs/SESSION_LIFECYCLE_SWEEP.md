@@ -235,6 +235,50 @@ the live queue.
   dead worker creates no new stuck rows. A route would add a second writer of the same invariant to
   cover a case that cannot arise. Stated here so the asymmetry with `sweep-claims` reads as a
   decision rather than an omission.
+### P4a — the ACTOR sweep, which P4 should have started from
+
+P4 was checked mechanism-by-mechanism and then asked whether it covered every actor, human or AI.
+It had not — it covered the holds already found rather than walking the roster. Enumerating every
+hold-shaped column in the live schema is the check that would have caught that on the first pass:
+
+```sql
+SELECT table_name||'.'||column_name FROM information_schema.columns
+ WHERE column_name ~ '(claimed|locked|held|reserved|picked|worker|editing)';
+```
+
+| hold | actor | verdict |
+| --- | --- | --- |
+| `tasks.claimed_by` | tenant_admin · tenant_user · partner_user | **swept** (P3, 90m) |
+| `agent_task_queue.picked_at` / `worker_id` | AI — the fabric consumer | **reaped + audited** (P4, 30m) |
+| `process_instances` running | AI — the workflow engine | already handled: `_recover_orphaned_instances` + stale-heartbeat; 0 stuck |
+| `space_presence` open bracket | rfp_admin · partner_admin | **gated + swept** (P2, 30m descent / 45m sweep) |
+| `proposal_sections.is_locked`, `proposal_artifacts.is_locked`, `proposals.is_locked` | tenant_admin | NOT a hold — the deliberate accept stricture. Must survive |
+| `proposal_sections.editing_by` / `editing_since` | — | dead pair: cleared in 5 places, set nowhere, read by nothing, 0 rows |
+| `proposal_sections.assigned_to` | tenant_admin | an assignment, not a hold — it has no expiry by design |
+| `curated_solicitations.claimed_by` | **rfp_admin** | see below — a real gap, smaller than it first looked |
+| `solicitation_summary.claimed_by` | rfp_admin | 0 rows, no writer in the frontend |
+| `pipeline_jobs.worker_id` | AI — pipeline | 0 running |
+
+**The rfp_admin curation claim, and two corrections to my own first reading.**
+
+`solicitation.claim` moves a record `new → claimed` behind `AND claimed_by IS NULL`, and nothing
+clears `claimed_by`. My first conclusion was that an admin whose session died left the solicitation
+**permanently unclaimable**. That was wrong twice over:
+
+1. **There is a door.** `ACTION_STATE_MAP` in the triage route carries `release`
+   (`claimed → released_for_analysis`) and `reclaim` (back to `claimed`, restamping the holder), and
+   neither is restricted to the current holder — any rfp_admin can do both. So a stranded record is
+   two clicks from recovery, and it stays visible in the triage queue the whole time.
+2. **The sweep I wrote for it was the wrong shape.** It set `claimed → new`, an edge
+   `ACTION_STATE_MAP` does not have — a second writer of the transition table, which is the defect
+   class this repo works hardest to avoid. It was reverted rather than shipped.
+
+What remains true is narrower and worth stating plainly: **a curation claim has no automatic expiry,
+so recovery depends on a person noticing.** That is acceptable at two curators with a visible queue,
+and the in-page guide already frames a claim as a signal rather than a lock. If it bites during a
+real curation week, the correct fix is an automatic form of the EXISTING `release` edge — never a
+new one — and the note box on the curation guide is where that evidence should land.
+
 * **`process_instances` was checked and is NOT a gap** — the workflow manager already has
   `_recover_orphaned_instances` and stale-heartbeat handling, and the sandbox holds zero stuck
   `running` rows.
