@@ -222,6 +222,23 @@ rather than a copy of its SQL. Its second check is the pairing that matters — 
 ceiling must be **left alone**, or an inverted comparison would pass every other check while killing
 the live queue.
 
+**Finished on a second pass, after the first version was asked whether it was complete.** It was not:
+
+* The reap only called `logger.warning`. A log line is not an audit trail — it never reaches
+  `system_events`, so neither `/admin/events` nor the customer's own history learned their agent work
+  had been abandoned, and the only trace was a Railway log nobody tails. That is the same
+  invisibility the reaper exists to remove, reintroduced one layer up. It now emits
+  `tool:agent.task_abandoned` **per row** — "which task, for which customer" is the question asked
+  afterwards and a count cannot answer it — and the drive's third check pins it, red-tested.
+* **No operator route, and that is deliberate.** The claim sweep got a route plus a scheduler poke;
+  this did not need one. The reap runs *before every claim*, so a live worker always reaps, and a
+  dead worker creates no new stuck rows. A route would add a second writer of the same invariant to
+  cover a case that cannot arise. Stated here so the asymmetry with `sweep-claims` reads as a
+  decision rather than an omission.
+* **`process_instances` was checked and is NOT a gap** — the workflow manager already has
+  `_recover_orphaned_instances` and stale-heartbeat handling, and the sandbox holds zero stuck
+  `running` rows.
+
 ### P5 — Make the state knowable: extend the operator surface
 
 `/admin/workspace-access` answers the descent question well. Extend the same page (do not build a

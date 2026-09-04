@@ -21,7 +21,7 @@ which a row stuck in 'running' quietly corrupts.
   1 a task abandoned past the ceiling is reaped, with a reason naming the dead worker
   2 a task abandoned INSIDE the ceiling is LEFT ALONE
   3 a 'pending' task is untouched — the reaper must not eat the queue it protects
-  4 the reaper cannot take the consumer down
+  4 the reap is AUDITED — one `tool:agent.task_abandoned` per row, not a log line
 
 (2) is what stops this being a guard that eats live work: without it, a reaper with the comparison
 inverted — or a ceiling of zero — would pass (1) and (3) while killing every task in flight. A guard
@@ -151,7 +151,25 @@ async def main() -> None:
             print("    A guard that refuses everything passes a refusal-only test. This is the")
             print("    pairing that separates a working reaper from one that kills the queue.")
 
-        print("\n══ 3 · a pending task is untouched")
+        print("\n══ 3 · the reap is audited, not just logged")
+        # A log line is not an audit trail: it never reaches system_events, so neither
+        # /admin/events nor a customer's own history ever learns their agent work was abandoned.
+        # The first version of this reaper only called logger.warning, and the only trace was a
+        # Railway log nobody tails — the same invisibility the reaper exists to remove.
+        ev = await conn.fetchval(
+            """
+            SELECT count(*) FROM system_events
+             WHERE namespace = 'tool' AND type = 'agent.task_abandoned'
+               AND payload->>'taskId' = $1
+            """,
+            str(stale_id),
+        )
+        if ev and int(ev) > 0:
+            ok("`tool:agent.task_abandoned` was emitted for the reaped task")
+        else:
+            no("the reap is SILENT — nothing in system_events", "a log line is not an audit trail")
+
+        print("\n══ 4 · a pending task is untouched")
         st3, _ = after.get(pending_id, ("?", None))
         # `pending` is claimable, so process_task_queue may legitimately have picked it up and run
         # it. What must NOT happen is that the reaper failed it.
@@ -167,6 +185,10 @@ async def main() -> None:
             # findings under a stack trace.
             await conn.execute(
                 "DELETE FROM agent_task_results WHERE task_id = ANY($1::uuid[])", made
+            )
+            await conn.execute(
+                "DELETE FROM system_events WHERE payload->>'taskId' = ANY($1::text[])",
+                [str(x) for x in made],
             )
             await conn.execute(
                 "DELETE FROM agent_task_queue WHERE id = ANY($1::uuid[])", made

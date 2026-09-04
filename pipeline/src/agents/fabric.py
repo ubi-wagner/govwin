@@ -980,7 +980,7 @@ class AgentFabric:
                 WHERE status = 'running'
                   AND picked_at IS NOT NULL
                   AND picked_at < now() - make_interval(mins => $1)
-                RETURNING id, agent_role, worker_id
+                RETURNING id, tenant_id, agent_role, worker_id
                 """,
                 STALE_TASK_MINUTES,
             )
@@ -989,6 +989,28 @@ class AgentFabric:
                     "[process_task_queue] reaped %d abandoned task(s): %s",
                     len(stale),
                     ", ".join(f"{r['id']} ({r['agent_role']})" for r in stale[:5]),
+                )
+            # ONE EVENT PER ROW, not one summary. "Which task was abandoned, for which customer"
+            # is the question anyone asks afterwards and a count cannot answer it — the same reason
+            # `sweepStaleClaims` emits per row. A log line is not an audit trail: it is not in
+            # `system_events`, so it reaches neither /admin/events nor a tenant's own history, and
+            # this repo's rule is that every automation action posts there. Without this the reaper
+            # silently failed a customer's agent work and the only trace was a Railway log nobody
+            # is tailing — which is the shape of defect the reaper itself exists to remove.
+            for r in stale:
+                await self._emit_event(
+                    conn,
+                    namespace="tool",
+                    event_type="agent.task_abandoned",
+                    phase="end",
+                    tenant_id=str(r["tenant_id"]) if r["tenant_id"] else None,
+                    payload={
+                        "taskId": str(r["id"]),
+                        "archetype": r["agent_role"],
+                        "workerId": r["worker_id"],
+                        "staleMinutes": STALE_TASK_MINUTES,
+                        "reason": "no worker completed this task within the ceiling",
+                    },
                 )
         except Exception as exc:
             # Never let the reaper stop the consumer: the queue draining matters more than the
