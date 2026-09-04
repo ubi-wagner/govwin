@@ -1,5 +1,5 @@
 /** Drive-test the Ingest Assist materializer (default + multi-topic) vs the sandbox. */
-import { sql } from '@/lib/db';
+import { sql, sqlBypass } from '@/lib/db';
 import { parseSolicitation } from '@/lib/ingest/parse-solicitation';
 import { materializeSkeleton } from '@/lib/ingest/materialize';
 import { resolveTopicCompliance } from '@/lib/compliance-resolver';
@@ -30,7 +30,30 @@ try {
   ok('materialize multi-topic → suite of cards', r2.topics === 2 && r2.cards >= 2, `${r2.topics} topics, ${r2.cards} cards`);
   (await sql<{ id: string }[]>`SELECT id FROM opportunities WHERE source='ingest' AND source_id IN ('TEST-INGEST-T1','TEST-INGEST-T2')`).forEach((x) => opps.push(x.id));
 } finally {
-  for (const id of opps) { await sql`DELETE FROM tenant_opportunity_cards WHERE opportunity_id=${id}::uuid`; await sql`DELETE FROM opportunity_bridge WHERE opportunity_id=${id}::uuid`; }
+  /**
+   * `sqlBypass` FOR THE CARDS, and that is not a style choice — it is the difference between this
+   * cleanup working and silently doing nothing.
+   *
+   * `tenant_opportunity_cards` is FORCE-RLS. This script holds no tenant context, so under
+   * `govtech_app` the tenant-equality policy matches NOTHING and the DELETE removes zero rows
+   * WITHOUT ERROR. `opportunities` and `opportunity_bridge` carry no RLS, so those two lines worked
+   * — which is the worst possible combination: the opportunity and its bridge rows went, the cards
+   * did not, and every future run of `bridge-buckets` failed on
+   *
+   *     ✗ no product-made card exists without a bridge event behind it
+   *
+   * Seven orphaned cards across four tenants, pointing at an opportunity that no longer exists.
+   * Deleting across tenants is exactly what the bypass connection is for.
+   *
+   * Matched by SOURCE PATTERN rather than only by the ids collected in `opps`: a run that throws
+   * before line 31 never collects the topic ids, so an id-only cleanup leaves residue behind
+   * precisely when the drive failed — the moment cleanup matters most.
+   */
+  await sqlBypass`
+    DELETE FROM tenant_opportunity_cards
+     WHERE opportunity_id IN (SELECT id FROM opportunities
+                               WHERE source = 'ingest' AND source_id LIKE 'TEST-INGEST-%')`;
+  for (const id of opps) { await sqlBypass`DELETE FROM tenant_opportunity_cards WHERE opportunity_id=${id}::uuid`; await sql`DELETE FROM opportunity_bridge WHERE opportunity_id=${id}::uuid`; }
   for (const s of sols) { await sql`DELETE FROM volume_required_items WHERE volume_id IN (SELECT id FROM solicitation_volumes WHERE solicitation_id=${s}::uuid)`; await sql`DELETE FROM solicitation_volumes WHERE solicitation_id=${s}::uuid`; await sql`DELETE FROM solicitation_compliance WHERE solicitation_id=${s}::uuid`; await sql`DELETE FROM curated_solicitations WHERE id=${s}::uuid`; }
   for (const id of opps) { await sql`DELETE FROM opportunities WHERE id=${id}::uuid`; }
   await sql.end();
