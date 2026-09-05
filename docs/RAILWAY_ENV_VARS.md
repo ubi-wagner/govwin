@@ -33,7 +33,8 @@ Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` ser
 | `EMAIL_FROM` | present but **read by no code** today | 💤 |
 | `CRON_SECRET` · `PIPELINE_INTERNAL_URL` · `CMS_API_KEY` · `REVALIDATE_SECRET` · `CMS_PUBLIC_URL` | cron-endpoint auth · FE→pipeline internal call · FE↔rfp-crm auth/revalidate/CRM iframe | ○ (add when those integrations go live) |
 | `PLAYWRIGHT_CHROMIUM_EXECUTABLE` | PDF-export Chromium path — **set in the frontend Dockerfile** (`/usr/bin/chromium-browser`), not a Railway var | (Docker) |
-| `FOUNDING_COHORT_BYPASS` · `SEED_DEV_ACCOUNTS` · `SEED_PAGE_CONTENT` · `ALLOW_SCHEMA_RESET` | dev/seed toggles — **must stay UNSET (or false) in prod** | — |
+| `FOUNDING_COHORT_BYPASS` · `SEED_DEV_ACCOUNTS` · `ALLOW_SCHEMA_RESET` | dev/seed toggles — **must stay UNSET (or false) in prod**. `SEED_DEV_ACCOUNTS=true` seeds accounts with DEFAULT TEST PASSWORDS | — |
+| `SEED_PAGE_CONTENT` | **NOT a dev toggle** — it was listed as one on the row above and that is why this row exists. `scripts/seed_page_content.mjs` says: *"set it permanently once you've backed off CMS editing for marketing pages"*. `true` pushes the build-time `PAGE_SEEDS` snapshot into `content_pages` on each deploy, so the public marketing pages match the deployed code. It touches ONLY `content_type='page'` rows for those exact page_keys; blog posts, resource articles and testimonials are never touched. Unset it and nothing breaks — the site simply serves whatever was last seeded and drifts from the `.ts` source | ✅ keep `true` |
 | `RAILWAY_PUBLIC_DOMAIN` · `RAILWAY_GIT_COMMIT_SHA` · `RAILWAY_ENVIRONMENT_NAME` · … | health/release id | ⚙️ |
 
 ## pipeline (Python worker)
