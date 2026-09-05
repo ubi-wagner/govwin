@@ -2,7 +2,7 @@ import { getPublishedContent } from '@/lib/cms';
 
 export async function GET() {
   const posts = await getPublishedContent('blog_post', 50);
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rfppipeline.com';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.rfppipeline.com';
 
   const items = posts.map(p => `
     <item>

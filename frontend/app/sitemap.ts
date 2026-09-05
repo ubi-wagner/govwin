@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { sql } from '@/lib/db';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rfppipeline.com';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.rfppipeline.com';
 
   // Static pages
   const staticPages = [

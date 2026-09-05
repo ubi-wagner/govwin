@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: RouteContext): Promise<Metada
   const article = await getContentBySlug(slug);
   if (!article) return { title: 'Not Found' };
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rfppipeline.com';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.rfppipeline.com';
   return {
     title: `${article.title} | RFP Pipeline`,
     description: article.excerpt || article.title,
