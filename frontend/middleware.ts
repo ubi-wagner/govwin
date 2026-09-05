@@ -156,6 +156,25 @@ const CRON_EXACT_PATHS = [
   // `{"error":"unauthenticated"}` in lowercase, which is the middleware's wording and not the
   // route's. A comment explaining a trap does not prevent the trap; the LIST is the mechanism.
   '/api/admin/event-brackets/sweep',
+  // FOURTH occurrence, added at the same time as the route rather than after the 401. The
+  // space-presence sweep is the only closer for a bracket whose owner shut the tab, so omitting it
+  // here would have left the customer-facing symptom this whole change exists to remove — an
+  // "opened your workspace" with no matching close — while every other path looked fixed.
+  '/api/admin/space-presence/sweep',
+  // FIFTH occurrence — and the comment two entries up predicted it exactly: "a comment explaining a
+  // trap does not prevent the trap; the LIST is the mechanism." The task-claim sweep shipped with
+  // the handler-side `Bearer $CRON_SECRET` check and without this line, so it answered 401 with the
+  // middleware's lowercase `unauthenticated` before its handler ever ran.
+  //
+  // Measured on a live server with the CORRECT secret, which is the only way to tell the two 401s
+  // apart — a WRONG token produces the same body from both the gate and the handler:
+  //   /api/admin/space-presence/sweep  → 200 {"data":{"closed":2,...}}   (listed: handler ran)
+  //   /api/admin/tasks/sweep-claims    → 401 {"error":"unauthenticated"} (unlisted: gate refused)
+  //
+  // It matters more than the count suggests. The session bounds GUARANTEE people are signed out
+  // mid-task, and this sweep is the only thing that returns their claim to the queue — so a silent
+  // 401 here means ToDos accumulate holders who are gone and nobody else can pick them up.
+  '/api/admin/tasks/sweep-claims',
 ];
 
 function isAuthorizedCron(pathname: string, authorization: string | null): boolean {

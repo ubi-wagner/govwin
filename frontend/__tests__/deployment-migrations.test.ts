@@ -60,9 +60,69 @@ describe('the frontend migrates at boot, as the owner', () => {
   });
 
   it('says so loudly when the owner connection is missing', () => {
-    // It still runs — older migrations work fine as the app role — but an operator reading the log
-    // has to be able to tell this apart from a real schema problem.
     expect(ENTRYPOINT).toMatch(/DATABASE_URL_OWNER is NOT SET/);
+  });
+
+  /**
+   * THE CONSEQUENCE NO SINGLE FILE STATES.
+   *
+   * This used to be a soft failure, and the comment here used to say so: "it still runs — older
+   * migrations work fine as the app role". That stopped being true when `migrate.mjs` learned to
+   * refuse a role that cannot bypass RLS (migration 245 was applied by such a role, matched zero
+   * rows, and was recorded as done forever). Three files now compose into a hard boot prerequisite:
+   *
+   *   migrate.mjs   exits 1 as any role that is neither rolsuper nor rolbypassrls
+   *   entrypoint.sh falls back to DATABASE_URL when DATABASE_URL_OWNER is unset
+   *   entrypoint.sh runs `set -e`, so that exit 1 never reaches `exec node server.js`
+   *
+   * On the frontend service DATABASE_URL *is* the scoped role, so unset ⇒ the container does not
+   * start. Each file is individually reasonable and none of them says that. Verified against a live
+   * database both ways: as the owner the runner applied 245–253; as `govtech_app` it refused and a
+   * faithful copy of this block exited 1 without reaching the server.
+   *
+   * If the refusal is ever relaxed, this test should fail — the deploy docs describe the strict
+   * behaviour and an operator plans around it.
+   */
+  it('composes into a hard boot prerequisite: no owner connection, no server', () => {
+    const migrate = read('db/migrations/migrate.mjs');
+
+    // 1 · the runner refuses a scoped role, and does it on capability rather than on an error code
+    expect(migrate, 'the runner must ask whether the role can bypass RLS').toMatch(
+      /rolsuper[\s\S]{0,200}rolbypassrls/,
+    );
+    expect(migrate, 'and refuse rather than warn').toMatch(/REFUSING TO RUN/);
+
+    // 2 · the entrypoint hands it the scoped role when the owner variable is absent
+    expect(ENTRYPOINT).toMatch(/MIGRATE_URL="\$\{DATABASE_URL_OWNER:-\$DATABASE_URL\}"/);
+
+    // 3 · and `set -e` turns that refusal into a stopped boot rather than a skipped step
+    expect(ENTRYPOINT.split('\n').slice(0, 3).join('\n')).toMatch(/^\s*set -e\s*$/m);
+
+    // 4 · so the ECHOED warning must say the container will not start. An operator who reads
+    //     "warning" and deploys anyway gets a crash-loop whose cause scrolled past in the log.
+    //
+    //     Scoped to the `echo` lines on purpose. Matching the whole file passed against the
+    //     UNFIXED entrypoint, because a comment near the top already contained the words "a server
+    //     that will not start" — the assertion was green for a sentence no operator ever sees. A
+    //     check that cannot fail on the code it was written for is worse than no check.
+    const echoed = ENTRYPOINT.split('\n')
+      .filter((l) => /^\s*echo /.test(l))
+      .join('\n');
+    expect(
+      echoed,
+      'the unset-owner warning must state the boot consequence, not just the risk',
+    ).toMatch(/WILL NOT START/i);
+  });
+
+  it('the deploy docs mark the owner connection as required, not recommended', () => {
+    // The prose deep in RAILWAY_ENV_VARS already called this a hard requirement. The TABLE ROW is
+    // what an operator actually scans, and it said "➕ recommended to add" — which is exactly the
+    // marking someone defers. The row and the prose must not disagree about whether a deploy boots.
+    const env = read('docs/RAILWAY_ENV_VARS.md');
+    const row = env.split('\n').find((l) => l.includes('`DATABASE_URL_OWNER`') && l.startsWith('|'));
+    expect(row, 'DATABASE_URL_OWNER must have a row in the frontend table').toBeTruthy();
+    expect(row, 'the row must not read as optional').not.toMatch(/➕/);
+    expect(row).toMatch(/REQUIRED/i);
   });
 
   it('the image actually contains what the entrypoint runs', () => {

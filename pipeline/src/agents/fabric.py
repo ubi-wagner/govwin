@@ -91,6 +91,7 @@ from .archetypes import (
     StatusNarratorArchetype,
     RedactionGuardArchetype,
     ResearchScoutArchetype,
+    OpsCompanionArchetype,
     RfpIngestManagerArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
@@ -137,6 +138,7 @@ _ARCHETYPE_CLASSES = [
     StatusNarratorArchetype,
     RedactionGuardArchetype,
     ResearchScoutArchetype,
+    OpsCompanionArchetype,
     RfpIngestManagerArchetype,
     ScoringStrategistArchetype,
     SectionDrafterArchetype,
@@ -156,6 +158,14 @@ MAX_TOOL_ROUNDS = 20
 RATE_LIMIT_PER_HOUR = 50
 DEFAULT_MONTHLY_BUDGET_USD = 50.00
 PER_CALL_CEILING_USD = 0.50  # mid-loop cost ceiling for a single invocation
+
+# How long a task may sit in 'running' before it is presumed abandoned.
+#
+# Nothing ever moved a 'running' row back, so a worker that died mid-task left it there forever —
+# no error, no retry, and that piece of work simply never finished. Generous on purpose: a long
+# agent call is normal, and the thing being detected is a worker that is GONE rather than one that
+# is slow. Reaping a live task would be worse than the gap it closes.
+STALE_TASK_MINUTES = 30
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
 DEFAULT_MAX_TOKENS = 4096
 
@@ -941,6 +951,80 @@ class AgentFabric:
         """
         results: list[dict] = []
         worker_id = f"fabric-{uuid.uuid4().hex[:8]}"
+
+        # ── RECLAIM WHAT A DEAD WORKER WAS HOLDING, BEFORE CLAIMING ANYTHING NEW ──────────────
+        #
+        # A task moves to 'running' with a worker_id and a picked_at, and NOTHING ever moved it
+        # back. If the worker dies mid-task — which is not hypothetical: restarting Postgres under
+        # a running worker wedged all three consumer loops for four minutes (fcc646ee) — the row
+        # stays 'running' forever. It is invisible: no error, no retry, and the queue simply never
+        # finishes that piece of work.
+        #
+        # FAILED, not re-queued back to 'pending'. An agent invocation costs money and may have
+        # already had side effects before the worker died; silently re-running it would bill twice
+        # and could land two drafts. `failed` with a stated reason is honest and leaves the decision
+        # to re-run with a person. It also keeps the spend ledger and the runaway bounds truthful,
+        # which a row stuck in 'running' quietly corrupts.
+        #
+        # The ceiling is generous on purpose. A long agent call is normal; the thing being detected
+        # is a worker that is GONE, not one that is slow, and reaping a live task would be worse
+        # than the gap being closed.
+        try:
+            stale = await conn.fetch(
+                """
+                UPDATE agent_task_queue
+                SET status = 'failed',
+                    completed_at = now(),
+                    error = 'abandoned: no worker completed this task within '
+                            || $1::text || ' minutes (worker ' || COALESCE(worker_id, '?') || ')'
+                WHERE status = 'running'
+                  AND picked_at IS NOT NULL
+                  AND picked_at < now() - make_interval(mins => $1)
+                RETURNING id, tenant_id, agent_role, worker_id,
+                          requested_by, source_task_id
+                """,
+                STALE_TASK_MINUTES,
+            )
+            if stale:
+                logger.warning(
+                    "[process_task_queue] reaped %d abandoned task(s): %s",
+                    len(stale),
+                    ", ".join(f"{r['id']} ({r['agent_role']})" for r in stale[:5]),
+                )
+            # ONE EVENT PER ROW, not one summary. "Which task was abandoned, for which customer"
+            # is the question anyone asks afterwards and a count cannot answer it — the same reason
+            # `sweepStaleClaims` emits per row. A log line is not an audit trail: it is not in
+            # `system_events`, so it reaches neither /admin/events nor a tenant's own history, and
+            # this repo's rule is that every automation action posts there. Without this the reaper
+            # silently failed a customer's agent work and the only trace was a Railway log nobody
+            # is tailing — which is the shape of defect the reaper itself exists to remove.
+            for r in stale:
+                await self._emit_event(
+                    conn,
+                    namespace="tool",
+                    event_type="agent.task_abandoned",
+                    phase="end",
+                    tenant_id=str(r["tenant_id"]) if r["tenant_id"] else None,
+                    payload={
+                        "taskId": str(r["id"]),
+                        "archetype": r["agent_role"],
+                        "workerId": r["worker_id"],
+                        "staleMinutes": STALE_TASK_MINUTES,
+                        "reason": "no worker completed this task within the ceiling",
+                        # WHO ASKED, and WHAT IS STILL WAITING (mig 251). Without these the event
+                        # says which task was dropped and for which customer, and still cannot say
+                        # whose action it was — leaving the one person who could decide whether to
+                        # re-run it unnamed. `sourceTaskId` names the ToDo that is otherwise still
+                        # sitting in somebody's queue waiting on work that already failed.
+                        # Null is a real answer here: nothing human queued it.
+                        "requestedBy": str(r["requested_by"]) if r["requested_by"] else None,
+                        "sourceTaskId": str(r["source_task_id"]) if r["source_task_id"] else None,
+                    },
+                )
+        except Exception as exc:
+            # Never let the reaper stop the consumer: the queue draining matters more than the
+            # tidying, and a reaper that can take the worker down is worse than no reaper.
+            logger.error("[process_task_queue] stale reap failed: %s", exc)
 
         try:
             # Claim up to 5 pending tasks atomically

@@ -1,0 +1,146 @@
+# Producer / consumer asymmetry — the "works by itself but does nothing for the system" sweep
+
+**First run 2026-09-01.** Instrument: `frontend/scripts/audit-producer-consumer.mjs`.
+Regenerate with `source scripts/sandbox-env.sh && cd frontend && node scripts/audit-producer-consumer.mjs`.
+
+---
+
+## Why this exists
+
+Every other instrument here asks whether what the product does, it does **correctly**. None asked
+whether the two halves of a thing are actually **joined**. That gap has produced the same defect
+repeatedly, and it is the most expensive class in this codebase because nothing else can see it:
+
+| | what was correct | what was missing |
+|---|---|---|
+| `applications.session_id` | the column, the route, `contacts`, `/admin/funnel`, the drive | no form ever sent it |
+| `tenant_profiles` | the Profile page wrote it, the bucket prefill read it | the accept route never wrote it |
+| the domain audit trail | 45 call sites, all correct | the table was dropped 74 migrations earlier |
+| `billableHours` | computed correctly | never once called |
+| suppression list | enforced correctly | no way to lift an entry |
+
+Each was found by accident, months apart. **They are one shape: a producer with no consumer, or a
+consumer with no producer.** A correctness lens cannot see it — the code is correct. A coverage lens
+cannot see it — the code is covered. Only asking *"is the other half there"* finds it.
+
+## What it checks
+
+1. Every table column, classified WRITTEN / READ from the source of all three services (plus
+   migrations, which are a real if one-time writer), crossed with whether the column holds data.
+2. Environment variables read by code, against every deploy document.
+
+**A finding is a question, not a defect.** A column written only by a migration, or by Python while
+its reader is TypeScript, legitimately lands in an asymmetric cell. The report says which evidence
+produced each cell, and the audit excludes what it cannot honestly judge: 50 ambiguous column names
+(`status`, `value`, `id` — a hit says nothing), NextAuth's adapter tables and generated `_tsv`
+columns (the writer is a library or Postgres, invisible to a source scan), and the meta-instruments
+themselves — this file's own scanner read its own source on the first run and failed its control
+case, which is exactly what the control case is for.
+
+---
+
+## Standing findings
+
+### Confirmed — a capability that looks live and is not
+
+**`rate_limit_state`** — three sources configured (`sam_gov` 100/hr, `sbir_gov` 30/hr,
+`grants_gov` 50/hr) and **no code reads or writes the table**. Its only mention in the tree is a
+comment in `frontend/lib/rate-limit.ts` naming it as a future migration target. Unused schema.
+
+> ⚠️ **The first version of this entry overstated it, and the correction is the useful part.** It
+> said the stored numbers imply a third-party quota is defended when it is not. That was wrong on
+> both halves: `lib/rate-limit.ts` is an **IP-based limiter for our own public endpoints**, nothing
+> to do with third-party quotas — and the SAM.gov quota **is** defended, in the pipeline, by
+> `sam_gov.py` reading `X-RateLimit-Remaining` and raising `IngesterRateLimitError` on 429. Reacting
+> to the provider's own accounting is strictly better than keeping a local counter that can drift.
+>
+> The real consequence is narrower: the limiter is **per-container**, so on a multi-container deploy
+> a caller gets N times the intended limit against our own endpoints. A scaling concern, not an
+> operational blocker. Recorded because "an audit found something alarming" is exactly the claim that
+> needs checking hardest.
+
+**`system_health_snapshots`** — zero rows, and referenced by **nothing in any of the three
+services**. Dead schema: no writer, no reader, no surface.
+
+**`api_key_registry.encrypted_key` · `key_hint`** — the reader half is live
+(`pipeline/src/crypto.py` → `sam_gov.py`); nothing ever writes it; all rows are NULL and the
+documented `SAM_GOV_API_KEY` env fallback is the real path. Documented in `frontend/lib/crypto.ts`.
+
+### Already decided — the instrument found an existing answer
+
+**`source_health.*`** — written once by the pipeline, deliberately NOT read by `/admin/scouts`,
+which explains why in its own header (bug log B53). Correct behaviour, correctly documented; listed
+here so a future run does not re-open it.
+
+### Worth a look, not yet judged
+
+* `scout_runs.found_count` · `new_count` · `acted_count` — the scout records what it found and no
+  surface displays it.
+* `agent_performance.avg_cost_usd` — cost per agent computed, never surfaced.
+* `contracts.award_amount_cents` — read, never written: the `outcome=awarded` route creates the
+  contract without an amount and no surface captures one. **Not a wrong number** — the page
+  renders `money ?? 'Not recorded'`, and project cost rolls up from CLINs
+  (`project_milestones.planned_cost`), not from this column. A missing input, not a broken
+  measure.
+* `canvas_versions.parent_version_id` — version lineage has a column and no writer.
+* `proposals.stripe_payment_id` — written; nothing reads it (self-serve checkout is descoped).
+* 23 columns touched by no code at all (§3 of the report) — schema that was declared and never used.
+
+---
+
+## The live counterpart — the same question asked of the database
+
+**Added 2026-09-02.** This audit reads **source**: it decides a column is written by finding code
+that writes it. That is its strength (it names the file) and its blind spot (a writer that only runs
+under a condition nobody triggers still counts as a writer, and a `SELECT *` counts as reading
+everything).
+
+`/admin/architecture` → **Live** asks the same question of the running database instead, from
+`pg_stat_user_tables`, and the two disagree in useful ways:
+
+|  | this audit | the Live tab |
+|---|---|---|
+| evidence | code that mentions the column | counters the database kept |
+| grain | per **column** | per **table** |
+| blind to | a writer that never actually runs | which column, and who wrote it |
+| verdict | "no code writes this" | "nothing wrote this in the last N" |
+
+The four classes it paints are **live** (written and read), **read only**, **written and never
+read** — the producer-with-no-consumer shape stated by Postgres rather than inferred — and
+**untouched**. Implementation and the exact predicates: `frontend/lib/architecture-live.ts`.
+
+**The epoch is the whole instrument, and it is usually missing.** Those counters run from
+`pg_stat_database.stats_reset`, which is frequently NULL — Postgres is not saying how far back they
+go, and statistics do not survive a crash or a `pg_dump`. So "untouched" means *untouched since an
+unknown moment*, which is a different claim from "nothing writes this". The endpoint returns
+`anchored: false` in that case and the tab renders coverage language ("not touched in this reading")
+rather than finding language. When it IS anchored, the tab states the span exactly and judges
+nothing — after a full lane sweep a quiet table is a finding, eight minutes after a reset it is a
+short reading, and no threshold in the code can tell those apart.
+
+Anchor it deliberately and it becomes a **coverage map for a drive**:
+
+```
+psql "$DATABASE_URL_OWNER" -c 'SELECT pg_stat_reset()'   # mark the start
+…drive the product…                                      # a lane, a lens, a customer journey
+open /admin/architecture → Live                          # what the drive never reached
+```
+
+First run of exactly that: `verify-surfaces` renders all 86 addressable admin and portal surfaces,
+and afterwards **38 tables had still not been touched** — among them `canvas_versions`,
+`proposal_comments`, `proposal_artifacts` and `proposal_stage_history` (they need actions, not page
+loads), the four agent-memory tables (no agent ran), and `atom_embeddings` (the embed engine was
+off). That is a precise statement of what a render sweep is and is not evidence for, which no
+source-reading instrument can produce.
+
+---
+
+## How to read a run
+
+* **§1 read, never written** — the dangerous cell. A consumer waiting for a producer. Check whether
+  the column is also EMPTY: unwritten *and* empty means nothing has ever filled it.
+* **§2 written, never read** — work the system does for nobody. Either a missing surface or a dead
+  write. Cheaper to fix, less dangerous to leave.
+* **§3 touched by nothing** — declared schema that was never wired at either end.
+* **§4 env vars** — a variable nobody documents is a variable nobody sets, and code that reads one
+  takes its fallback silently. Same shape as an unwritten column.

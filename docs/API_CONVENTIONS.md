@@ -1,5 +1,12 @@
 # API Conventions
 
+> ⚠️ **PARTLY ASPIRATIONAL — verified 2026-09-01 against the tree.** The conventions below are
+> still how routes are written, but some of the ROUTES used as examples were never built or were
+> replaced: `…/rfp-curation/[solId]/claim` and `…/push` do not exist (claim/release live as agent
+> TOOLS — `solicitation.claim` / `solicitation.release` — not HTTP routes), and
+> `…/portal/[tenantSlug]/opportunities` is now `…/cards`. Read this for the CONVENTIONS; read
+> `docs/FRONTEND_INVENTORY.md` for the routes that exist.
+
 Binding contract every `frontend/app/api/**/route.ts` handler must satisfy. Non-compliance fails PR review.
 
 See also: [ERROR_HANDLING.md](./ERROR_HANDLING.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md). Namespace registry: ARCHITECTURE_V9.md §8.

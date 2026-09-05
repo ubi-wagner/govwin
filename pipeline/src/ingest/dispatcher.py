@@ -24,6 +24,7 @@ from ingest.sam_gov import SamGovIngester
 from ingest.sbir_gov import SbirGovIngester
 from ingest.grants_gov import GrantsGovIngester
 from ingest.dsip import DsipIngester
+from errors import IngesterRateLimitError
 
 log = logging.getLogger("pipeline.dispatcher")
 
@@ -562,6 +563,20 @@ async def run_consumer_loop(
 
         last_tick = 0.0
         while not shutdown_event.is_set():
+            # Same reconnect guard as workflows/processor.py, and for the same reason: a
+            # client-side drop raises asyncpg.InterfaceError("connection is closed"), which the
+            # generic handler below logs and sleeps through — forever. This loop is the INGEST
+            # consumer, so the failure mode is a scout queue that stops draining silently while
+            # the process stays alive and /healthz (which opens its own connection) reports ok.
+            # Asking the connection whether it is closed cannot be defeated by an error class.
+            if conn is None or conn.is_closed():
+                try:
+                    conn = await asyncpg.connect(database_url)
+                    log.info("consumer loop reconnected to DB")
+                except Exception as reconn_exc:
+                    log.error("consumer loop reconnect failed: %s", reconn_exc)
+                    await asyncio.sleep(10)
+                    continue
             # get_RUNNING_loop, not get_event_loop: we are inside a coroutine, so the running
             # loop is the one we want, and the deprecated spelling raises on 3.12 whenever no
             # loop happens to be set for the thread.
@@ -583,6 +598,23 @@ async def run_consumer_loop(
                 if not processed:
                     # No pending jobs — sleep briefly before next check
                     await asyncio.sleep(5)
+            except IngesterRateLimitError as e:
+                # HONOUR THE BACK-OFF THE SOURCE ASKED FOR.
+                #
+                # Three ingesters raised this typed error carefully — grants_gov and dsip even put
+                # `retry_after_seconds` in its details — and nothing outside the ingest module
+                # caught it. It fell into the generic handler below, which logs and sleeps TEN
+                # SECONDS, so a source that said "back off for 300" was retried in 10, and the next
+                # schedule tick re-queued the same job. That is how an API key gets throttled
+                # harder or banned, and it would have shown up on the first day of live scouting.
+                wait = 300
+                try:
+                    wait = int((getattr(e, "details", None) or {}).get("retry_after_seconds", 300))
+                except (TypeError, ValueError):
+                    pass
+                wait = max(30, min(wait, 3600))     # never hammer, never sleep past an hour
+                log.warning("rate limited (%s) — backing off %ds before the next job", e, wait)
+                await asyncio.sleep(wait)
             except Exception as e:
                 log.error("consume_one_job error: %s", e)
                 await asyncio.sleep(10)

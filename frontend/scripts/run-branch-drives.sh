@@ -16,6 +16,21 @@
 #
 #   ./scripts/run-branch-drives.sh            all drives
 #   ./scripts/run-branch-drives.sh amendment  only names matching a substring
+#
+# ── A FULL RUN TAKES OVER AN HOUR, SO PIN THE SCRIPT BEFORE STARTING ONE ────────────────────────
+#
+# Bash reads a script INCREMENTALLY, by byte offset. Any change to this file mid-run — your own
+# rebase, a `git pull`, a teammate's push landing in the working tree — shifts everything beneath a
+# live interpreter, and the run's exit code and late results are worthless (CONTINUATION.md §2,
+# trap 1). More than one session works this branch, so on a long run that is a real risk, not a
+# theoretical one; it happened at drive 20 of 63.
+#
+#   cp scripts/run-branch-drives.sh scripts/.run-pinned.sh && bash scripts/.run-pinned.sh
+#
+# IN THIS DIRECTORY, not /tmp. The script does `cd "$(dirname "$0")/.."`, so a copy under /tmp
+# resolves that to `/` — and the run then reported a cross-tenant invariant VIOLATION that was
+# really a broken working directory. A false alarm from the preflight whose whole job is to be
+# believed is worse than the mid-run edit it was working around. `.run-pinned.sh` is gitignored.
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 2
@@ -242,8 +257,35 @@ else
 fi
 echo
 
+# The two ASYNCHRONOUS dependencies. This preflight is the newest, and it is here because its
+# absence had already cost a full run: five drives reported FAIL, every failing assertion naming a
+# shred that never ran or an agent that never fired, and the cause was that a container restart had
+# taken the worker. The requirement was documented — twice, in the DRIVES comments below — and
+# documentation is not a check. An environmental absence that prints as five product defects is the
+# most expensive kind of wrong, because someone then goes looking for the defects.
+WORKER_OK=1
+if node scripts/check-async-workers.mjs > "$OUT/async-workers.log" 2>&1; then
+  echo "Async workers: pipeline worker + Claude emulator up (steps will actually run)"
+else
+  WORKER_OK=0
+  echo "╔══════════════════════════════════════════════════════════════════════════════════════╗"
+  echo "║ WORKER OR EMULATOR DOWN — the drives that wait on them are CANT-RUN, not run. Every   ║"
+  echo "║ one of them asserts that something HAPPENED asynchronously; with nothing to process   ║"
+  echo "║ the event they all time out, and a timeout is indistinguishable from a broken         ║"
+  echo "║ product. Five drives read as product FAILs this way on 2026-09-02.                    ║"
+  echo "╚══════════════════════════════════════════════════════════════════════════════════════╝"
+  sed 's/^/  /' "$OUT/async-workers.log" | head -8
+fi
+echo
+
 # Drives that need a real Office engine to mean anything. Without one they measure nothing.
 OFFICE_DRIVES="deck-overlap"
+
+# Drives whose assertions are about something happening ASYNCHRONOUSLY — a shred rolling up, a
+# process_instance appearing from an event, an agent invocation landing. Each waits on the pipeline
+# worker, and the AI ones additionally on the emulator. Without them the wait expires and the drive
+# reports the thing it was waiting for as missing, which is exactly what a real defect looks like.
+WORKER_DRIVES="real-solicitation curate-baa end-to-end opp-scout project-lifecycle full-draft full-build-cost"
 
 # Drives whose entire value is an isolation claim. Meaningless in the wrong posture.
 # Drives whose entire value is an isolation claim MADE THROUGH THE DATABASE. Meaningless in the
@@ -269,7 +311,7 @@ ISOLATION_DRIVES="rls-app rls-admin rls-portal rls-pages collaborator-boundary"
 # Running the whole suite under either role makes the other group CANT-RUN. So each group gets the
 # connection its job requires, and the scenario factory refuses loudly if it is ever handed the
 # wrong one rather than half-working.
-SCENARIO_DRIVES="commercial-path pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
+SCENARIO_DRIVES="commercial-path application-intake archive pin identity-deeplink partner-lifecycle partner-invite scenario-factory scenario-matrix shadow-tenant-admin spine-section-todo atomization vault-isolation award-to-contract uncovered-triggers cms-generate canvas-authoring ruler-overlays page-scale deck-ruler canvas-demo spend-guardrails full-build-cost"
 
 # label | script — the branches the spine drive does not fork into.
 DRIVES=(
@@ -368,6 +410,33 @@ DRIVES=(
   "partner-invite|scripts/drive-p3-invite.mts"
   "starter-offer|scripts/drive-starter-offer.mts"
   "copy-starter|scripts/drive-copy-starter.mts"
+  # Every way OUT of a customer's workspace, driven as the actor who leaves. Registered WITH the
+  # feature rather than after it: this file's own header says a drive run by hand or not at all is
+  # how one quietly stops being run, and the thing it guards — an "opened your workspace" with no
+  # matching close — is invisible on every surface until somebody reads a customer's audit trail.
+  "space-presence|scripts/drive-space-presence.mts"
+  # THE DESCENT EXPIRES BEFORE THE SESSION DOES. space_presence had one liveness column and two
+  # things advanced it: a person working, and a 2-minute heartbeat on a visible tab. So an
+  # unattended tab held a descent — and, since the heartbeat route calls auth(), a session — open
+  # forever, while the customer's trail asserted an administrator was in their account. Mig 248
+  # splits the clocks; this drives the gate. Phases 3 and 4 only mean something as a pair: without
+  # 4, deleting descent entirely would pass.
+  "descent-timeout|scripts/drive-descent-timeout.mts"
+  # AN OPERATOR CAN END SOMEBODY'S ACCESS, and it actually removes them. Closing a bracket evicts
+  # the RECORD, not the actor — isShadowAdmin is recomputed per render, so the target's next page
+  # load opens a new one. Check 3 is the whole drive: with the cooldown gate absent, checks 1, 2, 4
+  # and 5 all pass while the target walks straight back in.
+  "force-ascend|scripts/drive-force-ascend.mts"
+  # A ToDo CAN NOW BE CLAIMED, and a claim expires. `tasks.status` allowed 'in_progress' since the
+  # table existed and nothing ever wrote it (open 47 · completed 65 · expired 2 · in_progress 0), so
+  # the queue could not tell an item somebody had begun from one nobody had touched. That matters
+  # MORE once sessions end on time, not less: P1/P2 guarantee people are signed out mid-task. Check
+  # 6 is the pairing that keeps it honest — a claim must not BLOCK completion, or it is a lock.
+  "task-claim|scripts/drive-task-claim.mts"
+  # AN ABANDONED AGENT TASK COMES BACK. `agent_task_queue` moved a row to 'running' and nothing ever
+  # moved it back, so a worker that died mid-task left it there forever — no error, no retry, the
+  # work simply never finished. Python, dispatched by extension like `spend-guardrails`.
+  "stale-agent-tasks|../pipeline/tests/verify_stale_task_reaper.py"
   "shadow-tenant-admin|scripts/drive-shadow-tenant-admin.mts"
   "rls-app|scripts/drive-rls-app.mjs"
   "rls-admin|scripts/drive-rls-admin.mjs"
@@ -432,6 +501,14 @@ DRIVES=(
   # two actors and needs the app serving. It refuses a verdict when the app is serving no CSS,
   # which is the failure that once made it report 75 phantom findings across the whole tree.
   "mobile-interaction|scripts/probe-interaction-mobile.mts"
+  # FINISH — the same shape of question one layer up. The lenses ask whether a page renders and
+  # whether its envelope is well-formed; this asks whether what the customer READS is finished: an
+  # identifier where a name belongs, a raw snake_case token in prose, a NaN or an undefined, an
+  # empty state with no way forward. It found 116 of them across 32 tenant routes on its first run,
+  # including a customer's own activity stream naming them by UUID. Its self-test plants a defect
+  # every detector must see AND a control every detector must ignore, and it refuses a verdict when
+  # the app is not serving the build on disk — a staleness that once read as a partial fix.
+  "customer-finish|scripts/probe-customer-finish.mts"
   # THE TWO OPERATORS' CONSOLES. Every other lens asks whether a page renders or whether an
   # envelope is well-formed; this asks the question an operator asks — can I see the state of the
   # system, and is what I am shown TRUE — for rfp_admin and tenant_admin across system status,
@@ -447,6 +524,24 @@ DRIVES=(
   # welcome that carries the way in, and the first sign-in. Every defect found in the 2026-08-31
   # sweep lived in a join nobody walked, and these were the joins nobody walked.
   "commercial-path|scripts/drive-commercial-path.mts"
+  # THE PUBLIC→PRIVATE NOTIFICATION, on its own, because it is the minimum viable path into
+  # the business and its failure is silent and total: the applicant sees a success page and
+  # nobody is ever told. commercial-path asserts the application and the EMAIL; this asserts
+  # the ToDo, which is the half that survives a mail outage — and asserts it the only way
+  # that means anything, by calling the same listOpenTasksForActor the ToDo surface calls
+  # and requiring the row to come back. A task created into a bucket nobody queries is the
+  # same as no task, and RLS cannot catch that because a platform row is readable from
+  # everywhere; the app-layer predicate is what decides whether a person is told.
+  "application-intake|scripts/drive-application-intake.mts"
+  # THE ARCHIVABLE CONTRACT on all three entities it lives on — portal, atom, tenant.
+  # Restored after a script of this name was found MISSING while two documents cited it as
+  # evidence that tenant archive was verified. The behaviour worked; the verification did
+  # not exist, which is uncovered rather than passing. It asserts the CASCADE (a portal
+  # archive that leaves its workflows active keeps nudging a build the customer archived),
+  # the GATE rather than the column (verifyTenantAccess reads tenants.archived_at, so the
+  # timestamp alone proves only that an UPDATE ran), and RESTORE on every case — an
+  # archive test that never restores proves half a contract and leaves the box dirty.
+  "archive|scripts/drive-archive.mts"
   # THE SPEND GUARDRAILS, both directions. Eleven cases: the tenant budget refuses and allows, a
   # monthly_budget of 0 disables, the platform cap refuses even when the tenant has headroom, the
   # kill switch stops everything, the hourly rate limit refuses and allows, and the framework
@@ -515,6 +610,11 @@ for entry in "${DRIVES[@]}"; do
 
   if [ "$OFFICE_OK" -eq 0 ] && [[ " $OFFICE_DRIVES " == *" $label "* ]]; then
     printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "no LibreOffice Impress filter — nothing independent to measure against"
+    cantrun=$((cantrun+1)); FAILED+=("$label"); continue
+  fi
+
+  if [ "$WORKER_OK" -eq 0 ] && [[ " $WORKER_DRIVES " == *" $label "* ]]; then
+    printf '%-24s %-8s %s\n' "$label" "CANT-RUN" "worker/emulator down — its waits would expire and read as product failures"
     cantrun=$((cantrun+1)); FAILED+=("$label"); continue
   fi
 

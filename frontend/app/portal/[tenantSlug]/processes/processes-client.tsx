@@ -7,6 +7,7 @@ import {
   healthSortWeight,
   type ProcessHealth,
 } from '@/lib/process/health';
+import { humanizeIfIdentifier } from '@/lib/humanize';
 
 export interface ProcessRow {
   id: string;
@@ -326,7 +327,10 @@ export function ProcessesClient({
               {health === 'failing' && row.lastError && (
                 <p className="mt-2 text-xs text-red-600">
                   {row.lastErrorStep ? `${formatStepName(row.lastErrorStep)}: ` : ''}
-                  {row.lastError}
+                  {/* The step name was already humanized; the error beside it was not, so a
+                      customer read the whole message as `wait_deadline_exceeded`. Humanize only
+                      when it IS a code — a real sentence passes through. lib/humanize.ts. */}
+                  {humanizeIfIdentifier(row.lastError)}
                 </p>
               )}
               {health === 'stalled' && row.status === 'paused' && (

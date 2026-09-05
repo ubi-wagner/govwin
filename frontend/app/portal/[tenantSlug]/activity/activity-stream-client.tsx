@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { describeEvent as describeEventLabel } from '@/lib/event-labels';
+import { describeEvent as describeEventLabel, describeActor } from '@/lib/event-labels';
 import { fmtDateTime } from '@/lib/fmt';
 
 export type SerializedActivityEvent = {
@@ -14,6 +14,7 @@ export type SerializedActivityEvent = {
   actorType: string | null;
   actorId: string | null;
   actorEmail: string | null;
+  actorName?: string | null;
   parentEventId: string | null;
   payload: Record<string, unknown> | null;
   error: Record<string, unknown> | null;
@@ -117,10 +118,12 @@ function ActorDisplay({
   actorType,
   actorEmail,
   actorId,
+  actorName,
 }: {
   actorType: string | null;
   actorEmail: string | null;
   actorId: string | null;
+  actorName?: string | null;
 }) {
   const icons: Record<string, string> = {
     user: '\u{1F464}',
@@ -129,12 +132,16 @@ function ActorDisplay({
     pipeline: '\u{1F504}',
   };
   const icon = actorType ? (icons[actorType] ?? '•') : '•';
-  const label = actorEmail ?? actorId ?? actorType ?? 'unknown';
+  // `describeActor`, not `actorEmail ?? actorId ?? actorType` — that chain rendered a raw UUID and
+  // then a raw `workflow_manager` to a CUSTOMER, one line below the describeEvent call that had
+  // already been fixed for exactly this reason. The identifier is kept in `title`, where support
+  // can still read it and prose cannot. See lib/event-labels.ts.
+  const { label, title } = describeActor({ actorType, actorEmail, actorId, actorName });
 
   return (
     <span className="text-xs text-gray-500 min-w-0 inline-flex items-center max-w-full">
       <span className="mr-1 shrink-0">{icon}</span>
-      <span className="truncate">{label}</span>
+      <span className="truncate" title={title ?? undefined}>{label}</span>
     </span>
   );
 }
@@ -341,8 +348,17 @@ export function ActivityStreamClient({
 
           {/* Auto-refresh */}
           <div className="flex items-center gap-2 ml-auto">
-            <label className="text-xs text-gray-500">Auto-refresh</label>
+            <label className="text-xs text-gray-500" id="auto-refresh-label">Auto-refresh</label>
+            {/* role="switch" + aria-checked, not a bare <button>. The state was carried by colour
+                alone: a screen reader announced "button" and nothing about whether it was on, and
+                the `<label>` beside it was not associated with anything. Found by
+                scripts/probe-customer-finish.mts. */}
             <button
+              type="button"
+              role="switch"
+              aria-checked={autoRefresh}
+              aria-labelledby="auto-refresh-label"
+              title={autoRefresh ? 'Auto-refresh is on' : 'Auto-refresh is off'}
               onClick={() => setAutoRefresh((v) => !v)}
               className={`w-10 h-5 rounded-full relative transition-colors ${
                 autoRefresh ? 'bg-green-500' : 'bg-gray-300'
@@ -457,6 +473,7 @@ export function ActivityStreamClient({
                           actorType={ev.actorType}
                           actorEmail={ev.actorEmail}
                           actorId={ev.actorId}
+                          actorName={ev.actorName}
                         />
                       </div>
 

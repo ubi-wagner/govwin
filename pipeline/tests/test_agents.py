@@ -89,6 +89,9 @@ EXPECTED_ARCHETYPES = {
     # only by the reusable AdvisoryOverlay sub-workflow, which nothing emits): the fan-out PLANNER +
     # RECONCILER (discrepancy → adversarial survival → remediation) + advisory-memory writer.
     "advisory_manager",
+    # Admin companion (docs/ADMIN_COMPANION_DESIGN.md) — platform-scope second pair of eyes over a
+    # telemetry window + the architecture map's live table activity. Advisory, read-only, no writes.
+    "ops_companion",
 }
 
 

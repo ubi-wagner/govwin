@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { agentDisplayName, titleizeIdentifier } from '@/lib/agent-labels';
 
 interface AgentBreakdown {
   agentRole: string;
@@ -191,8 +192,11 @@ export function AgentUsagePanel({ tenantSlug }: AgentUsagePanelProps) {
             {data.recentActivity.map((activity, idx) => (
               <div key={idx} className="flex items-center justify-between text-xs border-l-2 border-blue-200 pl-3 py-1">
                 <div>
-                  <span className="font-medium text-gray-700">{activity.agentRole}</span>
-                  <span className="text-gray-400 ml-2">{activity.taskType}</span>
+                  {/* The table above renders `displayName`; this row rendered the raw role and the
+                      raw task type beside it — the same defect, two elements apart. Both go through
+                      the one humanizer (lib/agent-labels.ts). */}
+                  <span className="font-medium text-gray-700">{agentDisplayName(activity.agentRole)}</span>
+                  <span className="text-gray-400 ml-2">{titleizeIdentifier(activity.taskType)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {activity.durationMs > 0 && (

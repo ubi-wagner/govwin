@@ -1,5 +1,9 @@
 # Ingest Studio — the gated, adversarially-reviewed ingest
 
+> ⚠️ **ONE STALE PATH — verified 2026-09-01 against the tree.**
+> `pipeline/src/workflows/ingest_adversarial_overlay.py` does not exist; the adversarial overlay
+> shipped as `pipeline/src/workflows/advisory_overlay.py` (the reusable `AdvisoryOverlay`).
+
 **Canonical.** Read with `docs/INGEST_PROVENANCE.md` (what provenance means) and
 `docs/AGENT_WORKFORCE.md` (the agent safety contract). This document is the *control flow*;
 those two are the *data contract* and the *safety contract*.

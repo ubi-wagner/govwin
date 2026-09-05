@@ -6,6 +6,9 @@ import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { PortalNavLink } from '@/components/portal/portal-nav-link';
 import { NotificationBell } from '@/components/portal/notification-panel';
 import { ShadowSpaceBanner } from '@/components/portal/shadow-space-banner';
+import { syncPortalPresence, idleDescent, closePresence, noteInteraction, inForcedCooldown } from '@/lib/space-presence';
+import { DESCENT_IDLE_MS } from '@/lib/session-policy';
+import { PresenceHeartbeat } from '@/components/portal/presence-heartbeat';
 import { getActiveMemberships, hasActiveMembership } from '@/lib/memberships';
 import { NavShell } from '@/components/ui/nav-shell';
 import type { Metadata } from 'next';
@@ -50,6 +53,7 @@ export default async function PortalLayout({
   const sessionUser = session.user as {
     id?: string;
     name?: string | null;
+    email?: string | null;
     role?: unknown;
     tenantId?: string | null;
     membershipPinned?: boolean;
@@ -90,6 +94,79 @@ export default async function PortalLayout({
   // workspace, so the shadow banner is suppressed there. Admins are the only accounts that
   // re-scope in-session, so they're EXEMPT from the singular-session pin either way.
   const isShadowAdmin = isAdmin && !(await hasActiveMembership(userId, tenantId));
+
+  /**
+   * THE OPEN HALF OF THE BRACKET, recorded by the SERVER on every render inside the space.
+   *
+   * Previously the descend event came from a client component's `useEffect`, deduped in
+   * `sessionStorage` — per TAB, so a second tab opened a second bracket. And nothing recorded that
+   * the actor was still here, so nothing could ever tell an abandoned session from a long one.
+   *
+   * This also closes the "moved" case in the same call: a manager who goes from company A straight
+   * into company B passes no exit control, and A is owed a departure. `syncPortalPresence` opens
+   * the current one and closes every other, which is only knowable from inside a render that has
+   * just established which tenant this is.
+   *
+   * Deliberately NOT awaited into the render path's critical section beyond its own try/catch — it
+   * is best-effort inside the helper, because an audit write must never take a customer's page
+   * down. The hourly sweep is the backstop for anything it misses.
+   */
+  const outsideKind = isShadowAdmin ? 'shadow' : isDescendedPartner ? 'partner' : null;
+
+  /**
+   * THE DESCENT IDLE GATE — checked BEFORE the bracket is synced, and that order matters.
+   *
+   * `syncPortalPresence` advances liveness, so running it first would refresh the very value this
+   * reads and the gate could never fire. Same shape as the ordering bug in the `jwt` callback, one
+   * layer up.
+   *
+   * WHY A GATE AND NOT A STATE RESET. An rfp_admin has nothing to ascend FROM: `isShadowAdmin` is
+   * computed per render as "is an admin AND is not a member here", so being on this URL *is* the
+   * descent. There is no flag to clear, which is why the sweep — which closes the ROW — never
+   * removed anybody's access. Refusing here is the only thing that does.
+   *
+   * The bracket is closed as `timeout` on the way out so the customer's trail records the departure
+   * at the moment access actually ended, rather than up to an hour later when the sweep runs.
+   */
+  if (outsideKind) {
+    /**
+     * A FORCED ASCENT holds by TIME, and is checked before the idle rule.
+     *
+     * Closing a bracket evicts the RECORD, not the actor: `isShadowAdmin` is recomputed every
+     * render, so the target's next page load simply opens a new one. Without this line the
+     * "End access" button on /admin/workspace-access looks like it worked and removes nobody —
+     * which is worse than not having the button, because an operator would trust it.
+     *
+     * Proven by `drive-force-ascend.mts` check 3: with this absent, the target walks straight back
+     * in while checks 1, 2, 4 and 5 all pass.
+     */
+    if (await inForcedCooldown(userId, tenantId)) {
+      redirect(isShadowAdmin ? '/admin/dashboard?descent=forced' : '/partner?descent=forced');
+    }
+    const idle = await idleDescent(userId, tenantId, DESCENT_IDLE_MS / 60_000);
+    if (idle) {
+      // No `exceptTenantId`: an idle person is idle everywhere, so every open bracket they hold
+      // closes. In practice `syncPortalPresence` keeps that to one, but a timeout that left a
+      // second workspace asserting a presence would be the same defect one company over.
+      await closePresence({ id: userId, email: sessionUser.email }, 'timeout');
+      // `/admin/dashboard`, NOT `/admin`: the latter is a bare `redirect('/admin/dashboard')` and a
+      // redirect DROPS the query string, so the person arrived with no idea why they had been
+      // moved. The drive caught exactly that — "no reason is carried" — which is why the reason
+      // travels to the page that actually renders.
+      redirect(isShadowAdmin ? '/admin/dashboard?descent=timeout' : '/partner?descent=timeout');
+    }
+  }
+
+  await syncPortalPresence(
+    { id: userId, email: sessionUser.email },
+    tenantId,
+    outsideKind,
+    { slug: tenantSlug },
+  );
+
+  // A person navigated INSIDE the space — advance the interaction clock the gate above reads.
+  // Deliberately after the sync, and deliberately not in the heartbeat route.
+  if (outsideKind) await noteInteraction({ id: userId, email: sessionUser.email });
 
   // Singular-session enforcement (non-admins). A session acts as exactly ONE
   // (company, role); the active membership is pinned onto the JWT when the user picks
@@ -195,6 +272,10 @@ export default async function PortalLayout({
         </div>
       )}
       {isShadowAdmin && <ShadowSpaceBanner companyName={companyName} tenantId={tenantId} />}
+      {/* Liveness for the bracket this render opened. Only an OUTSIDE actor holds one, so a normal
+          customer session mounts nothing and pings nothing. Without it the sweep evicts an actor
+          who is still here — a soft navigation does not re-run this layout. */}
+      {(isShadowAdmin || isDescendedPartner) && <PresenceHeartbeat />}
       <div className="p-4 sm:p-6 lg:p-8">{children}</div>
     </NavShell>
   );

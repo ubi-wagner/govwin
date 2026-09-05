@@ -60,7 +60,18 @@ export default function PrivacyPage() {
             <h2 className="text-base font-bold text-navy-900 mb-3">4. Data Sharing & Expert Access</h2>
             <p>We do not sell your personal information. We may share or grant access to data as follows:</p>
             <ul className="list-disc pl-6 space-y-1 mt-2">
-              <li><strong>Service providers:</strong> Stripe (payments), Railway (infrastructure), AWS (storage), Anthropic (AI processing) — each bound by data processing agreements</li>
+              <li><strong>Subprocessors:</strong> the third parties that may process your data, and what each one does:
+                <ul className="list-disc pl-6 space-y-1 mt-1">
+                  <li><strong>Anthropic</strong> — AI processing (drafting, analysis, compliance extraction)</li>
+                  <li><strong>Voyage AI</strong> — text embeddings for semantic search within your library</li>
+                  <li><strong>Postmark</strong> — transactional email delivery (recipient address and message content)</li>
+                  <li><strong>Google Workspace</strong> — correspondence email sent on our behalf</li>
+                  <li><strong>Cloudflare R2</strong> — object storage for uploaded documents and generated artifacts</li>
+                  <li><strong>Railway</strong> — application hosting and the managed database</li>
+                  <li><strong>Stripe</strong> — payment processing (we never store card numbers)</li>
+                </ul>
+                We will update this list before engaging a new subprocessor that processes your content.
+              </li>
               <li><strong>Your collaborators:</strong> When you invite team members or partners, they can see the content you grant them access to</li>
               <li><strong>RFP-Pipeline expert staff (shadow access):</strong> By default, our expert staff are granted oversight access to your proposal portals to curate, review, release, and support your build (&ldquo;RFP-Pipeline Oversight&rdquo;). This is enabled automatically for each portal and is how we provide expert curation. You can decline it per portal in that portal&apos;s guardrail settings; opting out means we no longer access or review that portal — see the Terms for the full effects.</li>
               <li><strong>Legal requirements:</strong> When required by law, court order, or governmental authority</li>

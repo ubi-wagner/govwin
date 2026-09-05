@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { TERMS_TEXT, TERMS_VERSION } from '@/lib/terms';
+import { visitorSessionId } from '@/lib/visitor-session';
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
 
@@ -107,7 +108,12 @@ export function ApplicationForm() {
       const resp = await fetch('/api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        // The analytics session that brought them (migration 242). Without this line the whole
+        // attribution chain — session → contact → application → customer → revenue — is complete
+        // at every layer and fed by nothing, and /admin/funnel reads 0 attributed forever.
+        // null is legal: somebody with storage blocked lands in the un-attributed row, which is
+        // the honest reading. Never fabricate one.
+        body: JSON.stringify({ ...payload, sessionId: visitorSessionId() }),
       });
       const json = await resp.json();
       if (!resp.ok || json.error) {

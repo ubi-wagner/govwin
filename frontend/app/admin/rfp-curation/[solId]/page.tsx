@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation';
 import { sqlBypass as sql } from '@/lib/db';
 import { CurationWorkspace } from '@/components/rfp-curation/curation-workspace';
 import SpotlightSummaryEditor from './spotlight-summary-editor';
+import CurationGuide from './curation-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -405,6 +406,7 @@ export default async function CurationWorkspacePage({ params }: Props) {
   return (
     <>
       <SpotlightSummaryEditor solId={solId} />
+      <CurationGuide />
       <CurationWorkspace
       solicitation={solicitation}
       compliance={compliance}

@@ -31,6 +31,7 @@ import httpx
 
 import config
 from ingest.base import BaseIngester
+from errors import IngesterRateLimitError
 
 log = logging.getLogger("pipeline.ingest.dsip")
 
@@ -388,6 +389,17 @@ class DsipIngester(BaseIngester):
             },
         )
 
+        # 429 FIRST, and as the TYPED error its three siblings raise. Without this a DSIP rate
+        # limit fell through to raise_for_status() as a generic HTTPError, indistinguishable from
+        # a bad request — so the consumer loop could not back off for it. DSIP is the DoD SBIR/STTR
+        # source, which makes it the one we can least afford to be throttled on.
+        if resp.status_code == 429:
+            retry_after = int(resp.headers.get("Retry-After", "300"))
+            log.warning("DSIP rate limited, retry_after=%d", retry_after)
+            raise IngesterRateLimitError(
+                "DSIP rate limit exceeded",
+                details={"source": "dsip", "retry_after_seconds": retry_after},
+            )
         if resp.status_code in (502, 503):
             log.warning("DSIP API upstream error (HTTP %d)", resp.status_code)
             raise Exception(f"DSIP returned HTTP {resp.status_code}")

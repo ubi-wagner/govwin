@@ -241,14 +241,38 @@ cd frontend && npx tsx ../scripts/seed_admin.ts
 
 ## Step 8 — Update AUTH_URL
 
-After your first deploy, Railway gives you a URL like:
-`https://govtech-frontend-production.up.railway.app`
+After your first deploy, Railway gives you a generated URL like
+`https://govtech-frontend-production.up.railway.app`. Set these three to it:
 
-Update these env vars in the frontend service with the real URL:
-- `AUTH_URL` → `https://govtech-frontend-production.up.railway.app`
-- `NEXT_PUBLIC_APP_URL` → same
+- `AUTH_URL`
+- `NEXTAUTH_URL` — read FIRST wherever both are read (`NEXTAUTH_URL || AUTH_URL`)
+- `NEXT_PUBLIC_APP_URL`
 
 Redeploy the frontend service (Settings → Deploy → Redeploy).
+
+> ### ⚠️ AND THEN AGAIN, THE DAY YOU ATTACH A CUSTOM DOMAIN — THIS STEP IS NOT DONE ONCE
+>
+> This step used to end at the generated URL, and that is exactly how production
+> ran for months with `AUTH_URL = https://govtech-frontend-production.up.railway.app`
+> while customers browsed the custom domain. **Nothing looks broken**, which is why
+> it survived: this app authenticates with an email/password provider, so sign-in
+> performs no external callback redirect that would visibly fail.
+>
+> The damage is silent and customer-facing. **Ten** call sites build links from
+> `NEXTAUTH_URL || AUTH_URL || NEXT_PUBLIC_APP_URL` — including the `loginUrl` mailed
+> to a customer when an application is accepted, the teammate invite, the
+> collaborator invite, the vault-member invite and the partner manager-request. Every
+> one of those emails sends a real customer to the `railway.app` host. They work
+> today and stop working the moment that generated domain is detached.
+>
+> All three must equal the host Railway actually serves — check
+> **govtech-frontend → Settings → Networking**. `www.example.com` and `example.com`
+> are DIFFERENT hosts to a browser and there is no www↔apex redirect in
+> `next.config.mjs`, so pick the one that is attached and use it verbatim, scheme
+> included, no trailing slash.
+>
+> `NEXT_PUBLIC_APP_URL` is inlined into the client bundle at BUILD time, so it needs
+> a rebuild rather than a restart — changing it in Railway triggers one.
 
 ---
 

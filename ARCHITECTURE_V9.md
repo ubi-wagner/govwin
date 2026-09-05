@@ -1151,7 +1151,7 @@ Highest-risk untested paths:
 | `scripts/migrate.sh` | No tracking — marked "NEVER USE" in CLIFFNOTES; delete or rename to `_DANGEROUS_NO_TRACKING.sh` |
 | `docker-compose.yml` | CMS section comment says "V1 dormant" — stale |
 | `.env.example` | CMS section says "V1 dormant, deferred to V2+" — stale |
-| `docs/AUTOMATION_WORKFLOWS.md` | Superseded by `WORKFLOW_REFERENCE.md`; archived → `docs/archive/AUTOMATION_WORKFLOWS.md` |
+| ~~`docs/AUTOMATION_WORKFLOWS.md`~~ | Superseded by `WORKFLOW_REFERENCE.md`; archived → `docs/archive/AUTOMATION_WORKFLOWS.md` |
 
 ---
 

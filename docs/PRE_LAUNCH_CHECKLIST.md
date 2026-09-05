@@ -20,7 +20,8 @@ q() { psql "$PROD_DATABASE_URL" -Atc "$1"; }
 The offboarding fix made proposal access **purely membership-based**. If mig 111 isn't applied +
 backfilled in prod, non-admin users with no membership row are locked out of their own tenant.
 
-**Verify the schema is current (through mig 143):**
+**Verify the schema is current (head is **243** as of 2026-09-01 — this section was
+written at 143; the check below is a floor, not a target):**
 ```bash
 q "SELECT count(*) FROM _migration_history WHERE filename IN ('111_user_memberships.sql','143_proposal_sort_index.sql')"
 # PASS = 2   (both present → schema is at least through 111 and 143)
@@ -55,28 +56,39 @@ insert the missing `home` memberships) before launch.
 
 ## 2. Email delivery is wired
 
-`lib/email.ts` tries **Gmail API first, then Resend, else returns `provider:'skipped'`** (a silent
-no-op). Nudges, final-notices, and the welcome-email-with-temp-password all depend on this. Set
-**one** provider fully.
+**Superseded by the send seam (migration 215).** Every outbound message in both services now goes
+through ONE seam — `frontend/lib/email/` and `services/cms/src/mailer` — which validates, resolves
+the sender, checks suppression, **reserves a ledger row before dispatch**, sends, and confirms.
+There is no "try provider A then provider B" any more: `EMAIL_DRIVER` selects `gmail` | `postmark` |
+the committed emulator, and an unset variable defaults to `gmail`. (Resend survives only as an
+in-driver fallback inside `gmail.ts`; it is not a provider you configure.)
 
-**Gmail path — all four required:**
+**Postmark path (the intended production transport):**
+```
+EMAIL_DRIVER=postmark
+POSTMARK_SERVER_TOKEN      # the SERVER token. The ACCOUNT token cannot send and 401s in a way
+                           # that reads exactly like a wrong key.
+POSTMARK_WEBHOOK_SECRET    # Postmark does not sign webhooks; Basic auth on the URL is the
+                           # mechanism. Set the webhook to
+                           #   https://postmark:<secret>@<host>/api/webhooks/postmark
+```
+**Gmail path (correspondence is pinned to this regardless of `EMAIL_DRIVER`):**
 ```
 GOOGLE_CLIENT_ID   GOOGLE_CLIENT_SECRET   GOOGLE_REFRESH_TOKEN   GOOGLE_WORKSPACE_EMAIL
 ```
-**or Resend path:**
-```
-RESEND_API_KEY
-```
 
-**Verify the vars are set in the FRONTEND service** (that's what sends), then do a **real send** and
-confirm the provider is not `skipped`:
-- Trigger a known send (accept a throwaway application, or invite yourself as a collaborator).
-- PASS = the email arrives AND the API response / logs show `provider: 'gmail'` or `'resend'`
-  (NOT `'skipped'`, NOT `emailFailed: true`).
+**Also required for deliverability:** DKIM and Return-Path DNS for the sending domain. Without
+them delivery is a coin flip and `email_suppressions` fills with bounces that were never the
+recipient's fault.
 
-> Note: onboarding now returns the temp password even if email fails (sweep F1 fix), so a customer
-> is never fully locked out — but a silent `skipped` means **no one gets nudged**, which defeats the
-> whole automation value prop. Treat `skipped` as a fail.
+**Verify:** open **`/admin/crm`** (Marketing & Sales → Outbound Mail). It states the transport in
+force, 30-day sent/failed counts, reserved-never-confirmed rows (a crash mid-send), webhook
+callbacks, and the blocked-address list — reading through the seam, never the ledger tables
+directly. PASS = a real send lands and the ledger row reads `sent`, not `skipped` or `failed`.
+
+> Onboarding returns the temp password even when mail fails, so a customer is never fully locked
+> out — but a silent `skipped` means nobody gets nudged, which defeats the automation. Treat
+> `skipped` as a fail.
 
 ---
 
@@ -123,11 +135,13 @@ cards (the bridge → tenant_opportunity_cards spine).
 
 ## Fast-follow (not tonight-blocking, but soon)
 
-**`NOBYPASSRLS govtech_app` cutover.** The app runs as the RLS-bypassing owner, so tenant isolation
-currently rests on the SQL `WHERE tenant_id` predicates — which the sweep just audited to be
-complete (35 tenant tables, ~72 routes; the only 2 gaps are fixed). That makes single-layer
-**defensible** for launch, but the cutover to the `NOBYPASSRLS` role is the belt-and-suspenders
-backstop (checklist in `docs/DEPRECATION_CLEANUP_2026-07-22.md`). Schedule it right after go-live.
+**~~`NOBYPASSRLS govtech_app` cutover~~ — DONE, and this entry was wrong for 107 migrations.**
+Verified 2026-09-01 against the running box: the app connects as `govtech_app`, `rolbypassrls = f`.
+The cutover landed in **migration 136** (19 force-RLS tables, 35 policies, the per-request
+`SET app.tenant_id` context), and has since been extended by migs 171 · 173 · 184. Isolation is
+**two-layer and enforced**, not single-layer resting on SQL predicates. Do not schedule this work;
+it is finished. `node frontend/scripts/check-rls-posture.mjs` proves it on any box — it refuses to
+report a verdict at all if the connection can bypass RLS. Mechanics: docs/RLS_CUTOVER.md.
 
 **Foundation TVSF demo content is canonical only after a refresh.** Migration 140
 (`gen-foundation-seed-migration.mjs` output) seeds the demo proposal, but that snapshot predates the

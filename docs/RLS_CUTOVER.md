@@ -106,10 +106,10 @@ gate when they call an RLS'd-table helper. **Pipeline** keeps its own owner `DAT
 ## P5 — PROVEN in sandbox (app connected as `govtech_app`, NOBYPASSRLS)
 - `scripts/drive-rls-context.mts` **6/6** — no-ctx → DENY-ALL, correct tenant → sees own,
   other/forged-by-id cross-tenant → 0 (RLS backstop), **bypass ctx → owner pool**, direct owner → all.
-- `scripts/drive-rls-portal.mts` **38/38** — every data-bearing portal route returns its tenant's
+- `scripts/drive-rls-portal.mjs` **38/38** — every data-bearing portal route returns its tenant's
   data (was 11 DENY-ALL 404s pre-fix); admin-only route 403s, retired route 410s. Surfaced + fixed a
   pre-existing prod bug (supporting-docs queried the dropped `library_unit_id` column → 500).
-- `scripts/drive-rls-admin.mts` — admin routes return **cross-tenant** data via `sqlBypass`
+- `scripts/drive-rls-admin.mjs` — admin routes return **cross-tenant** data via `sqlBypass`
   (the tenants list sees ≥2 tenants; a DENY-ALL would see 0/1).
 - `tsc` 0 · `vitest` 829 (test `@/lib/db` mocks gained `enterTenant`/`enterBypass` no-ops).
 - **Migration integrity (nuke + migrate from scratch):** `ALLOW_SCHEMA_RESET=true migrate.mjs` on an
@@ -154,7 +154,7 @@ pages got `sqlBypass`, `/api/invite` + `/api/stripe/webhook` + `listVaultsForCol
 `sqlBypass`. Audit confirmed NO frontend cron, NO `unstable_after`; analytics tables aren't RLS'd;
 other forced writers are request-reached or the Python pipeline (owner).
 
-**VERIFIED (`scripts/drive-rls-pages.mts` — 9/9, app connected as govtech_app on `next dev`):** the
+**VERIFIED (`scripts/drive-rls-pages.mjs` — 9/9, app connected as govtech_app on `next dev`):** the
 server-component surface renders correct tenant-scoped forced data. `enterTenant` **does** work inside
 a React Server Component render (proposals list, dashboard, proposals/[id] all render the tenant's
 proposal), and `sqlBypass` works in admin server components (admin/proposals renders cross-tenant

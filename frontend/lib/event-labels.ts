@@ -177,6 +177,35 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
 
   'shadow.descended': 'An RFP administrator opened your workspace to assist',
   'shadow.ascended': 'An RFP administrator left your workspace',
+
+  // ── The partner-manager family — the SAME gap, found by drive-oversight-surfaces ────
+  //
+  // `finder:partner.entered` reached a customer's Activity feed as "Partner entered": B136 again,
+  // in a namespace the earlier sweep did not cover. It is the partner analogue of
+  // `shadow.descended` and deserves the same plainness — somebody outside this company opened its
+  // workspace, and that is the single most important line in a customer's audit trail.
+  //
+  // The drive found ONE because one is all that has fired. The other four are tenant-scoped in
+  // code (verified at each emit site: portal team/managers routes, manager-request, and the
+  // application accept all pass a real `tenantId`), so each is the identical finding waiting for
+  // its first row. Wording follows what the product already calls these people to the customer —
+  // team-invite-form.tsx: "a Manager is an existing partner organization you grant admin-level
+  // access to build on your behalf."
+  //
+  // ⚠️ ASYMMETRY, DELIBERATELY LEFT: `partner.exited` is emitted with `tenantId: null` (it happens
+  // in the partner console, which is not in any tenant's scope), so a customer sees the entry and
+  // never the departure. That is a scope question, not a wording one, and it is not fixed here —
+  // recorded so the next reader finds it stated rather than rediscovering it.
+  'partner.entered': 'A manager from your partner organization opened your workspace',
+  // The EXIT half. `space_presence` (migs 246/247) made partner.exited tenant-scoped, so it now
+  // reaches the customer's feed — where it rendered as its own de-punctuated type. An arrival with
+  // no departure is the worse half of a bracket to leave unwritten: the trail then asserts somebody
+  // is still in the workspace, in the plainest words it has, and never takes it back.
+  'partner.exited': 'The partner manager left your workspace',
+  'partner.manager_granted': 'Manager access granted to a partner organization',
+  'partner.manager_revoked': 'Manager access revoked from a partner organization',
+  'partner.manager_requested': 'A partner organization requested manager access',
+  'partner.company_registered': 'Your company was registered by a partner organization',
   'card.applied': 'Opportunity added to your board',
   'card.scored': 'Opportunity ranked against your buckets',
   'tenant.rescored': 'Opportunities re-ranked against your buckets',
@@ -627,6 +656,29 @@ export function describeEventOrNull(ev: EventLike): string | null {
 
   // Closed-loop system events (email/notification delivery, failures)
   if (namespace === 'system') {
+    /**
+     * The ToDo CLAIM events (mig 249). Written here because `oversight-surfaces` asks the question
+     * that catches the omission: every event type a CUSTOMER sees must have a sentence, not a
+     * de-punctuated type. `system:task.claimed` shipped without one and rendered as its own token —
+     * the same "internal vocabulary on a customer's screen" defect as the 48 atoms titled
+     * `bulleted_list`, one namespace over.
+     */
+    if (type === 'task.claimed') {
+      const t = str(payload.title);
+      return t ? `Someone started "${t}"` : 'Someone started a to-do';
+    }
+    if (type === 'task.released') {
+      const t = str(payload.title);
+      return t ? `"${t}" was put back in the queue` : 'A to-do was put back in the queue';
+    }
+    if (type === 'task.claim_expired') {
+      const t = str(payload.title);
+      // Says what happened to the WORK, not what happened to the row: the person who left it is not
+      // the reader, and the reader's question is whether it still needs doing.
+      return t
+        ? `"${t}" went back to the queue — nobody finished it`
+        : 'A to-do went back to the queue — nobody finished it';
+    }
     if (type === 'content_pipeline.post.publish_completed') {
       const title = str(payload.title) ?? str(payload.slug) ?? 'post';
       return `Blog post "${title}" published`;
@@ -667,12 +719,108 @@ export function describeEventOrNull(ev: EventLike): string | null {
   const entry = LABELS[type];
   if (typeof entry === 'function') return entry(payload);
   if (typeof entry === 'string') return entry;
+  // ── working notes (the shared board, mig 244) ──────────────────────────────────────────────
+  if (namespace === 'system' && type === 'note.created') {
+    const who = str(payload.author);
+    const where = str(payload.anchor);
+    return `Note added${who ? ` by ${who.replace('_', ' ')}` : ''}${where ? ` on ${where}` : ''}`;
+  }
+  if (namespace === 'system' && type === 'note.advanced') {
+    return `Note moved from ${str(payload.from) ?? '?'} to ${str(payload.to) ?? '?'}`;
+  }
+  if (namespace === 'system' && type === 'note.resolved') {
+    return 'Note resolved';
+  }
+
   return null;
 }
 
 /** The label a surface renders. Always a string: an unlabelled type still has to say something. */
 export function describeEvent(ev: EventLike): string {
   return describeEventOrNull(ev) ?? humanizeType(ev.type);
+}
+
+export interface ActorLike {
+  actorType?: string | null;
+  actorId?: string | null;
+  actorEmail?: string | null;
+  /** The person's display name, when the caller resolved the id against `users`. */
+  actorName?: string | null;
+}
+
+/**
+ * The system actors a customer can actually see in their own activity stream, in English.
+ *
+ * Measured, not imagined — these are the `actor_id` values present in `system_events`, and every
+ * one of them was being rendered raw. Anything unmapped falls through to the humanizer rather than
+ * to the token, so a new actor introduced tomorrow reads as "Some new worker", never
+ * `some_new_worker`.
+ */
+const ACTOR_LABELS: Record<string, string> = {
+  workflow_manager: 'Workflow automation',
+  lifecycle_scheduler: 'Scheduled job',
+  cron: 'Scheduled job',
+  worker: 'Pipeline worker',
+  fabric: 'Agent workforce',
+  bridge: 'Opportunity bridge',
+  'template-bridge': 'Template bridge',
+  'public-apply': 'Public application form',
+  claude_code: 'Claude Code session',
+};
+
+const ACTOR_TYPE_FALLBACK: Record<string, string> = {
+  system: 'Automation',
+  pipeline: 'Pipeline',
+  agent: 'Agent workforce',
+  user: 'A team member',
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Who did this, as a person would say it — and NEVER as an identifier.
+ *
+ * ── THE DEFECT THIS CLOSES ───────────────────────────────────────────────────────────────────
+ * The activity stream rendered `actorEmail ?? actorId ?? actorType ?? 'unknown'`, one line below
+ * the `describeEvent` call that had already been fixed for exactly this reason. So a customer read
+ * their own history as:
+ *
+ *     bd101904-582d-44db-ac2e-ce63eb341979 — Section saved
+ *     workflow_manager                     — Portal provisioned
+ *
+ * The sentences had been humanized; the name beside them had not. Found by
+ * `scripts/probe-customer-finish.mts`, which reads prose off the rendered page — 17 visible UUIDs
+ * and 99 raw system tokens on one customer-facing route.
+ *
+ * ── AN UNRESOLVED ID IS "UNKNOWN", NOT THE ID ────────────────────────────────────────────────
+ * Showing 36 hex characters to a customer who wants to know who touched their proposal tells them
+ * nothing that "Unknown" does not, and costs them the impression that the product knows its own
+ * business. The id is preserved in `title` — support keeps it, prose does not.
+ *
+ * Returns `{ label, title }`: `label` is always safe to render as text; `title` carries the raw
+ * identifier when there is one worth keeping, or null.
+ */
+export function describeActor(a: ActorLike): { label: string; title: string | null } {
+  const name = str(a.actorName);
+  if (name) return { label: name, title: str(a.actorEmail) };
+
+  const email = str(a.actorEmail);
+  if (email) return { label: email, title: null };
+
+  const id = str(a.actorId);
+  const type = str(a.actorType);
+
+  if (id && !UUID_RE.test(id)) {
+    const mapped = ACTOR_LABELS[id];
+    if (mapped) return { label: mapped, title: id };
+    // `ingest:sbir_gov` → "SBIR.gov ingest". One rule, not a second map to keep in step.
+    const ingest = /^ingest:(.+)$/.exec(id);
+    if (ingest) return { label: `${ingest[1].replace(/_/g, '.').toUpperCase()} ingest`, title: id };
+    return { label: humanizeType(id), title: id };
+  }
+
+  // A UUID (or nothing at all). Say what we know, keep what we cannot say.
+  return { label: (type && ACTOR_TYPE_FALLBACK[type]) ?? 'Unknown', title: id };
 }
 
 /**

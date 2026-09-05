@@ -5,7 +5,7 @@ per service, so future changes reference the exact names Railway provides. Value
 NOT recorded here. Deploy flow is **merge → Railway build/deploy → migrations**; nobody edits services
 or the DB directly.
 
-Legend: **✅ set in Railway** · **➕ recommended to add** · **○ optional / feature-gated** · **⚙️ Railway auto-injected** · **💤 read by no code (safe to leave/prune)**
+Legend: **✅ set in Railway** · **⛔ required — the service will not start without it** · **➕ recommended to add** · **○ optional / feature-gated** · **⚙️ Railway auto-injected** · **💤 read by no code (safe to leave/prune)**
 
 Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` services · `Postgres`
 (main `govtech_intel`, shared by frontend+pipeline) · `cms-postgres` (rfp-crm's DB) · `rfp-pipeline-bucket`
@@ -18,7 +18,7 @@ Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` ser
 | Variable | Purpose | Status |
 |---|---|---|
 | `DATABASE_URL` | main DB — the **`govtech_app` (NOBYPASSRLS)** role, so RLS is live | ✅ |
-| `DATABASE_URL_OWNER` | owner/superuser connection for `sqlBypass` — the legit **admin/CMS cross-tenant reads** (agent-workforce rollup, rfp-curation "Customer Interest"). Unset → those reads run as govtech_app and return **0 rows** under RLS | **➕ ADD** (reference the `Postgres` service's own connection URL) |
+| `DATABASE_URL_OWNER` | owner/superuser connection. Two jobs: `entrypoint.sh` **migrates** with it, and `sqlBypass` uses it for the legit **admin/CMS cross-tenant reads** (agent-workforce rollup, rfp-curation "Customer Interest"). Unset → `migrate.mjs` refuses to run as a role that cannot bypass RLS and `set -e` **stops the boot** (see §"Migrations at boot"); if it ever did serve, those reads would return **0 rows** with no error | **⛔ REQUIRED — the container will not start without it** (reference the `Postgres` service's own connection URL) |
 | `API_KEY_ENCRYPTION_SECRET` | AES-256 key for DB-stored API keys — **must match the pipeline's value** | ✅ |
 | `AUTH_SECRET` | NextAuth session secret | ✅ |
 | `AUTH_URL` | canonical app URL; NextAuth + all invite/reset/notification link-builders use it (code falls back to it from `NEXTAUTH_URL`) | ✅ |
@@ -33,7 +33,8 @@ Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` ser
 | `EMAIL_FROM` | present but **read by no code** today | 💤 |
 | `CRON_SECRET` · `PIPELINE_INTERNAL_URL` · `CMS_API_KEY` · `REVALIDATE_SECRET` · `CMS_PUBLIC_URL` | cron-endpoint auth · FE→pipeline internal call · FE↔rfp-crm auth/revalidate/CRM iframe | ○ (add when those integrations go live) |
 | `PLAYWRIGHT_CHROMIUM_EXECUTABLE` | PDF-export Chromium path — **set in the frontend Dockerfile** (`/usr/bin/chromium-browser`), not a Railway var | (Docker) |
-| `FOUNDING_COHORT_BYPASS` · `SEED_DEV_ACCOUNTS` · `SEED_PAGE_CONTENT` · `ALLOW_SCHEMA_RESET` | dev/seed toggles — **must stay UNSET (or false) in prod** | — |
+| `FOUNDING_COHORT_BYPASS` · `SEED_DEV_ACCOUNTS` · `ALLOW_SCHEMA_RESET` | dev/seed toggles — **must stay UNSET (or false) in prod**. `SEED_DEV_ACCOUNTS=true` seeds accounts with DEFAULT TEST PASSWORDS | — |
+| `SEED_PAGE_CONTENT` | **NOT a dev toggle** — it was listed as one on the row above and that is why this row exists. `scripts/seed_page_content.mjs` says: *"set it permanently once you've backed off CMS editing for marketing pages"*. `true` pushes the build-time `PAGE_SEEDS` snapshot into `content_pages` on each deploy, so the public marketing pages match the deployed code. It touches ONLY `content_type='page'` rows for those exact page_keys; blog posts, resource articles and testimonials are never touched. Unset it and nothing breaks — the site simply serves whatever was last seeded and drifts from the `.ts` source | ✅ keep `true` |
 | `RAILWAY_PUBLIC_DOMAIN` · `RAILWAY_GIT_COMMIT_SHA` · `RAILWAY_ENVIRONMENT_NAME` · … | health/release id | ⚙️ |
 
 ## pipeline (Python worker)
@@ -49,6 +50,20 @@ Production topology (5 nodes): `govtech-frontend` · `pipeline` · `rfp-crm` ser
 | `CLAUDE_MODEL` | agent model id | ○ (defaults to `claude-sonnet-4-20250514`) |
 | `AGENT_DATABASE_URL` | routes the agent pool through the **`rfp_agent` (NOBYPASSRLS)** role for agent-side RLS (defense-in-depth). **Unset today** → agents ride the pipeline `DATABASE_URL` connection; isolation is the app-layer `WHERE tenant_id` + fail-closed guards | ○ |
 | `SAM_GOV_API_KEY` · `MASTER_ADMIN_EMAIL` · `INITIAL_MASTER_ADMIN_PASSWORD` | SAM.gov ingest · first-admin seed | ○ |
+| `CARD_RECONCILE_URL` (+ `CRON_SECRET`) | hourly poke → `POST /api/admin/reconcile-cards`. The ONLY thing that heals a tenant who never opens their feed; without it their weekly digest and the admin rollups are computed off a stale mirror | ○ (**inert when unset**) |
+| `AGENT_GATE_SWEEP_URL` (+ `CRON_SECRET`) | 60s poke → `POST /api/admin/agent-gates/sweep`. TW-8 AI-manager auto-advance | ○ (**inert when unset**) |
+| `SPACE_PRESENCE_SWEEP_URL` (+ `CRON_SECRET`) | hourly poke → `POST /api/admin/space-presence/sweep`. Closes an abandoned "an RFP administrator opened your workspace" bracket when the admin/partner shut the tab instead of exiting — the one closer that does not need the person to still be there. Unset ⇒ those brackets stay open in the customer's audit trail indefinitely | ○ (**inert when unset**) |
+| `TASK_CLAIM_SWEEP_URL` (+ `CRON_SECRET`) | 30-min poke → `POST /api/admin/tasks/sweep-claims`. Returns an abandoned ToDo claim to the queue when the person who started it was signed out mid-task. NOT optional alongside the session bounds — those GUARANTEE people are signed out mid-task, so unset ⇒ the queue fills with claims nobody holds and nobody else will pick up | ○ (**inert when unset**) |
+
+> **These three are read through a helper, not by name.** `pipeline/src/main.py` calls
+> `_run_poker('…', 'CARD_RECONCILE_URL', …)` and the helper does `os.environ.get(url_var)`, so no
+> `os.environ["CARD_RECONCILE_URL"]` exists anywhere to grep for. `audit-env-inventory.mjs` was
+> blind to all three until it learned the call-site idiom — which meant the audit built to catch
+> "a capability that silently does nothing in production" could not see its own best examples.
+> Each URL is the **full public** endpoint (e.g. `https://<frontend-domain>/api/admin/…`), and each
+> path must also be in `CRON_EXACT_PATHS` in `middleware.ts` or the bearer is rejected before the
+> handler runs — a 401 whose lowercase `{"error":"unauthenticated"}` body is the middleware's
+> wording, not the route's.
 
 ## rfp-crm (FastAPI — CRM, build-out later)
 

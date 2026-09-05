@@ -14,6 +14,7 @@ import { partnerOwnOrg, partnerScopeTenants } from '@/lib/partner/scope';
 import { tenantRollupStats, type TenantRollup } from '@/lib/partner/rollup';
 import { getPartnerStableTodos } from '@/lib/partner/todos';
 import { ensurePartnerOwnOrgProvisioned } from '@/lib/partner/own-org';
+import { closePresence } from '@/lib/space-presence';
 import AddCompanyFlow from './add-company-flow';
 import PartnerGuide from './partner-guide';
 
@@ -60,6 +61,16 @@ export default async function PartnerConsole() {
     if (u?.partnerHomeRole === 'partner_admin') redirect('/api/partner/exit');
     redirect('/login');
   }
+
+  /**
+   * Back on the console = out of every client company. Close whatever is still open.
+   *
+   * The exit link is not the only way here: a manager can use browser Back, a bookmark, or the
+   * redirect two lines above. `partner.exited` only ever fired from `/api/partner/exit`, so all of
+   * those left a company's audit trail asserting the manager was still inside it. Rendering this
+   * page is the proof that they are not.
+   */
+  await closePresence({ id: u.id, email: u.email }, 'left_space');
 
   const ownOrg = await partnerOwnOrg(u.id);
   // First-visit provisioning of the own org (idempotent, best-effort — never break the console).

@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { emitEventSingle, systemActor } from '@/lib/events';
 import { recordContact } from '@/lib/contacts';
+import { createTask } from '@/lib/tasks/tasks';
 
 export async function GET() {
   // Admin-only check endpoint — not needed for V1 public form
@@ -103,6 +104,32 @@ export async function POST(request: Request) {
         } catch (e) {
           console.error('[waitlist] contact link failed:', e);
         }
+      }
+
+      // ── SOMEBODY HAS TO BE TOLD ──────────────────────────────────────────────────────────
+      // A waitlist sign-up is a person raising their hand on a public page. Until this existed the
+      // row landed, the contact was recorded, `capture:waitlist.joined` was emitted — and NOTHING
+      // consumed it. No ToDo, no mail, no surface. The applicant saw a success message and nobody
+      // on our side ever found out, which is the same silent-and-total failure the application
+      // path was given a ToDo to avoid.
+      //
+      // A ToDo rather than an email, deliberately: the waitlist is lower-urgency and higher-volume
+      // than an application, so a message per sign-up would train an admin to ignore it. The work
+      // ledger holds it with a nudge instead, and /admin/waitlist shows the list.
+      //
+      // Best-effort: a task failure must never cost somebody their place on the list.
+      try {
+        await createTask({
+          actor: { id: 'public-waitlist', email: null, role: 'master_admin', tenantId: null },
+          tenantId: null, assigneeRole: 'rfp_admin', taskType: 'admin_review',
+          title: `Waitlist sign-up: ${body.company_name?.trim() || body.email.toLowerCase().trim()}`,
+          description: `${body.email.toLowerCase().trim()}`
+            + `${body.company_name ? ` — ${body.company_name.trim()}` : ''}`
+            + ` joined the waitlist. Reach out, or leave it for the next cohort round.`,
+          entityType: 'waitlist', entityId: entry.id, nudgeDays: [7],
+        });
+      } catch (e) {
+        console.error('[waitlist] triage ToDo failed (sign-up unaffected):', e);
       }
 
       try {

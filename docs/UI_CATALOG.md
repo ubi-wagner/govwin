@@ -9,7 +9,7 @@ it "the UI" measures the doors and ignores what is behind them. This counts both
 
 | | count |
 |---|---:|
-| addressable routes | 122 |
+| addressable routes | 123 |
 | components | 202 |
 | event handlers (total) | 1622 |
 | …of which BIND behaviour (on a DOM element) | 1381 |
@@ -47,6 +47,7 @@ tree carries far more, listed per component in §2.
 | `/admin/funnel` | app/admin/funnel/page.tsx | server | 0 | 0 | 0/0/0 | Rate, Link, Stage |
 | `/admin/guardrail-defaults` | app/admin/guardrail-defaults/page.tsx | server | 0 | 0 | 0/0/0 | GuardrailDefaults |
 | `/admin/intake` | app/admin/intake/page.tsx | server | 0 | 0 | 0/0/0 | IntakeStageStrip, IntakeForm |
+| `/admin/observe` | app/admin/observe/page.tsx | server | 0 | 0 | 0/0/0 | Link, Card, Empty |
 | `/admin/opportunities` | app/admin/opportunities/page.tsx | server | 0 | 0 | 0/0/0 | Stage, OppWatchToggle |
 | `/admin/pipeline` | app/admin/pipeline/page.tsx | server | 0 | 0 | 0/0/0 | — |
 | `/admin/process` | app/admin/process/page.tsx | server | 0 | 0 | 0/0/0 | Link, ProcessMonitorClient |
@@ -177,9 +178,9 @@ tree carries far more, listed per component in §2.
 | app/portal/[tenantSlug]/processes/processes-client.tsx | client | 3/0 | 2 | /portal/[tenantSlug]/command, /portal/[tenantSlug]/processes |
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | 14/0 | 12 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/admin/admin-file-manager.tsx | client | 35/0 | 8 | /admin/storage |
-| components/admin/admin-nav-context.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +46 |
-| components/admin/admin-nav-link.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +46 |
-| components/admin/admin-nav-trail.tsx | client | 0/3 | 0 | /admin/agents, /admin/analytics, /admin/applications +46 |
+| components/admin/admin-nav-context.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +47 |
+| components/admin/admin-nav-link.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +47 |
+| components/admin/admin-nav-trail.tsx | client | 0/3 | 0 | /admin/agents, /admin/analytics, /admin/applications +47 |
 | components/admin/agent-usage-summary.tsx | client | 0/0 | 1 | /admin/agents |
 | components/admin/agent-workforce.tsx | client | 0/0 | 1 | /admin/agents |
 | components/admin/application-review.tsx | client | 7/0 | 4 | /admin/applications |
@@ -251,7 +252,7 @@ tree carries far more, listed per component in §2.
 | components/marketing/value-comparison.tsx | server | 0/0 | 0 | /pricing, /value |
 | components/marketing/waitlist-form.tsx | client | 3/0 | 1 | /federal-rd-101 |
 | components/marketing/wordmark.tsx | server | 0/0 | 0 | /about, /apply, /blog/[slug] +20 |
-| components/nav-link.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +46 |
+| components/nav-link.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +47 |
 | components/portal/agent-usage-panel.tsx | client | 1/0 | 1 | /portal/[tenantSlug]/agents, /portal/[tenantSlug]/manage |
 | components/portal/amendment-banner.tsx | client | 3/0 | 3 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/portal/archive-portal-button.tsx | client | 1/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId] |
@@ -349,9 +350,9 @@ tree carries far more, listed per component in §2.
 | components/ui/advisory-overlay.tsx | client | 3/0 | 0 | /admin/rfp-curation/[solId] |
 | components/ui/autocomplete.tsx | client | 5/0 | 0 | /admin/rfp-curation/[solId], /admin/rfp-curation/upload |
 | components/ui/count-badge.tsx | server | 0/0 | 0 | /admin/command, /portal/[tenantSlug]/command |
-| components/ui/drawer.tsx | client | 1/0 | 0 | /portal/[tenantSlug]/dashboard, /portal/[tenantSlug]/manage, /admin/agents +84 |
+| components/ui/drawer.tsx | client | 1/0 | 0 | /portal/[tenantSlug]/dashboard, /portal/[tenantSlug]/manage, /admin/agents +85 |
 | components/ui/modal.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/portals, /portal/[tenantSlug]/manage |
-| components/ui/nav-shell.tsx | client | 1/1 | 0 | /admin/agents, /admin/analytics, /admin/applications +84 |
+| components/ui/nav-shell.tsx | client | 1/1 | 0 | /admin/agents, /admin/analytics, /admin/applications +85 |
 | components/ui/tabs.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/proposals/[proposalId], /admin/command, /portal/[tenantSlug]/command |
 | components/ui/time-ago.tsx | client | 0/0 | 0 | /admin/process, /admin/processes, /admin/system-state +12 |
 

@@ -1,0 +1,794 @@
+{
+ "generatedAt": "2026-09-04T16:05:36.835Z",
+ "summary": {
+  "surfaces": 53,
+  "none": 46,
+  "open": 6,
+  "ready": 1,
+  "stale": 0
+ },
+ "rows": [
+  {
+   "route": "/admin/agents",
+   "dir": "app/admin/agents",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/analytics",
+   "dir": "app/admin/analytics",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/applications",
+   "dir": "app/admin/applications",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/architecture",
+   "dir": "app/admin/architecture",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/automation",
+   "dir": "app/admin/automation",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/automation-framework",
+   "dir": "app/admin/automation-framework",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/billing",
+   "dir": "app/admin/billing",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/cards",
+   "dir": "app/admin/cards",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/command",
+   "dir": "app/admin/command",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/contacts",
+   "dir": "app/admin/contacts",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/crm",
+   "dir": "app/admin/crm",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/dashboard",
+   "dir": "app/admin/dashboard",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/documents/[documentId]",
+   "dir": "app/admin/documents/[documentId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/documents",
+   "dir": "app/admin/documents",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/events",
+   "dir": "app/admin/events",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/expert-time",
+   "dir": "app/admin/expert-time",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/funnel",
+   "dir": "app/admin/funnel",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/guardrail-defaults",
+   "dir": "app/admin/guardrail-defaults",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/guides",
+   "dir": "app/admin/guides",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/intake",
+   "dir": "app/admin/intake",
+   "guide": "app/admin/intake/intake-guide.tsx",
+   "state": "open",
+   "steps": [
+    {
+     "id": "check",
+     "title": "1 · Check it is not already here"
+    },
+    {
+     "id": "minimum",
+     "title": "2 · What to type, and what not to"
+    },
+    {
+     "id": "document",
+     "title": "3 · Get the document in early"
+    },
+    {
+     "id": "provenance",
+     "title": "4 · The rule everything downstream depends on"
+    },
+    {
+     "id": "after",
+     "title": "5 · What happens next"
+    }
+   ],
+   "controls": [
+    "Stage into review queue"
+   ],
+   "unwritten": 1,
+   "canon": "docs/INGEST_PROVENANCE.md",
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/notes",
+   "dir": "app/admin/notes",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/observe",
+   "dir": "app/admin/observe",
+   "guide": "app/admin/observe/companion-guide.tsx",
+   "state": "ready",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/opportunities",
+   "dir": "app/admin/opportunities",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin",
+   "dir": "app/admin",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/pipeline",
+   "dir": "app/admin/pipeline",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/process",
+   "dir": "app/admin/process",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/processes",
+   "dir": "app/admin/processes",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/projects",
+   "dir": "app/admin/projects",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/proposals",
+   "dir": "app/admin/proposals",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/provisioning/[portalId]",
+   "dir": "app/admin/provisioning/[portalId]",
+   "guide": "app/admin/provisioning/[portalId]/provisioning-guide.tsx",
+   "state": "open",
+   "steps": [
+    {
+     "id": "clock",
+     "title": "1 · Read the clock and the buyer first"
+    },
+    {
+     "id": "skeleton",
+     "title": "2 · The skeleton — build-out readiness"
+    },
+    {
+     "id": "release-two",
+     "title": "3 · Release two — and it is two acts"
+    },
+    {
+     "id": "second-buyer",
+     "title": "4 · The second buyer is cheap, and that is the design"
+    }
+   ],
+   "controls": [
+    "Complete &amp; Release"
+   ],
+   "unwritten": 1,
+   "canon": "docs/PROVISIONING_WORKSPACE_DESIGN.md",
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/provisioning",
+   "dir": "app/admin/provisioning",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/purchases",
+   "dir": "app/admin/purchases",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/rfp-curation/[solId]",
+   "dir": "app/admin/rfp-curation/[solId]",
+   "guide": "app/admin/rfp-curation/[solId]/curation-guide.tsx",
+   "state": "open",
+   "steps": [
+    {
+     "id": "text",
+     "title": "1 · Text first — nothing works without it"
+    },
+    {
+     "id": "assist",
+     "title": "2 · Assist proposes; you decide"
+    },
+    {
+     "id": "structure",
+     "title": "3 · Topics and compliance — the shape a build inherits"
+    },
+    {
+     "id": "amend",
+     "title": "4 · Amendments — the update path, not a re-ingest"
+    },
+    {
+     "id": "release-one",
+     "title": "5 · Release one — Push, and it is forward-only"
+    },
+    {
+     "id": "after",
+     "title": "6 · What happens without you"
+    }
+   ],
+   "controls": [
+    "Push",
+    "Documents",
+    "✨ Ingest Assist",
+    "🔍 Shred audit",
+    "🩺 Assess readiness",
+    "Extract Topics",
+    "Compliance",
+    "Customer Interest",
+    "+ Log amendment"
+   ],
+   "unwritten": 2,
+   "canon": "docs/INGEST_PROVENANCE.md",
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/rfp-curation/[solId]/topic/[topicId]",
+   "dir": "app/admin/rfp-curation/[solId]/topic/[topicId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/rfp-curation",
+   "dir": "app/admin/rfp-curation",
+   "guide": "app/admin/rfp-curation/curation-queue-guide.tsx",
+   "state": "open",
+   "steps": [
+    {
+     "id": "claim",
+     "title": "1 · Claim before you start"
+    },
+    {
+     "id": "work",
+     "title": "2 · Work it, then mark it"
+    },
+    {
+     "id": "scope",
+     "title": "3 · Dismissing is a judgement, and it is recorded"
+    }
+   ],
+   "controls": [
+    "Claim",
+    "Approve / Done",
+    "Dismiss",
+    "Refresh"
+   ],
+   "unwritten": 1,
+   "canon": "docs/RFP_ADMIN_OPERATIONS_GUIDE.md",
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/rfp-curation/upload",
+   "dir": "app/admin/rfp-curation/upload",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/scouts",
+   "dir": "app/admin/scouts",
+   "guide": "app/admin/scouts/scouts-guide.tsx",
+   "state": "open",
+   "steps": [
+    {
+     "id": "read",
+     "title": "1 · Read the classification before the title"
+    },
+    {
+     "id": "decide",
+     "title": "2 · The decision — and it is one-way"
+    },
+    {
+     "id": "trust",
+     "title": "3 · What the text on this screen is, and is not"
+    },
+    {
+     "id": "after",
+     "title": "4 · Where it goes next"
+    },
+    {
+     "id": "stuck",
+     "title": "5 · When the queue looks wrong"
+    }
+   ],
+   "controls": [
+    "Release as new",
+    "Release as update",
+    "Dismiss",
+    "Refresh"
+   ],
+   "unwritten": 2,
+   "canon": "docs/SCOUT_INTAKE_QUEUE.md",
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/site/[pageKey]",
+   "dir": "app/admin/site/[pageKey]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/site/docs/[type]/[slug]",
+   "dir": "app/admin/site/docs/[type]/[slug]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/site",
+   "dir": "app/admin/site",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/sources/[profileId]",
+   "dir": "app/admin/sources/[profileId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/sources",
+   "dir": "app/admin/sources",
+   "guide": "app/admin/sources/sources-guide.tsx",
+   "state": "open",
+   "steps": [
+    {
+     "id": "add",
+     "title": "1 · Adding a source"
+    },
+    {
+     "id": "schedule",
+     "title": "2 · Schedule, and the honest default"
+    },
+    {
+     "id": "diffs",
+     "title": "3 · Reading the changes"
+    },
+    {
+     "id": "upload",
+     "title": "4 · When there is no page to crawl"
+    },
+    {
+     "id": "backoff",
+     "title": "5 · When a site asks you to slow down"
+    }
+   ],
+   "controls": [
+    "Manual only",
+    "Scout Now",
+    "Upload PDFs"
+   ],
+   "unwritten": 2,
+   "canon": "docs/SCOUT_INTAKE_QUEUE.md",
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/storage",
+   "dir": "app/admin/storage",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/system",
+   "dir": "app/admin/system",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/system-state",
+   "dir": "app/admin/system-state",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/template-stable",
+   "dir": "app/admin/template-stable",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/templates/[templateId]/edit",
+   "dir": "app/admin/templates/[templateId]/edit",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/templates",
+   "dir": "app/admin/templates",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/tenants/[tenantId]",
+   "dir": "app/admin/tenants/[tenantId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/tenants",
+   "dir": "app/admin/tenants",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/waitlist",
+   "dir": "app/admin/waitlist",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/workflows",
+   "dir": "app/admin/workflows",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/admin/workspace-access",
+   "dir": "app/admin/workspace-access",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  }
+ ]
+}

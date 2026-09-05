@@ -27,7 +27,7 @@ export default function AiDisclosurePage() {
             <p>RFP Pipeline currently uses the following AI models:</p>
             <ul className="list-disc pl-6 space-y-1 mt-2">
               <li><strong>Anthropic Claude:</strong> Used for proposal section drafting, content analysis, compliance extraction, opportunity classification, and source change detection</li>
-              <li><strong>OpenAI Embeddings:</strong> Used for semantic search within the content library to find relevant past content atoms</li>
+              <li><strong>Voyage AI (voyage-3.5):</strong> Used to generate embeddings for semantic search within your content library, so drafting can find relevant past material</li>
             </ul>
             <p className="mt-3">
               We may update the specific models used as improved versions become available. The
@@ -79,7 +79,7 @@ export default function AiDisclosurePage() {
           <div>
             <h2 className="text-base font-bold text-navy-900 mb-3">5. Data Handling by AI Providers</h2>
             <p>
-              Our AI providers (Anthropic, OpenAI) process your data solely to generate responses
+              Our AI providers (Anthropic, Voyage AI) process your data solely to generate responses
               to our API requests. Per our agreements with these providers:
             </p>
             <ul className="list-disc pl-6 space-y-1 mt-2">

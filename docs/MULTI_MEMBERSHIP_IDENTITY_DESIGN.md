@@ -312,9 +312,12 @@ lossless:
   (they enter a slumbering company to renew it).
 - **Archiving touches NO per-user rows.** So restoring (clear `archived_at`) returns
   everyone to **exactly** their prior state — active users active, individually-inactive
-  users still inactive — for free, no snapshot needed. Verified end-to-end
-  (`scripts/drive-archive.mts`): archived → all users denied; admin still enters;
-  restored → back; the individually-inactive user stays inactive.
+  users still inactive — for free, no snapshot needed. Verified end-to-end by
+  `scripts/drive-archive.mts`, which drives the tenant case through `verifyTenantAccess`
+  itself: a member is admitted, the tenant is archived, the SAME member is refused, the
+  workflows cascade, the company drops off the login list, and restoring admits them again.
+  (That script went missing once while this line cited it; it was rebuilt 2026-09-01 and is
+  suite drive `archive`, so the citation is checkable rather than historical.)
 - **An archived company disappears from the login list.** `getActiveMemberships` excludes
   archived tenants, so a user only ever lands on / selects a *reachable* company; if all
   their companies are archived they get an "Access paused" message (never a broken land).

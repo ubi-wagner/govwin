@@ -97,9 +97,28 @@ fi
 say "logins — tenant: kate.ulepic@foundation3dp.com / DemoPass123!"
 say "         admin:  eric@rfppipeline.com / ${SANDBOX_PASSWORD:-SandboxDrive2026!}"
 
-# 5) build if missing
+# 5) build if MISSING **or OLDER THAN THE SOURCE**
+#
+# ⚠️ "The build exists" is not "the build is current", and the difference is invisible.
+# A re-provisioned box re-clones the repo, so `git checkout` / a resync can move the SOURCE forward
+# under a `.next/standalone` that is still perfectly self-consistent — same BUILD_ID top and
+# staged, server boots, every page renders. What is missing is only the routes added since that
+# build, and a route Next has never heard of is a 404 with no log line and no error surface.
+#
+# That is how a screenshot sweep photographed a customer-facing 404 on
+# `/portal/[tenantSlug]/cards/[opportunityId]/solicitation` and read as a product defect: the page
+# source was on disk, the route directory in the build output was EMPTY, and the BUILD_ID check
+# below said MATCH because both halves came from the same stale build.
+#
+# So compare the newest source file against the build stamp. Cheap, and it fails in the safe
+# direction: a spurious rebuild costs minutes, a stale build costs a false bug report.
+NEWEST_SRC=$(find "$FE/app" "$FE/lib" "$FE/components" -type f \( -name '*.ts' -o -name '*.tsx' \) \
+  -newer "$STANDALONE/server.js" -print -quit 2>/dev/null)
 if [ ! -f "$STANDALONE/server.js" ]; then
   say "no standalone build — running next build (slow)…"
+  ( cd "$FE" && DATABASE_URL="$DBURL" npx next build >/dev/null 2>&1 )
+elif [ -n "$NEWEST_SRC" ]; then
+  say "build is OLDER than the source (e.g. ${NEWEST_SRC#$FE/}) — rebuilding (slow)…"
   ( cd "$FE" && DATABASE_URL="$DBURL" npx next build >/dev/null 2>&1 )
 fi
 

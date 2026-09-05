@@ -78,7 +78,28 @@ async def run_agent_task_consumer(
             backoff = 30  # reset after a healthy connect
             log.info("agent task queue consumer connected to database")
 
+            # WHY the inner loop leaves has to be distinguishable. The `break` after it means
+            # "shutdown requested" and exits the consumer for good; a break for a dead connection
+            # must fall through to the OUTER loop's reconnect instead. Without this flag the fix
+            # for a lost connection would have shut the consumer down permanently — a worse
+            # failure than the one being fixed, and a silent one.
+            reconnect = False
             while not shutdown_event.is_set():
+                # BREAK OUT TO THE RECONNECT, don't spin on a dead connection.
+                #
+                # The outer loop already knows how to reconnect — but nothing ever reached it.
+                # `process_task_queue` catches its own claim failure and returns [], so the
+                # `except` below never fires, and the inner loop polled a closed connection every
+                # interval forever, logging "[process_task_queue] claim failed: connection is
+                # closed" and processing nothing. Observed for four minutes straight after the
+                # database was restarted under a running worker.
+                #
+                # Checking the connection is what makes this independent of which layer swallows
+                # the error, and of which asyncpg class it was.
+                if conn is None or conn.is_closed():
+                    log.warning("agent task queue: connection is closed — reconnecting")
+                    reconnect = True
+                    break
                 try:
                     results = await fabric.process_task_queue(conn)
                     if results:
@@ -97,6 +118,14 @@ async def run_agent_task_consumer(
                 except asyncio.TimeoutError:
                     pass  # Normal — poll interval elapsed
 
+            if reconnect:
+                try:
+                    if conn is not None and not conn.is_closed():
+                        await conn.close()
+                except Exception:
+                    pass
+                conn = None
+                continue  # outer loop reconnects
             break  # inner loop exited → shutdown requested
 
         except asyncio.CancelledError:
@@ -253,12 +282,44 @@ async def main() -> None:
         behind = sum(1 for t in (d.get("perTenant") or []) if t.get("applied"))
         return f"caught up {applied} card(s) across {behind} tenant(s)"
 
+    # SPACE-PRESENCE SWEEP — close abandoned "somebody is in your workspace" brackets.
+    #
+    # An rfp_admin shadowing a customer, or a partner-manager descended into a client company, opens
+    # a bracket in `space_presence` (mig 246). Pressing exit closes it; so does turning up on the
+    # platform console, or inside a different company. None of those happen when the tab is simply
+    # CLOSED — and that is the case the customer's audit trail suffers most from, because it goes on
+    # asserting somebody is in their workspace forever. This is the only closer that does not need
+    # the person to still be there.
+    #
+    # Hourly, like the card reconcile and for the same reason: it is a backstop for the sessions
+    # nobody is driving, not a latency path for one somebody is. The route bounds `idleMinutes`
+    # itself (default 45), so an eviction can never be so eager that it writes a departure into a
+    # customer's trail while the admin is merely reading.
+    def _presence_report(d: dict) -> str | None:
+        closed = d.get("closed", 0)
+        return f"closed {closed} abandoned space presence(s)" if closed else None
+
+    # ABANDONED ToDo CLAIMS. A claim (mig 249) records that somebody started a ToDo; this returns
+    # one to the queue when they did not finish. It is the half that makes claiming safe to do at
+    # all — and it is NOT optional decoration on the session work, it is the consequence of it: the
+    # absolute cap and the descent gate GUARANTEE people are signed out mid-task, which is their
+    # whole point. Without this sweep a security improvement becomes a stalled queue, with the queue
+    # asserting work is under way that nobody is doing.
+    #
+    # Half-hourly rather than hourly: the default staleness is 90 minutes, so a claim is released
+    # within ~30 minutes of going stale instead of drifting toward two hours.
+    def _claims_report(d: dict) -> str | None:
+        released = d.get("released", 0)
+        return f"returned {released} abandoned ToDo claim(s) to the queue" if released else None
+
     # Run the ingester consumer loop, workflow processor, health
     # server, lifecycle scheduler, and agent task queue consumer
     # concurrently. All manage their own resources and respect shutdown_event.
     await asyncio.gather(
         _run_poker('agent-gate auto-advance poker', 'AGENT_GATE_SWEEP_URL', 60, _gate_report),
         _run_poker('card reconcile sweep', 'CARD_RECONCILE_URL', 3600, _reconcile_report),
+        _run_poker('space presence sweep', 'SPACE_PRESENCE_SWEEP_URL', 3600, _presence_report),
+        _run_poker('stale ToDo claim sweep', 'TASK_CLAIM_SWEEP_URL', 1800, _claims_report),
         run_consumer_loop(
             database_url=DATABASE_URL,
             shutdown_event=shutdown_event,

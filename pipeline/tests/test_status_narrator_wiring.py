@@ -34,7 +34,7 @@ def test_registered_and_action_mapped():
     fabric = AgentFabric()
     assert "status_narrator" in fabric._archetypes
     assert TOOL_ACTION_TO_ARCHETYPE.get("tool.project.draft_status_narrative") == "status_narrator"
-    assert len(_ARCHETYPE_CLASSES) == 38
+    assert len(_ARCHETYPE_CLASSES) == 39
 
 
 def test_step_only():

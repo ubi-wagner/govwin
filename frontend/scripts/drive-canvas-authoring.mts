@@ -115,7 +115,18 @@ async function mediaCount(buf: Buffer): Promise<number> {
 const pdfPages = (buf: Buffer): number =>
   (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
 
-interface Session { ctx: import('playwright').BrowserContext; label: string }
+/**
+ * `label` is the ROLE, for this drive's own output. `who` is the same actor written the way a
+ * person would, and it is the only one allowed into anything the product then RENDERS.
+ *
+ * The titles here were `Primitive Vocabulary (rfp_admin)`, and the documents outlive the run: the
+ * event stays in the tenant's Activity feed forever. `probe-customer-finish` reported it as jargon
+ * on a customer surface — correctly, because a customer really is being shown `rfp_admin`. The
+ * finding was ours, not the product's, but a harness that seeds internal vocabulary into a
+ * customer-facing surface is manufacturing the very defect the next probe reports, and 18 standing
+ * known-benign findings are what teach a reader to stop reading the list.
+ */
+interface Session { ctx: import('playwright').BrowserContext; label: string; who: string }
 
 /** POST/PUT through the signed-in browser context, so auth + RLS are the real ones. */
 async function api(s: Session, method: string, url: string, body: unknown): Promise<{ status: number; json: any }> {
@@ -172,11 +183,11 @@ try {
 
   const tenantCtx: Session = {
     ctx: await signIn(browser, member.email, process.env.TENANT_PW || 'DemoPass123!'),
-    label: 'tenant_admin',
+    label: 'tenant_admin', who: 'Company Admin',
   };
   const adminCtx: Session = {
     ctx: await signIn(browser, admin.email, process.env.RFP_ADMIN_PW || process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!'),
-    label: 'rfp_admin',
+    label: 'rfp_admin', who: 'RFP Administrator',
   };
 
   const created: Array<{ id: string; title: string }> = [];
@@ -397,13 +408,13 @@ try {
   note(`fixture: vocabularyDoc() — the SAME document the unit test uses (${VOCABULARY.length} primitives)`);
   for (const s of [tenantCtx, adminCtx]) {
     await authorAndExport({
-      s, preset: 'letter', title: `Primitive Vocabulary (${s.label})`,
+      s, preset: 'letter', title: `Primitive Vocabulary (${s.who})`,
       formats: ['docx', 'pptx', 'xlsx', 'pdf'],
       mustContain: [],   // per-primitive presence is checked below, marker by marker
       doc: (id) => {
         const d = vocabularyDoc('letter_standard');
         (d as { document_id: string }).document_id = id;
-        (d as { metadata: { title: string } }).metadata.title = `Primitive Vocabulary (${s.label})`;
+        (d as { metadata: { title: string } }).metadata.title = `Primitive Vocabulary (${s.who})`;
         return d;
       },
     });

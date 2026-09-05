@@ -39,6 +39,7 @@ import { sqlBypass as sql } from '@/lib/db';
 import ScoutCandidateQueue from '@/components/scout/candidate-queue';
 import IntakeStageStrip from '@/components/admin/intake-stage-strip';
 import { loadIntakeStageCounts } from '@/lib/admin/intake-stage-counts';
+import ScoutsGuide from './scouts-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -178,6 +179,7 @@ export default async function ScoutMonitorPage() {
   return (
     <div>
       <IntakeStageStrip current="scouts" counts={stageCounts} />
+      <ScoutsGuide />
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold">Scout Monitor</h1>

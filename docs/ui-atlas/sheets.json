@@ -74,10 +74,8 @@
    "/portal/[tenantSlug]/contracts/[contractId]",
    "/portal/[tenantSlug]/dashboard",
    "/portal/[tenantSlug]/documents",
-   "/portal/[tenantSlug]/documents/[documentId]",
    "/portal/[tenantSlug]/documents/new",
    "/portal/[tenantSlug]/library",
-   "/portal/[tenantSlug]/library/foundation/[foundationId]",
    "/portal/[tenantSlug]/library/review",
    "/portal/[tenantSlug]/library/upload",
    "/portal/[tenantSlug]/manage",
@@ -86,7 +84,9 @@
    "/portal/[tenantSlug]/portals/[portalId]",
    "/portal/[tenantSlug]/processes",
    "/portal/[tenantSlug]/profile",
-   "/portal/[tenantSlug]/projects"
+   "/portal/[tenantSlug]/projects",
+   "/portal/[tenantSlug]/projects/[projectId]",
+   "/portal/[tenantSlug]/proposals"
   ]
  },
  {
@@ -95,8 +95,6 @@
   "parts": 3,
   "file": "sheet-tenant-3.png",
   "routes": [
-   "/portal/[tenantSlug]/projects/[projectId]",
-   "/portal/[tenantSlug]/proposals",
    "/portal/[tenantSlug]/proposals/[proposalId]",
    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
    "/portal/[tenantSlug]/spotlights",
@@ -189,10 +187,10 @@
    "/admin/billing",
    "/admin/cards",
    "/admin/command",
+   "/admin/contacts",
    "/admin/crm",
    "/admin/dashboard",
    "/admin/documents",
-   "/admin/documents/[documentId]",
    "/admin/events",
    "/admin/expert-time"
   ]
@@ -203,12 +201,14 @@
   "parts": 3,
   "file": "sheet-admin-2.png",
   "routes": [
+   "/admin/funnel",
    "/admin/guardrail-defaults",
    "/admin/intake",
    "/admin/opportunities",
    "/admin/pipeline",
    "/admin/process",
    "/admin/processes",
+   "/admin/projects",
    "/admin/proposals",
    "/admin/provisioning",
    "/admin/provisioning/[portalId]",
@@ -216,9 +216,7 @@
    "/admin/rfp-curation",
    "/admin/rfp-curation/[solId]",
    "/admin/rfp-curation/[solId]/topic/[topicId]",
-   "/admin/rfp-curation/upload",
-   "/admin/scouts",
-   "/admin/site"
+   "/admin/rfp-curation/upload"
   ]
  },
  {
@@ -227,6 +225,8 @@
   "parts": 3,
   "file": "sheet-admin-3.png",
   "routes": [
+   "/admin/scouts",
+   "/admin/site",
    "/admin/site/[pageKey]",
    "/admin/site/docs/[type]/[slug]",
    "/admin/sources",

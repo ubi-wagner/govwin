@@ -30,7 +30,12 @@ export default async function ArchitecturePage() {
           <p className="mt-0.5 max-w-3xl text-sm text-gray-500">
             The live <span className="font-mono text-gray-700">govtech_intel</span> schema and its data
             flows, straight from the migrated database. Click any table for its fields and a navigable
-            foreign-key neighborhood, or open the Data&nbsp;flows and UI&nbsp;surfaces tabs.
+            foreign-key neighborhood, or open the Data&nbsp;flows and UI&nbsp;surfaces tabs.{' '}
+            <span className="text-gray-600">
+              <b className="font-medium">Live</b> adds the layer the other three cannot: which tables
+              anything is actually writing and reading — so a table with nothing on either end stops
+              looking like a load-bearing one. It is also where you ask the companion.
+            </span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">

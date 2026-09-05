@@ -13,7 +13,9 @@ of reinventing conventions per route.
 
 Binding standards every future commit checks against.
 
-- `docs/NAMESPACES.md` — canonical registry for event, tool, and log scopes
+- ~~`docs/NAMESPACES.md`~~ — announced here and never written. The canonical registry is in
+  CODE, in the three runtimes that must agree: `frontend/lib/event-namespaces.ts`,
+  `pipeline/src/events.py`, and the `system_events_namespace_chk` constraint in Postgres.
 - `docs/API_CONVENTIONS.md` — response shapes, status codes, handler ordering, `withHandler` usage
 - `docs/TOOL_CONVENTIONS.md` — dual-use `Tool` interface, registry enforcement chain, authoring guide
 - `docs/EVENT_CONTRACT.md` — `system_events` shape, start/end pattern, correlation via `parent_event_id`
@@ -31,7 +33,7 @@ Binding standards every future commit checks against.
 - `frontend/lib/api-helpers.ts` — `ok()`, `err()`, `withHandler({ scope, inputSchema, requireAuth, requiredRole, handler })` — the wrapper every future API route uses
 - `frontend/lib/events.ts` — rewritten for structured events: `emitEventStart`, `emitEventEnd`, `emitEventSingle` writing to `system_events`, never throws (best-effort instrumentation)
 - `db/migrations/007_system_events.sql` — new `system_events` table with 5 indexes, `pg_notify` trigger on `events:{namespace}` channels
-- Deleted `frontend/lib/storage.ts` (legacy filesystem layer) — `frontend/lib/storage/` is the authoritative S3 layer
+- Deleted `frontend/lib/storage/` (legacy filesystem layer) — `frontend/lib/storage/` is the authoritative S3 layer
 - Added `zod` ^4.3.6, `pino` ^10.3.1, `pino-pretty` to `frontend/package.json`
 
 ### Section C — Dual-use Tool framework

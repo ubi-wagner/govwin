@@ -96,10 +96,23 @@ export async function getReviewQueue(): Promise<ReviewQueue> {
   const amendRows = await safeRows(sqlBypass<Array<{
     id: string; solicitationId: string; label: string | null; severity: string | null;
   }>>`
-    SELECT id, solicitation_id AS "solicitationId", label, severity
-    FROM solicitation_amendments
-    WHERE status = 'detected'
-    ORDER BY detected_at DESC
+    SELECT a.id, a.solicitation_id AS "solicitationId", a.label, a.severity
+    FROM solicitation_amendments a
+    -- The JOIN is the point, not decoration. This row's only action is to open the solicitation
+    -- and confirm the amendment, and the queue links straight at it. An amendment whose
+    -- solicitation no longer exists is not a task an operator can do -- it is a 404 sitting in the
+    -- one list that is supposed to be their next actions, and customer-finish grades it a
+    -- brokenLink.
+    --
+    -- Nothing deletes a solicitation in production; harnesses do, and they leave the amendment
+    -- behind. Either way the queue must not offer work that cannot be performed, so it is fixed
+    -- where the list is BUILT rather than by chasing every cleanup path.
+    --
+    -- No backticks in this comment: one inside a tagged template terminates the literal, and tsc
+    -- then reports errors against the SQL as though it were code. That cost two rounds here.
+    JOIN curated_solicitations cs ON cs.id = a.solicitation_id
+    WHERE a.status = 'detected'
+    ORDER BY a.detected_at DESC
   `);
 
   const sections: QueueSection[] = [

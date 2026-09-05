@@ -163,7 +163,7 @@ flagged"). Those are the fallback working as designed, not defects.
 
 ### Purchase history names the work
 
-`app/portal/[slug]/billing/page.tsx` and `…/manage/page.tsx` each ran their own bare
+`app/portal/[tenantSlug]/billing/page.tsx` and `…/manage/page.tsx` each ran their own bare
 `SELECT id, product_type, amount_cents, status, created_at, opportunity_id` and fed the same
 `BillingPanel`, which rendered Product / Amount / Status / Date. Three purchases, three identical
 rows — visible in `docs/ui-atlas/tenant__portal-tenantSlug-billing.jpg`, captured before any of this

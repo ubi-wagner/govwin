@@ -4,7 +4,7 @@
     --ink:#141922; --paper:#e9edf2; --surface:#f6f8fb; --raised:#ffffff;
     --muted:#55606e; --faint:#7f8b99; --line:#d3dae2; --line-soft:#e5e9ef;
     --trace:#0c7280; --trace-ink:#075661; --loop:#5a4fc4; --loop-ink:#443aa6;
-    --good:#2f8f5b;
+    --good:#2f8f5b; --warn:#a06008; --alert:#b0342a;
     /* subsystem chip lightness/sat, hue supplied inline via --h */
     --csat:46%; --cbg:92%; --cbd:80%; --ctsat:52%; --ctxt:30%;
     --shadow:0 1px 2px rgba(20,25,34,.06),0 10px 34px -20px rgba(20,25,34,.30);
@@ -15,6 +15,7 @@
     --ink:#e7ecf2; --paper:#0d1117; --surface:#141a22; --raised:#1a212b;
     --muted:#9aa6b4; --faint:#6b7787; --line:#29323e; --line-soft:#212a35;
     --trace:#35c6cf; --trace-ink:#7fe3e6; --loop:#9a8dff; --loop-ink:#c3baff; --good:#56c98a;
+    --warn:#e0a54a; --alert:#f0736a;
     --csat:40%; --cbg:21%; --cbd:32%; --ctsat:66%; --ctxt:74%;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 40px -22px rgba(0,0,0,.7);
   }}
@@ -22,6 +23,7 @@
     --ink:#e7ecf2; --paper:#0d1117; --surface:#141a22; --raised:#1a212b;
     --muted:#9aa6b4; --faint:#6b7787; --line:#29323e; --line-soft:#212a35;
     --trace:#35c6cf; --trace-ink:#7fe3e6; --loop:#9a8dff; --loop-ink:#c3baff; --good:#56c98a;
+    --warn:#e0a54a; --alert:#f0736a;
     --csat:40%; --cbg:21%; --cbd:32%; --ctsat:66%; --ctxt:74%;
     --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 40px -22px rgba(0,0,0,.7);
   }
@@ -38,8 +40,11 @@
   .brand{display:flex;flex-direction:column;gap:.05rem;margin-right:.4rem;}
   .brand b{font-size:.95rem;letter-spacing:-.01em;}
   .brand span{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);}
-  .meta{display:flex;gap:.4rem;flex-wrap:wrap;}
-  .mchip{font-family:var(--font-mono);font-size:.7rem;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:.16rem .55rem;background:var(--surface);}
+  /* align-items:center, not the default stretch: once a fourth tab narrowed this row the meta
+     chips wrapped to a second line and the live-rows chip stretched to the full height and
+     width of the wrapped container — a 410x60 green slab where a pill belongs. */
+  .meta{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;}
+  .mchip{font-family:var(--font-mono);font-size:.7rem;color:var(--muted);border:1px solid var(--line);border-radius:20px;padding:.16rem .55rem;background:var(--surface);white-space:nowrap;align-self:center;}
   .tabs{display:flex;gap:.25rem;margin-left:auto;}
   .tab{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.02em;padding:.36rem .7rem;border-radius:7px;border:1px solid transparent;color:var(--muted);}
   .tab[aria-selected="true"]{color:var(--trace-ink);border-color:color-mix(in oklab,var(--trace) 40%,var(--line));background:color-mix(in oklab,var(--trace) 9%,transparent);}
@@ -150,6 +155,52 @@
   .uicard .rt{font-family:var(--font-mono);font-size:.7rem;color:var(--muted);margin:.2rem 0 .6rem;word-break:break-all;}
   .uicard .relchips{gap:.3rem;}
 
+  /* ---- live view ---- */
+  /* `.liveview`, NOT `.live` — `live` was already a MODIFIER on `.mchip`/`.badge` (the green
+     'rows · live' pill and the row-estimate badge). A view container called `.live` therefore
+     also matched those pills and handed them `width:100%` and 1.4rem of padding: the header
+     chip rendered as a 413x64 green slab. Two different meanings of one class name, colliding
+     silently — the page still returned 200 and every test still passed. */
+  .liveview{overflow:auto;padding:1.4rem clamp(1rem,3vw,2rem);width:100%;}
+  .epoch{border:1px solid var(--line);border-left:3px solid var(--k,var(--good));border-radius:11px;background:var(--raised);padding:.85rem 1rem;margin-bottom:1.1rem;box-shadow:var(--shadow);}
+  .epoch.unanchored{--k:var(--warn);}
+  .epoch b{font-size:.9rem;}
+  .epoch p{margin:.3rem 0 0;color:var(--muted);font-size:.82rem;max-width:78ch;}
+  .epoch code{font-family:var(--font-mono);font-size:.76rem;background:var(--surface);border:1px solid var(--line-soft);border-radius:4px;padding:.05rem .3rem;}
+  .kchips{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.3rem;}
+  .kchip{display:flex;flex-direction:column;gap:.1rem;align-items:flex-start;border:1px solid var(--line);border-top:3px solid var(--k,var(--faint));border-radius:9px;background:var(--raised);padding:.55rem .85rem;min-width:9.5rem;box-shadow:var(--shadow);}
+  .kchip:hover{border-color:var(--k,var(--trace));}
+  .kchip[aria-pressed="true"]{background:color-mix(in oklab,var(--k,var(--trace)) 11%,var(--raised));}
+  .kchip .kn{font-family:var(--font-mono);font-size:1.25rem;line-height:1.1;color:var(--k,var(--ink));font-variant-numeric:tabular-nums;}
+  .kchip .kl{font-family:var(--font-mono);font-size:.64rem;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);}
+  .k-live{--k:var(--good);} .k-read_only{--k:var(--trace);}
+  .k-written_unread{--k:var(--alert);} .k-untouched{--k:var(--faint);}
+  .lgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(20rem,1fr));gap:1rem;align-items:start;}
+  .lcard{border:1px solid var(--line);border-radius:11px;background:var(--raised);box-shadow:var(--shadow);overflow:hidden;}
+  .lcard>h4{margin:0;padding:.7rem .9rem;border-bottom:1px solid var(--line-soft);font-family:var(--font-mono);font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;gap:1ch;}
+  .lcard .bd{padding:.7rem .9rem;}
+  .lcard p.why{margin:0 0 .7rem;color:var(--muted);font-size:.8rem;}
+  .bars{display:flex;flex-direction:column;gap:.3rem;}
+  .bar{display:grid;grid-template-columns:11rem 1fr auto;align-items:center;gap:.6ch;font-family:var(--font-mono);font-size:.74rem;text-align:left;width:100%;padding:.1rem .15rem;border-radius:5px;}
+  .bar:hover{background:color-mix(in oklab,var(--ink) 6%,transparent);}
+  .bar .bn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--trace-ink);}
+  .bar .bt{height:.5rem;border-radius:3px;background:color-mix(in oklab,var(--good) 55%,transparent);min-width:2px;}
+  .bar .bv{color:var(--faint);font-size:.68rem;font-variant-numeric:tabular-nums;}
+  .tlist{display:flex;flex-wrap:wrap;gap:.35rem;}
+  .lempty{color:var(--faint);font-family:var(--font-mono);font-size:.76rem;}
+  /* activity dot on the sidebar rows + the class badge on a table's detail */
+  .adot{width:.42rem;height:.42rem;border-radius:50%;flex:0 0 auto;background:var(--k,var(--faint));}
+  .badge.act{color:var(--k,var(--faint));border-color:color-mix(in oklab,var(--k,var(--line)) 45%,var(--line));background:color-mix(in oklab,var(--k,var(--line)) 10%,transparent);}
+  .askbox{border:1px solid var(--line);border-radius:11px;background:var(--raised);padding:.9rem 1rem;margin-top:1.2rem;box-shadow:var(--shadow);}
+  .askrow{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;}
+  .askrow input{flex:1 1 20rem;min-width:0;padding:.45rem .6rem;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);font-size:.82rem;}
+  .askrow input::placeholder{color:var(--faint);}
+  .askrow button{border:1px solid var(--trace);border-radius:7px;padding:.45rem .8rem;font-family:var(--font-mono);font-size:.76rem;color:var(--trace-ink);background:color-mix(in oklab,var(--trace) 10%,transparent);}
+  .askrow button:hover:not(:disabled){background:color-mix(in oklab,var(--trace) 18%,transparent);}
+  .askrow button:disabled{opacity:.45;cursor:default;}
+  .askmsg{margin:.55rem 0 0;font-size:.78rem;}
+  .askmsg.err{color:var(--alert);}
+
   .hint{color:var(--faint);font-size:.78rem;font-family:var(--font-mono);margin-top:.8rem;}
 </style>
 
@@ -160,6 +211,7 @@
     <button class="tab" role="tab" data-view="schema" aria-selected="true">Schema</button>
     <button class="tab" role="tab" data-view="flows" aria-selected="false">Data flows</button>
     <button class="tab" role="tab" data-view="uis" aria-selected="false">UI surfaces</button>
+    <button class="tab" role="tab" data-view="live" aria-selected="false">Live</button>
   </div>
   <button class="tgl" id="tgl" aria-label="Toggle theme">◐</button>
 </div>
@@ -175,6 +227,7 @@
   </div>
   <div class="view" id="v-flows"><div class="flows" id="flows"></div></div>
   <div class="view" id="v-uis"><div class="uis" id="uis"></div></div>
+  <div class="view" id="v-live"><div class="liveview" id="live"></div></div>
 </div>
 
 <script id="arch-model" type="application/json">/*__ARCH_MODEL__*/</script>
@@ -186,7 +239,10 @@ const hueOf = t => (SUB[M.tables[t]?.subsystem]?.hue ?? 220);
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-let state = { view:'schema', sel:null, sub:null, q:'' };
+let state = { view:'schema', sel:null, sub:null, klass:null, q:'' };
+let LIVE = null;
+const KLABEL = { live:'live', read_only:'read only', written_unread:'written, never read', untouched:'untouched' };
+const KORDER = ['live','read_only','written_unread','untouched'];
 let COUNTS = null, COUNT_TOTAL = 0;
 const fmt = n => n==null ? '' : n>=1e6 ? (n/1e6).toFixed(n>=1e7?0:1)+'M' : n>=1e3 ? (n/1e3).toFixed(n>=1e4?0:1)+'k' : String(Math.round(n));
 
@@ -217,7 +273,11 @@ async function loadStats(){
 }
 
 function renderSubfilter(){
-  $('subfilter').innerHTML = M.subsystems.filter(s => tablesIn(s.id).length).map(s => {
+  const active = state.klass
+    ? `<button class="sflag k-${state.klass}" data-klass="${state.klass}" title="clear this filter"
+         style="color:var(--k);border-color:var(--k);background:color-mix(in oklab,var(--k) 12%,transparent)">${esc(KLABEL[state.klass])} ×</button>`
+    : '';
+  $('subfilter').innerHTML = active + M.subsystems.filter(s => tablesIn(s.id).length).map(s => {
     const on = state.sub === s.id;
     const style = `--h:${s.hue};color:hsl(${s.hue} var(--ctsat) var(--ctxt));border-color:hsl(${s.hue} var(--csat) var(--cbd));background:${on?`hsl(${s.hue} var(--csat) var(--cbg))`:'transparent'}`;
     return `<button class="sflag" data-sub="${s.id}" style="${style}">${esc(s.label)}</button>`;
@@ -268,6 +328,155 @@ async function loadLiveSchema(){
   } catch { /* not in-app — keep the committed snapshot */ }
 }
 
+/* ---------- THE LIVE LAYER ----------------------------------------------------------------
+   The first three layers describe what the system IS: the extracted schema, the curated
+   subsystems and traces, the UI map. None of them says whether any of it is DOING anything —
+   and on a static map a table with nothing on either end looks exactly like a load-bearing one.
+
+   This layer asks the database. `pg_stat_user_tables` counts writes (ins+upd+del) and reads
+   (seq_scan+idx_scan) per table, so the map can paint what is live, what is only read, what is
+   WRITTEN AND NEVER READ (a producer with no consumer, stated by Postgres rather than inferred),
+   and what nothing has touched at all.
+
+   ⚠️ THE EPOCH IS THE INSTRUMENT. Those counters run from `pg_stat_database.stats_reset`, which
+   is very often NULL — the database is not telling us how far back they go. When it is unknown
+   this view says "not touched in this reading" and NOT "nothing writes this", because the second
+   is a claim the evidence does not support. See lib/architecture-live.ts. */
+
+async function loadLive(){
+  try {
+    const r = await fetch('/api/admin/architecture/live', { headers: { Accept: 'application/json' } });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.data || !j.data.tables) return;
+    LIVE = j.data;
+    renderSubfilter(); renderList();
+    if (state.view === 'live') renderLive();
+    if (state.view === 'schema' && state.sel) renderDetail(state.sel);
+  } catch { /* opened as a file — the map keeps its three static layers */ }
+}
+
+const ago = iso => {
+  const ms = Date.now() - Date.parse(iso);
+  if (!isFinite(ms)) return '';
+  const h = ms/3.6e6;
+  return h < 1 ? `${Math.max(1,Math.round(h*60))}m` : h < 48 ? `${Math.round(h)}h` : `${Math.round(h/24)}d`;
+};
+
+function renderLive(){
+  if (!LIVE){
+    $('live').innerHTML = `<div class="epoch unanchored"><b>The live layer is not available here.</b>
+      <p>It reads the running database through <code>/api/admin/architecture/live</code>, so it only
+      appears when this explorer is opened inside the app at <code>/admin/architecture</code> by an
+      rfp_admin. The schema, flows and UI tabs are self-contained and work anywhere.</p></div>`;
+    return;
+  }
+  const L = LIVE, anchored = !!L.anchored;
+
+  // The banner is the honest part. Everything below it means something different depending on
+  // whether we know when the counters started, so that fact leads rather than sits in a footnote.
+  // THE SPAN IS STATED, NEVER JUDGED. A first draft here said a table with no writes "in a span
+  // this long" was a genuine finding — and then the very first anchored reading was one minute old
+  // and showed 121 untouched tables under that sentence. There is no principled threshold: whether
+  // silence means anything depends entirely on what was driven. So the span is reported exactly and
+  // the reader judges, which is the only version of this that cannot be confidently wrong.
+  const span = anchored ? ago(L.statsSince) : null;
+  const epoch = anchored
+    ? `<div class="epoch"><b>Counters anchored ${esc(span)} ago — ${esc(L.statsSince.slice(0,16).replace('T',' '))} UTC</b>
+        <p>Every number below is activity in exactly that span, and nothing below is a claim about
+        anything outside it. Whether a quiet table means something depends on what you drove: after a
+        full lane sweep it is a finding, ${esc(span)} after a reset it is just a short reading.</p></div>`
+    : `<div class="epoch unanchored"><b>Unanchored — Postgres does not know when these counters started.</b>
+        <p><code>pg_stat_database.stats_reset</code> is null, so the counts below are real but their
+        span is not. Read them as <em>coverage of this reading</em>: “nothing touched this table”
+        here does <strong>not</strong> mean “nothing writes this table”. To anchor it — and turn
+        this into a coverage map for a live drive — reset at a known moment, drive the product,
+        then come back:</p>
+        <p><code>psql "$DATABASE_URL_OWNER" -c 'SELECT pg_stat_reset()'</code>
+        ${L.serverStart ? ` &nbsp;·&nbsp; this server started ${ago(L.serverStart)} ago` : ''}</p></div>`;
+
+  const chips = KORDER.map(k => `<button class="kchip k-${k}" data-klass="${k}" aria-pressed="${state.klass===k}">
+      <span class="kn">${L.counts[k] ?? 0}</span><span class="kl">${esc(KLABEL[k])}</span></button>`).join('');
+
+  const max = L.hottest.length ? L.hottest[0].writes : 1;
+  const bars = L.hottest.length ? L.hottest.map(h => `<button class="bar" data-nav="t:${esc(h.table)}">
+      <span class="bn">${esc(h.table)}</span>
+      <span class="bt" style="width:${Math.max(2, Math.round(h.writes/max*100))}%"></span>
+      <span class="bv">${fmt(h.writes)}</span></button>`).join('')
+    : `<span class="lempty">no writes recorded in this reading</span>`;
+
+  const chipList = (arr) => arr.length
+    ? arr.map(t => M.tables[t]
+        ? `<button class="rchip" data-nav="t:${esc(t)}">${esc(t)}</button>`
+        : `<span class="rchip" style="opacity:.5" title="in the database, not in this map's snapshot">${esc(t)}</span>`).join('')
+    : `<span class="lempty">none</span>`;
+
+  $('live').innerHTML = epoch + `<div class="kchips">${chips}</div>
+    <div class="lgrid">
+      <div class="lcard"><h4><span>Written and never read</span><span>${L.writtenUnread.length}</span></h4>
+        <div class="bd">
+          <p class="why">Rows go in and nothing ever selects them. This is the producer-with-no-consumer
+          shape the whole asymmetry sweep was about — and unlike the others it is a defect shape
+          whatever the epoch is, because the writes and the absent reads are counted over the same span.</p>
+          <div class="tlist">${chipList(L.writtenUnread)}</div>
+        </div></div>
+
+      <div class="lcard"><h4><span>Not touched ${anchored ? `in the last ${esc(span)}` : 'in this reading'}</span><span>${L.untouched.length}</span></h4>
+        <div class="bd">
+          <p class="why">${anchored
+            ? `Nothing wrote or read these in the ${esc(span)} since the counters were anchored. That `
+              + 'is coverage of a drive, not a verdict on a table — a capability nobody exercised in '
+              + 'that span lands here exactly like one nothing can reach. The list earns weight from '
+              + 'what you drove, so drive deliberately and then read it.'
+            : 'Nothing touched these during this reading. With no epoch that is a statement about '
+              + 'the reading, not about the table: it is coverage, and the honest use of it is to '
+              + 'anchor the counters first and drive the product.'}</p>
+          <div class="tlist">${chipList(L.untouched)}</div>
+        </div></div>
+
+      <div class="lcard"><h4><span>Busiest by writes</span><span>${L.hottest.length}</span></h4>
+        <div class="bd"><div class="bars">${bars}</div></div></div>
+    </div>
+
+    <div class="askbox">
+      <div class="askrow">
+        <input id="ask-doing" type="text" maxlength="500" autocomplete="off"
+          placeholder="what you were just doing — optional, and the most useful thing here">
+        <button id="ask-go">Ask the companion (60m)</button>
+      </div>
+      <p class="askmsg" id="ask-msg" style="color:var(--faint)">Advisory only: it reads the same
+        telemetry window you can see at <code>/admin/observe</code>, plus this activity picture and
+        the findings the arithmetic already computed, and answers with a MECHANISM and a CHANGE. It
+        will not tell you things are fine — an empty window means nothing happened, not that nothing
+        is wrong. How it works, how to ask well and what it cannot see:
+        <a href="/admin/observe" target="_top">the guide on Observe</a>.</p>
+    </div>
+    <p class="hint">Counters from pg_stat_user_tables. Reads include our own harnesses and lenses —
+      a table can look busy because a sweep walked it.</p>`;
+}
+
+/* Ask the companion. A doorbell, not a call: this POSTs an event and the agent fabric picks it up
+   under its own spend caps, rate limits and kill switch. A direct model call from here would be
+   the one AI request on the platform that no cap could stop. */
+async function askCompanion(){
+  const btn = $('ask-go'), msg = $('ask-msg'), inp = $('ask-doing');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = 'Asking…';
+  msg.className = 'askmsg'; msg.style.color = 'var(--faint)';
+  try {
+    const r = await fetch('/api/admin/observe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ minutes: 60, doing: (inp.value || '').trim() || null }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok){ msg.className = 'askmsg err'; msg.style.color = ''; msg.textContent = j.error || `HTTP ${r.status}`; }
+    else msg.textContent = 'Asked. It runs under the platform spend caps; its read appears in /admin/agents.';
+  } catch {
+    msg.className = 'askmsg err'; msg.style.color = ''; msg.textContent = 'Network error — the request did not go.';
+  }
+  btn.disabled = false; btn.textContent = 'Ask the companion (60m)';
+}
+
 function tablesIn(sub){ return Object.keys(M.tables).filter(t => M.tables[t].subsystem === sub); }
 
 /* ---------- sidebar list ---------- */
@@ -275,6 +484,9 @@ function renderList(){
   const q = state.q.trim().toLowerCase();
   const match = t => {
     if (state.sub && M.tables[t].subsystem !== state.sub) return false;
+    // The activity filter only applies once the live layer has loaded. A table the map knows but
+    // pg_stat does not (a view) has no class and is filtered out rather than guessed at.
+    if (state.klass && (!LIVE || (LIVE.tables[t] || {}).klass !== state.klass)) return false;
     if (!q) return true;
     if (t.toLowerCase().includes(q)) return true;
     return M.tables[t].columns.some(c => c.name.toLowerCase().includes(q));
@@ -286,9 +498,11 @@ function renderList(){
     html += `<div class="grp"><span class="gc" style="background:hsl(${s.hue} var(--ctsat) 50%)"></span>${esc(s.label)} · ${ts.length}</div>`;
     for (const t of ts){
       const tb = M.tables[t];
+      const act = LIVE && LIVE.tables[t] ? LIVE.tables[t].klass : null;
       html += `<button class="trow" data-nav="t:${esc(t)}" aria-current="${state.sel===t}">`+
         `<span class="tdot" style="background:hsl(${s.hue} var(--ctsat) 50%)"></span>`+
         `<span class="tn">${esc(t)}</span>`+
+        (act ? `<span class="adot k-${act}" title="${esc(KLABEL[act])}"></span>` : '')+
         `<span class="tm">${tb.columns.length}c·${tb.out.length}fk${COUNTS&&COUNTS[t]!=null?` · ${fmt(COUNTS[t])}`:''}</span></button>`;
     }
   }
@@ -365,6 +579,10 @@ function renderDetail(name){
       <span class="badge">${t.columns.length} fields</span>
       <span class="badge">${t.out.length} out · ${t.in.length} in</span>
       ${COUNTS && COUNTS[name]!=null ? `<span class="badge live">~${fmt(COUNTS[name])} rows</span>` : ''}
+      ${LIVE && LIVE.tables[name] ? (a => `<span class="badge act k-${a.klass}" title="${LIVE.anchored
+          ? 'since ' + esc(LIVE.statsSince.slice(0,16).replace('T',' ')) + ' UTC'
+          : 'unanchored reading — the span of these counters is unknown'
+        }">${esc(KLABEL[a.klass])} · ${fmt(a.writes)}w ${fmt(a.reads)}r</span>`)(LIVE.tables[name]) : ''}
     </div>
     <div class="sectitle">Foreign-key neighborhood</div>
     ${graph(name)}
@@ -424,6 +642,7 @@ function setView(v){
   $('v-'+v).classList.add('on');
   if (v==='flows') renderFlows();
   if (v==='uis') renderUis();
+  if (v==='live') renderLive();
   syncHash();
 }
 function select(name){
@@ -439,6 +658,20 @@ const cssq = s => s.replace(/["\\]/g,'\\$&');
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
+  if (e.target.closest('#ask-go')){ askCompanion(); return; }
+  // A class chip is a lens on the MAP, not just a number: it drops you into the schema list
+  // filtered to those tables, so "show me everything nothing has touched" is one click.
+  const kl = e.target.closest('[data-klass]');
+  if (kl){
+    const wasLive = state.view === 'live';
+    state.klass = state.klass===kl.dataset.klass ? null : kl.dataset.klass;
+    state.sel = null;
+    renderSubfilter();
+    if (state.klass){ setView('schema'); renderList(); renderOverview(); }
+    else if (wasLive) renderLive();
+    else { renderList(); renderOverview(); }
+    return;
+  }
   const nav = e.target.closest('[data-nav]');
   if (nav){ const [k,v] = nav.dataset.nav.split(':'); if (k==='t') select(v); return; }
   const sub = e.target.closest('[data-sub]');
@@ -468,7 +701,7 @@ function syncHash(){
 function fromHash(){
   const h = decodeURIComponent(location.hash.slice(1));
   if (h.startsWith('t/')) { select(h.slice(2)); return; }
-  if (h==='flows'||h==='uis') { setView(h); return; }
+  if (h==='flows'||h==='uis'||h==='live') { setView(h); return; }
   setView('schema'); renderOverview();
 }
 window.addEventListener('hashchange', fromHash);
@@ -476,6 +709,6 @@ window.addEventListener('hashchange', fromHash);
 /* ---------- boot ---------- */
 renderList();
 fromHash();
-loadLiveSchema().then(loadStats);
+loadLiveSchema().then(loadStats).then(loadLive);
 
 </script>

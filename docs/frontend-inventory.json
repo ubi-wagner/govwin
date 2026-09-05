@@ -5,7 +5,7 @@
   {
    "kind": "api-route",
    "files": 285,
-   "lines": 43262
+   "lines": 43316
   },
   {
    "kind": "app-boundary",
@@ -25,7 +25,7 @@
   {
    "kind": "component",
    "files": 180,
-   "lines": 46152
+   "lines": 46165
   },
   {
    "kind": "e2e",
@@ -39,8 +39,8 @@
   },
   {
    "kind": "lib",
-   "files": 330,
-   "lines": 69424
+   "files": 333,
+   "lines": 69975
   },
   {
    "kind": "middleware",
@@ -54,13 +54,13 @@
   },
   {
    "kind": "page",
-   "files": 122,
-   "lines": 19664
+   "files": 123,
+   "lines": 19911
   },
   {
    "kind": "script",
-   "files": 209,
-   "lines": 32673
+   "files": 177,
+   "lines": 30573
   },
   {
    "kind": "server-action",
@@ -69,8 +69,8 @@
   },
   {
    "kind": "test",
-   "files": 242,
-   "lines": 33726
+   "files": 244,
+   "lines": 33926
   }
  ],
  "records": [
@@ -3255,6 +3255,80 @@
     "expect(isSectionWritable({ isLocked: false, completedStage: 'draft' }, 'final')).toBe",
     "expect(sectionLockReason({ isLocked: false, completedStage: 'draft' }, 'final')?.code).toBe",
     "expect(isSectionWritable({ isLocked: false, completedStage: null }, 'final')).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/capture-forms-send-session.test.ts",
+   "kind": "test",
+   "lines": 99,
+   "bytes": 4939,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readdirSync",
+      "readFileSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "process.cwd",
+    "readdirSync",
+    "e.name.startsWith",
+    "join",
+    "e.isDirectory",
+    "walk",
+    "/\\.tsx?$/.test",
+    "out.push",
+    "statSync(join(ROOT, d)).isDirectory",
+    "statSync",
+    "f.replace",
+    "componentFiles().filter",
+    "componentFiles",
+    "readFileSync",
+    "rel(f).startsWith",
+    "rel",
+    "CAPTURE_ROUTES.some",
+    "src.includes",
+    "describe",
+    "it",
+    "capturePosters().map",
+    "capturePosters",
+    "expect(posters.length, 'no component posts to a capture route — the scan root or the route '\n      + 'list is wrong').toBeGreaterThan",
+    "expect",
+    "expect(posters).toContain",
+    "capturePosters().filter",
+    "readFileSync(f, 'utf8').includes",
+    "expect(\n      offenders.map(rel),\n      `these components POST to a capture route without sending the visitor session. The columns `\n      + `accept NULL by design, so the route answers 201 and nothing fails — but every such `\n      + `submission is un-attributable forever, and /admin/funnel can only report that it has `\n      + `nothing to measure. Import { ${HELPER} } from '@/lib/visitor-session'.`,\n    ).toEqual",
+    "offenders.map",
+    "componentFiles()\n      .concat([join(ROOT, 'lib', 'visitor-session.ts')])\n      .filter((f) => { try { return readFileSync(f, 'utf8').includes('_rfp_sid'); } catch { return false; } })\n      .map(rel).sort",
+    "componentFiles()\n      .concat([join(ROOT, 'lib', 'visitor-session.ts')])\n      .filter((f) => { try { return readFileSync(f, 'utf8').includes('_rfp_sid'); } catch { return false; } }).map",
+    "componentFiles()\n      .concat([join(ROOT, 'lib', 'visitor-session.ts')]).filter",
+    "componentFiles().concat",
+    "expect(naming).toEqual"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -7554,6 +7628,81 @@
     "exportToDocx(spacerDoc({ height: 600 }), {}).then",
     "expect(small).toContain",
     "expect(large).toContain"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/observe-discrepancies.test.ts",
+   "kind": "test",
+   "lines": 101,
+   "bytes": 5003,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/observe",
+     "names": [
+      "findDiscrepancies",
+      "clampWindow",
+      "ObservedEvent"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "Math.random().toString(36).slice",
+    "Math.random().toString",
+    "Math.random",
+    "findDiscrepancies",
+    "describe",
+    "it",
+    "expect(run([ev({}), ev({ type: 'section.locked' })])).toEqual",
+    "expect",
+    "run",
+    "ev",
+    "expect(unclosed.map((d) => d.severity)).toContain",
+    "unclosed.map",
+    "expect(unclosed[0].what).toMatch",
+    "expect(closed, 'a matched bracket must NOT be reported').toEqual",
+    "expect(stuck.some((d) => d.severity === 'finding' && /never confirmed/.test(d.what))).toBe",
+    "stuck.some",
+    "/never confirmed/.test",
+    "expect(sent).toEqual",
+    "expect(r).toHaveLength",
+    "expect(r[0].severity, 'a sandbox with no provider would otherwise cry wolf every run').toBe",
+    "expect(r[0].meaning).toMatch",
+    "expect(idle.some((d) => /never advanced/.test(d.what))).toBe",
+    "idle.some",
+    "/never advanced/.test",
+    "t.getTime",
+    "expect(moved).toEqual",
+    "expect(bad.some((d) => /no queue reads/.test(d.what))).toBe",
+    "bad.some",
+    "/no queue reads/.test",
+    "expect(good).toEqual",
+    "expect(r.some((d) => /carry an error/.test(d.what))).toBe",
+    "r.some",
+    "/carry an error/.test",
+    "expect(clampWindow(0)).toBe",
+    "clampWindow",
+    "expect(clampWindow(99999)).toBe",
+    "expect(clampWindow('abc')).toBe",
+    "expect(clampWindow(undefined)).toBe",
+    "expect(clampWindow(15)).toBe",
+    "expect(r.length).toBeGreaterThan",
+    "expect(d.meaning.length, `\"${d.what}\" has no meaning`).toBeGreaterThan"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -19056,7 +19205,7 @@
    "file": "app/(marketing)/legal/ai-disclosure/page.tsx",
    "kind": "page",
    "lines": 144,
-   "bytes": 7314,
+   "bytes": 7355,
    "client": false,
    "exports": [
     {
@@ -19142,8 +19291,8 @@
   {
    "file": "app/(marketing)/legal/privacy/page.tsx",
    "kind": "page",
-   "lines": 140,
-   "bytes": 7685,
+   "lines": 151,
+   "bytes": 8603,
    "client": false,
    "exports": [
     {
@@ -22064,6 +22213,93 @@
    "jsonResponses": [],
    "route": "/admin/layout.tsx",
    "dynamic": false,
+   "params": []
+  },
+  {
+   "file": "app/admin/observe/page.tsx",
+   "kind": "page",
+   "lines": 211,
+   "bytes": 10384,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "ObservePage",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "redirect"
+     ]
+    },
+    {
+     "spec": "next/link",
+     "names": [
+      "Link"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/observe",
+     "names": [
+      "observe",
+      "clampWindow",
+      "Observation"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "new Date(d).toISOString().slice",
+    "new Date(d).toISOString",
+    "auth",
+    "redirect",
+    "hasRoleAtLeast",
+    "clampWindow",
+    "observe",
+    "console.error",
+    "o?.discrepancies.filter",
+    "WINDOWS.map",
+    "[...findings, ...notes].map",
+    "o.events.slice(0, 60).map",
+    "o.events.slice",
+    "clock",
+    "o.tasks.map",
+    "o.mail.map",
+    "o.agents.map",
+    "o.workflows.map"
+   ],
+   "jsx": [
+    "Link",
+    "Card",
+    "Empty"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [],
+   "route": "/admin/observe",
+   "dynamic": true,
    "params": []
   },
   {
@@ -26974,8 +27210,8 @@
   {
    "file": "app/api/admin/applications/[id]/accept/route.ts",
    "kind": "api-route",
-   "lines": 383,
-   "bytes": 16951,
+   "lines": 400,
+   "bytes": 18051,
    "client": false,
    "exports": [
     {
@@ -27061,6 +27297,12 @@
      ]
     },
     {
+     "spec": "@/lib/onboarding",
+     "names": [
+      "seedProfileFromApplication"
+     ]
+    },
+    {
      "spec": "@/lib/rbac",
      "names": [
       "isRole",
@@ -27080,11 +27322,11 @@
      ]
     }
    ],
-   "tryCount": 10,
+   "tryCount": 11,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 58
+     "line": 59
     }
    ],
    "calls": [
@@ -27112,6 +27354,7 @@
     "send",
     "String",
     "closeTasksForEntity",
+    "seedProfileFromApplication",
     "backfillTenant",
     "scoreTenantCards",
     "copyStarterSetToTenant",
@@ -27127,42 +27370,42 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 34
+     "line": 35
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 38
+     "line": 39
     },
     {
      "arg": "{ error: 'Invalid application ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'Missing user id in session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 47
+     "line": 48
     },
     {
      "arg": "{ error: 'Application not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 74
+     "line": 75
     },
     {
      "arg": "{ error: `Application is already ${app.status}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 409 }",
-     "line": 77
+     "line": 78
     },
     {
      "arg": "{\n      data: {\n        tenantId: tenantId,\n        tenantSlug: finalSlug,\n        userId: newUserId,\n        contactEmail: app.contactEmail,\n        contactName: app.contactName,\n        companyName: app.companyName,\n        emailSent: emailResult.accepted,\n        emailProvider: emailResult.provider,\n        emailFailed: !!emailResult.error,\n        // The admin UI relays these to the customer w",
      "opts": "",
-     "line": 352
+     "line": 369
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 377
+     "line": 394
     }
    ],
    "route": "/api/admin/applications/[id]/accept",
@@ -41536,8 +41779,8 @@
   {
    "file": "app/api/applications/route.ts",
    "kind": "api-route",
-   "lines": 260,
-   "bytes": 11239,
+   "lines": 270,
+   "bytes": 12241,
    "client": false,
    "exports": [
     {
@@ -41606,19 +41849,19 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 97
+     "line": 101
     },
     {
      "tag": "sql",
-     "line": 118
+     "line": 122
     },
     {
      "tag": "sql",
-     "line": 133
+     "line": 137
     },
     {
      "tag": "sql",
-     "line": 162
+     "line": 166
     }
    ],
    "calls": [
@@ -41655,7 +41898,6 @@
     "z.string().min(1, 'Please tell us how you heard about us').max",
     "z.literal",
     "z.string().email().max(200).optional",
-    "z.string().max(50).default",
     "z.string().max(120).nullable().optional",
     "z.string().max(120).nullable",
     "request.json",
@@ -41688,42 +41930,42 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_JSON' }",
      "opts": "{ status: 400 }",
-     "line": 71
+     "line": 75
     },
     {
      "arg": "{\n        error: 'Please check the form and fix the highlighted issues.',\n        code: 'VALIDATION_ERROR',\n        details: parsed.error.issues.map((i) => ({ path: i.path, message: i.message })),\n      }",
      "opts": "{ status: 422 }",
-     "line": 79
+     "line": 83
     },
     {
      "arg": "{\n        error: 'An account with this email already exists. Log in at /login or email eric@rfppipeline.com for help.',\n        code: 'EMAIL_EXISTS_USER',\n      }",
      "opts": "{ status: 409 }",
-     "line": 101
+     "line": 105
     },
     {
      "arg": "{\n          error: 'An application from this organization already exists. RFP Pipeline allows one administrator per company. Please contact your organization\\'s existing administrator to be added as a team member, or email eric@rfppipeline.com if this is a different company.',\n          code: 'DOMAIN_MATCH',\n        }",
      "opts": "{ status: 409 }",
-     "line": 126
+     "line": 130
     },
     {
      "arg": "{\n          error: 'Your organization already has an account on RFP Pipeline. Please contact your organization\\'s administrator to be added as a team member, or email eric@rfppipeline.com if this is a different company.',\n          code: 'DOMAIN_MATCH_USER',\n        }",
      "opts": "{ status: 409 }",
-     "line": 140
+     "line": 144
     },
     {
      "arg": "{ data: { id: rows[0].id } }",
      "opts": "{ status: 201 }",
-     "line": 239
+     "line": 249
     },
     {
      "arg": "{\n          error:\n            'An application with this email already exists. If you need to update your submission, email eric@rfppipeline.com.',\n          code: 'DUPLICATE_EMAIL',\n        }",
      "opts": "{ status: 409 }",
-     "line": 244
+     "line": 254
     },
     {
      "arg": "{ error: 'Something went wrong. Please try again or email eric@rfppipeline.com.', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 254
+     "line": 264
     }
    ],
    "route": "/api/applications",
@@ -70082,8 +70324,8 @@
   {
    "file": "app/api/waitlist/route.ts",
    "kind": "api-route",
-   "lines": 139,
-   "bytes": 5102,
+   "lines": 166,
+   "bytes": 6800,
    "client": false,
    "exports": [
     {
@@ -70122,17 +70364,23 @@
      "names": [
       "recordContact"
      ]
+    },
+    {
+     "spec": "@/lib/tasks/tasks",
+     "names": [
+      "createTask"
+     ]
     }
    ],
-   "tryCount": 5,
+   "tryCount": 6,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 74
+     "line": 75
     },
     {
      "tag": "sql",
-     "line": 100
+     "line": 101
     }
    ],
    "calls": [
@@ -70146,6 +70394,8 @@
     "body.email.toLowerCase",
     "recordContact",
     "console.error",
+    "createTask",
+    "body.company_name.trim",
     "emitEventSingle",
     "systemActor"
    ],
@@ -70156,37 +70406,37 @@
     {
      "arg": "{ error: 'Use POST to join waitlist', code: 'NOT_IMPLEMENTED' }",
      "opts": "{ status: 501 }",
-     "line": 16
+     "line": 17
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 36
+     "line": 37
     },
     {
      "arg": "{ error: 'email is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 44
+     "line": 45
     },
     {
      "arg": "{ error: 'Invalid email format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 53
+     "line": 54
     },
     {
      "arg": "{ data: { id: entry.id, message: 'Successfully joined waitlist' } }",
      "opts": "{ status: 201 }",
-     "line": 120
+     "line": 147
     },
     {
      "arg": "{ error: 'Failed to join waitlist', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 126
+     "line": 153
     },
     {
      "arg": "{ error: 'Failed to process request', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 133
+     "line": 160
     }
    ],
    "route": "/api/waitlist",
@@ -72080,8 +72330,8 @@
   {
    "file": "app/portal/[tenantSlug]/dashboard/page.tsx",
    "kind": "page",
-   "lines": 243,
-   "bytes": 12761,
+   "lines": 268,
+   "bytes": 14463,
    "client": false,
    "exports": [
     {
@@ -72168,23 +72418,23 @@
     },
     {
      "tag": "sql",
-     "line": 86
-    },
-    {
-     "tag": "sql",
      "line": 92
     },
     {
      "tag": "sql",
-     "line": 96
+     "line": 103
     },
     {
      "tag": "sql",
-     "line": 109
+     "line": 107
     },
     {
      "tag": "sql",
-     "line": 124
+     "line": 120
+    },
+    {
+     "tag": "sql",
+     "line": 135
     }
    ],
    "calls": [
@@ -76240,8 +76490,8 @@
   {
    "file": "components/admin/admin-nav-data.ts",
    "kind": "component",
-   "lines": 187,
-   "bytes": 8515,
+   "lines": 190,
+   "bytes": 8831,
    "client": false,
    "exports": [
     {
@@ -81130,8 +81380,8 @@
   {
    "file": "components/marketing/application-form.tsx",
    "kind": "component",
-   "lines": 471,
-   "bytes": 19189,
+   "lines": 477,
+   "bytes": 19720,
    "client": true,
    "exports": [
     {
@@ -81154,6 +81404,12 @@
      "names": [
       "TERMS_TEXT",
       "TERMS_VERSION"
+     ]
+    },
+    {
+     "spec": "@/lib/visitor-session",
+     "names": [
+      "visitorSessionId"
      ]
     }
    ],
@@ -81192,6 +81448,7 @@
     "tcSignature.toLowerCase",
     "fetch",
     "JSON.stringify",
+    "visitorSessionId",
     "resp.json",
     "toggle",
     "setTcOpen",
@@ -81754,8 +82011,8 @@
   {
    "file": "components/marketing/waitlist-form.tsx",
    "kind": "component",
-   "lines": 90,
-   "bytes": 3161,
+   "lines": 94,
+   "bytes": 3412,
    "client": true,
    "exports": [
     {
@@ -81770,6 +82027,12 @@
      "names": [
       "useState"
      ]
+    },
+    {
+     "spec": "@/lib/visitor-session",
+     "names": [
+      "visitorSessionId"
+     ]
     }
    ],
    "tryCount": 1,
@@ -81783,6 +82046,7 @@
     "fetch",
     "JSON.stringify",
     "company.trim",
+    "visitorSessionId",
     "res.json().catch",
     "res.json",
     "String",
@@ -100240,8 +100504,8 @@
   {
    "file": "lib/crypto.ts",
    "kind": "lib",
-   "lines": 46,
-   "bytes": 1874,
+   "lines": 68,
+   "bytes": 3304,
    "client": false,
    "exports": [
     {
@@ -100883,7 +101147,7 @@
    "file": "lib/email/index.ts",
    "kind": "lib",
    "lines": 207,
-   "bytes": 8945,
+   "bytes": 8957,
    "client": false,
    "exports": [
     {
@@ -100948,6 +101212,10 @@
     },
     {
      "name": "mailStateFor",
+     "form": "re-export"
+    },
+    {
+     "name": "sendsSince",
      "form": "re-export"
     },
     {
@@ -101067,8 +101335,8 @@
   {
    "file": "lib/email/ledger.ts",
    "kind": "lib",
-   "lines": 377,
-   "bytes": 15774,
+   "lines": 397,
+   "bytes": 16724,
    "client": false,
    "exports": [
     {
@@ -101147,6 +101415,11 @@
      "async": true
     },
     {
+     "name": "sendsSince",
+     "form": "function",
+     "async": true
+    },
+    {
      "name": "suppress",
      "form": "function",
      "async": true
@@ -101166,7 +101439,7 @@
      ]
     }
    ],
-   "tryCount": 11,
+   "tryCount": 12,
    "sqlTags": [
     {
      "tag": "sqlBypass",
@@ -101214,7 +101487,11 @@
     },
     {
      "tag": "sqlBypass",
-     "line": 366
+     "line": 368
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 386
     }
    ],
    "calls": [
@@ -106491,6 +106768,197 @@
     "Math.abs(n).toLocaleString",
     "Math.abs",
     "formatByCode"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/observe.ts",
+   "kind": "lib",
+   "lines": 232,
+   "bytes": 10995,
+   "client": false,
+   "exports": [
+    {
+     "name": "Severity",
+     "form": "type"
+    },
+    {
+     "name": "Discrepancy",
+     "form": "type"
+    },
+    {
+     "name": "ObservedEvent",
+     "form": "type"
+    },
+    {
+     "name": "Observation",
+     "form": "type"
+    },
+    {
+     "name": "clampWindow",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "observe",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "findDiscrepancies",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sqlBypass"
+     ]
+    },
+    {
+     "spec": "@/lib/event-labels",
+     "names": [
+      "describeEvent"
+     ]
+    },
+    {
+     "spec": "@/lib/email",
+     "names": [
+      "sendsSince"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [
+    {
+     "tag": "sqlBypass",
+     "line": 85
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 89
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 93
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 96
+    }
+   ],
+   "calls": [
+    "Number",
+    "Number.isFinite",
+    "Math.max",
+    "Math.min",
+    "Math.round",
+    "clampWindow",
+    "Date.now",
+    "Promise.all",
+    "sendsSince",
+    "events.map",
+    "describeEvent",
+    "findDiscrepancies",
+    "starts.set",
+    "starts.delete",
+    "out.push",
+    "e.createdAt.toISOString().slice",
+    "e.createdAt.toISOString",
+    "mail.filter",
+    "stuck.map((m) => `${m.template ?? 'no template'} → ${m.toEmail}`).slice(0, 4).join",
+    "stuck.map((m) => `${m.template ?? 'no template'} → ${m.toEmail}`).slice",
+    "stuck.map",
+    "failed.map((m) => `${m.template ?? '—'} → ${m.toEmail}`).slice(0, 4).join",
+    "failed.map((m) => `${m.template ?? '—'} → ${m.toEmail}`).slice",
+    "failed.map",
+    "workflows.filter",
+    "w.updatedAt.getTime",
+    "w.createdAt.getTime",
+    "idle.map((w) => `${w.workflowName} (step ${w.currentStep ?? '?'})`).slice(0, 4).join",
+    "idle.map((w) => `${w.workflowName} (step ${w.currentStep ?? '?'})`).slice",
+    "idle.map",
+    "events.filter",
+    "errored.map((e) => `${e.namespace}:${e.type} — ${String(e.error).slice(0, 60)}`).slice(0, 4).join",
+    "errored.map((e) => `${e.namespace}:${e.type} — ${String(e.error).slice(0, 60)}`).slice",
+    "errored.map",
+    "String(e.error).slice",
+    "String",
+    "tasks.filter",
+    "VISIBLE.has",
+    "unseen.map((t) => `${t.title.slice(0, 40)} → ${t.assigneeRole}`).slice(0, 4).join",
+    "unseen.map((t) => `${t.title.slice(0, 40)} → ${t.assigneeRole}`).slice",
+    "unseen.map",
+    "t.title.slice",
+    "agentFail.map((e) => e.type).slice(0, 4).join",
+    "agentFail.map((e) => e.type).slice",
+    "agentFail.map"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/onboarding.ts",
+   "kind": "lib",
+   "lines": 135,
+   "bytes": 7005,
+   "client": false,
+   "exports": [
+    {
+     "name": "ProfileSeedResult",
+     "form": "type"
+    },
+    {
+     "name": "seedProfileFromApplication",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sqlBypass"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sqlBypass",
+     "line": 83
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 89
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 89
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 105
+    }
+   ],
+   "calls": [
+    "Array.isArray",
+    "v.trim",
+    "seen.has",
+    "s.toLowerCase",
+    "seen.add",
+    "out.push",
+    "clean",
+    "a.techSummary.trim().slice",
+    "a.techSummary.trim",
+    "console.error"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -116535,8 +117003,8 @@
   {
    "file": "lib/rate-limit.ts",
    "kind": "lib",
-   "lines": 66,
-   "bytes": 2091,
+   "lines": 81,
+   "bytes": 3158,
    "client": false,
    "exports": [
     {
@@ -120603,8 +121071,8 @@
   {
    "file": "lib/terms.ts",
    "kind": "lib",
-   "lines": 96,
-   "bytes": 10763,
+   "lines": 176,
+   "bytes": 21930,
    "client": false,
    "exports": [
     {
@@ -125190,6 +125658,37 @@
    "jsonResponses": []
   },
   {
+   "file": "lib/visitor-session.ts",
+   "kind": "lib",
+   "lines": 47,
+   "bytes": 2498,
+   "client": false,
+   "exports": [
+    {
+     "name": "VISITOR_SESSION_KEY",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "visitorSessionId",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "window.sessionStorage.getItem",
+    "sid.trim",
+    "sid.trim().slice"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "middleware.ts",
    "kind": "middleware",
    "lines": 330,
@@ -126430,6 +126929,347 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-application-intake.mts",
+   "kind": "script",
+   "lines": 376,
+   "bytes": 24287,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "mkdirSync"
+     ]
+    },
+    {
+     "spec": "../lib/terms",
+     "names": [
+      "TERMS_VERSION"
+     ]
+    }
+   ],
+   "tryCount": 5,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 173
+    },
+    {
+     "tag": "sql",
+     "line": 191
+    },
+    {
+     "tag": "sql",
+     "line": 199
+    },
+    {
+     "tag": "sql",
+     "line": 217
+    },
+    {
+     "tag": "sql",
+     "line": 289
+    },
+    {
+     "tag": "sql",
+     "line": 321
+    },
+    {
+     "tag": "sql",
+     "line": 328
+    },
+    {
+     "tag": "sql",
+     "line": 342
+    },
+    {
+     "tag": "sql",
+     "line": 347
+    },
+    {
+     "tag": "sql",
+     "line": 350
+    },
+    {
+     "tag": "sql",
+     "line": 351
+    },
+    {
+     "tag": "sql",
+     "line": 352
+    },
+    {
+     "tag": "sql",
+     "line": 355
+    },
+    {
+     "tag": "sql",
+     "line": 356
+    },
+    {
+     "tag": "sql",
+     "line": 358
+    },
+    {
+     "tag": "sql",
+     "line": 359
+    },
+    {
+     "tag": "sql",
+     "line": 360
+    },
+    {
+     "tag": "sql",
+     "line": 361
+    }
+   ],
+   "calls": [
+    "console.error",
+    "process.exit",
+    "postgres",
+    "console.log",
+    "Date.now",
+    "mkdirSync",
+    "chromium.launch",
+    "(await browser.newContext()).newPage",
+    "browser.newContext",
+    "page.goto",
+    "page.waitForTimeout",
+    "page.evaluate",
+    "sessionStorage.getItem",
+    "ok",
+    "page.locator(`[name=\"${name}\"]`).first",
+    "page.locator",
+    "el.count",
+    "el.fill",
+    "type",
+    "page.locator('input[name=\"samRegistered\"][value=\"yes\"]').first().check",
+    "page.locator('input[name=\"samRegistered\"][value=\"yes\"]').first",
+    "page.getByRole('button', { name: label, exact: true }).first",
+    "page.getByRole",
+    "chip.count",
+    "chip.click",
+    "page.getByRole('button', { name: /Review Terms/i }).first",
+    "review.count",
+    "review.click",
+    "page.locator('div.max-h-80.overflow-y-auto').first",
+    "tc.count",
+    "tc.evaluate",
+    "page.locator('input[type=\"email\"]').last",
+    "sig.count",
+    "sig.fill(CONTACT).catch",
+    "sig.fill",
+    "page.getByRole('button', { name: 'I Accept', exact: true }).first",
+    "accept.count",
+    "accept.click",
+    "page.getByRole('button', { name: /submit|apply/i }).last().click",
+    "page.getByRole('button', { name: /submit|apply/i }).last",
+    "page.getByText(/Thanks for applying/i).first()\n      .waitFor({ timeout: 15000 }).then(() => true).catch",
+    "page.getByText(/Thanks for applying/i).first()\n      .waitFor({ timeout: 15000 }).then",
+    "page.getByText(/Thanks for applying/i).first().waitFor",
+    "page.getByText(/Thanks for applying/i).first",
+    "page.getByText",
+    "(await page.textContent('body') ?? '').replace(/\\s+/g, ' ').slice",
+    "(await page.textContent('body') ?? '').replace",
+    "page.textContent",
+    "page.screenshot",
+    "String",
+    "listOpenTasksForActor",
+    "seen.find",
+    "ap.goto",
+    "ap.waitForSelector",
+    "ap.fill",
+    "ap.click",
+    "ap.waitForLoadState('networkidle').catch",
+    "ap.waitForLoadState",
+    "ap.waitForTimeout",
+    "ap.url().includes",
+    "ap.url",
+    "ap.textContent",
+    "appsText.includes",
+    "appsText.indexOf",
+    "appsText.slice",
+    "/pending/i.test",
+    "near.replace(/\\s+/g, ' ').slice",
+    "near.replace",
+    "ap.screenshot",
+    "todoText.includes",
+    "ap.getByRole('button', { name: /to-?do|task|notification/i }).first",
+    "ap.getByRole",
+    "bell.count",
+    "bell.click().catch",
+    "bell.click",
+    "ap.close",
+    "fetch",
+    "JSON.stringify",
+    "page.close",
+    "browser.close",
+    "sql.end",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 18,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-archive.mts",
+   "kind": "script",
+   "lines": 204,
+   "bytes": 12140,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 61
+    },
+    {
+     "tag": "sql",
+     "line": 68
+    },
+    {
+     "tag": "sql",
+     "line": 72
+    },
+    {
+     "tag": "sql",
+     "line": 73
+    },
+    {
+     "tag": "sql",
+     "line": 77
+    },
+    {
+     "tag": "sql",
+     "line": 78
+    },
+    {
+     "tag": "sql",
+     "line": 82
+    },
+    {
+     "tag": "sql",
+     "line": 85
+    },
+    {
+     "tag": "sql",
+     "line": 92
+    },
+    {
+     "tag": "sql",
+     "line": 98
+    },
+    {
+     "tag": "sql",
+     "line": 103
+    },
+    {
+     "tag": "sql",
+     "line": 106
+    },
+    {
+     "tag": "sql",
+     "line": 107
+    },
+    {
+     "tag": "sql",
+     "line": 109
+    },
+    {
+     "tag": "sql",
+     "line": 116
+    },
+    {
+     "tag": "sql",
+     "line": 126
+    },
+    {
+     "tag": "sql",
+     "line": 132
+    },
+    {
+     "tag": "sql",
+     "line": 142
+    },
+    {
+     "tag": "sql",
+     "line": 143
+    },
+    {
+     "tag": "sql",
+     "line": 146
+    },
+    {
+     "tag": "sql",
+     "line": 147
+    },
+    {
+     "tag": "sql",
+     "line": 161
+    },
+    {
+     "tag": "sql",
+     "line": 167
+    },
+    {
+     "tag": "sql",
+     "line": 175
+    },
+    {
+     "tag": "sql",
+     "line": 176
+    },
+    {
+     "tag": "sql",
+     "line": 189
+    }
+   ],
+   "calls": [
+    "console.error",
+    "process.exit",
+    "postgres",
+    "console.log",
+    "cant",
+    "restore.push",
+    "ok",
+    "portal.title.slice",
+    "verifyTenantAccess",
+    "restore.reverse",
+    "undo",
+    "sql.end",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 26,
    "jsonResponses": []
   },
   {
@@ -127747,89 +128587,6 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 3,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/drive-capture.mts",
-   "kind": "script",
-   "lines": 67,
-   "bytes": 3677,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "fs",
-     "names": [
-      "fs"
-     ]
-    },
-    {
-     "spec": "@/lib/atomize-capture",
-     "names": [
-      "atomizeCaptureIntoLibrary"
-     ]
-    },
-    {
-     "spec": "@/lib/atomize-package",
-     "names": [
-      "contextTags"
-     ]
-    },
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "getTenantBySlug",
-      "sql"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 20
-    },
-    {
-     "tag": "sql",
-     "line": 49
-    },
-    {
-     "tag": "sql",
-     "line": 50
-    },
-    {
-     "tag": "sql",
-     "line": 51
-    },
-    {
-     "tag": "sql",
-     "line": 52
-    }
-   ],
-   "calls": [
-    "process.cwd",
-    "fs.readFileSync",
-    "getTenantBySlug",
-    "console.error",
-    "process.exit",
-    "console.log",
-    "fs.mkdirSync",
-    "fs.writeFileSync",
-    "key.split('/').pop",
-    "key.split",
-    "atomizeCaptureIntoLibrary",
-    "img",
-    "contextTags",
-    "JSON.stringify",
-    "node?.content?.storage_key.slice",
-    "regions.forEach",
-    "(r.summary || '').slice",
-    "regions.every",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
    "jsonResponses": []
   },
   {
@@ -130622,103 +131379,6 @@
     "costArtifactSections",
     "sql.end",
     "process.exit"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/drive-navair-business-case.mts",
-   "kind": "script",
-   "lines": 179,
-   "bytes": 19459,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/export/artifact-export",
-     "names": [
-      "assembleArtifactCanvas",
-      "renderCanvas"
-     ]
-    },
-    {
-     "spec": "node:fs",
-     "names": [
-      "readFileSync",
-      "writeFileSync"
-     ]
-    },
-    {
-     "spec": "node:path",
-     "names": [
-      "path"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 142
-    },
-    {
-     "tag": "sql",
-     "line": 147
-    },
-    {
-     "tag": "sql",
-     "line": 148
-    },
-    {
-     "tag": "sql",
-     "line": 160
-    },
-    {
-     "tag": "sql",
-     "line": 163
-    },
-    {
-     "tag": "sql",
-     "line": 164
-    }
-   ],
-   "calls": [
-    "console.log",
-    "NID",
-    "wrap",
-    "items.map",
-    "readFileSync",
-    "path.join",
-    "buf.toString",
-    "canvasFor",
-    "H",
-    "P",
-    "FIG",
-    "UL",
-    "B",
-    "TBL",
-    "console.error",
-    "process.exit",
-    "doc",
-    "JSON.stringify",
-    "ok",
-    "refresh",
-    "defenseNeed",
-    "transitionSummary",
-    "ccr",
-    "assembleArtifactCanvas",
-    "renderCanvas",
-    "writeFileSync",
-    "exportVolume",
-    "sql.end"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -134797,182 +135457,6 @@
    "jsonResponses": []
   },
   {
-   "file": "scripts/drive-vault-collab-surface.mts",
-   "kind": "script",
-   "lines": 92,
-   "bytes": 5304,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/library/starter-set",
-     "names": [
-      "GENERIC_STARTERS"
-     ]
-    },
-    {
-     "spec": "@/lib/vaults/vaults",
-     "names": [
-      "createVault",
-      "inviteVaultMember",
-      "listVaultsForCollaborator",
-      "getVaultOwnerContext",
-      "resolveVaultAccess",
-      "createVaultArtifact",
-      "notifyCollaboratorUpload"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 25
-    },
-    {
-     "tag": "sql",
-     "line": 62
-    },
-    {
-     "tag": "sql",
-     "line": 66
-    },
-    {
-     "tag": "sql",
-     "line": 82
-    },
-    {
-     "tag": "sql",
-     "line": 83
-    },
-    {
-     "tag": "sql",
-     "line": 84
-    }
-   ],
-   "calls": [
-    "crypto.randomUUID().slice",
-    "crypto.randomUUID",
-    "createVault",
-    "inviteVaultMember",
-    "listVaultsForCollaborator",
-    "listed.find",
-    "listedNull.some",
-    "getVaultOwnerContext",
-    "resolveVaultAccess",
-    "createVaultArtifact",
-    "GENERIC_STARTERS[0].build",
-    "notifyCollaboratorUpload",
-    "console.log",
-    "results.every",
-    "process.exit",
-    "main().then(() => sql.end()).catch",
-    "main().then",
-    "main",
-    "sql.end",
-    "console.error"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/drive-vault-content.mts",
-   "kind": "script",
-   "lines": 82,
-   "bytes": 4223,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/library/starter-set",
-     "names": [
-      "GENERIC_STARTERS"
-     ]
-    },
-    {
-     "spec": "@/lib/atoms",
-     "names": [
-      "listAtomsFaceted"
-     ]
-    },
-    {
-     "spec": "@/lib/vaults/vaults",
-     "names": [
-      "createVault",
-      "createVaultArtifact",
-      "listVaultArtifacts",
-      "canDownloadGrain",
-      "ingestVaultFoundation",
-      "TENANT_RIGHTS",
-      "COLLAB_RIGHTS"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 29
-    },
-    {
-     "tag": "sql",
-     "line": 38
-    },
-    {
-     "tag": "sql",
-     "line": 59
-    },
-    {
-     "tag": "sql",
-     "line": 73
-    },
-    {
-     "tag": "sql",
-     "line": 74
-    }
-   ],
-   "calls": [
-    "crypto.randomUUID().slice",
-    "crypto.randomUUID",
-    "listAtomsFaceted",
-    "r.atoms.some",
-    "createVault",
-    "createVaultArtifact",
-    "GENERIC_STARTERS[0].build",
-    "inMainLibrary",
-    "listVaultArtifacts",
-    "arts.some",
-    "canDownloadGrain",
-    "ingestVaultFoundation",
-    "console.log",
-    "results.every",
-    "process.exit",
-    "main().then(() => sql.end()).catch",
-    "main().then",
-    "main",
-    "sql.end",
-    "console.error"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
    "file": "scripts/drive-vault-isolation.mts",
    "kind": "script",
    "lines": 124,
@@ -135032,93 +135516,6 @@
     "String",
     "appSql.end",
     "results.every"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/drive-vault-leak.mts",
-   "kind": "script",
-   "lines": 59,
-   "bytes": 3483,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/library/starter-set",
-     "names": [
-      "GENERIC_STARTERS"
-     ]
-    },
-    {
-     "spec": "@/lib/atoms",
-     "names": [
-      "listAtomsFaceted",
-      "listAtoms",
-      "selectForSection"
-     ]
-    },
-    {
-     "spec": "@/lib/vaults/vaults",
-     "names": [
-      "createVault",
-      "createVaultArtifact"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 20
-    },
-    {
-     "tag": "sql",
-     "line": 26
-    },
-    {
-     "tag": "sql",
-     "line": 29
-    },
-    {
-     "tag": "sql",
-     "line": 50
-    },
-    {
-     "tag": "sql",
-     "line": 51
-    }
-   ],
-   "calls": [
-    "crypto.randomUUID().slice",
-    "crypto.randomUUID",
-    "createVault",
-    "createVaultArtifact",
-    "GENERIC_STARTERS[0].build",
-    "(await sql<Array<{ id: string }>>`SELECT id FROM library_atoms WHERE vault_id = ${v.id}::uuid`).map",
-    "rows.filter",
-    "vaultIds.has",
-    "String",
-    "leaks",
-    "listAtomsFaceted",
-    "listAtoms",
-    "selectForSection",
-    "console.log",
-    "checks.every",
-    "process.exit",
-    "main().then(() => sql.end()).catch",
-    "main().then",
-    "main",
-    "sql.end",
-    "console.error"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -136282,532 +136679,6 @@
    "jsonResponses": []
   },
   {
-   "file": "scripts/immo-admin-master.mts",
-   "kind": "script",
-   "lines": 85,
-   "bytes": 4913,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "console.log",
-    "chromium.launch",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "page.url",
-    "api.post",
-    "ok",
-    "cd.status",
-    "(await cd.text()).slice",
-    "cd.text",
-    "logRes.status",
-    "logRes.json",
-    "JSON.stringify(logBody).slice",
-    "JSON.stringify",
-    "cf.json().catch",
-    "cf.json",
-    "cf.status",
-    "JSON.stringify(cfBody).slice",
-    "cb.status",
-    "cb.json().catch",
-    "cb.json",
-    "JSON.stringify(gaps?.data?.readiness ?? gaps).slice",
-    "b.close",
-    "process.exit"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-author.mts",
-   "kind": "script",
-   "lines": 89,
-   "bytes": 4667,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium"
-     ]
-    },
-    {
-     "spec": "./immo-content.mts",
-     "names": [
-      "CONTENT"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "console.log",
-    "chromium.launch",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "api.get",
-    "ok",
-    "docRes.status",
-    "docRes.json",
-    "sections.find",
-    "api.put",
-    "put.json().catch",
-    "put.json",
-    "s.title.slice",
-    "put.status",
-    "JSON.stringify(body).slice",
-    "JSON.stringify",
-    "b.close",
-    "process.exit"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-card-fix.mts",
-   "kind": "script",
-   "lines": 16,
-   "bytes": 1190,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 4
-    },
-    {
-     "tag": "sql",
-     "line": 12
-    }
-   ],
-   "calls": [
-    "sql.json",
-    "console.log",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-content.mts",
-   "kind": "script",
-   "lines": 216,
-   "bytes": 36616,
-   "client": false,
-   "exports": [
-    {
-     "name": "h",
-     "form": "function",
-     "async": false
-    },
-    {
-     "name": "p",
-     "form": "function",
-     "async": false
-    },
-    {
-     "name": "ul",
-     "form": "function",
-     "async": false
-    },
-    {
-     "name": "ol",
-     "form": "function",
-     "async": false
-    },
-    {
-     "name": "table",
-     "form": "function",
-     "async": false
-    },
-    {
-     "name": "cap",
-     "form": "function",
-     "async": false
-    },
-    {
-     "name": "CONTENT",
-     "form": "const",
-     "async": false
-    }
-   ],
-   "imports": [
-    {
-     "spec": "crypto",
-     "names": [
-      "uuid"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "uuid",
-    "base",
-    "items.map",
-    "h",
-    "p",
-    "table",
-    "cap",
-    "ol",
-    "ul"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-cost.mts",
-   "kind": "script",
-   "lines": 122,
-   "bytes": 9090,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-forms",
-     "names": [
-      "buildCostVolume"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-model",
-     "names": [
-      "computeBudget"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-model",
-     "names": [
-      "LaborLine",
-      "OtherDirectCost",
-      "IndirectRates"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "console.log",
-    "buildCostVolume",
-    "computeBudget",
-    "base.totalPrice.toFixed",
-    "opt.totalPrice.toFixed",
-    "budget.grand.totalPrice.toFixed",
-    "(budget.workshare.sbcWorkPct * 100).toFixed",
-    "ok",
-    "Math.round(x).toLocaleString",
-    "Math.round",
-    "money",
-    "chromium.launch",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "api.get",
-    "docRes.json",
-    "secs.find",
-    "/Base Cost Proposal/i.test",
-    "/Option Cost Proposal/i.test",
-    "api.put",
-    "r.json().catch",
-    "r.json",
-    "r.status",
-    "JSON.stringify(body).slice",
-    "JSON.stringify",
-    "put",
-    "b.close",
-    "process.exit"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-export-all.mts",
-   "kind": "script",
-   "lines": 29,
-   "bytes": 2139,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium"
-     ]
-    },
-    {
-     "spec": "fs",
-     "names": [
-      "writeFileSync"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "chromium.launch",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "(await api.get(`${BASE}/api/portal/${SLUG}/proposals/${P}/readiness`)).json",
-    "api.get",
-    "console.log",
-    "JSON.stringify",
-    "api.post",
-    "Buffer.from",
-    "pk.body",
-    "writeFileSync",
-    "(buf.length/1024).toFixed",
-    "pk.headers",
-    "ex.status",
-    "(await ex.text()).slice",
-    "ex.text",
-    "ex.body",
-    "b.close"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-figs-cost.mts",
-   "kind": "script",
-   "lines": 118,
-   "bytes": 8608,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "fs",
-     "names": [
-      "readFileSync"
-     ]
-    },
-    {
-     "spec": "crypto",
-     "names": [
-      "uuid"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-forms",
-     "names": [
-      "buildCostVolume"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-model",
-     "names": [
-      "computeBudget"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-model",
-     "names": [
-      "LaborLine",
-      "OtherDirectCost",
-      "IndirectRates"
-     ]
-    },
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 40
-    },
-    {
-     "tag": "sql",
-     "line": 48
-    },
-    {
-     "tag": "sql",
-     "line": 54
-    },
-    {
-     "tag": "sql",
-     "line": 65
-    },
-    {
-     "tag": "sql",
-     "line": 107
-    },
-    {
-     "tag": "sql",
-     "line": 114
-    }
-   ],
-   "calls": [
-    "JSON.parse",
-    "readFileSync",
-    "uuid",
-    "f.caption.replace",
-    "Object.entries",
-    "f.caption.slice",
-    "sql.json",
-    "imageNode",
-    "console.log",
-    "Object.keys",
-    "[...plan].sort",
-    "nodes.splice",
-    "captionNode",
-    "JSON.stringify",
-    "placeFigures",
-    "buildCostVolume",
-    "computeBudget",
-    "x.toLocaleString",
-    "f",
-    "(budget.workshare.sbcWorkPct * 100).toFixed",
-    "process.exit",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-finalize3.mts",
-   "kind": "script",
-   "lines": 87,
-   "bytes": 5707,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium"
-     ]
-    },
-    {
-     "spec": "fs",
-     "names": [
-      "writeFileSync"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "console.log",
-    "text.replace",
-    "Buffer.from",
-    "chromium.launch",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "(await api.get(`${BASE}/api/portal/${SLUG}/proposals/${P}/supporting-docs`)).json",
-    "api.get",
-    "docs.filter",
-    "tinyPdf",
-    "d.requirementLabel.replace(/[^A-Za-z0-9]+/g, '_').slice",
-    "d.requirementLabel.replace",
-    "api.post",
-    "post.json().catch",
-    "post.json",
-    "post.status",
-    "api.put(uploadUrl, { data: pdf, headers: { 'content-type': 'application/pdf' } }).catch",
-    "api.put",
-    "api.patch",
-    "ap.status",
-    "(await ap.text()).slice",
-    "ap.text",
-    "ok",
-    "adv.json().catch",
-    "adv.json",
-    "adv.status",
-    "JSON.stringify(advBody).slice",
-    "JSON.stringify",
-    "lk.status",
-    "(await lk.text()).slice",
-    "lk.text",
-    "(await api.get(`${BASE}/api/portal/${SLUG}/proposals/${P}/readiness`)).json",
-    "bl.message.slice",
-    "pk.status",
-    "pk.body",
-    "writeFileSync",
-    "(buf.length / 1024).toFixed",
-    "pk.headers",
-    "(await pk.text()).slice",
-    "pk.text",
-    "b.close",
-    "process.exit"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
    "file": "scripts/immo-ingest-drive.mts",
    "kind": "script",
    "lines": 129,
@@ -136880,324 +136751,6 @@
     "data.docs.filter",
     "b.close",
     "process.exit"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-opp-caption-fix.mts",
-   "kind": "script",
-   "lines": 36,
-   "bytes": 2145,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 14
-    },
-    {
-     "tag": "sql",
-     "line": 18
-    },
-    {
-     "tag": "sql",
-     "line": 25
-    },
-    {
-     "tag": "sql",
-     "line": 32
-    }
-   ],
-   "calls": [
-    "sql.json",
-    "console.log",
-    "JSON.parse",
-    "JSON.stringify",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-purchase-release.mts",
-   "kind": "script",
-   "lines": 100,
-   "bytes": 6029,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium",
-      "Browser",
-      "APIRequestContext"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "console.log",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "chromium.launch",
-    "login",
-    "buyer.post",
-    "pu.json().catch",
-    "pu.json",
-    "ok",
-    "pu.status",
-    "JSON.stringify(puBody).slice",
-    "JSON.stringify",
-    "b.close",
-    "process.exit",
-    "admin.post",
-    "rel.json().catch",
-    "rel.json",
-    "rel.status",
-    "JSON.stringify(relBody).slice",
-    "buyer.get",
-    "wfGet.json().catch",
-    "wfGet.json",
-    "wfGet.status",
-    "Array.isArray",
-    "stages.map",
-    "String",
-    "buyer.patch",
-    "acc.json().catch",
-    "acc.json",
-    "acc.status",
-    "JSON.stringify(accBody).slice"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-recost.mts",
-   "kind": "script",
-   "lines": 87,
-   "bytes": 7443,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/proposal/cost-forms",
-     "names": [
-      "buildCostVolume"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-model",
-     "names": [
-      "computeBudget"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-volume-canvas",
-     "names": [
-      "parseStructuredCostInputs"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-model",
-     "names": [
-      "LaborLine",
-      "OtherDirectCost",
-      "IndirectRates"
-     ]
-    },
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 75
-    },
-    {
-     "tag": "sql",
-     "line": 76
-    },
-    {
-     "tag": "sql",
-     "line": 80
-    }
-   ],
-   "calls": [
-    "buildCostVolume",
-    "computeBudget",
-    "x.toLocaleString",
-    "console.log",
-    "f",
-    "JSON.stringify",
-    "/University \\/ Lab|15,000/.test",
-    "process.exit",
-    "Math.round(x).toLocaleString",
-    "Math.round",
-    "money",
-    "parseStructuredCostInputs",
-    "rows.map",
-    "(rb.workshare.sbcWorkPct * 100).toFixed",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-sow-cost-fix.mts",
-   "kind": "script",
-   "lines": 70,
-   "bytes": 7659,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "crypto",
-     "names": [
-      "uuid"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-forms",
-     "names": [
-      "buildCostVolume"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-model",
-     "names": [
-      "computeBudget"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/cost-model",
-     "names": [
-      "LaborLine",
-      "OtherDirectCost",
-      "IndirectRates"
-     ]
-    },
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 39
-    },
-    {
-     "tag": "sql",
-     "line": 41
-    },
-    {
-     "tag": "sql",
-     "line": 62
-    },
-    {
-     "tag": "sql",
-     "line": 67
-    }
-   ],
-   "calls": [
-    "uuid",
-    "N",
-    "items.map",
-    "h",
-    "p",
-    "table",
-    "cap",
-    "ul",
-    "JSON.parse",
-    "JSON.stringify",
-    "console.log",
-    "buildCostVolume",
-    "computeBudget",
-    "b.grand.totalPrice.toFixed",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/immo-volumes.mts",
-   "kind": "script",
-   "lines": 26,
-   "bytes": 1894,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium"
-     ]
-    },
-    {
-     "spec": "fs",
-     "names": [
-      "writeFileSync"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "chromium.launch",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "page.request.get",
-    "r.status",
-    "console.log",
-    "(await r.text()).slice",
-    "r.text",
-    "Buffer.from",
-    "r.body",
-    "writeFileSync",
-    "(buf.length/1024).toFixed",
-    "b.close"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -141185,51 +140738,6 @@
    "jsonResponses": []
   },
   {
-   "file": "scripts/seed-demo-atoms.mts",
-   "kind": "script",
-   "lines": 67,
-   "bytes": 5225,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/atoms",
-     "names": [
-      "createAtom"
-     ]
-    }
-   ],
-   "tryCount": 1,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 48
-    },
-    {
-     "tag": "sql",
-     "line": 62
-    }
-   ],
-   "calls": [
-    "console.log",
-    "createAtom",
-    "a.tags.map",
-    "a.status.padEnd",
-    "atomId.slice",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
    "file": "scripts/seed-demo-automation.mts",
    "kind": "script",
    "lines": 28,
@@ -141270,199 +140778,6 @@
     "console.log",
     "emitEventSingle",
     "systemActor",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/seed-demo-processes.mts",
-   "kind": "script",
-   "lines": 66,
-   "bytes": 3719,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    }
-   ],
-   "tryCount": 1,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 42
-    },
-    {
-     "tag": "sql",
-     "line": 47
-    },
-    {
-     "tag": "sql",
-     "line": 61
-    }
-   ],
-   "calls": [
-    "new Date(Date.now() - m * 60_000).toISOString",
-    "Date.now",
-    "console.log",
-    "sql.json",
-    "mins",
-    "p.status.padEnd",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/seed-demo-scouts.mts",
-   "kind": "script",
-   "lines": 76,
-   "bytes": 4217,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    }
-   ],
-   "tryCount": 1,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 10
-    },
-    {
-     "tag": "sql",
-     "line": 20
-    },
-    {
-     "tag": "sql",
-     "line": 27
-    },
-    {
-     "tag": "sql",
-     "line": 28
-    },
-    {
-     "tag": "sql",
-     "line": 31
-    },
-    {
-     "tag": "sql",
-     "line": 36
-    },
-    {
-     "tag": "sql",
-     "line": 42
-    },
-    {
-     "tag": "sql",
-     "line": 43
-    },
-    {
-     "tag": "sql",
-     "line": 47
-    },
-    {
-     "tag": "sql",
-     "line": 53
-    },
-    {
-     "tag": "sql",
-     "line": 62
-    },
-    {
-     "tag": "sql",
-     "line": 69
-    },
-    {
-     "tag": "sql",
-     "line": 70
-    },
-    {
-     "tag": "sql",
-     "line": 71
-    }
-   ],
-   "calls": [
-    "new Date(Date.now() - m * 60_000).toISOString",
-    "Date.now",
-    "mins",
-    "sql.json",
-    "console.log",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/seed-demo-tasks.mts",
-   "kind": "script",
-   "lines": 31,
-   "bytes": 2913,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/tasks/tasks",
-     "names": [
-      "createTask"
-     ]
-    }
-   ],
-   "tryCount": 1,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 5
-    },
-    {
-     "tag": "sql",
-     "line": 6
-    },
-    {
-     "tag": "sql",
-     "line": 7
-    },
-    {
-     "tag": "sql",
-     "line": 8
-    },
-    {
-     "tag": "sql",
-     "line": 11
-    },
-    {
-     "tag": "sql",
-     "line": 28
-    }
-   ],
-   "calls": [
-    "new Date(Date.now() + d * 86400000).toISOString",
-    "Date.now",
-    "createTask",
-    "console.log",
-    "mk",
-    "iso",
     "sql.end"
    ],
    "jsx": [],
@@ -141606,116 +140921,6 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 6,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/seed-house-artifacts.mts",
-   "kind": "script",
-   "lines": 92,
-   "bytes": 5080,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "node:fs",
-     "names": [
-      "writeFileSync"
-     ]
-    },
-    {
-     "spec": "node:path",
-     "names": [
-      "resolve"
-     ]
-    },
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/terms",
-     "names": [
-      "TERMS_TEXT"
-     ]
-    },
-    {
-     "spec": "@/lib/export/artifact-export",
-     "names": [
-      "renderCanvas"
-     ]
-    },
-    {
-     "spec": "@/lib/calendar",
-     "names": [
-      "listAdminAvailability"
-     ]
-    },
-    {
-     "spec": "@/lib/library/house-artifacts",
-     "names": [
-      "sectionsToCanvasDoc",
-      "tableToCanvasSheet",
-      "ingestHouseArtifact"
-     ]
-    },
-    {
-     "spec": "@/lib/atoms",
-     "names": [
-      "listAtoms",
-      "viewerFromRole"
-     ]
-    }
-   ],
-   "tryCount": 1,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 56
-    }
-   ],
-   "calls": [
-    "TERMS_TEXT.split('\\n\\n').map((b) => b.trim()).filter",
-    "TERMS_TEXT.split('\\n\\n').map",
-    "TERMS_TEXT.split",
-    "b.trim",
-    "blocks[0].split",
-    "blocks.slice(1).map",
-    "blocks.slice",
-    "b.split",
-    "lines.slice(1).join",
-    "lines.slice",
-    "sectionsToCanvasDoc",
-    "new Date(iso).toLocaleString",
-    "listAdminAvailability",
-    "blocks.map",
-    "fmtWhen",
-    "String",
-    "tableToCanvasSheet",
-    "console.log",
-    "termsDoc",
-    "renderCanvas",
-    "ok",
-    "isZip",
-    "writeFileSync",
-    "resolve",
-    "ingestHouseArtifact",
-    "calendarSheet",
-    "viewerFromRole",
-    "listAtoms",
-    "docFnd.some",
-    "sheetFnd.some",
-    "process.exit",
-    "main().then(() => sql.end()).catch",
-    "main().then",
-    "main",
-    "sql.end",
-    "console.error"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
    "jsonResponses": []
   },
   {
@@ -141947,6 +141152,65 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/seed-launch-todos.mts",
+   "kind": "script",
+   "lines": 128,
+   "bytes": 7060,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "../lib/tasks/tasks",
+     "names": [
+      "createTask"
+     ]
+    },
+    {
+     "spec": "../lib/terms",
+     "names": [
+      "TERMS_VERSION"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 98
+    },
+    {
+     "tag": "sql",
+     "line": 107
+    }
+   ],
+   "calls": [
+    "process.argv.includes",
+    "console.error",
+    "process.exit",
+    "postgres",
+    "console.log",
+    "DB.replace",
+    "createTask",
+    "new Date(Date.now() + item.days * 86_400_000).toISOString",
+    "Date.now",
+    "Math.max",
+    "Math.ceil",
+    "sql.end",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 2,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/seed-practice-guides.mts",
    "kind": "script",
    "lines": 282,
@@ -142092,59 +141356,6 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 4,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/seed-scout-candidates.mts",
-   "kind": "script",
-   "lines": 39,
-   "bytes": 2492,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "postgres",
-     "names": [
-      "postgres"
-     ]
-    },
-    {
-     "spec": "crypto",
-     "names": [
-      "randomUUID",
-      "createHash"
-     ]
-    },
-    {
-     "spec": "@/lib/scout/candidates",
-     "names": [
-      "classifyFinding"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 26
-    }
-   ],
-   "calls": [
-    "postgres",
-    "createHash('sha256').update(`seed176:${s.title}`).digest",
-    "createHash('sha256').update",
-    "createHash",
-    "randomUUID",
-    "(s.raw.description as string).slice",
-    "sql.json",
-    "classifyFinding",
-    "console.log",
-    "s.title.slice",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 1,
    "jsonResponses": []
   },
   {
@@ -142521,92 +141732,6 @@
    "jsonResponses": []
   },
   {
-   "file": "scripts/shots-deeplink.mts",
-   "kind": "script",
-   "lines": 81,
-   "bytes": 3966,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium",
-      "Page"
-     ]
-    },
-    {
-     "spec": "postgres",
-     "names": [
-      "postgres"
-     ]
-    },
-    {
-     "spec": "node:path",
-     "names": [
-      "join"
-     ]
-    },
-    {
-     "spec": "node:fs",
-     "names": [
-      "mkdirSync"
-     ]
-    }
-   ],
-   "tryCount": 2,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 40
-    },
-    {
-     "tag": "sql",
-     "line": 41
-    },
-    {
-     "tag": "sql",
-     "line": 42
-    },
-    {
-     "tag": "sql",
-     "line": 77
-    }
-   ],
-   "calls": [
-    "mkdirSync",
-    "postgres",
-    "page.context().clearCookies",
-    "page.context",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForLoadState",
-    "page.click",
-    "page.waitForTimeout",
-    "page.screenshot",
-    "join",
-    "console.log",
-    "page.url",
-    "chromium.launch",
-    "(await browser.newContext({ viewport: { width: 1280, height: 820 }, deviceScaleFactor: 2 })).newPage",
-    "browser.newContext",
-    "login",
-    "page.locator('form:has-text(\"Acme\") button[type=\"submit\"]').first().click",
-    "page.locator('form:has-text(\"Acme\") button[type=\"submit\"]').first",
-    "page.locator",
-    "shot",
-    "page.locator('button:has-text(\"Sign in to Beacon Labs\")').click",
-    "console.error",
-    "browser.close",
-    "sql.end"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 4,
-   "jsonResponses": []
-  },
-  {
    "file": "scripts/stage-collaborator-fixture.mts",
    "kind": "script",
    "lines": 149,
@@ -142838,170 +141963,6 @@
    "jsonResponses": []
   },
   {
-   "file": "scripts/t3cp-buildout.mts",
-   "kind": "script",
-   "lines": 171,
-   "bytes": 9995,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium",
-      "Browser",
-      "APIRequestContext"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "console.log",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "chromium.launch",
-    "login",
-    "admin.post",
-    "r.status",
-    "r.json().catch",
-    "r.json",
-    "admin.get",
-    "det.json().catch",
-    "det.json",
-    "ok",
-    "b.close",
-    "process.exit",
-    "volumes.map",
-    "Math.floor",
-    "Math.max",
-    "items.reduce",
-    "items.map((i) => i.pageLimit).join",
-    "items.map",
-    "Object.entries",
-    "byNum.get",
-    "Number",
-    "tool",
-    "it.itemName.slice",
-    "JSON.stringify(r.body).slice",
-    "JSON.stringify",
-    "rd.status",
-    "JSON.stringify(await rd.json().catch(() => ({}))).slice",
-    "rd.json().catch",
-    "rd.json"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/t3cp-compliance.mts",
-   "kind": "script",
-   "lines": 80,
-   "bytes": 7798,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "console.log",
-    "chromium.launch",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "api.post",
-    "r.json().catch",
-    "r.json",
-    "ok",
-    "JSON.stringify(value).slice",
-    "JSON.stringify",
-    "r.status",
-    "JSON.stringify(body).slice",
-    "b.close",
-    "process.exit"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/t3cp-curate-push.mts",
-   "kind": "script",
-   "lines": 136,
-   "bytes": 6812,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium",
-      "Browser",
-      "APIRequestContext"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "console.log",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "chromium.launch",
-    "login",
-    "admin.post",
-    "r.json().catch",
-    "r.json",
-    "r.status",
-    "admin.get",
-    "cur.json().catch",
-    "cur.json",
-    "ok",
-    "b.close",
-    "process.exit",
-    "tool",
-    "JSON.stringify(r.body).slice",
-    "JSON.stringify",
-    "JSON.stringify(body).slice",
-    "[\n  'DoW SBIR Open Topic \"T3CP Patent Holiday\" (OSW26BZ04-DP013) — a Direct-to-Phase-II-adjacent open call',\n  'that lets a small business bring an ISSUED U.S. PATENT it already owns to a transition partner: the',\n  'proposal must identify the patent, show a defense-relevant application, and lay out a Phase I feasibility',\n  'path to a fielded capability. Fits companies whose differentiator is protected IP (computer vision,',\n  'autonomy, sensing, edge AI) rather than a brand-new research idea. Seven-volume DSIP submission,',\n  'Technical Volume NTE 10 pages. Strong match for tenants with granted patents plus prior DoD work.',\n].join",
-    "admin.patch",
-    "new Date(Date.now() + 60 * 24 * 3600 * 1000).toISOString",
-    "Date.now",
-    "closeDate.slice"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
    "file": "scripts/t3cp-ingest.mts",
    "kind": "script",
    "lines": 178,
@@ -143041,170 +142002,6 @@
     "r.status",
     "(await r.text()).slice",
     "r.text"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/t3cp-section-draft.mts",
-   "kind": "script",
-   "lines": 143,
-   "bytes": 7491,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium",
-      "Browser",
-      "APIRequestContext"
-     ]
-    },
-    {
-     "spec": "@/lib/types/canvas-document",
-     "names": [
-      "createEmptyCanvas",
-      "CANVAS_PRESETS",
-      "CanvasNode"
-     ]
-    }
-   ],
-   "tryCount": 2,
-   "sqlTags": [],
-   "calls": [
-    "console.log",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "chromium.launch",
-    "login",
-    "buyer.get",
-    "sr.json().catch",
-    "sr.json",
-    "ok",
-    "sr.status",
-    "JSON.stringify(sBody).slice",
-    "JSON.stringify",
-    "b.close",
-    "process.exit",
-    "process.argv.includes",
-    "sections.filter",
-    "/cost volume/i.test",
-    "Math.min",
-    "Math.max",
-    "String",
-    "qs.toString",
-    "r.status",
-    "r.json",
-    "ranked.filter((a) => a.content?.trim()).map",
-    "ranked.filter",
-    "a.content.trim",
-    "buyer.post",
-    "t.json().catch",
-    "t.json",
-    "t.status",
-    "s.title.slice",
-    "JSON.stringify(tBody).slice",
-    "new Date().toISOString",
-    "createEmptyCanvas",
-    "buyer.put",
-    "sv.status",
-    "JSON.stringify(await sv.json().catch(() => ({}))).slice",
-    "sv.json().catch",
-    "sv.json",
-    "String(e).slice"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/t3cp-upload.mts",
-   "kind": "script",
-   "lines": 25,
-   "bytes": 1809,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "playwright",
-     "names": [
-      "chromium"
-     ]
-    },
-    {
-     "spec": "fs",
-     "names": [
-      "readFileSync"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [],
-   "calls": [
-    "chromium.launch",
-    "(await b.newContext()).newPage",
-    "b.newContext",
-    "page.goto",
-    "page.fill",
-    "Promise.all",
-    "page.waitForURL",
-    "u.pathname.includes",
-    "page.click",
-    "console.log",
-    "fd.append",
-    "JSON.stringify",
-    "readFileSync",
-    "page.request.post",
-    "r.status",
-    "(await r.text()).slice",
-    "r.text",
-    "b.close"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/t3cp-volumes.mts",
-   "kind": "script",
-   "lines": 22,
-   "bytes": 2740,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 14
-    },
-    {
-     "tag": "sql",
-     "line": 18
-    }
-   ],
-   "calls": [
-    "'Created as part of the DoW Proposal Submissions process in DSIP. Phase I Base cost must be identified here and in Volume 3.'.split",
-    "console.log",
-    "sql.end"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -144779,210 +143576,6 @@
    "jsonResponses": []
   },
   {
-   "file": "scripts/verify-readiness-deadline.mts",
-   "kind": "script",
-   "lines": 53,
-   "bytes": 3248,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/submission-readiness",
-     "names": [
-      "computeSubmissionReadiness"
-     ]
-    }
-   ],
-   "tryCount": 1,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 13
-    },
-    {
-     "tag": "sql",
-     "line": 17
-    },
-    {
-     "tag": "sql",
-     "line": 27
-    },
-    {
-     "tag": "sql",
-     "line": 35
-    },
-    {
-     "tag": "sql",
-     "line": 41
-    },
-    {
-     "tag": "sql",
-     "line": 47
-    }
-   ],
-   "calls": [
-    "console.error",
-    "process.exit",
-    "console.log",
-    "(r?.blockers ?? []).filter",
-    "computeSubmissionReadiness",
-    "deadlineBlockers",
-    "check",
-    "main().catch",
-    "main"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/verify-readiness-docs.mts",
-   "kind": "script",
-   "lines": 55,
-   "bytes": 3605,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/submission-readiness",
-     "names": [
-      "computeSubmissionReadiness"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 13
-    },
-    {
-     "tag": "sql",
-     "line": 20
-    },
-    {
-     "tag": "sql",
-     "line": 27
-    },
-    {
-     "tag": "sql",
-     "line": 38
-    },
-    {
-     "tag": "sql",
-     "line": 45
-    },
-    {
-     "tag": "sql",
-     "line": 50
-    }
-   ],
-   "calls": [
-    "console.error",
-    "process.exit",
-    "console.log",
-    "computeSubmissionReadiness",
-    "(before?.blockers ?? []).filter",
-    "(missing?.blockers ?? []).filter",
-    "check",
-    "missingBlockers.some",
-    "b.message.includes",
-    "(provided?.blockers ?? []).filter",
-    "(waived?.blockers ?? []).every",
-    "main().catch",
-    "main"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/verify-readiness-format.mts",
-   "kind": "script",
-   "lines": 59,
-   "bytes": 3462,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/proposal/submission-readiness",
-     "names": [
-      "computeSubmissionReadiness"
-     ]
-    }
-   ],
-   "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 21
-    },
-    {
-     "tag": "sql",
-     "line": 22
-    },
-    {
-     "tag": "sql",
-     "line": 26
-    },
-    {
-     "tag": "sql",
-     "line": 35
-    },
-    {
-     "tag": "sql",
-     "line": 38
-    },
-    {
-     "tag": "sql",
-     "line": 50
-    }
-   ],
-   "calls": [
-    "JSON.stringify",
-    "console.error",
-    "process.exit",
-    "console.log",
-    "(r?.blockers ?? []).filter",
-    "cleanup",
-    "sql.json",
-    "canvas",
-    "computeSubmissionReadiness",
-    "fmt",
-    "check",
-    "b.every",
-    "b.some",
-    "/below the .*minimum/i.test",
-    "main().catch",
-    "main",
-    "cleanup().catch"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
    "file": "scripts/verify-ruler-composition.mts",
    "kind": "script",
    "lines": 259,
@@ -145215,60 +143808,6 @@
     "main().then",
     "main",
     "console.error"
-   ],
-   "jsx": [],
-   "snakeRowTypes": [],
-   "ownClientSql": 0,
-   "jsonResponses": []
-  },
-  {
-   "file": "scripts/verify-shred-audit.mts",
-   "kind": "script",
-   "lines": 52,
-   "bytes": 3602,
-   "client": false,
-   "exports": [],
-   "imports": [
-    {
-     "spec": "@/lib/db",
-     "names": [
-      "sql"
-     ]
-    },
-    {
-     "spec": "@/lib/compliance/shred-audit",
-     "names": [
-      "auditShredCompleteness"
-     ]
-    }
-   ],
-   "tryCount": 1,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 27
-    },
-    {
-     "tag": "sql",
-     "line": 32
-    },
-    {
-     "tag": "sql",
-     "line": 46
-    }
-   ],
-   "calls": [
-    "[\n  'The offeror shall provide a detailed Technical Approach describing the proposed methodology.',\n  'Key Personnel shall be described with roles, qualifications, and level of effort.',\n  'The offeror must submit a Cost Volume with a detailed budget narrative and justification.',\n  'Proposals shall include a Commercialization Plan describing the path to market and revenue model.',\n  'The offeror shall submit a Letter of Support from the partnering research institution.',\n  // False-GO guard: shares ONE term (\"technical\") with the captured \"Technical Approach\" label but is\n  // about points of contact, not the technical approach. Must still be flagged — an incidental single-term\n  // overlap can't vouch coverage (reverse-subset needs ≥60% of the label's terms; the phrase isn't present).\n  'The offeror shall provide technical points of contact for each proposed subcontractor.',\n].join",
-    "console.error",
-    "process.exit",
-    "console.log",
-    "auditShredCompleteness",
-    "r.candidateGaps.join(' | ').toLowerCase",
-    "r.candidateGaps.join",
-    "check",
-    "gapsJoined.includes",
-    "main().catch",
-    "main"
    ],
    "jsx": [],
    "snakeRowTypes": [],

@@ -51,7 +51,11 @@ const ApplicationSchema = z.object({
 
   termsAccepted: z.literal(true),
   termsSignature: z.string().email().max(200).optional(),
-  termsVersion: z.string().max(50).default('v1'),
+  // REQUIRED, with no default. `.default('v1')` meant a request that omitted the version recorded
+  // "v1" — silently attributing to the signer an agreement to text they never saw. This column is
+  // the evidence of WHAT SOMEBODY AGREED TO; a wrong value here is worse than a refused submission,
+  // and the real form always sends it (application-form.tsx shows it to the signer as it signs).
+  termsVersion: z.string().min(1).max(50),
 
   // ── ATTRIBUTION ────────────────────────────────────────────────────────────────────────────
   // The analytics session in the browser when this form was submitted. Optional, deliberately:
@@ -183,7 +187,13 @@ export async function POST(request: Request) {
         ${input.targetAgencies}::text[],
         ${input.desiredOutcomes}::text[],
         ${input.motivation}, ${input.referralSource}, ${input.sessionId ?? null}, ${contactId},
-        'pending', now(), 'v1',
+        -- terms_version was HARDCODED 'v1' here. The form sends the version it displayed to the
+        -- signer, the schema validates it, and this INSERT threw it away and wrote a literal. So
+        -- the column whose entire job is to record WHICH agreement somebody accepted said v1 for
+        -- every applicant, including those shown v3. Nothing failed and nothing looked wrong: the
+        -- row is present, the timestamp right, the value a legal version string. It is visible only
+        -- by comparing what was STORED against what was SHOWN — drive-application-intake asserts it.
+        'pending', now(), ${input.termsVersion},
         ${userAgent}, ${sql.json({
           termsSignature: input.termsSignature ?? null,
           termsVersion: input.termsVersion,

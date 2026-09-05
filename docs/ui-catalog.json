@@ -1,6 +1,6 @@
 {
  "totals": {
-  "routes": 122,
+  "routes": 123,
   "components": 202,
   "handlers": 1622,
   "binding": 1381,
@@ -640,7 +640,7 @@
   },
   {
    "file": "app/(marketing)/legal/privacy/page.tsx",
-   "lines": 140,
+   "lines": 151,
    "client": false,
    "kind": "page",
    "exports": [
@@ -1927,6 +1927,7 @@
     "/admin/funnel",
     "/admin/guardrail-defaults",
     "/admin/intake",
+    "/admin/observe",
     "/admin/opportunities",
     "/admin",
     "/admin/pipeline",
@@ -1957,6 +1958,35 @@
     "/admin/tenants",
     "/admin/waitlist",
     "/admin/workflows"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/admin/observe/page.tsx",
+   "lines": 211,
+   "client": false,
+   "kind": "page",
+   "exports": [
+    "dynamic",
+    "ObservePage"
+   ],
+   "renders": [
+    "Link",
+    "Card",
+    "Empty"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 3,
+   "localImports": [],
+   "route": "/admin/observe",
+   "renderedBy": [],
+   "reachableFrom": [
+    "/admin/observe"
    ],
    "bindingHandlers": 0,
    "passedHandlers": 0
@@ -4461,6 +4491,7 @@
     "/admin/funnel",
     "/admin/guardrail-defaults",
     "/admin/intake",
+    "/admin/observe",
     "/admin/opportunities",
     "/admin",
     "/admin/pipeline",
@@ -5173,7 +5204,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/dashboard/page.tsx",
-   "lines": 243,
+   "lines": 268,
    "client": false,
    "kind": "page",
    "exports": [
@@ -5188,7 +5219,7 @@
    "forms": 0,
    "inputs": 0,
    "buttons": 0,
-   "links": 6,
+   "links": 7,
    "localImports": [
     "@/components/portal/cockpit"
    ],
@@ -7007,6 +7038,7 @@
     "/admin/funnel",
     "/admin/guardrail-defaults",
     "/admin/intake",
+    "/admin/observe",
     "/admin/opportunities",
     "/admin",
     "/admin/pipeline",
@@ -7043,7 +7075,7 @@
   },
   {
    "file": "components/admin/admin-nav-data.ts",
-   "lines": 187,
+   "lines": 190,
    "client": false,
    "kind": "module",
    "exports": [
@@ -7107,6 +7139,7 @@
     "/admin/funnel",
     "/admin/guardrail-defaults",
     "/admin/intake",
+    "/admin/observe",
     "/admin/opportunities",
     "/admin",
     "/admin/pipeline",
@@ -7203,6 +7236,7 @@
     "/admin/funnel",
     "/admin/guardrail-defaults",
     "/admin/intake",
+    "/admin/observe",
     "/admin/opportunities",
     "/admin",
     "/admin/pipeline",
@@ -12599,7 +12633,7 @@
   },
   {
    "file": "components/marketing/application-form.tsx",
-   "lines": 471,
+   "lines": 477,
    "client": true,
    "kind": "component",
    "exports": [
@@ -12615,73 +12649,73 @@
      "on": "onSubmit",
      "element": "form",
      "binds": true,
-     "line": 144
+     "line": 150
     },
     {
      "on": "onToggle",
      "element": "ChipGroup",
      "binds": false,
-     "line": 244
+     "line": 250
     },
     {
      "on": "onToggle",
      "element": "ChipGroup",
      "binds": false,
-     "line": 251
+     "line": 257
     },
     {
      "on": "onToggle",
      "element": "ChipGroup",
      "binds": false,
-     "line": 258
+     "line": 264
     },
     {
      "on": "onToggle",
      "element": "ChipGroup",
      "binds": false,
-     "line": 265
+     "line": 271
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 297
+     "line": 303
     },
     {
      "on": "onScroll",
      "element": "div",
      "binds": true,
-     "line": 308
+     "line": 314
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 333
+     "line": 339
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 341
+     "line": 347
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 365
+     "line": 371
     },
     {
      "on": "onMouseDown",
      "element": "button",
      "binds": true,
-     "line": 455
+     "line": 461
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 456
+     "line": 462
     }
    ],
    "fetches": [
@@ -13153,7 +13187,7 @@
   },
   {
    "file": "components/marketing/waitlist-form.tsx",
-   "lines": 90,
+   "lines": 94,
    "client": true,
    "kind": "component",
    "exports": [
@@ -13165,19 +13199,19 @@
      "on": "onSubmit",
      "element": "form",
      "binds": true,
-     "line": 60
+     "line": 64
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 66
+     "line": 70
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 81
+     "line": 85
     }
    ],
    "fetches": [
@@ -13290,6 +13324,7 @@
     "/admin/funnel",
     "/admin/guardrail-defaults",
     "/admin/intake",
+    "/admin/observe",
     "/admin/opportunities",
     "/admin",
     "/admin/pipeline",
@@ -21974,6 +22009,7 @@
     "/admin/funnel",
     "/admin/guardrail-defaults",
     "/admin/intake",
+    "/admin/observe",
     "/admin/opportunities",
     "/admin",
     "/admin/pipeline",
@@ -22140,6 +22176,7 @@
     "/admin/funnel",
     "/admin/guardrail-defaults",
     "/admin/intake",
+    "/admin/observe",
     "/admin/opportunities",
     "/admin",
     "/admin/pipeline",

@@ -89,7 +89,16 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **243** — migs 242/243 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **247** — migs 246/247 the
+**space-presence bracket**: an outside actor inside a tenant space (rfp_admin shadowing, partner-manager
+descending) wrote an ENTER into that customer's audit trail and no reliable EXIT — `partner.exited` carried
+`tenantId: null` so it reached nobody, and `shadow.ascended` fired only from a button whose dedupe was per-TAB
+`sessionStorage`. `lib/space-presence.ts` now owns BOTH ends; five distinct closers (explicit · left_space ·
+moved · signed_out · timeout) and session expiry deliberately gets no reason of its own, because nothing fires
+when a JWT expires and `timeout` is the only thing actually measured; mig 245 repaired
+48 library atoms titled `bulleted_list`, the atomizer having named every non-heading/text/table primitive
+after its own node type (B136 in the library surface: an internal term shown to the customer, on a shelf that
+is browsed BY TITLE); mig 244 the `working_notes` board; migs 242/243 the
 **marketing/sales spine**: 242 closed the funnel sever (`session_id` on `waitlist`/`applications` +
 `applications.tenant_id`, so campaign → session → application → customer joins), 243 added
 `contacts` — a person by normalised email, with **deliberately no `tenant_id` and no `status`**,
@@ -455,7 +464,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   the tree + the live DB (`frontend/scripts/inventory-scripts.mjs`). It says who references each of
   the 325 scripts and whether it still drives identifiers that exist. 52 classify as branch suite, 4 the
   lenses, 2 the cross-checks, 7 the canvas rulers — note the SUITE column counts *scripts*, and
-  `run-branch-drives.sh` registers **58 drives**, because two of them are filed elsewhere (RULER,
+  `run-branch-drives.sh` registers **64 drives**, because two of them are filed elsewhere (RULER,
   and the deck probe under DOCUMENTED) and one is the first **Python** entry the runner has ever
   had (`spend-guardrails`, dispatched by extension — never via the `pytest` on PATH, which is a uv
   tool that cannot see asyncpg); both
@@ -468,7 +477,7 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   it froze at migration 067 and misled for 135 migrations.
 - Escape ILIKE patterns: `input.replace(/[%_\\]/g, '\\$&')`
 - **Verification backbone** (every change): `cd frontend && npx tsc --noEmit` (0) → `npx vitest run`
-  (2546 pass) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
+  (2664 pass, 253 files) → schema via `db/migrations/migrate.mjs` against the sandbox → `npx next build` for risky
   changes → live Playwright drive (`frontend/e2e/*.spec.ts`) → an adversarial multi-agent bug sweep
   (API / React / SQL, findings must be *proven*) for large diffs. See docs/TESTING_STRATEGY.md.
 - **`npx tsc --noEmit` DOES NOT CHECK THE DRIVES.** `tsconfig.json` includes `**/*.ts` and

@@ -42,6 +42,23 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules/bcryptjs ./node_modu
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/playwright ./node_modules/playwright
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/playwright-core ./node_modules/playwright-core
 
+# Tesseract language data for atom OCR. `lib/atom-enrich.ts` reads it from `process.cwd()/ocr-data`
+# at runtime, and its own comment claimed it was "staged" here — nothing staged it. Next's standalone
+# tracer follows IMPORTS; a file opened by PATH is invisible to it, so this 2.9 MB blob was in the
+# repo, in the builder stage, and absent from every image ever shipped. The effect is not a crash:
+# `resolveLangPath()` returns null, one console.error goes to the Railway log, and OCR of uploaded
+# image crops returns '' with engine 'none' — a capability that silently does nothing in production.
+# Second instance of this class (the first was docs/guide-coverage.json, below);
+# `scripts/audit-runtime-assets.mjs` is the check that finds them.
+COPY --from=builder --chown=nextjs:nodejs /app/ocr-data ./ocr-data
+
+# The guide-coverage registry, shipped the same way the migration SQL is: GENERATED IN THE REPO,
+# copied in. `/admin/guides` reads it at runtime, and it cannot be produced here — the builder stage
+# copies only `frontend/`, and the script needs a git history the image does not have. Without this
+# line the board renders its "artifact is not in this build" notice in production: honest, but dead.
+# Regenerate with `node frontend/scripts/catalog-guides.mjs` and commit it.
+COPY --chown=nextjs:nodejs docs/guide-coverage.json ./docs/guide-coverage.json
+
 # Migration files + entrypoint — run automatically on deploy
 COPY --chown=nextjs:nodejs db/migrations/*.sql ./db/migrations/
 COPY --chown=nextjs:nodejs db/migrations/migrate.mjs ./db/migrations/migrate.mjs

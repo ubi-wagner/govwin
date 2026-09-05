@@ -317,7 +317,9 @@ export function WorkflowSetupClient({
                       </select>
                       <input type="date" value={toDateInput(t.dueDate)} onChange={(e) => patchTodo(si, ti, { dueDate: fromDateInput(e.target.value) })}
                         className="border border-gray-300 rounded px-1.5 py-1" title="Optional per-to-do date (else the stage date)" />
-                      <button onClick={() => patchStage(si, { todos: (s.todos ?? []).filter((_, tj) => tj !== ti) })} className="text-xs text-red-600 hover:underline">×</button>
+                      {/* "×" is a picture, not a name — six of these sat in one list and a screen reader read
+                          all six identically. The label names WHICH one. */}
+                      <button type="button" aria-label={`Remove “${t.title || 'this to-do'}”`} title="Remove this to-do" onClick={() => patchStage(si, { todos: (s.todos ?? []).filter((_, tj) => tj !== ti) })} className="text-xs text-red-600 hover:underline">×</button>
                     </div>
                   ))}
                   <button onClick={() => patchStage(si, { todos: [...(s.todos ?? []), { type: 'acknowledge', title: '' }] })} className="text-xs text-blue-600 hover:underline">+ add to-do</button>

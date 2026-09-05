@@ -124,7 +124,24 @@ export const ADMIN_NAV: AdminNavSection[] = [
         href: '/admin/system-state', label: 'System State',
         children: [{ href: '/admin/system', label: 'System Health' }],
       },
-      { href: '/admin/events', label: 'Event Stream' },
+      // Observe sits ABOVE the raw stream: the stream is everything that happened, this is
+      // what happened in the last few minutes and what does not add up. During a live drive
+      // it is the surface you keep open beside the one you are driving.
+      { href: '/admin/observe', label: 'Observe',
+        children: [{ href: '/admin/events', label: 'Event Stream' },
+                   // The shared board sits with Observe: one says what happened, the other
+                   // says what to watch for. During a drive you keep both open.
+                   { href: '/admin/notes', label: 'Notes' },
+                   // Guide coverage belongs with the board rather than with the guides it counts:
+                   // it is the ALARM, not the content. Its `stale` rows are what nobody thinks to
+                   // check, and they only get seen if the number sits next to the notes you already
+                   // open during a drive.
+                   { href: '/admin/guides', label: 'Guide Coverage' },
+                   // Who is inside a CUSTOMER's account right now. It belongs with Observe rather
+                   // than under Customers: it is a live-oversight question you ask about the
+                   // platform's own people, and the row you most need to see is the one nobody
+                   // went looking for.
+                   { href: '/admin/workspace-access', label: 'Workspace Access' }] },
       { href: '/admin/agents', label: 'Agents' },
       // Analytics moved to Marketing & Sales — see the note there.
       { href: '/admin/architecture', label: 'Architecture' },

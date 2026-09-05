@@ -4,6 +4,7 @@ import type { Role } from '@/lib/rbac';
 import IntakeForm from '@/components/admin/intake-form';
 import IntakeStageStrip from '@/components/admin/intake-stage-strip';
 import { loadIntakeStageCounts } from '@/lib/admin/intake-stage-counts';
+import IntakeGuide from './intake-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,7 @@ export default async function IntakePage() {
   return (
     <div className="max-w-2xl">
       <IntakeStageStrip current="intake" counts={stageCounts} />
+      <IntakeGuide />
       <h1 className="text-2xl font-bold mb-1">Stage Opportunity Intake</h1>
       <p className="text-gray-500 text-sm mb-6">
         Stage a found/uploaded notice into the review queue (status <code>new</code>, not yet live). Scout will call this

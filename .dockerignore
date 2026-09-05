@@ -3,7 +3,13 @@ frontend/node_modules/
 frontend/.next/
 pipeline/
 services/
-docs/
+# Ignore docs/ contents, but keep the ONE file the running app opens: the guide
+# coverage registry, which `/admin/guides` reads with readFileSync at request
+# time. Same shape as the scripts/ rule below, and for the same reason — this
+# has to be `docs/*`, not `docs/`, or the re-include silently does nothing and
+# `COPY docs/guide-coverage.json` fails the IMAGE BUILD with "not found".
+docs/*
+!docs/guide-coverage.json
 # Ignore scripts/ contents, but keep the dev-account seed the entrypoint runs
 # (SEED_DEV_ACCOUNTS=true). Note: exclude the CONTENTS (scripts/*), not the dir
 # itself — Docker can't re-include a file whose parent dir is excluded.

@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Urgency, urgencyOf, sortByUrgency } from '@/lib/tasks/urgency';
 import { taskCompleterKind, formFields, taskHref, taskChain, type ChainEntry } from '@/lib/tasks/completers';
+import { TaskClaim } from './task-claim';
 import { resolveTaskWorkflow, type TaskWorkflowDef } from '@/lib/tasks/workflows';
 
 export interface QueueTask {
@@ -27,6 +28,13 @@ export interface QueueTask {
   params?: Record<string, unknown> | null;
   /** For a broadcast: result.chain[] is the message thread. */
   result?: Record<string, unknown> | null;
+  /** Claim (mig 249). Optional so a build serving an older API shape renders an unclaimed row
+   *  rather than throwing — the feature degrades to what the queue did before it existed. */
+  status?: string;
+  claimedBy?: string | null;
+  claimedByName?: string | null;
+  claimedAt?: string | null;
+  resumeHref?: string | null;
 }
 
 const URGENCY_STYLE: Record<Urgency, { chip: string; label: string }> = {
@@ -58,6 +66,8 @@ export function TaskQueue({
   tenantSlug?: string;
 }) {
   const [tasks, setTasks] = useState<QueueTask[] | null>(null);
+  // Server-supplied. Null until the first load, which is why TaskClaim guards on it.
+  const [viewerId, setViewerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
 
@@ -70,6 +80,7 @@ export function TaskQueue({
       }
       const json = await res.json();
       setTasks(json.data?.tasks ?? []);
+      setViewerId(json.data?.viewerId ?? null);
       setError(null);
     } catch {
       setError('Could not load your to-dos.');
@@ -166,6 +177,22 @@ export function TaskQueue({
               {t.description && (
                 <p className="mt-1 text-xs text-gray-500">{t.description}</p>
               )}
+              <TaskClaim
+                task={{
+                  id: t.id,
+                  status: t.status ?? 'open',
+                  claimedBy: t.claimedBy ?? null,
+                  claimedByName: t.claimedByName ?? null,
+                  claimedAt: t.claimedAt ?? null,
+                  resumeHref: t.resumeHref ?? null,
+                  // The VIEWER's identity comes from the server (`/api/…/tasks` returns `viewerId`),
+                  // never from anything the client could assert. A client-decided "this is mine"
+                  // would render someone else's claim as your own.
+                  claimedByMe: !!viewerId && t.claimedBy === viewerId,
+                }}
+                apiBase={apiBase}
+                reload={load}
+              />
               <TaskCompleter
                 task={t}
                 workflow={wf}

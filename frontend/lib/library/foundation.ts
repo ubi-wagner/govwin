@@ -50,19 +50,85 @@ export interface DecomposedArtifact {
 // (a bare heading is a label, not a standalone reusable atom).
 const STRUCTURAL_NODES: ReadonlySet<string> = new Set(['heading', 'toc', 'page_break', 'spacer', 'divider']);
 
-function nodeLabel(n: CanvasNode): { title: string; content: string } {
+/**
+ * A HUMAN NAME FOR A NODE TYPE — the last resort, and never the raw token.
+ *
+ * `probe-customer-finish` found 48 atoms in customers' libraries titled `bulleted_list`: the old
+ * fallback returned `n.type` verbatim, so every list, image, link, caption and footnote atom was
+ * named after the system's own vocabulary. It is the B136 class in a different surface — a term
+ * from the implementation shown to the company that bought a proposal portal — and it never looked
+ * broken, which is why it survived. A library is browsed by title; a shelf of identical
+ * `bulleted_list` entries is not searchable by the person who owns it.
+ */
+const NODE_NOUN: Record<string, string> = {
+  bulleted_list: 'Bulleted list', numbered_list: 'Numbered list', image: 'Image',
+  url: 'Link', caption: 'Caption', footnote: 'Footnote', chart: 'Chart', code: 'Code',
+};
+const humanNode = (t: string) => NODE_NOUN[t] ?? (t.charAt(0).toUpperCase() + t.slice(1)).replace(/_/g, ' ');
+
+/** First non-empty string, trimmed and capped — the title is a label, not the content. */
+function firstText(...vals: unknown[]): string | null {
+  for (const v of vals) {
+    const s = typeof v === 'string' ? v.trim() : '';
+    if (s) return s.slice(0, 60);
+  }
+  return null;
+}
+
+/** Exported for `__tests__/atom-titles.test.ts` — the invariant is "no atom is named after a node
+ *  type", and that is only checkable at this function. Not part of the module's public surface. */
+export function nodeLabel(n: CanvasNode): { title: string; content: string } {
   const c = (n.content ?? {}) as Record<string, unknown>;
   if (n.type === 'heading') { const t = String(c.text ?? ''); return { title: t.slice(0, 120) || 'Heading', content: t }; }
   if (n.type === 'text_block') { const t = String(c.text ?? ''); return { title: t.slice(0, 60) || 'Text', content: t }; }
   if (n.type === 'table') { const s = String(c.sheet_name ?? 'Table'); return { title: s.slice(0, 60), content: JSON.stringify(c).slice(0, 4000) }; }
-  return { title: n.type, content: typeof c === 'object' ? JSON.stringify(c).slice(0, 4000) : String(c) };
+
+  // Name the atom from its OWN content, exactly as the three cases above do — a list by its first
+  // item, an image by its caption or alt text, a link by what it displays. Only when the node
+  // carries no text at all does the type appear, and then as a noun a person would write.
+  const items = Array.isArray(c.items) ? (c.items as Array<{ text?: unknown }>) : [];
+  const fromContent = firstText(
+    items[0]?.text,          // bulleted_list · numbered_list
+    c.caption, c.alt_text,   // image
+    c.display_text, c.href,  // url
+    c.text,                  // caption · footnote
+  );
+  return {
+    title: fromContent ?? humanNode(n.type),
+    content: typeof c === 'object' ? JSON.stringify(c).slice(0, 4000) : String(c),
+  };
+}
+
+/**
+ * A `doc` tag a PERSON can read.
+ *
+ * The tag is rendered on the library shelf as `doc:<value>`, so the value is customer-facing. Some
+ * callers pass an identifier where a slug belongs, and 76 atoms across four tenant routes ended up
+ * showing `doc:01b85d14-4a4e-494f-9122-d50cb75e3060` — an id that resolves to no document in any
+ * table, so it is not even useful to us. The other 909 doc tags are proper slugs.
+ *
+ * Normalised HERE rather than in each caller, for the same reason `nodeLabel` falls back to
+ * `humanNode` instead of trusting the atomizer: this is the one place the value is written, so it
+ * is the one place the invariant can hold no matter who calls.
+ *
+ * The title is the fallback because it is what the foundation is actually called — the four atoms
+ * sharing that uuid were all titled "CDR walkthrough with the COR", which is exactly the name that
+ * should have been on the chip.
+ */
+function readableDocSlug(meta: FoundationMeta): string {
+  const raw = (meta.slug ?? '').trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw);
+  if (raw && !isUuid) return raw;
+  const fromTitle = (meta.title ?? '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  return fromTitle || 'document';
 }
 
 /** The taxonomy tag set for a foundation + all its grains (collection · doc=slug · kind · form · format · context). */
 function foundationTags(meta: FoundationMeta): AtomTagInput[] {
   return [
     { dimension: 'collection', value: meta.collection ?? HOUSE_COLLECTION, source: 'admin', confirmed: true },
-    { dimension: 'doc', value: meta.slug, source: 'admin', confirmed: true },
+    { dimension: 'doc', value: readableDocSlug(meta), source: 'admin', confirmed: true },
     { dimension: 'kind', value: meta.kind ?? 'document', source: 'admin', confirmed: true },
     { dimension: 'form', value: meta.form, source: 'admin', confirmed: true },
     { dimension: 'format', value: ARTIFACT_FORMAT[meta.form], source: 'admin', confirmed: true },

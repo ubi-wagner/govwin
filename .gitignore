@@ -63,3 +63,7 @@ frontend/scripts/test-harness/*.out
 # for that reason. Regenerate with:
 #   cd frontend && node scripts/capture-ui-atlas.mjs && node scripts/drive-ui-states.mjs
 #                  && node scripts/build-ui-contact-sheets.mjs
+
+# Pinned copy of the branch-drive runner (see its header): a full run takes over an hour and
+# bash reads a script by byte offset, so the executing copy must not be the one git rewrites.
+frontend/scripts/.run-pinned.sh

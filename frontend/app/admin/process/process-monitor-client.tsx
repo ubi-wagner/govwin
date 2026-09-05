@@ -175,6 +175,11 @@ export function ProcessMonitorClient({
       <div className="flex items-center justify-end gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
         <span className="text-xs text-gray-500 uppercase font-medium">Auto-refresh</span>
         <button
+          type="button"
+          role="switch"
+          aria-checked={autoRefresh}
+          aria-label="Auto-refresh"
+          title={autoRefresh ? 'Auto-refresh is on' : 'Auto-refresh is off'}
           onClick={() => setAutoRefresh((v) => !v)}
           className={`w-10 h-5 rounded-full relative transition-colors ${
             autoRefresh ? 'bg-green-500' : 'bg-gray-300'

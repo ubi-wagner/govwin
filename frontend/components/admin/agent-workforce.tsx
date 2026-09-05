@@ -35,7 +35,11 @@ const POD_ORDER: Pod[] = [
   'Our-org — CMS content',
 ];
 
-// The 36 archetypes registered in the pipeline AgentFabric, grouped by pod. Tenant-scope
+// EVERY archetype registered in the pipeline AgentFabric, grouped by pod. The count is not
+// written here on purpose: it was "36" while the registry held 39, and a number in a comment
+// is the first thing to go stale. `__tests__/agent-roster-complete.test.ts` reconciles this
+// list against the registry instead, because an agent missing from THIS list is invisible to
+// the operator whose workforce it is. Tenant-scope
 // agents are role-bound to their assigned tenant (tenant_user authority; the trigger's
 // tenant_id is fixed by the task, never chosen by the model). Platform/our-org agents run at
 // our authority on master + cross-tenant data (no tenant to bind), and land into admin review.
@@ -58,6 +62,8 @@ const ROSTER: Agent[] = [
   { role: 'research_scout', label: 'Research Scout', scope: 'tenant', trigger: 'Research requested (proposal AI tab)', status: 'live', pod: 'Tenant — build & pursue', does: 'Browses the web incl. DoD sources (SAM.gov/SBIR.gov/DSIP) for market research & prior art; web results injection-fenced, budget-capped, human-gated.' },
   // ── Proposal Draft Manager cohort (P1–P4) + library-seed producers ────────
   { role: 'proposal_manager', label: 'Proposal Draft Manager', scope: 'tenant', trigger: 'Run full draft (Mode A/B/C)', status: 'live', pod: 'Tenant — build & pursue', does: 'Plans a full draft: emits the per-section draft plan the cohort executes.' },
+  { role: 'project_manager', label: 'Project Manager', scope: 'tenant', trigger: 'AI_INVOKE (post-award planning) — no firing hook wired', status: 'dormant', pod: 'Tenant — build & pursue', does: 'Post-award plan shaping: reads a project’s CLINs, WBS and milestones and proposes the next moves. Registered and action-mapped; nothing emits its trigger yet.' },
+  { role: 'status_narrator', label: 'Status Narrator', scope: 'tenant', trigger: 'AI_INVOKE tool.project.draft_status_narrative — no firing hook wired', status: 'dormant', pod: 'Tenant — build & pursue', does: 'Drafts the narrative half of a project status report from the three rollup measures. Registered and action-mapped; nothing emits its trigger yet.' },
   { role: 'formatter', label: 'Formatter', scope: 'tenant', trigger: 'Full draft / format pass', status: 'live', pod: 'Tenant — build & pursue', does: 'Per-section canvas scaffold-integrity reviewer (structure, headings, layout).' },
   { role: 'stylist', label: 'Stylist', scope: 'tenant', trigger: 'Full draft (Mode B restyle)', status: 'live', pod: 'Tenant — build & pursue', does: 'Style-normalization reviewer across atom pedigrees — one consistent voice.' },
   { role: 'continuity_manager', label: 'Continuity Manager', scope: 'tenant', trigger: 'Full-draft review gate / adversarial overlay', status: 'live', pod: 'Tenant — build & pursue', does: 'Whole-proposal continuity/QA + entity-reference integrity reviewer.' },
@@ -77,6 +83,7 @@ const ROSTER: Agent[] = [
   { role: 'curation_qa', label: 'Curation QA', scope: 'platform', trigger: 'Curation submitted for review', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Pre-release QC of a curated solicitation before push.' },
   { role: 'rfp_ingest_manager', label: 'RFP Ingest Manager', scope: 'platform', trigger: 'Assess ingest readiness (admin-invoked)', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Ingest-pipeline orchestration: reads a curated solicitation’s stage (shred → matrix → skeleton) and plans which specialist agents (ingest_analyst / matrix_stager / skeleton_architect / curation_qa) to run next — advisory, no descent.' },
   { role: 'ops_digest', label: 'Ops Digest', scope: 'platform', trigger: 'Scheduled — daily', status: 'live', pod: 'Our-org — RFP-admin ops', does: 'Scheduled health digest for master_admin (workforce, pipeline, SLA).' },
+  { role: 'ops_companion', label: 'Ops Companion', scope: 'platform', trigger: 'Ask the companion (/admin/observe · architecture → Live)', status: 'wired', pod: 'Our-org — RFP-admin ops', does: 'Reads a telemetry window plus per-table activity and the findings the arithmetic already established, then says WHY each one happens and WHAT TO CHANGE. Advisory: it proposes the fix, you make it. How it works and what it cannot see: the guide on Observe.' },
   // ── Our-org — CMS content ────────────────────────────────────────────────
   { role: 'content_generator', label: 'Content Generator', scope: 'platform', trigger: 'Content launched (admin “Generate Content” form → library:content.requested)', status: 'live', pod: 'Our-org — CMS content', does: 'Drafts new web/social copy from a brief in our published voice, as the AI_INVOKE step of the OnCmsContentRequested vertical (draft → human review ToDo → publish → notify). Admin-launched via LaunchContentClient; no automatic emitter (that stays post-V1).' },
   { role: 'content_curator', label: 'Content Curator', scope: 'platform', trigger: 'Scheduled — weekly (crawl findings)', status: 'live', pod: 'Our-org — CMS content', does: 'The social/web content scout: curates crawler findings into reshare drafts.' },

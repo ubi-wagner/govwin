@@ -20,7 +20,7 @@ stack up per `ALPHA_HITL_RUNBOOK.md §1`, migrations **001→108**, seed + fixtu
 |---|---|---|---|---|
 | 1 | `/apply` (anon) | Submit the Immobileyes application (company, tech summary ≥20, T&C w/ matching email) | 201; `applications` row `pending` | ✅ |
 | 2 | `/admin/applications` (rfp_admin) | Open Immobileyes → **Accept** (notes ≥10) | Temp password panel; `tenants` + `tenant_admin` user; opp river mirrors onto the tenant | ✅ tenant+tempPw |
-| 3 | `/admin/rfp-upload` | Upload the **Navy** RFP (title, agency=Navy, `programType=sbir_phase_1`) — **minimums** | `opportunities` + `curated_solicitations('new')` + stored doc | ✅ (⚠ **real S3** for doc storage; S3 failure now rolls back the orphan) |
+| 3 | `/admin/rfp-curation/upload` | Upload the **Navy** RFP (title, agency=Navy, `programType=sbir_phase_1`) — **minimums** | `opportunities` + `curated_solicitations('new')` + stored doc | ✅ (⚠ **real S3** for doc storage; S3 failure now rolls back the orphan) |
 | 4 | `/admin/rfp-curation/<sol>` | Write the **spotlight summary** (the push gate) + set `submission_format` | Persisted; push is blocked until both are present | ✅ gate on `spotlight_summary`+`submission_format` |
 | 5 | curation → **Approve + Push** | `solicitation.push` | Fan-out → a `tenant_opportunity_cards` row per active tenant (Immobileyes), auto-ranked vs buckets | ✅ push 200; **Immobileyes card = 1** |
 

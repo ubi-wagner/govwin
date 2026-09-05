@@ -157,6 +157,9 @@ export default function CrawlSettings({
           <span className="text-sm font-medium text-gray-700">Auto-crawl</span>
           <p className="text-xs text-gray-400">Automatically scout this source on a schedule</p>
         </div>
+        {/* The STATE was announced and the SUBJECT was not: "switch, off" tells a screen-reader
+            user nothing about what is off. `aria-checked` without an accessible name is the
+            half-done version of this control, and the one the probe caught. */}
         <button
           onClick={handleToggle}
           disabled={saving}
@@ -165,6 +168,8 @@ export default function CrawlSettings({
           } ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           role="switch"
           aria-checked={enabled}
+          aria-label="Scheduled crawling for this source"
+          title={enabled ? 'Scheduled crawling is on' : 'Scheduled crawling is off'}
         >
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${

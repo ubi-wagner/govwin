@@ -1,5 +1,10 @@
 # FOLDER_STRUCTURE.md — Where Every File Lives
 
+> ⚠️ **STALE PATHS — verified 2026-09-01 against the tree.** Two of the anchors moved: auth is
+> `frontend/auth.ts` (not `lib/auth.ts`), and storage is a DIRECTORY, `frontend/lib/storage/`
+> (`paths.ts` + `s3-client.ts`), with no `index.ts`. The generated
+> `docs/FRONTEND_INVENTORY.md` is the authority on where things are.
+
 **Status: BINDING.** Moving a file to a different directory requires updating this document. If you find yourself wanting to put a file in a location not covered here, update this doc in the same PR.
 
 See also: [CLAUDE.md](../CLAUDE.md), [API_CONVENTIONS.md](./API_CONVENTIONS.md), [TOOL_CONVENTIONS.md](./TOOL_CONVENTIONS.md), [EVENT_CONTRACT_V3.md](./EVENT_CONTRACT_V3.md), [ERROR_HANDLING.md](./ERROR_HANDLING.md), [DEFINITION_OF_DONE.md](./DEFINITION_OF_DONE.md). Namespace registry: ARCHITECTURE_V9.md §8.

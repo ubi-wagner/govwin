@@ -88,7 +88,7 @@ the ToDos appearing + nudging is F1 (the drive + screenshots).
 on re-run.
 
 **D2 — tenant grammar editor (`accf4e4`).** `lib/automation/catalog.ts` (6 governable triggers; framework-hard
-gates excluded) · `app/api/portal/[slug]/automation-policies/route.ts` (GET catalog-merge + PATCH validated
+gates excluded) · `app/api/portal/[tenantSlug]/automation-policies/route.ts` (GET catalog-merge + PATCH validated
 upsert, RLS-scoped via withTenant) · `components/portal/automation-policies-card.tsx` (per-trigger Who/nudge/
 channel + the **locked admin-floor chip**, decision ①), swapped in at both mounts. Tests:
 `automation-policies.test.ts` (**8**).

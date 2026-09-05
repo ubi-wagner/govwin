@@ -83,7 +83,18 @@ export default async function DashboardPage({
     catch (e) { console.error('[dashboard] todos count failed', e); return 0; }
   })();
   const bucketsCount = await count('buckets', sql`SELECT COUNT(*)::text AS count FROM tenant_spotlight_buckets WHERE tenant_id = ${tenantId} AND is_active`);
-  const hasProfile = (await count('profile', sql`SELECT COUNT(*)::text AS count FROM tenant_profiles WHERE tenant_id = ${tenantId}`)) > 0;
+  // CONTENT, not a row. `COUNT(*) > 0` on tenant_profiles ticked "Set up your company profile"
+  // for anyone who had a row at all — foundation has one with zero keywords and showed the step
+  // struck through, done, having never been opened. It also would have become universally wrong
+  // now that acceptance seeds a profile row from the application: the tick has to mean the profile
+  // says something, or the checklist tells a customer a step is finished when it is not (B80's
+  // shape — a page stating a number that is not the truth).
+  const hasProfile = (await count('profile', sql`
+    SELECT COUNT(*)::text AS count FROM tenant_profiles
+     WHERE tenant_id = ${tenantId}
+       AND (COALESCE(array_length(keywords, 1), 0) > 0
+         OR COALESCE(array_length(agency_priorities, 1), 0) > 0
+         OR COALESCE(array_length(naics_codes, 1), 0) > 0)`)) > 0;
 
   // ── Accessible active proposals (the cockpit center) ──
   // Two reads, deliberately: the LIST is capped at 6 for display, the COUNT is not. The cockpit
@@ -183,6 +194,20 @@ export default async function DashboardPage({
         <li className="flex items-start gap-2">
           <span className={`mt-0.5 ${oppsCount > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>{oppsCount > 0 ? '☑' : '☐'}</span>
           <a href={`${basePath}/cards`} className={oppsCount > 0 ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}>Review your matched opportunities</a>
+        </li>
+        {/*
+          The step that was missing, and the one that makes the product personal. Without a bucket
+          /cards falls back to recency ordering — a real list, ranked by nothing the customer
+          chose — and nothing anywhere said so. Measured before this shipped: 6 of 7 tenants had
+          zero buckets. It sits AFTER "review your opportunities" deliberately: the feed is what
+          makes the idea of a ranking lens concrete, and the bucket form can now do the typing
+          from the profile seeded off their application.
+        */}
+        <li className="flex items-start gap-2">
+          <span className={`mt-0.5 ${bucketsCount > 0 ? 'text-emerald-500' : 'text-gray-400'}`}>{bucketsCount > 0 ? '☑' : '☐'}</span>
+          <a href={`${basePath}/buckets`} className={bucketsCount > 0 ? 'text-gray-500 line-through' : 'text-blue-600 hover:underline'}>
+            Rank them your way — add a spotlight bucket
+          </a>
         </li>
         <li className="flex items-start gap-2">
           <span className={`mt-0.5 ${step4IconCls}`}>{step4.icon}</span>

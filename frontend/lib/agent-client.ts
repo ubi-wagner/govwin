@@ -17,6 +17,18 @@ export async function requestAgentTask(params: {
    */
   scopeLevel?: 'node' | 'group' | 'section' | 'pages' | 'document';
   scopeRef?: object | null;
+  /**
+   * WHO ASKED (mig 251). Omitted means nothing human did — a schedule, or a workflow step advancing
+   * itself — and that is a real answer, deliberately not filled with a service account: automated
+   * work must stay distinguishable from a person's.
+   *
+   * It matters because the reaper (P4) can now say which task was abandoned and for which customer,
+   * and without this still cannot say whose action it was — leaving the one person who could decide
+   * whether to re-run it unnamed. `sourceTaskId` is the other half: it reconnects an abandoned agent
+   * task to the ToDo still sitting in somebody's queue waiting on it.
+   */
+  requestedBy?: string | null;
+  sourceTaskId?: string | null;
 }) {
   try {
     // input is a jsonb column — write via sql.json so it lands as a real jsonb OBJECT
@@ -24,10 +36,11 @@ export async function requestAgentTask(params: {
     // input->>'key' return null for SQL-side reads/analytics (CLAUDE.md jsonb bug-class).
     // The pipeline reads both forms, so this is a safe correctness fix.
     const [task] = await sql`
-      INSERT INTO agent_task_queue (tenant_id, agent_role, task_type, input, proposal_id, section_id, scope_level, scope_ref)
+      INSERT INTO agent_task_queue (tenant_id, agent_role, task_type, input, proposal_id, section_id, scope_level, scope_ref, requested_by, source_task_id)
       VALUES (${params.tenantId}, ${params.agentRole}, ${params.taskType}, ${sql.json(params.input as Parameters<typeof sql.json>[0])}, ${params.proposalId ?? null}, ${params.sectionId ?? null},
               ${params.scopeLevel ?? null},
-              ${params.scopeRef ? sql.json(params.scopeRef as Parameters<typeof sql.json>[0]) : null})
+              ${params.scopeRef ? sql.json(params.scopeRef as Parameters<typeof sql.json>[0]) : null},
+              ${params.requestedBy ?? null}, ${params.sourceTaskId ?? null})
       RETURNING id
     `;
     return task?.id ?? null;

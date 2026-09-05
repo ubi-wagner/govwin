@@ -8,7 +8,16 @@
 > this pass: `section_drafter`'s raw RFP `full_text` is now canonically fenced (it bypassed the central
 > `ContextAssembler` fence), and the guardrail verdict is now actually enforced at the draft-landing site.
 
-> **Admin-agent Phase 1 (2026-08-02) — the fabric now auto-registers 36.** Added **`rfp_ingest_manager`**
+> **Admin companion (2026-09-02) — the fabric auto-registers 39.** Added **`ops_companion`** (platform,
+> advisory), the admin's second pair of eyes during a live drive: detection is counted in
+> `frontend/lib/observe.ts` and HANDED OVER in the event payload; the agent's job is the diagnosis and
+> the proposed change. Its operator's manual is **docs/OPS_COMPANION_MANUAL.md**, and
+> `frontend/__tests__/agent-roster-complete.test.ts` reconciles that manual against this code so it
+> cannot go stale unnoticed — the same test also fails if a registered archetype is missing from the
+> roster an rfp_admin can see, which is how `ops_companion`, `project_manager` and `status_narrator`
+> were invisible at `/admin/agents` while being fully registered.
+>
+> **Admin-agent Phase 1 (2026-08-02).** Added **`rfp_ingest_manager`**
 > (platform / our-org, `Our-org — RFP-admin ops` pod) — the *manager* over the ingest cohort and the
 > platform-scope analog of the tenant-side `proposal_manager`. Admin-invoked (`POST
 > /api/admin/rfp-curation/[solId]/assess-ingest` → `finder:ingest.assessment_requested` →
@@ -67,6 +76,7 @@ marked ⊕):
 | Platform triage / amendments | `OnOpportunitiesDetected` (`finder:opportunities.detected:single`) · `OnSourceChangeDetected` / `OnSolicitationUpdateScan` | opportunity_scout · amendment_monitor |
 | Onboarding / outcome | `OnApplicationAccepted` · `OnProposalOutcomeRecorded` | onboarding_agent · outcome_analyst |
 | Scheduled (our-org CMS/ops) | `OnOpsDigestRequested` · `OnContentResurfaceRequested` · `OnSocialScheduleRequested` · `OnCmsContentRequested` | ops_digest · content_curator · social_scheduler · content_generator |
+| Admin-invoked ops diagnosis | `system:observation.requested` — the **Ask the companion** doorbell on `/admin/observe` and on `/admin/architecture` → Live | **ops_companion** — reads a telemetry window + per-table activity + the findings `lib/observe.ts` already computed, and returns WHY each one happens and WHAT TO CHANGE. Advisory. Operator's manual: **docs/OPS_COMPANION_MANUAL.md** |
 
 ⊕ **Admin doorbells** (missing from §s below): full-draft **and** Studio are also admin-drivable from
 `/admin/agents` — `POST /api/admin/proposals/[p]/full-draft` and `.../studio` funnel through the SAME

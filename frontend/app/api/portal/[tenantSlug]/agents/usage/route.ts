@@ -13,6 +13,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
+// ONE definition of an agent's human name — this route's own ten-entry map fell through to the
+// raw role for the other twenty-nine, and a customer read `outcome_analyst` in a table headed
+// "Agent". lib/agent-labels.ts title-cases anything uncurated, so a new archetype is never a token.
+import { agentDisplayName } from '@/lib/agent-labels';
 
 interface RouteContext {
   params: Promise<{ tenantSlug: string }>;
@@ -27,18 +31,6 @@ const VALID_PERIODS: Record<string, string> = {
 const DEFAULT_MONTHLY_BUDGET = 50.0;
 const DEFAULT_RATE_LIMIT_PER_HOUR = 50;
 
-const AGENT_DISPLAY_NAMES: Record<string, string> = {
-  opportunity_analyst: 'Opportunity Analyst',
-  scoring_strategist: 'Scoring Strategist',
-  capture_strategist: 'Capture Strategist',
-  proposal_architect: 'Proposal Architect',
-  section_drafter: 'Section Drafter',
-  compliance_reviewer: 'Compliance Reviewer',
-  color_team_reviewer: 'Color Team Reviewer',
-  librarian: 'Librarian',
-  partner_coordinator: 'Partner Coordinator',
-  packaging_specialist: 'Packaging Specialist',
-};
 
 export async function GET(request: NextRequest, ctx: RouteContext) {
   try {
@@ -207,7 +199,7 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
 
     const byAgentMapped = byAgent.map((row) => ({
       agentRole: row.agentRole,
-      displayName: AGENT_DISPLAY_NAMES[row.agentRole] ?? row.agentRole,
+      displayName: agentDisplayName(row.agentRole),
       calls: row.calls,
       lastUsed: row.lastUsed,
     }));

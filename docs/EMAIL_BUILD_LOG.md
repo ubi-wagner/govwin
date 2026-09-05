@@ -111,7 +111,7 @@ remedy (`DATABASE_URL="$DATABASE_URL_OWNER" node db/migrations/migrate.mjs`).
 ## E2 · The seam — `lib/email/`
 
 **Shipped:** `lib/email/{index,types,ledger,sender-identity}.ts`, `lib/email/drivers/gmail.ts`,
-`lib/google-calendar.ts`. `lib/email.ts` is gone; `@/lib/email` now resolves to the directory.
+`lib/google-calendar.ts`. `lib/email/` is gone; `@/lib/email` now resolves to the directory.
 
 `send()` owns four things no transport may reimplement — suppression, idempotency, the ledger,
 sender resolution — and a driver's whole job is to hand bytes to a provider and say what happened.

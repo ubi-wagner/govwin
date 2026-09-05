@@ -57,7 +57,10 @@ export async function GET(_request: Request, ctx: RouteContext) {
     // the HANDLER frame (ALS set inside the awaited helper dies with the helper).
     enterTenant(r.actor.tenantId);
     const tasks = await listOpenTasksForActor(r.actor);
-    return NextResponse.json({ data: { tasks } });
+    // `viewerId` so the client can render "You started this" vs "Dana is on this" WITHOUT deciding
+    // whose claim it is. A client that derived its own identity would render someone else's claim
+    // as the viewer's own — the same class as trusting a client-supplied author.
+    return NextResponse.json({ data: { tasks, viewerId: r.actor.id } });
   } catch (err) {
     console.error('[portal/tasks GET] error:', err);
     return NextResponse.json({ error: 'Failed to load tasks', code: 'DB_ERROR' }, { status: 500 });

@@ -68,6 +68,13 @@ const EXEMPT = {
   PLAYWRIGHT_BROWSERS_PATH: 'test harness only — the sandbox browser location',
   PLAYWRIGHT_CHROMIUM_EXECUTABLE: 'test harness only',
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 'test harness only',
+  // Both are TEST-ONLY session-bound shorteners, refused when NODE_ENV === 'production' and able
+  // only to make a bound SHORTER (lib/session-policy.ts, pinned in __tests__/session-policy.test.ts).
+  // Exempt rather than documented BECAUSE they must never appear on an operator's checklist: a
+  // variable in RAILWAY_ENV_VARS.md reads as one somebody may set, and these two exist purely so
+  // scripts/prove-session-cap.mts can drive a 12-hour cap and a 2-hour idle window in 90 seconds.
+  SESSION_CAP_MS_OVERRIDE: 'test harness only — refused in production, and can only shorten a bound',
+  SESSION_IDLE_MS_OVERRIDE: 'test harness only — refused in production, and can only shorten a bound',
 };
 
 function walk(p, out = []) {
@@ -102,6 +109,29 @@ function readByCode() {
     for (const m of text.matchAll(/process\.env\[\s*['"]([A-Z][A-Z0-9_]*)['"]\s*\]/g)) add(m[1], f);
     for (const m of text.matchAll(/os\.environ(?:\.get)?\[?\(?\s*['"]([A-Z][A-Z0-9_]*)['"]/g)) add(m[1], f);
     for (const m of text.matchAll(/os\.getenv\(\s*['"]([A-Z][A-Z0-9_]*)['"]/g)) add(m[1], f);
+    /**
+     * THE INDIRECTION THIS AUDIT WAS BLIND TO.
+     *
+     * `pipeline/src/main.py` reads its scheduled-poke URLs through one helper:
+     *
+     *     _run_poker('card reconcile sweep', 'CARD_RECONCILE_URL', 3600, _reconcile_report)
+     *     async def _run_poker(name, url_var, ...):  url = os.environ.get(url_var)
+     *
+     * so the only `os.environ.get` in the tree takes a VARIABLE, and the name itself never appears
+     * next to it. The header above is honest that a computed key cannot be found by a static scan —
+     * but the effect was that THREE deployment-critical variables were invisible here, and none of
+     * them was in the canonical deploy docs either. Each one gates a sweep that ships inert when
+     * unset: the card reconcile that heals a tenant who never opens their feed, the agent-gate
+     * auto-advance, and the space-presence sweep that closes an "opened your workspace" bracket
+     * whose owner shut the tab. Silently doing nothing in production is the exact failure this
+     * audit exists to catch, and it could not see its own best examples.
+     *
+     * The call site names the variable as a literal, so it IS statically findable — just not by a
+     * pattern that only looks where the read happens. Matched here as its own idiom rather than by
+     * loosening the others, because a rule that accepted any quoted ALL-CAPS string would start
+     * counting log tags and dict keys as environment variables.
+     */
+    for (const m of text.matchAll(/_run_poker\(\s*['"][^'"]*['"]\s*,\s*['"]([A-Z][A-Z0-9_]*)['"]/g)) add(m[1], f);
   }
   return found;
 }
@@ -169,6 +199,12 @@ const SELF = [
     ok: () => Object.values(EXEMPT).every((r) => typeof r === 'string' && r.length > 8) },
   { why: 'the Python idiom is swept, not just the TypeScript one',
     ok: () => [...code.entries()].some(([, files]) => [...files].some((f) => f.endsWith('.py'))) },
+  { // A name passed INTO the poker helper and read there through a variable. All three were
+    // invisible until the idiom was matched, and each gates a sweep that ships inert when unset —
+    // the audit could not see its own best examples of "a capability that silently does nothing".
+    why: 'a variable named only at a _run_poker call site is still found',
+    ok: () => ['CARD_RECONCILE_URL', 'AGENT_GATE_SWEEP_URL', 'SPACE_PRESENCE_SWEEP_URL']
+      .every((n) => code.has(n)) },
   { // Both were reported STALE by the first version, which swept only source files.
     why: 'a variable used only in docker-compose or the Dockerfile is not stale',
     ok: () => !stale.includes('CMS_SERVICE_URL') && !stale.includes('SEED_DEV_ACCOUNTS') },

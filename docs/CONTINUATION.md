@@ -1,6 +1,69 @@
 # CONTINUATION — spin up exactly here
 
-**Last updated:** 2026-09-01 (migration head **243** — the marketing/sales spine: 242 closed the
+**Last updated:** 2026-09-04 · migration head **251**.
+
+## 📍 The session spine (2026-09-04, migs 248–251)
+
+**Canonical: docs/SESSION_LIFECYCLE_SWEEP.md.** A session had no absolute cap — measured, not read:
+on the JWT strategy every request re-signs the cookie, so `maxAge` is a SLIDING idle window and an
+active session never ended. Worse, `PresenceHeartbeat` is mounted ONLY for an outside actor inside a
+customer's workspace and pings every two minutes, so the one population that most needed a bound was
+guaranteed never to hit one — a visible unattended tab held the session AND the presence bracket open
+indefinitely while the customer's trail asserted an administrator was in their account.
+
+Six pieces, each red-then-green on the PRODUCTION-shaped build (standalone, `NODE_ENV=production`,
+serving as `govtech_app`) — not `next dev`, which is where the first four were proven and where the
+bounds turned out not to exist at all:
+
+* **P1** two bounds in `lib/session-policy.ts`, enforced in the `jwt` callback because it is the only
+  code that runs on every token read. Absolute 12h from sign-in; per-role idle (2h platform admin,
+  4h everyone else — the split is blast radius, not seniority). Returning `null` makes `@auth/core`
+  clean the cookie. **Three orderings are load-bearing:** adopt an unstamped token BEFORE checking,
+  check BEFORE advancing `lastSeenAt`, and report `absolute` over `idle`.
+* **P2** mig 248 splits `space_presence.last_seen_at` ("is this tab there", what the sweep reads)
+  from `last_interaction_at` ("is a person working", what the descent gate reads). That split is what
+  closes the heartbeat hole. The gate REFUSES rather than resetting state, because an rfp_admin has
+  nothing to ascend from — being on the portal URL *is* the descent. Three clocks nest:
+  descent 30m < admin session 2h < absolute 12h.
+* **P3** mig 249 makes a ToDo claimable. `tasks.status` allowed `in_progress` for the life of the
+  table and NOTHING ever wrote it. A claim is not a lock — it cannot block completion and it EXPIRES,
+  because P1/P2 guarantee people are signed out mid-task and a claim without an expiry is a stalled
+  queue. `resume_href` is what makes coming back cheap.
+* **P4** the fabric reaps `agent_task_queue` rows abandoned past 30m — `failed`, not re-queued, since
+  an invocation costs money and may have had side effects — and EMITS per row. **Section locks are
+  NOT a target:** locking is the deliberate accept stricture; the plan was wrong and reaping them
+  would have destroyed accepted work. `editing_by`/`editing_since` are a dead pair, set nowhere.
+* **P5** mig 250 adds `forced`, the sixth close reason and the only one a second person can cause.
+  `/admin/workspace-access` can now END somebody's access. It is a COOLDOWN by architecture, not
+  choice: closing the bracket evicts the record and not the actor.
+* **P6** mig 251 gives `agent_task_queue` `requested_by` + `source_task_id`, carried into the
+  abandoned-task event. NULL is a real answer, deliberately not a service account.
+
+New drives, all registered: `descent-timeout` · `task-claim` · `force-ascend` ·
+`stale-agent-tasks` (Python). Instruments: `probe-session-lifecycle.mts` (measures the posture),
+`prove-session-cap.mts` (proves cap AND idle live, refusing to run unless `/api/health` confirms the
+bound it is testing against). `check-async-workers.mjs` is a new suite preflight — five drives once
+reported an absent worker as five product defects.
+
+**Deployment readiness: docs/DEPLOYMENT_READINESS_2026-09-03.md.** Two operator variables remain and
+neither can be closed from the repo: Postmark + DKIM/Return-Path DNS, and `DATABASE_URL_OWNER` on the
+frontend (measured: 574 rows as owner, 0 as `govtech_app`, no error either way — `/api/health` now
+reports whether the bypass pool can actually bypass).
+
+⚠️ **A "standing gap" that nobody re-measures becomes a permanent one.** Four in a row here did not
+survive a rebuild: the `verify-surfaces` tenant-lane preflight, `/admin/workspace-access` 404ing,
+`application-intake`'s 21 findings, and `/admin` React #418 (intermittent, 1 run in 3). Re-measure
+before reporting.
+
+---
+
+**Previously — 2026-09-01** · **branch restarted from `main` at `fb203632` (PR #215 merged).**
+Doc-currency + UI-atlas + launch-gap pass — canonical **docs/LAUNCH_GAPS_2026-09-01.md**. One hard
+blocker to guided onboarding: outbound email is not switched on. Three defects fixed: the
+attribution chain was fed by nothing (no form read `_rfp_sid`), acceptance dropped the customer's
+own answers (`tenant_profiles` written zero times), and the first-run checklist had no bucket step
+plus a tick that fired on a row's existence. New instrument: `audit-doc-currency.mjs`.
+(migration head **243** — the marketing/sales spine: 242 closed the
 funnel sever, 243 added `contacts`, the subject the CRM never had. See
 "📍 The funnel is joined" immediately below.) (2026-08-31: migration head **241**, and **`main` is now at that head** — PR #213
 merged the entire arc; see the Branch line below before doing anything else. Earlier: head **237** —
@@ -1001,7 +1064,11 @@ items show 📄 template + ✎ notes badges in the volume list. Proven by `scrip
 - **archived** = whole COMPANY (license lapsed): `tenants.archived_at`, orthogonal to per-user state so
   renewal restores everyone to their exact prior state for free. Archived companies vanish from the login
   list (`getActiveMemberships` filters them); admins can still enter to renew. Admin control on the tenant
-  page. DONE + verified (`scripts/drive-archive.mts`). Every user-creation path now writes a membership.
+  page. DONE + verified — `scripts/drive-archive.mts` was found MISSING while this line cited it,
+  and has been REBUILT (2026-09-01, suite drive `archive`). It now covers all three archivable
+  entities, asserts the GATE rather than the column, and red-tests: removing
+  `t.archived_at IS NULL` from `verifyTenantAccess` fails exactly that assertion. Every
+  user-creation path writes a membership.
 See the identity design's "Never hard-delete" + "third state: ARCHIVED" sections.
 
 **As-built mechanism (don't re-derive):**
