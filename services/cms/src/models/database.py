@@ -114,7 +114,38 @@ async def init_event_bridge() -> asyncpg.Pool | None:
         logger.warning('SHARED_DATABASE_URL not set — event bridge disabled, events will be local-only')
         return None
     _event_pool = await asyncpg.create_pool(shared_url, min_size=1, max_size=3, command_timeout=10)
-    logger.info('Event bridge to shared database initialized')
+
+    # WHICH ROLE DOES THIS POOL CARRY? — a question the repo could not answer until now.
+    #
+    # `mailer/ledger.py` says it outright: "established which role SHARED_DATABASE_URL actually
+    # carries" was never done. It matters because migration 215 gives `email_send_ledger` a SELECT
+    # policy and NO write policy, so a NOBYPASSRLS role is refused there BY DESIGN. If this pool is
+    # not privileged, every CRM send runs DEGRADED — the mail goes out, the ledger row is never
+    # reserved, and a crash mid-send becomes invisible again, which is the exact failure the ledger
+    # exists to make visible. The symptom is one 42501 per process and otherwise normal behaviour.
+    #
+    # So state it at boot, once, where an operator reading the startup log can see it — rather than
+    # leaving it to be discovered from a suppressed exception months later. Reporting only: a wrong
+    # role here degrades one capability and must not stop the service from starting.
+    try:
+        row = await _event_pool.fetchrow(
+            'SELECT current_user AS role, rolsuper, rolbypassrls '
+            'FROM pg_roles WHERE rolname = current_user'
+        )
+        if row is None:
+            logger.warning('Event bridge: could not read the connected role')
+        elif row['rolsuper'] or row['rolbypassrls']:
+            logger.info(
+                'Event bridge to shared database initialized (role=%s, privileged — '
+                'email_send_ledger writes will land)', row['role'])
+        else:
+            logger.error(
+                'Event bridge role=%s is NOBYPASSRLS — email_send_ledger has no write policy, so '
+                'every CRM send will run DEGRADED (mail sent, no ledger reservation). Point '
+                'SHARED_DATABASE_URL at the owner role.', row['role'])
+    except Exception as exc:  # noqa: BLE001 - reporting only, never fatal
+        logger.warning('Event bridge: role check failed (%s)', exc)
+
     return _event_pool
 
 

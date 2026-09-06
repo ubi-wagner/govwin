@@ -57,6 +57,7 @@ interface HealthResponse {
     db: CheckResult;
     s3: CheckResult;
     bypass: CheckResult;
+    scoped: CheckResult;
   };
 }
 
@@ -78,9 +79,10 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
   let db: CheckResult = { ok: false, detail: 'not checked' };
   let s3: CheckResult = { ok: false, detail: 'not checked' };
   let bypass: CheckResult = { ok: false, detail: 'not checked' };
+  let scoped: CheckResult = { ok: false, detail: 'not checked' };
 
   try {
-    [db, s3, bypass] = await Promise.all([checkDb(), checkS3(), checkBypass()]);
+    [db, s3, bypass, scoped] = await Promise.all([checkDb(), checkS3(), checkBypass(), checkScoped()]);
   } catch (err) {
     log.warn({ err }, 'health checks threw during startup');
   }
@@ -105,7 +107,7 @@ export async function GET(): Promise<NextResponse<HealthResponse>> {
       absoluteMaxMs: ABSOLUTE_MAX_MS,
       idleMs: Object.fromEntries(Object.keys(IDLE_MS).map((r) => [r, idleLimitFor(r)])),
     },
-    checks: { db, s3, bypass },
+    checks: { db, s3, bypass, scoped },
   };
 
   if (allOk) {
@@ -218,6 +220,69 @@ async function checkS3(): Promise<CheckResult> {
       { err: err instanceof Error ? { message: err.message } : err },
       's3 health check failed',
     );
+    return {
+      ok: false,
+      detail: truncateDetail(err instanceof Error ? err.message : String(err)),
+    };
+  }
+}
+
+/**
+ * IS THE SCOPED POOL ACTUALLY SCOPED? — the mirror of `checkBypass`, and the half that was missing.
+ *
+ * `checkBypass` asks whether the privileged pool is privileged. Nothing asked the opposite question
+ * about the pool that serves every customer request, and that omission is not hypothetical: this
+ * deployment ran for months with `DATABASE_URL` pointing at the SUPERUSER. The app behaved
+ * perfectly, `checks.db.ok` was true, and row-level security was bypassed on every request — the
+ * documented "two-layer" posture was one layer, and no instrument anywhere could say so. It was
+ * found by a person reading two environment variables side by side.
+ *
+ * That is bug B86's shape at production scale: **RLS bypassed looks identical to RLS satisfied**
+ * from every angle except a cross-tenant read that should return nothing and doesn't.
+ *
+ * `rolsuper` is checked as well as `rolbypassrls` because a superuser bypasses RLS while reporting
+ * `rolbypassrls = f`. Owning the tables is not sufficient either — migs 212/213 FORCE row security,
+ * and FORCE applies to the owner too.
+ *
+ * NOT in the `ok` conjunction, for the same reason `bypass` is not: the product serves correctly
+ * either way, and failing a liveness probe over a security posture would take the site down to
+ * report a configuration fault. It reports, and logs at ERROR.
+ *
+ * Cached like `checkBypass`: a role's attributes cannot change without an ALTER ROLE, and the fix
+ * requires a redeploy — a new process, and a fresh answer.
+ */
+let scopedCache: CheckResult | null = null;
+
+async function checkScoped(): Promise<CheckResult> {
+  if (scopedCache) return scopedCache;
+  try {
+    const rows = await sql<{ role: string; rolsuper: boolean; rolbypassrls: boolean }[]>`
+      SELECT current_user AS role, rolsuper, rolbypassrls
+        FROM pg_roles WHERE rolname = current_user`;
+    const r = rows[0];
+    if (!r) return { ok: false, detail: 'could not read the connected role' };
+
+    if (!r.rolsuper && !r.rolbypassrls) {
+      scopedCache = { ok: true, detail: `role=${r.role}` };
+      return scopedCache;
+    }
+
+    log.error(
+      { role: r.role, rolsuper: r.rolsuper, rolbypassrls: r.rolbypassrls },
+      'APPLICATION POOL BYPASSES RLS — every request is served by a role row-level security does '
+      + 'not apply to. Tenant isolation is app-layer only. Point DATABASE_URL at the govtech_app '
+      + 'role (NOBYPASSRLS); DATABASE_URL_OWNER keeps the privileged connection.',
+    );
+    scopedCache = {
+      ok: false,
+      detail:
+        `role=${r.role} BYPASSES RLS (rolsuper=${r.rolsuper} rolbypassrls=${r.rolbypassrls}) — `
+        + 'tenant isolation is app-layer only',
+    };
+    return scopedCache;
+  } catch (err) {
+    // Not cached: a connection failure during startup is transient, and pinning it would report a
+    // correctly-scoped pool as broken for the life of the process.
     return {
       ok: false,
       detail: truncateDetail(err instanceof Error ? err.message : String(err)),
