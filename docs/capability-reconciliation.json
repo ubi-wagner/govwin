@@ -6,7 +6,7 @@
    "methods": [
     "POST"
    ],
-   "reason": "headless scheduler via CRON_SECRET (middleware CRON_EXACT_PATHS)",
+   "reason": "headless scheduler via CRON_SECRET (derived from middleware CRON_EXACT_PATHS)",
    "duplicatedBy": null,
    "secondDoor": null,
    "nearMiss": false
@@ -40,7 +40,7 @@
    "methods": [
     "POST"
    ],
-   "reason": null,
+   "reason": "headless scheduler via CRON_SECRET (derived from middleware CRON_EXACT_PATHS)",
    "duplicatedBy": null,
    "secondDoor": null,
    "nearMiss": false
@@ -73,7 +73,7 @@
    "methods": [
     "POST"
    ],
-   "reason": "headless scheduler via CRON_SECRET (middleware CRON_EXACT_PATHS)",
+   "reason": "headless scheduler via CRON_SECRET (derived from middleware CRON_EXACT_PATHS)",
    "duplicatedBy": null,
    "secondDoor": null,
    "nearMiss": false
@@ -157,6 +157,17 @@
    "nearMiss": true
   },
   {
+   "route": "/api/admin/space-presence/sweep",
+   "file": "app/api/admin/space-presence/sweep/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": "headless scheduler via CRON_SECRET (derived from middleware CRON_EXACT_PATHS)",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": false
+  },
+  {
    "route": "/api/admin/system",
    "file": "app/api/admin/system/route.ts",
    "methods": [
@@ -166,6 +177,17 @@
    "duplicatedBy": "app/admin/system/page.tsx (both call eventRates())",
    "secondDoor": null,
    "nearMiss": false
+  },
+  {
+   "route": "/api/admin/tasks/sweep-claims",
+   "file": "app/api/admin/tasks/sweep-claims/route.ts",
+   "methods": [
+    "POST"
+   ],
+   "reason": "headless scheduler via CRON_SECRET (derived from middleware CRON_EXACT_PATHS)",
+   "duplicatedBy": null,
+   "secondDoor": null,
+   "nearMiss": true
   },
   {
    "route": "/api/admin/tenants/[tenantId]/backfill-cards",
@@ -768,6 +790,10 @@
    "tail": "/proposals/:p"
   },
   {
+   "route": "/api/portal/[tenantSlug]/tasks/[taskId]/claim",
+   "tail": "/:p/claim"
+  },
+  {
    "route": "/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/download",
    "tail": "/atoms/:p/download"
   },
@@ -779,7 +805,7 @@
  "unreadTables": [
   {
    "name": "_migration_history",
-   "rows": 243
+   "rows": 254
   },
   {
    "name": "cms_content",
@@ -821,7 +847,7 @@
    "archetype": "color_team_reviewer",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "compliance_reviewer",
@@ -905,7 +931,7 @@
    "archetype": "onboarding_agent",
    "inWorkflow": true,
    "namedInUi": true,
-   "everRan": true
+   "everRan": false
   },
   {
    "archetype": "opportunity_analyst",
@@ -918,6 +944,12 @@
    "inWorkflow": true,
    "namedInUi": true,
    "everRan": true
+  },
+  {
+   "archetype": "ops_companion",
+   "inWorkflow": false,
+   "namedInUi": true,
+   "everRan": false
   },
   {
    "archetype": "ops_digest",

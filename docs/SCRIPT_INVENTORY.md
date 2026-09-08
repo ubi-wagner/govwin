@@ -24,7 +24,7 @@ a stale green nobody re-checks. The live answer is `bash scripts/run-branch-driv
 table is the record. Everything in **SUITE** below ran in that suite; everything else did not.
 
 
-## SUITE — 65
+## SUITE — 66
 
 Runs on every `run-branch-drives.sh`. This is the regression net.
 
@@ -33,7 +33,7 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `audit-empty-not-null.mjs` | — | 2026-08-30 |
 | `audit-env-inventory.mjs` | — | 2026-09-04 |
 | `audit-pipeline-coherence.mjs` | — | 2026-08-28 |
-| `audit-row-type-truth.mjs` | — | 2026-08-28 |
+| `audit-row-type-truth.mjs` | — | 2026-09-08 |
 | `close-e2e-cms.mjs` | — | 2026-08-30 |
 | `demo-canvas-capabilities.mts` | — | 2026-08-24 |
 | `drive-admin-demand.mts` | — | 2026-08-31 |
@@ -53,6 +53,7 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `drive-curate-baa.mts` | — | 2026-08-30 |
 | `drive-curated-ranking.mts` | — | 2026-08-30 |
 | `drive-descent-timeout.mts` | — | 2026-09-03 |
+| `drive-email-spine.mts` | — | 2026-08-26 |
 | `drive-end-to-end.mjs` | — | 2026-09-03 |
 | `drive-force-ascend.mts` | — | 2026-09-04 |
 | `drive-full-draft.mts` | — | 2026-08-24 |
@@ -191,7 +192,7 @@ Reachable via `npm run` — package.json names it.
 |---|---|---|
 | `sync-pdf-worker.mjs` | — | 2026-08-18 |
 
-## DOCUMENTED — 99
+## DOCUMENTED — 98
 
 No code references it, but a document tells someone to run it.
 
@@ -205,7 +206,7 @@ No code references it, but a document tells someone to run it.
 | `backfill-buckets.mts` | — | 2026-08-15 |
 | `bug-log-status.mjs` | — | 2026-08-24 |
 | `capture-guides.mjs` | — | 2026-08-30 |
-| `capture-hydration-diff.mjs` | — | — |
+| `capture-hydration-diff.mjs` | — | 2026-09-08 |
 | `capture-mobile-guide.mts` | — | 2026-08-28 |
 | `capture-projects-guide.mjs` | — | 2026-08-28 |
 | `capture-shots.mts` | 14 | 2026-07-19 |
@@ -222,7 +223,6 @@ No code references it, but a document tells someone to run it.
 | `drive-control-reachability.mts` | — | 2026-08-24 |
 | `drive-corpus-verbatim.mts` | — | 2026-08-19 |
 | `drive-dormant-surface.mjs` | — | 2026-08-26 |
-| `drive-email-spine.mts` | — | 2026-08-26 |
 | `drive-foundation-tvsf.mts` | — | 2026-08-19 |
 | `drive-item-template-picker.mts` | 1 | 2026-08-30 |
 | `drive-milestone-construct.mts` | — | 2026-08-27 |
@@ -436,13 +436,13 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 
 | class | count |
 |---|---|
-| SUITE | 65 |
+| SUITE | 66 |
 | LENS | 4 |
 | CROSS-CHECK | 2 |
 | RULER | 7 |
 | LIBRARY | 8 |
 | CALLED-BY-ANOTHER | 31 |
 | NPM-WIRED | 1 |
-| DOCUMENTED | 99 |
+| DOCUMENTED | 98 |
 | UNREFERENCED | 98 |
 | **total** | **315** |

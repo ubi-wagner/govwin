@@ -420,6 +420,13 @@ the committed emulator, so every path is drivable with no live key.
    social are live. Its content/page-block routers are **superseded** for front-facing content (that moved
    to the frontend per §1 — content is frontend-owned in the main DB) — the service's forward scope is
    **CRM** (customer identification / acquisition / management), **still to be built out**.
+   **`scripts/sandbox-up.sh` starts it locally** (`:8000`, migrations first exactly as the Dockerfile
+   does, `CMS_API_KEY` defaulted so its routes do not fail closed) and the verdict now checks it.
+   It did not, for as long as it has existed — and because this service is the CONSUMER half of the
+   `system_events` bridge, running without it meant a `system:notification.requested` was written and
+   nothing consumed it: no ledger row, no send, no `notification.failed`. **That reads as a working
+   emit, because the emitting side succeeds** (B159). Every API route fails closed with 503
+   `auth_not_configured` when `CMS_API_KEY` is unset, and 401 on a wrong key.
 
 Frontend + Pipeline share the main PostgreSQL database (`govtech_intel`, Railway service `Postgres`); the
 `rfp-crm` CRM service has its own (`cms-postgres`) and bridges via the shared `system_events` table. Object
@@ -462,9 +469,12 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Portal routes MUST verify tenant access — never query by ID alone
 - **Before running or reviving a harness script, check docs/SCRIPT_INVENTORY.md** — generated from
   the tree + the live DB (`frontend/scripts/inventory-scripts.mjs`). It says who references each of
-  the 325 scripts and whether it still drives identifiers that exist. 52 classify as branch suite, 4 the
+  the 325 scripts and whether it still drives identifiers that exist. 66 classify as branch suite, 4 the
   lenses, 2 the cross-checks, 7 the canvas rulers — note the SUITE column counts *scripts*, and
-  `run-branch-drives.sh` registers **64 drives**, because two of them are filed elsewhere (RULER,
+  `run-branch-drives.sh` registers **65 drives** (`drive-email-spine.mts` joined it — it proves the
+  whole outbound-email path against the committed emulator and had NEVER been in the suite, filed
+  under DOCUMENTED, which is the category for "a doc points at it" and not "something runs it";
+  every outbound email the product sends was uncovered, B159), because two of them are filed elsewhere (RULER,
   and the deck probe under DOCUMENTED) and one is the first **Python** entry the runner has ever
   had (`spend-guardrails`, dispatched by extension — never via the `pytest` on PATH, which is a uv
   tool that cannot see asyncpg); both
