@@ -147,7 +147,15 @@ if (captured) {
   console.log(`\n❌ ${captured} hydration diagnostic(s) captured — the diff above names the component.`);
   process.exit(1);
 }
+/**
+ * SAY WHAT THE ZONE WAS. A clean run means nothing without it: B156 was invisible for months
+ * precisely because every sweep compared UTC against UTC, and the summary line that used to sit
+ * here blamed "mid-suite, with the workflow engine writing" — a theory the diff later disproved.
+ * A green line that carries a wrong explanation is worse than one that carries none, because the
+ * next reader inherits the explanation and not the doubt.
+ */
 console.log('\n✅ no hydration mismatch on a DEV build across '
-  + `${ROUTES.length} route(s) × ${PASSES} pass(es). This is evidence for THESE routes under THESE `
-  + 'conditions — #418 has only ever been seen mid-suite, with the workflow engine writing.');
+  + `${ROUTES.length} route(s) × ${PASSES} pass(es), browser zone ${process.env.BROWSER_TZ || 'America/New_York'} `
+  + 'vs the server\'s. Evidence for THESE routes at THIS zone pair — not for every route, and not '
+  + 'for a viewer in a zone whose offset differs from this one at a different time of year.');
 process.exit(0);
