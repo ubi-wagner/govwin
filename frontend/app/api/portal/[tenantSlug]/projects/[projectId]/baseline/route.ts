@@ -7,6 +7,7 @@
  *           is a different verb and not an argument to the one above.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject, readiness } from '@/lib/projects/project';
 import { setBaseline, rebaseline, milestoneVariance, type RebaselineInput } from '@/lib/projects/baseline';
@@ -39,7 +40,15 @@ export async function POST(_request: Request, ctx: { params: Promise<{ tenantSlu
     return await withProject(tenantSlug, async (gate) => {
 
       const result = await setBaseline(gate.actor, projectId);
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      // B162 — a refusal the SYSTEM made (the baseline freeze is a fact about stored state, not
+      // about this request) must be visible beyond the caller. `refuse` returns the same envelope
+      // and emits, so the two halves cannot come apart again.
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'baseline.set', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { baseline: result.data } });
     });
   } catch (err) {
