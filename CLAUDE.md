@@ -804,6 +804,20 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   `relativeFrom(x, useClientNow())` (`components/ui/time-ago.tsx`): `now` is null until mounted, so
   the first paint is a deterministic UTC stamp on both sides. `__tests__/client-clock-in-render.test.ts`
   guards the shape.
+- **…and it must NEVER format a date in the AMBIENT TIME ZONE either — the same #418, and the one
+  the sandbox is STRUCTURALLY BLIND TO (B156).** The clock rule above guards *when* a value was
+  computed; this guards *where*. `toLocale*` with no `timeZone` formats in the container's zone on
+  the server and the viewer's in the browser — React's own mismatch list names it — so the strings
+  disagree and hydration fails for the whole subtree at HTTP 200. **This box runs the server AND
+  the browser in UTC, so it cannot happen here and every sweep is clean**, while in production it
+  fires for every admin whose browser is not UTC, i.e. all of them. It was recorded five times on
+  five routes as "observed, unreproduced" and misattributed to the clock rule above before anyone
+  pinned a non-UTC browser. Seven components carried it. Use `<LocalTime iso={x} opts={…}/>` or
+  `localFrom(x, mounted)` (`components/ui/time-ago.tsx`) — or an explicit `timeZone` where the
+  value really IS defined in one (cron schedules). `__tests__/client-timezone-in-render.test.ts`
+  guards the shape; `frontend/scripts/capture-hydration-diff.mjs` reproduces it on a dev build,
+  where React names the component and prints the diff (`NEXT_DIST_DIR` + `NODE_ENV=development` —
+  see `next.config.mjs`, B155; **`next dev` in this tree otherwise deletes the standalone build**).
 - **`next/dynamic({ssr:false})` drops `ref`** (Next 15 sets `ref.current={retry}`, a truthy non-handle):
   pass an imperative handle via a normal prop (`innerRef`), not `ref`. And load browser-only libs
   (react-pdf / pdfjs) via `next/dynamic({ssr:false})` — a static import into a `'use client'` component

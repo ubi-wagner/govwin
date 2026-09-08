@@ -32,7 +32,8 @@
  *     npx next dev -p 3001                                         # leave running
  *   node scripts/capture-hydration-diff.mjs                        # in another shell
  *
- * Env: BASE (default http://localhost:3001) · ROUTES (comma-separated) · PASSES (default 2).
+ * Env: BASE (default http://localhost:3001) · ROUTES (comma-separated) · PASSES (default 2) ·
+ * BROWSER_TZ (default America/New_York — see below; a UTC-against-UTC run cannot see B156).
  *
  * DELIBERATELY NOT REGISTERED in `run-branch-drives.sh`. The suite serves the standalone build on
  * :3000; this needs a second, dev server on :3001, and a drive that silently finds nothing because
@@ -58,8 +59,10 @@ const EXE = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome-li
 const BASE = process.env.BASE || 'http://localhost:3001';
 const PASSES = Number(process.env.PASSES || 2);
 const ROUTES = (process.env.ROUTES
-  // The four routes #418 has actually been seen on, plus the two layouts they share.
-  || '/admin/dashboard,/admin/pipeline,/admin/analytics,/admin/events,/partner').split(',');
+  // The five routes #418 has actually been seen on. `/admin/sources` leads because it is the one
+  // that was REPRODUCED and named its component (B156) — a default route list that omits the only
+  // proven case is a default that cannot re-prove the bug it was written for.
+  || '/admin/sources,/admin/dashboard,/admin/pipeline,/admin/analytics,/admin/events,/partner').split(',');
 const EMAIL = process.env.DRIVE_ADMIN_EMAIL || 'eric@rfppipeline.com';
 const PW = process.env.SANDBOX_PASSWORD;
 
@@ -68,7 +71,22 @@ const HYDRATION = /[Hh]ydrat|did not match|server rendered|server-rendered|#418|
 if (!PW) { console.error('✗ HARNESS DEFECT — SANDBOX_PASSWORD not set; source scripts/sandbox-env.sh'); process.exit(2); }
 
 const br = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-const ctx = await br.newContext({ viewport: { width: 1440, height: 1000 } });
+/**
+ * TZ IS A FIRST-CLASS KNOB, not a detail. React's own hydration-mismatch list names *"date
+ * formatting in a user's locale which doesn't match the server"* as a cause, and this sandbox runs
+ * the server AND the browser in UTC — so a `toLocaleString` with no `timeZone` renders identically
+ * on both sides here and is invisible, while firing for every customer whose browser is not UTC.
+ * A UTC-only sweep is therefore structurally blind to the single most common cause. Default to a
+ * non-UTC zone; `BROWSER_TZ=UTC` to measure the sandbox's own default.
+ *
+ * `BROWSER_TZ`, not `TZ`: `TZ` is read by Node itself, so reusing it would silently move THIS
+ * process's clock as well as the browser's — and the whole point is to make the two differ
+ * deliberately, not to move both together and see nothing.
+ */
+const ctx = await br.newContext({
+  viewport: { width: 1440, height: 1000 },
+  timezoneId: process.env.BROWSER_TZ || 'America/New_York',
+});
 const page = await ctx.newPage();
 const seen = [];
 page.on('pageerror', (e) => seen.push({ kind: 'pageerror', text: e.message }));
@@ -82,7 +100,10 @@ const die = async (msg) => { console.error(`✗ HARNESS DEFECT — ${msg}`); awa
 
 // GUARD 2 first: cheapest, and it invalidates everything below if it fails.
 await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' }).catch(() => {});
-const loginHtml = await page.content();
+// `page.content()` throws "the page is navigating" if it races a redirect, so settle first. A
+// harness that dies on a race reports nothing, which is the same outcome as a clean run.
+await page.waitForLoadState('load').catch(() => {});
+const loginHtml = await page.content().catch(() => '');
 /**
  * The discriminator, VALIDATED BOTH WAYS rather than guessed: dev emits UNHASHED bootstrap chunks
  * (`app-pages-internals.js`, `chunks/webpack.js`), production emits content-hashed ones. Measured

@@ -59,6 +59,63 @@ export function elapsedFrom(iso: string | Date | null | undefined, now: number |
   return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
 }
 
+/**
+ * ── ABSOLUTE dates need the same rule, for a DIFFERENT reason (B156) ───────────────────────────
+ *
+ * Everything above guards *when* a value was computed. This guards *where*. `toLocaleDateString`
+ * / `toLocaleString` / `toLocaleTimeString` with no `timeZone` formats in the AMBIENT zone — the
+ * container's on the server, the viewer's in the browser. React's own hydration-mismatch list names
+ * it outright: *"date formatting in a user's locale which doesn't match the server."*
+ *
+ * Measured on `/admin/sources`, browser pinned to America/New_York:
+ *
+ *     +  Aug 25, 2026, 04:02 PM      (client)
+ *     -  Aug 25, 2026, 08:02 PM      (server, UTC)
+ *
+ * Four hours apart, inside `<SourceCard>` — #418, whole-subtree hydration failure, HTTP 200.
+ *
+ * THIS IS WHY #418 READ AS AN INTERMITTENT FOR FIVE ROUTES AND MONTHS. The sandbox runs the server
+ * AND the browser in UTC, so both sides format identically and every sweep is clean. In production
+ * it is not intermittent at all: it fires for every admin whose browser is not UTC, which is all of
+ * them. A bug that cannot occur on the machine you test on is not a rare bug.
+ *
+ * `timeZone: 'UTC'` also removes the mismatch and is right where the value IS defined in UTC (cron
+ * schedules — B92). It is wrong here: showing a person in Ohio a timestamp in UTC, unlabelled, is a
+ * correctness bug of its own. The mount rule gives both — a deterministic UTC stamp on the first
+ * paint that both sides agree on, then the viewer's own zone on the next tick.
+ */
+export function useMounted(): boolean {
+  const [m, setM] = useState(false);
+  useEffect(() => setM(true), []);
+  return m;
+}
+
+const DEFAULT_ABS: Intl.DateTimeFormatOptions = {
+  year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+};
+
+/** Absolute date in the VIEWER's zone once mounted; a deterministic UTC stamp before that. */
+export function localFrom(
+  iso: string | Date | null | undefined,
+  mounted: boolean,
+  opts: Intl.DateTimeFormatOptions = DEFAULT_ABS,
+  fallback = '—',
+): string {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return fallback;
+  // Not mounted — server and first client paint both take this branch, so they cannot disagree.
+  if (!mounted) return d.toLocaleString('en-US', { ...opts, timeZone: 'UTC' });
+  return d.toLocaleString('en-US', opts);
+}
+
+/** Drop-in for `{formatDate(x)}` in a client component. */
+export function LocalTime({
+  iso, opts, fallback,
+}: { iso: string | Date | null | undefined; opts?: Intl.DateTimeFormatOptions; fallback?: string }) {
+  return <>{localFrom(iso, useMounted(), opts, fallback)}</>;
+}
+
 /** Drop-in for `{relativeTime(x)}` at a call site that has no `now` to hand. */
 export function TimeAgo({ iso, everyMs }: { iso: string | Date | null | undefined; everyMs?: number }) {
   return <>{relativeFrom(iso, useClientNow(everyMs))}</>;

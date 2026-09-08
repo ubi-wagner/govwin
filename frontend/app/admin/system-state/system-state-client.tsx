@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
+import { TimeAgo, Elapsed, LocalTime } from '@/components/ui/time-ago';
 import { useState, useEffect } from 'react';
 import type {
   HealthSummary,
@@ -78,10 +78,13 @@ function truncateJson(obj: unknown, maxLen = 120): string {
   return s.slice(0, maxLen) + '...';
 }
 
-function formatHour(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-}
+/**
+ * B156 — a `toLocale*` with no `timeZone` formats in the AMBIENT zone: UTC on the server, the
+ * viewer's in the browser. The strings disagree, React throws #418, and hydration fails for the
+ * WHOLE subtree while the route answers HTTP 200. `<LocalTime>` owns its own mount state — a
+ * deterministic UTC stamp on the first paint, the viewer's zone on the next tick.
+ */
+const HOUR_MIN: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
 
 // ─── Sub-components ───────────────────────────────────────────────────
 
@@ -665,7 +668,7 @@ function EventVolumeChart({ data }: { data: EventVolumeRow[] }) {
               {/* Tooltip */}
               <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:block z-10">
                 <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
-                  <div className="font-medium">{formatHour(hour)}</div>
+                  <div className="font-medium"><LocalTime iso={hour} opts={HOUR_MIN} /></div>
                   {namespaces.map((ns) => {
                     const count = nsMap.get(ns) ?? 0;
                     if (count === 0) return null;
@@ -700,7 +703,7 @@ function EventVolumeChart({ data }: { data: EventVolumeRow[] }) {
               {/* Hour label - show every 3rd to avoid overlap */}
               {hours.indexOf(hour) % 3 === 0 && (
                 <div className="text-center mt-1">
-                  <span className="text-xs text-gray-400 font-mono">{formatHour(hour)}</span>
+                  <span className="text-xs text-gray-400 font-mono"><LocalTime iso={hour} opts={HOUR_MIN} /></span>
                 </div>
               )}
             </div>

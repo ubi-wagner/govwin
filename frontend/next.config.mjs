@@ -39,7 +39,10 @@ const nextConfig = {
    *
    * ⚠️ One thing dev DOES still write outside its dist dir: it rewrites `next-env.d.ts` and
    * `tsconfig.json` to point at whatever `distDir` is active — `./.next-dev/types/routes.d.ts`,
-   * plus a `.next-dev/types/**/*.ts` entry in `include`. Both files are TRACKED. Committing that
+   * plus a `.next-dev/types` glob entry in tsconfig's `include`. Both files are TRACKED. (That glob
+   * is written out here without its wildcards ON PURPOSE: the literal contains the two characters
+   * that CLOSE a block comment, which is how this exact line broke `next.config.mjs` for every
+   * build until the dev server refused to boot on `SyntaxError: Unexpected token '.'`.) Committing
    * reference breaks `tsc` and `next build` for everyone else, against a directory that exists only
    * on the machine that ran dev.
    *

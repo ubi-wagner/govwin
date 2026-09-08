@@ -955,9 +955,14 @@ was broken and is clean, and the events stopped. If it recurs, a dev-build captu
 > own middleware loader, so it reads as a framework incompatibility. Both are fixed:
 > `NEXT_DIST_DIR` in `next.config.mjs` and `scripts/capture-hydration-diff.mjs`, red-tested (it
 > names the component and prints the literal server/client diff) with a guard that exits **2**
-> rather than report a clean sweep when pointed at a production build. **#418 itself remains
-> undiagnosed** — the clock-read and write-on-render hypotheses are both disproven by measurement
-> on `/admin/pipeline`.
+> rather than report a clean sweep when pointed at a production build.
+>
+> **And it named the cause the same day — B156.** Not the clock, and not a write during render:
+> both were disproven by measurement first. Seven client components formatted dates with
+> `toLocale*` and no `timeZone`, so the server rendered UTC and the browser the viewer's zone. It
+> was invisible because this sandbox runs BOTH in UTC; pinning the capture browser to
+> `America/New_York` reproduced it immediately. All seven fixed, guarded by
+> `__tests__/client-timezone-in-render.test.ts`.
 
 ### And the branch suite disagreed with itself depending on whether the engine was running
 

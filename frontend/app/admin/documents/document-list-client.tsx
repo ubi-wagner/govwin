@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { LocalTime } from '@/components/ui/time-ago';
 import { toast } from '@/lib/toast';
 
 interface DocumentMeta {
@@ -54,10 +55,12 @@ function formatPresetLabel(preset: string): string {
   return found ? found.label : preset;
 }
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
+/**
+ * B156 — formatting in the AMBIENT zone is a hydration mismatch (#418), which fails the whole
+ * subtree at HTTP 200. `<LocalTime>` owns its own mount state: a deterministic UTC stamp on the
+ * first paint (server and client alike), the viewer's zone on the next tick.
+ */
+const DATE_ONLY: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
 
 export function DocumentListClient() {
   const router = useRouter();
@@ -276,8 +279,8 @@ export function DocumentListClient() {
                       </td>
                       <td className="px-4 py-3 text-gray-600">{formatPresetLabel(doc.formatPreset)}</td>
                       <td className="px-4 py-3 text-center text-gray-600">{doc.nodeCount}</td>
-                      <td className="px-4 py-3 text-gray-500">{formatDate(doc.createdAt)}</td>
-                      <td className="px-4 py-3 text-gray-500">{formatDate(doc.updatedAt)}</td>
+                      <td className="px-4 py-3 text-gray-500"><LocalTime iso={doc.createdAt} opts={DATE_ONLY} /></td>
+                      <td className="px-4 py-3 text-gray-500"><LocalTime iso={doc.updatedAt} opts={DATE_ONLY} /></td>
                       <td className="px-4 py-3 text-right">
                         <a
                           href={`/admin/documents/${doc.id}`}
