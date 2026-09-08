@@ -67,7 +67,14 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
       const result = await rebaseline(gate.actor, projectId, body ?? ({} as RebaselineInput));
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      // Found by `audit-refusal-observability.mjs` — the POST above was converted and this, in the
+      // same file, was not. Converting "the route" is not the unit of work; a REFUSAL PATH is.
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'baseline.rebaseline', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { rebaseline: result.data } });
     });
   } catch (err) {
