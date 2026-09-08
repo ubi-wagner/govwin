@@ -948,6 +948,17 @@ I have not reproduced #418 on a dev build where React names the component, so th
 strong and circumstantial rather than proven: the write-on-render was real and is gone, the route
 was broken and is clean, and the events stopped. If it recurs, a dev-build capture is the next step.
 
+> **2026-09-08 — that next step was not reachable, and now is (B155).** `next dev` in this tree
+> deletes the `output:'standalone'` build out from under the running server (which keeps answering
+> 200, holding its files open), and `NODE_ENV=production` leaking in from `scripts/sandbox-env.sh`
+> makes every dev request 500 on `EvalError: Code generation from strings disallowed` — from Next's
+> own middleware loader, so it reads as a framework incompatibility. Both are fixed:
+> `NEXT_DIST_DIR` in `next.config.mjs` and `scripts/capture-hydration-diff.mjs`, red-tested (it
+> names the component and prints the literal server/client diff) with a guard that exits **2**
+> rather than report a clean sweep when pointed at a production build. **#418 itself remains
+> undiagnosed** — the clock-read and write-on-render hypotheses are both disproven by measurement
+> on `/admin/pipeline`.
+
 ### And the branch suite disagreed with itself depending on whether the engine was running
 
 `scenario-factory` failed the full suite with `LEAKED: instances 178→179`. The leaked row was an

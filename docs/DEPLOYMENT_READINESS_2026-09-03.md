@@ -352,6 +352,14 @@ recording, because "a known issue" that nobody re-measures becomes a permanent o
   varies. Attribution matters here — the same symptom was misattributed to a clock-in-render bug
   earlier in this work, five components were changed for it, and a later sweep hit a page none of
   them touched.
+  **Update 2026-09-08 (B155):** the clock hypothesis is now disproven by direct measurement on
+  `/admin/pipeline` — its `Date.now()` is in a **server** component, so the HTML and the RSC flight
+  payload come from one render and the relative-time strings are identical within a response. A
+  second hypothesis (`closePresence()` writing during render in `app/admin/layout.tsx`) is also
+  disproven: the write fires on every load and produced 0 hydration errors in 6. **Still
+  undiagnosed** — but the dev-build capture that names the component was *impossible* in this tree
+  and now runs (`frontend/scripts/capture-hydration-diff.mjs`), so the next occurrence is a one-shot
+  diagnosis rather than another round of attribution.
 
 ## 6. Not blocking, worth knowing
 
