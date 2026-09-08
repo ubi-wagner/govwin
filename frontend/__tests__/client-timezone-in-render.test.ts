@@ -80,38 +80,121 @@ function topLevelFunctions(src: string): Array<{ name: string; body: string }> {
   return out;
 }
 
-const LOCALE_CALL = /\.toLocale(?:Date|Time)?String\s*\(([\s\S]{0,220}?)\)/g;
+const LOCALE_CALL = /(\.toLocale(?:Date|Time)?String|Intl\.DateTimeFormat)\s*\(/g;
 /** Options that only make sense for a date — what separates a date format from a number format. */
-const DATE_OPTS = /\b(year|month|day|hour|minute|second|weekday|timeZone)\s*:/;
+const DATE_OPTS = /\b(year|month|day|hour|minute|second|weekday|timeZone|dateStyle|timeStyle)\s*:/;
 
-/** True when the body formats a DATE with no `timeZone`. */
-function formatsAmbientDate(body: string): boolean {
+/**
+ * The argument list, PAREN-MATCHED — never a fixed-width window.
+ *
+ * The first version captured `([\s\S]{0,220}?)` after the open paren. That is a scanner that
+ * silently drops what it cannot parse, and it did: `components/portal/notification-panel.tsx`
+ * writes a four-key options object at 26 columns of indentation, whose argument list runs past 220
+ * characters, so the regex simply failed to match and the site VANISHED from the count while the
+ * guard reported a clean run. It was found only because a WIDER window in a second instrument
+ * happened to reach it — i.e. by luck, on a defect that had shipped.
+ *
+ * Returns null when the parens do not balance, and the caller treats that as UNCHECKED rather than
+ * as safe.
+ */
+function callArgs(src: string, openParen: number): string | null {
+  let depth = 0;
+  for (let i = openParen; i < src.length; i += 1) {
+    const c = src[i];
+    if (c === '(') depth += 1;
+    else if (c === ')') { depth -= 1; if (depth === 0) return src.slice(openParen + 1, i); }
+  }
+  return null;
+}
+
+/** Sites whose argument list could not be resolved — reported, never counted as clean. */
+export const unchecked: string[] = [];
+
+/** True when the source formats a DATE with no `timeZone`. */
+function formatsAmbientDate(body: string, label = '<fixture>'): boolean {
   let m: RegExpExecArray | null;
   LOCALE_CALL.lastIndex = 0;
   while ((m = LOCALE_CALL.exec(body))) {
-    const args = m[1];
-    const isDate = /toLocale(Date|Time)String/.test(m[0]) || DATE_OPTS.test(args);
+    const open = m.index + m[0].length - 1;
+    const args = callArgs(body, open);
+    if (args === null) { unchecked.push(`${label} @${m.index} (unbalanced parens)`); continue; }
+    const isDate = /toLocale(Date|Time)String|Intl\.DateTimeFormat/.test(m[1]) || DATE_OPTS.test(args);
     if (isDate && !/timeZone\s*:/.test(args)) return true;
   }
   return false;
 }
 
-const detect = (src: string) => topLevelFunctions(stripComments(src)).some(
-  (fn) => formatsAmbientDate(fn.body)
-    && new RegExp(`\\{[^{}\\n]*\\b${fn.name}\\(`).test(stripComments(src)));
+/**
+ * ── THE SECOND SWEEP, AND WHY IT WAS NEEDED (B156, part two) ────────────────────────────────
+ *
+ * The first version of this guard matched module-level `function name() {}` declarations that were
+ * then called from JSX. That is the shape the first seven happened to have, and generalising from
+ * the cases you already found is exactly how a class survives its own fix: a follow-up sweep found
+ * **six more**, every one of them invisible here — four written INLINE IN JSX
+ * (`{new Date(x).toLocaleDateString(…)}`, no named function at all) and two assigned from a
+ * `const` inside the component body. Two of the six included hour/minute, so they fired on every
+ * load for any non-UTC viewer, and one was the canvas version-history panel.
+ *
+ * So the detector now asks the question directly — **does a `'use client'` file format a date in
+ * the ambient zone anywhere that render can reach** — instead of asking whether it does so through
+ * one particular syntax. Effects, handlers and `useMemo` bodies are still excluded: those do not
+ * run during the server render, so the two sides cannot disagree.
+ */
+
+/** Bodies of `useEffect`/`useCallback`/`useMemo` and event handlers — brace-matched, then removed. */
+function stripNonRenderBodies(src: string): string {
+  let out = src;
+  for (const kw of ['useEffect', 'useCallback', 'useMemo']) {
+    let i = 0;
+    for (;;) {
+      const at = out.indexOf(`${kw}(`, i);
+      if (at < 0) break;
+      const open = out.indexOf('{', at);
+      if (open < 0) { i = at + kw.length; continue; }
+      let depth = 0;
+      let j = open;
+      for (; j < out.length; j += 1) {
+        if (out[j] === '{') depth += 1;
+        else if (out[j] === '}') { depth -= 1; if (depth === 0) break; }
+      }
+      if (j >= out.length) { i = at + kw.length; continue; }
+      out = out.slice(0, open) + '{/*non-render*/}' + out.slice(j + 1);
+      i = open + 18;
+    }
+  }
+  return out;
+}
+
+const detect = (src: string, label = '<fixture>') =>
+  formatsAmbientDate(stripNonRenderBodies(stripComments(src)), label);
 
 describe("a 'use client' component does not format a date in the ambient zone during render", () => {
-  it('has no module-level date formatter without a timeZone that is called from JSX', () => {
+  it('formats no date in the ambient zone on any render path', () => {
     // THE DETECTOR MUST SEE THE THING IT GUARDS AGAINST, or a clean run below means nothing.
-    // These four fixtures are the real classification boundary, not decoration.
+    // Every fixture is a real classification boundary this sweep got wrong at least once.
     const unsafe = `'use client';\nfunction f(iso){ return new Date(iso).toLocaleDateString('en-US',{hour:'2-digit'}); }\nexport default () => <p>{f(x)}</p>;`;
+    // The four shapes the FIRST version of this guard missed — all found live (B156 part two).
+    const inlineJsx = `'use client';\nexport default () => <p>{new Date(x).toLocaleDateString('en-US',{month:'short'})}</p>;`;
+    const arrowConst = `'use client';\nconst f = (iso) => new Date(iso).toLocaleDateString('en-US',{day:'numeric'});\nexport default () => <p>{f(x)}</p>;`;
+    const inComponent = `'use client';\nexport default function C(){ const s = new Date(x).toLocaleDateString('en-US',{year:'numeric'}); return <p>{s}</p>; }`;
+    const intl = `'use client';\nexport default () => <p>{new Intl.DateTimeFormat('en-US',{month:'short'}).format(d)}</p>;`;
+    // …and the four that must stay quiet.
     const pinned = `'use client';\nfunction f(iso){ return new Date(iso).toLocaleDateString('en-US',{hour:'2-digit',timeZone:'UTC'}); }\nexport default () => <p>{f(x)}</p>;`;
     const numeric = `'use client';\nfunction f(n){ return n.toLocaleString('en-US'); }\nexport default () => <p>{f(x)}</p>;`;
+    const currency = `'use client';\nfunction f(n){ return n.toLocaleString('en-US',{style:'currency',currency:'USD'}); }\nexport default () => <p>{f(x)}</p>;`;
     const commented = `'use client';\n/* it used to call toLocaleDateString('en-US',{hour:'2-digit'}) here */\nfunction f(iso){ return iso; }\nexport default () => <p>{f(x)}</p>;`;
+    const inEffect = `'use client';\nexport default function C(){ useEffect(() => { log(new Date(x).toLocaleDateString('en-US',{day:'numeric'})); }, []); return <p/>; }`;
+
     expect(detect(unsafe), 'must flag an unpinned date format rendered from JSX').toBe(true);
+    expect(detect(inlineJsx), 'must flag an INLINE toLocale* in JSX — 4 live cases hid here').toBe(true);
+    expect(detect(arrowConst), 'must flag an arrow const, not just a function declaration').toBe(true);
+    expect(detect(inComponent), 'must flag a helper inside the component body — 2 live cases').toBe(true);
+    expect(detect(intl), 'must flag Intl.DateTimeFormat with no timeZone').toBe(true);
     expect(detect(pinned), 'must leave an explicit timeZone alone').toBe(false);
     expect(detect(numeric), 'must not flag Number.toLocaleString').toBe(false);
+    expect(detect(currency), 'must not flag currency formatting — 3 live false positives').toBe(false);
     expect(detect(commented), 'must not flag a bug described in a comment').toBe(false);
+    expect(detect(inEffect), 'must not flag a useEffect body — it never server-renders').toBe(false);
 
     const offenders: string[] = [];
     for (const r of ROOTS) {
@@ -122,11 +205,7 @@ describe("a 'use client' component does not format a date in the ambient zone du
         if (EXEMPT.includes(rel)) continue;
         const raw = readFileSync(file, 'utf8');
         if (!/^['"]use client['"]/m.test(raw)) continue;
-        const src = stripComments(raw);
-        for (const fn of topLevelFunctions(src)) {
-          if (!formatsAmbientDate(fn.body)) continue;
-          if (new RegExp(`\\{[^{}\\n]*\\b${fn.name}\\(`).test(src)) offenders.push(`${rel} → ${fn.name}()`);
-        }
+        if (detect(raw, rel)) offenders.push(rel);
       }
     }
 
@@ -135,5 +214,11 @@ describe("a 'use client' component does not format a date in the ambient zone du
       'use <LocalTime iso={x} opts={…}/> or localFrom(x, mounted) from components/ui/time-ago, '
         + 'or pass an explicit timeZone when the value really is defined in one',
     ).toEqual([]);
+
+    // A SITE THE SCANNER COULD NOT RESOLVE IS NOT A CLEAN SITE. The previous version of this guard
+    // used a fixed-width argument window and silently dropped a real defect whose options object
+    // ran past it — reporting a clean sweep. Anything unparseable now fails the test by name.
+    expect(unchecked, 'unresolvable toLocale*/Intl.DateTimeFormat call sites — widen the parser, '
+      + 'do not ignore them').toEqual([]);
   });
 });

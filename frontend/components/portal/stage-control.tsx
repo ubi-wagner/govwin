@@ -1,4 +1,7 @@
 'use client';
+import { localFrom, useMounted } from '@/components/ui/time-ago';
+
+const DAY_STAMP: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -105,22 +108,18 @@ export function StageControl({
   const isAtFinal = currentStage === 'final' || currentStage === 'submitted';
   const isAtLastGate = isAtFinal || currentIndex >= gateConfig.length - 1;
 
-  // Format deadline
-  const deadlineStr = unlockDeadline
-    ? new Date(unlockDeadline).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : null;
-
-  const closeDateStr = closeDate
-    ? new Date(closeDate).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : null;
+  /**
+   * B156 — these format in the AMBIENT zone (UTC on the server, the viewer's in the browser), so
+   * the strings disagree and React #418 fails hydration for the whole subtree at HTTP 200.
+   *
+   * `localFrom` rather than `<LocalTime>` because these stay STRINGS: both are used as truthiness
+   * gates (`{closeDateStr && …}`) as well as rendered, and a component is always truthy — swapping
+   * in an element would silently open two sections that are meant to stay closed when the date is
+   * absent. Same mount rule either way.
+   */
+  const mounted = useMounted();
+  const deadlineStr = unlockDeadline ? localFrom(unlockDeadline, mounted, DAY_STAMP) : null;
+  const closeDateStr = closeDate ? localFrom(closeDate, mounted, DAY_STAMP) : null;
 
   const daysUntilClose = closeDate
     ? Math.ceil((new Date(closeDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
