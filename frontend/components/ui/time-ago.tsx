@@ -46,6 +46,33 @@ export function relativeFrom(iso: string | Date | null | undefined, now: number 
   return `${Math.floor(h / 24)}d ago`;
 }
 
+/**
+ * THE SIGNED DISTANCE from `now` to `iso`, in milliseconds — the primitive under every countdown,
+ * age and overdue flag in the tree (B160).
+ *
+ * Twelve call sites computed this inline off `Date.now()` during render, each with its own rounding:
+ * `Math.ceil(…/86_400_000)` for days-left, `Math.floor` for days-ago, `Math.round(Math.abs(…))` for
+ * a due label. Every one made its output a function of WHEN it rendered, which is React #418 — and
+ * the guard for that class could not see them, because it matched only module-level helpers whose
+ * body builds an "ago"-shaped string.
+ *
+ * DELIBERATELY RETURNS MILLISECONDS, not days. Each caller keeps its own rounding, so the text a
+ * person sees after mount is byte-identical to what it was before this change — the same discipline
+ * the email seam used when thirteen call sites moved behind one function. A helper that also
+ * rounded would be a behaviour change wearing a refactor's clothes.
+ *
+ * `null` until mounted (and for an unparseable date), so the server and the first client render
+ * take the same branch and cannot disagree. What each site shows in that moment is its own choice —
+ * usually the absolute date without the countdown — and it must render the SAME thing on both
+ * sides, including any className the value drives: an `overdue` flag that flips on hydration is
+ * exactly as much of a mismatch as the words next to it.
+ */
+export function deltaMsFrom(iso: string | Date | null | undefined, now: number | null): number | null {
+  if (!iso || now === null) return null;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t - now : null;
+}
+
 /** Elapsed since a start, for a still-running thing ("2m 14s"). Same mount rule. */
 export function elapsedFrom(iso: string | Date | null | undefined, now: number | null): string {
   if (!iso) return '--';

@@ -813,7 +813,18 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   never on a single local load. **Eight occurrences.** Use `<TimeAgo iso={x}/>` or
   `relativeFrom(x, useClientNow())` (`components/ui/time-ago.tsx`): `now` is null until mounted, so
   the first paint is a deterministic UTC stamp on both sides. `__tests__/client-clock-in-render.test.ts`
-  guards the shape.
+  guards the shape — and now guards **reachability** too (B160), because the original check matched
+  only a module-level helper building an "ago"-shaped string and missed **seven** reads that decided
+  a filter, a count, an inline style, or **whether an element exists at all** (a DOM-structure
+  mismatch, worse than different text, with nothing in the code reading as "time"). Use
+  `deltaMsFrom(iso, useClientNow())` for a countdown or an age: it returns signed milliseconds and
+  deliberately does NOT round, so each caller keeps its own arithmetic and the rendered text is
+  unchanged. **A count that is unknown before mount renders `—`, never `0`.** ⚠️ Whether a clock read
+  is dangerous depends on whether its value reaches the SERVER render — a component that fetches its
+  rows in an effect renders an empty list there and is safe. Five of twelve candidates were exactly
+  that, and "fixing" them would have been change with no defect behind it; they are ENUMERATED in
+  the test's `SAFE_BECAUSE` table with a reason each, and a third check prunes an exemption that no
+  longer applies.
 - **…and it must NEVER format a date in the AMBIENT TIME ZONE either — the same #418, and the one
   the sandbox is STRUCTURALLY BLIND TO (B156).** The clock rule above guards *when* a value was
   computed; this guards *where*. `toLocale*` with no `timeZone` formats in the container's zone on

@@ -1,5 +1,5 @@
 'use client';
-import { localFrom, useMounted } from '@/components/ui/time-ago';
+import { localFrom, useMounted, useClientNow, deltaMsFrom } from '@/components/ui/time-ago';
 
 const DAY_STAMP: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
 
@@ -118,12 +118,20 @@ export function StageControl({
    * absent. Same mount rule either way.
    */
   const mounted = useMounted();
+  const now = useClientNow();
   const deadlineStr = unlockDeadline ? localFrom(unlockDeadline, mounted, DAY_STAMP) : null;
   const closeDateStr = closeDate ? localFrom(closeDate, mounted, DAY_STAMP) : null;
 
-  const daysUntilClose = closeDate
-    ? Math.ceil((new Date(closeDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : null;
+  /**
+   * B160 — the clock half of the same defect the block above fixes for the ZONE. Reading
+   * `Date.now()` here made the countdown a function of when it rendered, so a server and client
+   * render straddling a day boundary disagreed and React #418 took the whole control to its error
+   * boundary at HTTP 200. `now` is null until mounted and the two consumers below already require
+   * `daysUntilClose !== null`, so the countdown simply appears on the next tick — the date beside
+   * it, which is the load-bearing fact, is there from the first paint either way.
+   */
+  const closeDeltaMs = deltaMsFrom(closeDate, now);
+  const daysUntilClose = closeDeltaMs === null ? null : Math.ceil(closeDeltaMs / (1000 * 60 * 60 * 24));
 
   const handleAdvance = useCallback(async (opts: { force?: boolean; acknowledgeBlockers?: boolean } = {}) => {
     const { force = false, acknowledgeBlockers = false } = opts;
