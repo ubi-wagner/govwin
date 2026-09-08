@@ -31,7 +31,7 @@
  * findings — the rule this guards is "a TENANT-scoped write must not leave the tenant context".
  */
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOT = join(__dirname, '..');
@@ -113,5 +113,55 @@ describe('the Projects tree never nests a sql template inside a value', () => {
       .map((f) => relative(ROOT, f));
     expect(offenders, 'compute the value in JS — a nested sql`` is a Promise, not a fragment')
       .toEqual([]);
+  });
+});
+
+/**
+ * ── THE SAME FAMILY, ONE TABLE OVER: A WRITE THAT MATCHED NOTHING (B161) ──────────────────────
+ *
+ * Everything above guards a tenant context that LOOKS present and is not. This guards the case
+ * where none was ever established — and the write still returns successfully.
+ *
+ * Under FORCE ROW LEVEL SECURITY an UPDATE or DELETE issued with no `app.tenant_id` matches ZERO
+ * rows. Postgres does not treat "your predicate excluded everything" as an error, so the statement
+ * returns, `rows.length` is 0, and the caller proceeds. `clearHouseDocs` did exactly that: measured
+ * on a live box, the owner connection sees 355 atoms for a tenant and the app connection with no
+ * context sees none.
+ *
+ * WHAT HID IT was the asymmetry. The seed half of that script goes through `createAtom`, which
+ * wraps every write in `withTenant`, so it worked — while the "idempotent" clear beside it silently
+ * did nothing and each run added another full copy of the house library. A function that throws
+ * gets fixed; one that returns 0 gets believed.
+ *
+ * This asserts the SHAPE rather than the behaviour, because the behaviour needs a database: a
+ * mutating statement against a FORCE-RLS table in this module must go through `withTenant`.
+ */
+describe('house-library writes are scoped, so a delete cannot silently match nothing', () => {
+  const HOUSE = join(__dirname, '..', 'lib/library/house-docs.ts');
+
+  it('found the module (a guard over nothing is not a guard)', () => {
+    expect(existsSync(HOUSE), 'lib/library/house-docs.ts moved — repoint this guard').toBe(true);
+  });
+
+  it('every mutating statement goes through withTenant', () => {
+    const src = readFileSync(HOUSE, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+    // The detector must see the defect it exists for: the pre-fix line was a bare
+    // `await sql`DELETE FROM library_atoms …``.
+    const unsafeFixture = 'const rows = await sql`DELETE FROM library_atoms WHERE tenant_id = ${t}`;';
+    const safeFixture = 'const rows = await withTenant(t, async (tx) => tx`DELETE FROM library_atoms`);';
+    const mutatesUnscoped = (s: string) =>
+      /\bawait\s+sql\s*(<[^`]*>)?\s*`[\s\S]{0,80}?\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b/i.test(s);
+    expect(mutatesUnscoped(unsafeFixture), 'must flag a bare mutating sql template').toBe(true);
+    expect(mutatesUnscoped(safeFixture), 'must leave a withTenant-wrapped one alone').toBe(false);
+
+    expect(
+      mutatesUnscoped(src),
+      'a mutating statement on a FORCE-RLS table through the context-aware `sql` matches zero rows '
+        + 'and returns success when no tenant context is set — wrap it in withTenant(tenantId, tx => …)',
+    ).toBe(false);
+    expect(src.includes('withTenant'), 'the module must import and use withTenant').toBe(true);
   });
 });
