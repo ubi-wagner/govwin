@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { sql, getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { withTenant } from '@/lib/rls';
@@ -156,9 +157,10 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     // ── Stage validation ───────────────────────────────────────────
     if (proposal.stage === 'archived') {
-      return NextResponse.json(
-        { error: 'Outcome already recorded', code: 'ALREADY_ARCHIVED' },
-        { status: 409 },
+      return await refuse(
+        { status: 409, error: 'Outcome already recorded', code: 'ALREADY_ARCHIVED' },
+        { namespace: 'proposal', action: 'outcome.record', entityId: proposalId,
+          tenantId, actor: { id: sessionUser.id, email: sessionUser.email ?? null } },
       );
     }
 
@@ -273,9 +275,10 @@ export async function POST(request: Request, ctx: RouteContext) {
     } catch (txErr) {
       if (txErr instanceof Error && txErr.message === 'CONFLICT') {
         await emitEventEnd(startId, { error: { message: 'Proposal was modified by another user', code: 'CONFLICT' } });
-        return NextResponse.json(
-          { error: 'Proposal was modified by another user', code: 'CONFLICT' },
-          { status: 409 },
+        return await refuse(
+          { status: 409, error: 'Proposal was modified by another user', code: 'CONFLICT' },
+          { namespace: 'proposal', action: 'outcome.record', entityId: proposalId,
+            tenantId, actor: { id: sessionUser.id, email: sessionUser.email ?? null } },
         );
       }
       console.error('[api/portal/proposals/outcome] transaction failed:', txErr);
@@ -406,6 +409,10 @@ export async function POST(request: Request, ctx: RouteContext) {
       await emitEventEnd(startId, { error: { message: e instanceof Error ? e.message : String(e), code: 'HANDLER_THREW' } });
     }
     if (e instanceof Error && e.message === 'CONFLICT') {
+      // NOT converted: this sits in the catch, where the try's variables are out of scope — and it
+      // is already observable, because `emitEventEnd` above closes the bracket with the error. The
+      // conversion pass must be driven by the audit's SILENT list, not by a fresh regex; this site
+      // was never in it.
       return NextResponse.json(
         { error: 'Proposal was modified by another user', code: 'CONFLICT' },
         { status: 409 },

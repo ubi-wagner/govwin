@@ -112,6 +112,23 @@ for (const r of ROOTS) {
       sites.push({ rel, line: src.slice(0, m.index).split('\n').length, kind: 'forward', status: -1, code: `forwards ${m[1]}.code`, at: m.index });
     }
 
+    /**
+     * CONVERTED SITES MUST STAY IN THE DENOMINATOR, or the meter reads progress as noise.
+     *
+     * A site converted to `refuse()` no longer matches any pattern above, so it left the count
+     * entirely: converting two sites moved "silent" by one and dropped "emit" by one. Progress and
+     * error look identical in that arithmetic, which makes the number useless for the exact job it
+     * exists to track. Counting `refuse(` as a site of its own keeps the total stable, so the only
+     * thing that moves is silent → emitting.
+     */
+    const cre = /\brefuse\s*\(/g;
+    while ((m = cre.exec(src))) {
+      sites.push({
+        rel, line: src.slice(0, m.index).split('\n').length, kind: 'route',
+        status: 409, code: 'via refuse()', at: m.index, emits: true,
+      });
+    }
+
     for (const s of sites.filter((x) => x.rel === rel && x.emits === undefined)) {
       s.emits = EMITS.test(enclosingBlock(src, s.at));
     }
