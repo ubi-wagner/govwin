@@ -15,6 +15,7 @@
  * mean a save that touched a note could also silently reopen finished work.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { setTaskStatus, updateTask } from '@/lib/projects/milestone-tasks';
 
@@ -62,7 +63,12 @@ export async function PATCH(
           );
         }
         const result = await setTaskStatus(gate.actor, projectId, taskId, next, body.blockedReason ?? null);
-        if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+        if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'task', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
         return NextResponse.json({ data: { task: result.data } });
       }
 
@@ -76,7 +82,12 @@ export async function PATCH(
       const patch: Body = {};
       for (const k of edits) Object.assign(patch, { [k]: body[k] });
       const result = await updateTask(gate.actor, projectId, taskId, patch);
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'task', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { task: result.data } });
     });
   } catch (err) {

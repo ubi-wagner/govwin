@@ -16,6 +16,7 @@
  *   DELETE — remove one, except the last (an unstaffed project is one nobody can reopen).
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { assignMember, unassignMember, listAssignees } from '@/lib/projects/access';
@@ -46,7 +47,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
         return NextResponse.json({ error: 'userId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
       }
       const r = await assignMember(gate.actor, projectId, body.userId);
-      if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+      if (!r.ok) {
+        return await refuse(r, {
+          namespace: 'project', action: 'assignee', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { assignee: r.data } }, { status: 201 });
     });
   } catch (err) {
@@ -64,7 +70,12 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ tenantSl
         return NextResponse.json({ error: 'userId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
       }
       const r = await unassignMember(gate.actor, projectId, userId);
-      if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+      if (!r.ok) {
+        return await refuse(r, {
+          namespace: 'project', action: 'assignee', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: r.data });
     });
   } catch (err) {

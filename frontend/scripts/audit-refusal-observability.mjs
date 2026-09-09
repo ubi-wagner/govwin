@@ -63,7 +63,7 @@ function enclosingBlock(src, at) {
 
 const EMITS = /\brefuse\s*\(|\bemitEventSingle(Strict)?\s*\(|\bemitEventEnd\s*\(|\bwithEventBracket\s*\(|\.refused\b/;
 /** Mirrors `shouldEmit` in lib/api-refusal.ts. */
-const emitRequired = (status) => status === 409 || status >= 500;
+const emitRequired = (status) => status === -1 || status === 409 || status >= 500;
 
 const sites = [];
 const unparsed = [];
@@ -85,10 +85,31 @@ for (const r of ROOTS) {
       sites.push({ rel, line: src.slice(0, m.index).split('\n').length, kind: 'domain', status: +st[1], code: cd[1], at: m.index });
     }
 
-    // route: NextResponse.json({ error, code }, { status })
+    // route: NextResponse.json({ error, code }, { status: 409 }) — a LITERAL status
     const rre = /NextResponse\.json\(\s*\{[^}]*\bcode:\s*['"]?([A-Za-z0-9_.]+)['"]?[^}]*\}\s*,\s*\{\s*status:\s*(\d{3})/g;
     while ((m = rre.exec(src))) {
       sites.push({ rel, line: src.slice(0, m.index).split('\n').length, kind: 'route', status: +m[2], code: m[1], at: m.index });
+    }
+
+    /**
+     * ── THE SHAPE THIS AUDIT COULD NOT SEE, AND IT IS THE MOST COMMON ONE ──────────────────────
+     *
+     * `return NextResponse.json({ error: r.error, code: r.code }, { status: r.status })` FORWARDS
+     * whatever the domain decided — including every 409 the business logic raises. The regex above
+     * requires a literal three-digit status, so every one of these was invisible: not counted as
+     * silent, not counted at all.
+     *
+     * It was caught the only way it could be. Twenty-nine of these were converted to the seam and
+     * the audit's totals did not move by a single site — a fix that the meter could not see. Had
+     * the numbers merely looked plausible, the reported 868 would have stood as the size of the
+     * job while the largest population in it was missing.
+     *
+     * The status is unknown from here (it lives in the domain function), so it is recorded as
+     * FORWARD and always requires an emit: a path that can carry a 409 must be able to say so.
+     */
+    const fre = /NextResponse\.json\(\s*\{\s*error:\s*([A-Za-z_$][\w$]*)\.error,\s*code:\s*\1\.code\s*\}\s*,\s*\{\s*status:\s*\1\.status\s*\}/g;
+    while ((m = fre.exec(src))) {
+      sites.push({ rel, line: src.slice(0, m.index).split('\n').length, kind: 'forward', status: -1, code: `forwards ${m[1]}.code`, at: m.index });
     }
 
     for (const s of sites.filter((x) => x.rel === rel && x.emits === undefined)) {
@@ -123,6 +144,10 @@ selfTest.push([
   'an untouched 409 still reads as SILENT — the detector can see the gap it exists for',
   sites.some((s) => s.status === 409 && !s.emits && !convertedFiles.includes(s.rel)),
 ]);
+selfTest.push([
+  'the FORWARD shape is counted — it was invisible, and it is the most common one',
+  sites.some((s) => s.kind === 'forward'),
+]);
 const q404 = sites.find((s) => s.status === 404);
 selfTest.push(['a 404 is not counted as requiring an emit', q404 ? !emitRequired(q404.status) : false]);
 console.log('── self-test ──');
@@ -155,8 +180,10 @@ console.log(`   ${silent.length} do NOT — the rollout list\n`);
  *         that reads the event stream. Mechanical, and lower value per site.
  */
 const business = silent.filter((s) => s.status === 409);
+const forwards = silent.filter((s) => s.status === -1);
 const crashes = silent.filter((s) => s.status >= 500);
-console.log(`   of those: ${business.length} are 409 BUSINESS refusals · ${crashes.length} are 5xx crash paths`);
+console.log(`   of those: ${business.length} literal-409 BUSINESS refusals · ${forwards.length} FORWARD a domain refusal `
+  + `(can carry a 409) · ${crashes.length} are 5xx crash paths`);
 const topCodes = Object.entries(business.reduce((a, s) => { a[s.code] = (a[s.code] ?? 0) + 1; return a; }, {}))
   .sort((a, b) => b[1] - a[1]).slice(0, 12);
 console.log('\n  409 codes nothing records, most frequent first:');

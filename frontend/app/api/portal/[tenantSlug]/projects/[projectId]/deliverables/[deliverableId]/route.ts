@@ -6,6 +6,7 @@
  * file being present is not a deliverable met.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { acceptDeliverable, uploadDeliverable, authorDeliverable } from '@/lib/projects/milestones';
 
@@ -26,7 +27,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
       const result = await uploadDeliverable(gate.actor, projectId, deliverableId, {
         filename: file.name, body: Buffer.from(await file.arrayBuffer()), contentType: file.type || null,
       });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'deliverable', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { deliverable: result.data } });
     });
   } catch (err) {
@@ -63,7 +69,12 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
       }
 
       const result = await acceptDeliverable(gate.actor, projectId, deliverableId);
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'deliverable', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { deliverable: result.data } });
     });
   } catch (err) {

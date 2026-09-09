@@ -17,6 +17,7 @@
  *                         start someone pinned.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { createMilestone, listMilestones, listDeliverables, markMilestoneMet } from '@/lib/projects/milestones';
@@ -53,7 +54,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
       const result = await createMilestone(gate.actor, projectId, { title: body?.title ?? '', ...body });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'milestone', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { milestone: result.data } }, { status: 201 });
     });
   } catch (err) {
@@ -121,7 +127,12 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
 
       const result = await markMilestoneMet(gate.actor, projectId, body.milestoneId,
         { note: body.note ?? null, metrics: body.metrics ?? null });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'milestone', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { milestone: result.data } });
     });
   } catch (err) {

@@ -64,7 +64,12 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
 
       if (body?.action === 'reopen') {
         const r = await reopenProject(gate.actor, projectId, body.reason ?? null);
-        if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+        if (!r.ok) {
+        return await refuse(r, {
+          namespace: 'project', action: 'route.t', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
         return NextResponse.json({ data: { project: r.data } });
       }
       if (body?.action !== 'close') {
