@@ -57,7 +57,17 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
         const made = await authorDeliverable(gate.actor, projectId, deliverableId, {
           preset: body.preset, title: body.title ?? null,
         });
-        if (!made.ok) return NextResponse.json({ error: made.error, code: made.code }, { status: made.status });
+        if (!made.ok) {
+
+          return await refuse(made, {
+
+            namespace: 'project', action: 'deliverable', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
         return NextResponse.json({ data: { document: made.data } }, { status: 201 });
       }
 

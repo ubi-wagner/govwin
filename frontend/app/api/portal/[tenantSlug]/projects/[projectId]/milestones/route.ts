@@ -84,7 +84,17 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
 
       if (body?.action === 'resequence') {
         const seq = await resequence(gate.actor, projectId);
-        if (!seq.ok) return NextResponse.json({ error: seq.error, code: seq.code }, { status: seq.status });
+        if (!seq.ok) {
+
+          return await refuse(seq, {
+
+            namespace: 'project', action: 'milestone', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
         return NextResponse.json({ data: seq.data });
       }
 
@@ -105,7 +115,17 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
           );
         }
         const dep = await setMilestoneDependency(gate.actor, projectId, body.milestoneId, body.dependsOnId ?? null);
-        if (!dep.ok) return NextResponse.json({ error: dep.error, code: dep.code }, { status: dep.status });
+        if (!dep.ok) {
+
+          return await refuse(dep, {
+
+            namespace: 'project', action: 'milestone', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
         return NextResponse.json({ data: dep.data });
       }
 
@@ -114,7 +134,17 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
           return NextResponse.json({ error: 'forecastDate is required to reschedule', code: 'VALIDATION_ERROR' }, { status: 400 });
         }
         const moved = await rescheduleMilestone(gate.actor, projectId, body.milestoneId, body.forecastDate, { cascade: body.cascade });
-        if (!moved.ok) return NextResponse.json({ error: moved.error, code: moved.code }, { status: moved.status });
+        if (!moved.ok) {
+
+          return await refuse(moved, {
+
+            namespace: 'project', action: 'milestone', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
         return NextResponse.json({ data: moved.data });
       }
 

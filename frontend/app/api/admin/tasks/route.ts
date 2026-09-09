@@ -7,6 +7,7 @@
  * shared completeTask core.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 // Admin cross-tenant route — the @/lib/tasks helpers query across tenants, so route their
 // global-`sql` to the owner (BYPASSRLS) pool via enterBypass() after the gate. (docs/RLS_CUTOVER.md)
@@ -69,7 +70,10 @@ export async function POST(request: Request) {
 
     const out = await completeTask({ taskId, result, actor: r.actor });
     if (!out.ok) {
-      return NextResponse.json({ error: out.error, code: out.code }, { status: out.status });
+        return await refuse(out, {
+          namespace: 'system', action: 'task',
+          tenantId: null, actor: r.actor,
+        });
     }
     return NextResponse.json({ data: out.data });
   } catch (err) {

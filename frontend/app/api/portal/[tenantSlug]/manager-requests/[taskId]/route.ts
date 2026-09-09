@@ -5,6 +5,7 @@
  * Auth: tenant_admin (or higher) of THIS company.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
@@ -43,7 +44,12 @@ export async function POST(request: Request, ctx: Ctx) {
     const result = await resolveManagerRequest({
       taskId, tenantId, approver: { id: u.id, email: u.email ?? null }, decision: action,
     });
-    if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+    if (!result.ok) {
+      return await refuse(result, {
+        namespace: 'finder', action: 'manager_request.decide',
+        tenantId: tenantId, actor: { id: u?.id, email: u?.email ?? null },
+      });
+    }
     return NextResponse.json({ data: { granted: result.granted } });
   } catch (e) {
     console.error('[portal/manager-requests] POST error:', e);

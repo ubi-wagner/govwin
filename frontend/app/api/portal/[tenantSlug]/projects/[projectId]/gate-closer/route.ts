@@ -10,6 +10,7 @@
  * block a close and can never permit one.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { canAssign } from '@/lib/projects/access';
@@ -62,9 +63,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
       const result = await setGateCloser(
         gate.actor, projectId, milestoneId, body.gateCloser as GateCloser,
       );
-      return result.ok
-        ? NextResponse.json({ data: result.data })
-        : NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'gate-closer', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
+
+      return NextResponse.json({ data: result.data });
     });
   } catch (err) {
     console.error('[api/portal/projects/gate-closer PATCH]', err);

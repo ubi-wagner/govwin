@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
@@ -162,7 +163,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
         actor: { id: g.userId, email: g.userEmail, role: g.role },
         guardrailConfig: body.guardrailConfig,
       });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'proposal', action: 'portal.workflow',
+          tenantId: g.tenantId, actor: { id: g.userId, email: g.userEmail, role: g.role },
+        });
+      }
       return NextResponse.json({ data: { released: true, proposalId: result.proposalId, tasksCreated: result.tasksCreated } });
     }
     if (action === 'advance-stage') {

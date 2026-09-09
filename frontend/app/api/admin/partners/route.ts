@@ -4,6 +4,7 @@
  * returns a temp password to relay. Gated at rfp_admin+ (middleware + this re-check).
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { isRole, hasRoleAtLeast } from '@/lib/rbac';
 import { createPartnerOrg } from '@/lib/partner/create-partner-org';
@@ -31,7 +32,12 @@ export async function POST(request: Request) {
       adminEmail: str(body.adminEmail),
       createdBy: { id: u.id, email: u.email ?? null },
     });
-    if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+    if (!result.ok) {
+      return await refuse(result, {
+        namespace: 'finder', action: 'partner.create',
+        tenantId: null, actor: { id: u?.id, email: u?.email ?? null },
+      });
+    }
     return NextResponse.json({
       data: { userId: result.userId, tenantId: result.tenantId, slug: result.slug, tempPassword: result.tempPassword },
     }, { status: 201 });

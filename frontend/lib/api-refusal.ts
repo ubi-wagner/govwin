@@ -36,11 +36,24 @@
 import { NextResponse } from 'next/server';
 import { emitEventSingle, type EventNamespace } from '@/lib/events';
 
-/** What a domain function returns when it declines to do the work. */
+/**
+ * What a domain function returns when it declines to do the work.
+ *
+ * DELIBERATELY DOES NOT REQUIRE `ok: false`. `refuse` reads status, error and code and nothing
+ * else, and insisting on the discriminant only excludes result types that spell it `ok: boolean`
+ * rather than as a union — `ClaimResult` among them. Requiring a field the function never touches
+ * would have meant either rewriting those domain types or leaving their refusals silent, and
+ * neither is a good reason.
+ */
 export type Refusal = {
-  ok: false;
   status: number;
-  error: string;
+  /**
+   * OPTIONAL, because some domain result types declare it so (`ClaimResult` again). The response
+   * still carries a string either way — see the fallback in `refuse` — because the SOP envelope
+   * requires BOTH fields and a refusal that answers `{"error": undefined}` would fail the contract
+   * these lenses grade while looking fine to a casual read.
+   */
+  error?: string;
   code: string;
 };
 
@@ -88,7 +101,7 @@ export async function refuse(r: Refusal, ctx: RefuseContext): Promise<NextRespon
         payload: {
           code: r.code,
           status: r.status,
-          reason: r.error,
+          reason: r.error ?? null,
           entityId: ctx.entityId ?? null,
           ...(ctx.payload ?? {}),
         },
@@ -98,5 +111,7 @@ export async function refuse(r: Refusal, ctx: RefuseContext): Promise<NextRespon
       console.error('[api-refusal] emit failed for', ctx.action, r.code, e);
     }
   }
-  return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+  // The code is the fallback message, and only when there is no message at all — never a
+  // substitution for one. A refusal with a code and no prose is still better than an empty string.
+  return NextResponse.json({ error: r.error ?? r.code, code: r.code }, { status: r.status });
 }

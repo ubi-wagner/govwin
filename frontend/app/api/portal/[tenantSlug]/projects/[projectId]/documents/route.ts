@@ -10,6 +10,7 @@
  * can still change, while one tracing to the uploaded PDF traces to what was actually signed.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { addSourceDocument, listSourceDocuments, getProject, type SourceKind } from '@/lib/projects/project';
 
@@ -59,7 +60,17 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
         kind, filename: file.name, body, contentType: file.type || null,
       });
       if (!result.ok) {
-        return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+        {
+
+          return await refuse(result, {
+
+            namespace: 'project', action: 'document', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
       }
       return NextResponse.json({ data: { document: result.data } }, { status: 201 });
     });
