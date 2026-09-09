@@ -158,13 +158,32 @@ if (selfBad) {
   process.exit(2);
 }
 
-const required = sites.filter((s) => emitRequired(s.status));
+/**
+ * ── DOMAIN SITES ARE NOT SEPARATE WORK, AND COUNTING THEM AS SUCH WAS WRONG (B166) ─────────────
+ *
+ * A domain function returns `{ ok:false, status:409, code }`. It does not emit, and it SHOULD NOT:
+ * the route that calls it is where `refuse()` lives, because that is the boundary holding the actor
+ * and the tenant. Emit in both places and every refusal is recorded twice — a trail that lies about
+ * frequency, which is worse than one that is silent, because it looks like data.
+ *
+ * This audit asked "does the enclosing block emit", which for a domain function is almost never
+ * true. So `MILESTONES_OUTSTANDING` in `lib/projects/closeout.ts` was counted SILENT while
+ * `system_events` demonstrably holds `project:close.refused code=MILESTONES_OUTSTANDING`, emitted
+ * by the converted route. Caught by checking one number against the database before acting on it.
+ *
+ * Domain sites are therefore reported as CONTEXT — where the codes are defined — and the work is
+ * counted at the ROUTE, once. Had this not been checked, the next batch would have added 134
+ * duplicate emits and called it progress.
+ */
+const domainSites = sites.filter((s) => s.kind === 'domain');
+const required = sites.filter((s) => emitRequired(s.status) && s.kind !== 'domain');
 const silent = required.filter((s) => !s.emits);
 const byFile = {};
 for (const s of silent) (byFile[s.rel] ??= []).push(s);
 
 console.log(`\n── ${sites.length} refusal site(s) — ${sites.filter((s) => s.kind === 'domain').length} domain · ${sites.filter((s) => s.kind === 'route').length} route ──`);
-console.log(`   ${required.length} are 409 or 5xx and REQUIRE an emit`);
+console.log(`   ${domainSites.length} domain site(s) DEFINE the codes — the emit belongs at the route that calls them, ONCE`);
+console.log(`   ${required.length} ROUTE site(s) are 409 or 5xx and require an emit`);
 console.log(`   ${required.length - silent.length} of those emit`);
 console.log(`   ${silent.length} do NOT — the rollout list\n`);
 
