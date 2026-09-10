@@ -8,6 +8,7 @@
  * createTask). No parked workflow — completeTask closes it without a resume.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
@@ -95,7 +96,10 @@ export async function POST(request: Request, ctx: RouteContext) {
     });
 
     if (!out.ok) {
-      return NextResponse.json({ error: out.error, code: out.code }, { status: out.status });
+        return await refuse(out, {
+          namespace: 'system', action: 'task.assign',
+          tenantId, actor: { id: u.id, email: u.email ?? null, role },
+        });
     }
     return NextResponse.json({ data: out.data }, { status: 201 });
   } catch (err) {

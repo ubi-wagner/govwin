@@ -10,6 +10,7 @@
  * issued and then vanished is a gap somebody has to explain to an auditor.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import {
@@ -56,9 +57,14 @@ export async function POST(request: Request, ctx: Ctx) {
         notes: (body.notes as string) ?? null,
         lines: Array.isArray(body.lines) ? (body.lines as LineInput[]) : [],
       });
-      return result.ok
-        ? NextResponse.json({ data: { invoice: result.data } }, { status: 201 })
-        : NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'invoice', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
+
+      return NextResponse.json({ data: { invoice: result.data } }, { status: 201 });
     });
   } catch (err) {
     console.error('[api/portal/projects/invoices POST]', err);
@@ -92,9 +98,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
           { status: 400 },
         );
       }
-      return result.ok
-        ? NextResponse.json({ data: result.data })
-        : NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'invoice', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
+
+      return NextResponse.json({ data: result.data });
     });
   } catch (err) {
     console.error('[api/portal/projects/invoices PATCH]', err);

@@ -95,8 +95,10 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
       status: string;
       usageCount: number;
       sourceType: string | null;
-      createdAt: string;
-      updatedAt: string;
+      // TRUTHFUL: postgres.js hands back a Date for a timestamptz. Declaring `string` here is what
+      // made the `typeof === 'string'` guard below resolve the wrong way (B158).
+      createdAt: Date;
+      updatedAt: Date;
     }>;
     let total: number;
     try {
@@ -112,8 +114,10 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
       status: string;
       usageCount: number;
       sourceType: string | null;
-      createdAt: string;
-      updatedAt: string;
+      // TRUTHFUL: postgres.js hands back a Date for a timestamptz. Declaring `string` here is what
+      // made the `typeof === 'string'` guard below resolve the wrong way (B158).
+      createdAt: Date;
+      updatedAt: Date;
     }>>`
       SELECT
         id,
@@ -172,8 +176,21 @@ export const librarySearchAtomsTool = defineTool<Input, Output>({
       status: row.status,
       usageCount: row.usageCount,
       sourceType: row.sourceType,
-      createdAt: typeof row.createdAt === 'string' ? row.createdAt : String(row.createdAt),
-      updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : String(row.updatedAt),
+      /**
+       * B158 — this emitted `Tue Aug 04 2026 13:22:32 GMT+0000 (Coordinated Universal Time)`.
+       *
+       * The row type declared these `string`, so the `typeof row.createdAt === 'string'` guard read
+       * as defensive. At runtime postgres.js returns a **Date** for a timestamptz, so the check was
+       * always false and the fallback `String(date)` produced JavaScript's locale-ish default form —
+       * the exact `String(d)` shape CLAUDE.md documents, in the one place nothing renders it to a
+       * person: this is an AGENT TOOL, so the malformed stamp went into a model's context, where a
+       * wrong date is reasoned over rather than noticed.
+       *
+       * `Output.createdAt` stays `string` — the tool's wire contract is an ISO string, and that was
+       * always the intent. What was wrong is the claim about what came out of the database.
+       */
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
     }));
 
     return { atoms, total };

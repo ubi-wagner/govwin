@@ -13,6 +13,7 @@
  * Returns: { data: { instanceId, resumedStep } } on success.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { enterBypass } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
@@ -93,9 +94,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     });
 
     if (!result.ok) {
-      return NextResponse.json(
-        { error: result.error, code: result.code },
-        { status: result.status },
+      return await refuse(
+        result,
+        { namespace: 'system', action: 'workflow.advance', tenantId: null, actor: { id: (session.user as { id?: string }).id, email: session.user.email ?? null } },
       );
     }
     return NextResponse.json({ data: result.data });

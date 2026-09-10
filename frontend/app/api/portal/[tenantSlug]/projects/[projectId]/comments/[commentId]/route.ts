@@ -11,6 +11,7 @@
  * (docs/ARCHIVABLE_CONTRACT.md), and a conversation with holes in it is worse than none.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { setCommentResolved, editComment } from '@/lib/projects/comments';
 
@@ -26,13 +27,23 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
       if (body?.action === 'resolve' || body?.action === 'reopen') {
         const result = await setCommentResolved(gate.actor, projectId, commentId, body.action === 'resolve');
-        if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+        if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'comment', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
         return NextResponse.json({ data: { comment: result.data } });
       }
 
       if (typeof body?.body === 'string') {
         const result = await editComment(gate.actor, projectId, commentId, body.body);
-        if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+        if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'comment', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
         return NextResponse.json({ data: result.data });
       }
 

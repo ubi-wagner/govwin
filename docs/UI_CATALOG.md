@@ -9,13 +9,13 @@ it "the UI" measures the doors and ignores what is behind them. This counts both
 
 | | count |
 |---|---:|
-| addressable routes | 123 |
-| components | 202 |
-| event handlers (total) | 1622 |
-| …of which BIND behaviour (on a DOM element) | 1381 |
+| addressable routes | 126 |
+| components | 218 |
+| event handlers (total) | 1636 |
+| …of which BIND behaviour (on a DOM element) | 1395 |
 | …of which PASS a prop to a child component | 241 |
-| `fetch` call sites | 357 |
-| `<form>` · `<input>` · `<button>` | 24 · 530 · 758 |
+| `fetch` call sites | 364 |
+| `<form>` · `<input>` · `<button>` | 25 · 534 · 768 |
 | components NO route can reach (orphans) | **1** |
 
 ## 1. Routes — the addressable surface
@@ -39,15 +39,17 @@ tree carries far more, listed per component in §2.
 | `/admin/command` | app/admin/command/page.tsx | server | 0 | 0 | 0/0/0 | EmptyLane, Link, OpportunityLanes, TaskQueue, TenantSurfacedList, OpsDigestCard +2 |
 | `/admin/contacts` | app/admin/contacts/page.tsx | server | 0 | 0 | 0/0/0 | Cell, Link |
 | `/admin/crm` | app/admin/crm/page.tsx | server | 0 | 0 | 0/0/0 | SuppressionList |
-| `/admin/dashboard` | app/admin/dashboard/page.tsx | server | 0 | 0 | 0/0/0 | StatCard, TaskQueue, Link |
+| `/admin/dashboard` | app/admin/dashboard/page.tsx | server | 0 | 0 | 0/0/0 | DescentTimeoutNotice, StatCard, TaskQueue, Link |
 | `/admin/documents` | app/admin/documents/page.tsx | server | 0 | 0 | 0/0/0 | DocumentListClient |
 | `/admin/documents/[documentId]` | app/admin/documents/[documentId]/page.tsx | client | 4 | 5 | 0/0/2 | CanvasEditor |
 | `/admin/events` | app/admin/events/page.tsx | server | 0 | 0 | 0/0/0 | Link, EventStreamClient |
 | `/admin/expert-time` | app/admin/expert-time/page.tsx | client | 4 | 3 | 1/2/2 | — |
 | `/admin/funnel` | app/admin/funnel/page.tsx | server | 0 | 0 | 0/0/0 | Rate, Link, Stage |
 | `/admin/guardrail-defaults` | app/admin/guardrail-defaults/page.tsx | server | 0 | 0 | 0/0/0 | GuardrailDefaults |
-| `/admin/intake` | app/admin/intake/page.tsx | server | 0 | 0 | 0/0/0 | IntakeStageStrip, IntakeForm |
-| `/admin/observe` | app/admin/observe/page.tsx | server | 0 | 0 | 0/0/0 | Link, Card, Empty |
+| `/admin/guides` | app/admin/guides/page.tsx | server | 0 | 0 | 0/0/0 | Link |
+| `/admin/intake` | app/admin/intake/page.tsx | server | 0 | 0 | 0/0/0 | IntakeStageStrip, IntakeGuide, IntakeForm |
+| `/admin/notes` | app/admin/notes/page.tsx | server | 0 | 0 | 0/0/0 | Link, NoteComposer, NoteActions |
+| `/admin/observe` | app/admin/observe/page.tsx | server | 0 | 0 | 0/0/0 | Link, CompanionGuide, CompanionButton, Card, Empty |
 | `/admin/opportunities` | app/admin/opportunities/page.tsx | server | 0 | 0 | 0/0/0 | Stage, OppWatchToggle |
 | `/admin/pipeline` | app/admin/pipeline/page.tsx | server | 0 | 0 | 0/0/0 | — |
 | `/admin/process` | app/admin/process/page.tsx | server | 0 | 0 | 0/0/0 | Link, ProcessMonitorClient |
@@ -55,17 +57,17 @@ tree carries far more, listed per component in §2.
 | `/admin/projects` | app/admin/projects/page.tsx | server | 0 | 0 | 0/0/0 | Measure |
 | `/admin/proposals` | app/admin/proposals/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/admin/provisioning` | app/admin/provisioning/page.tsx | server | 0 | 0 | 0/0/0 | Link, SlaCountdown, InstantReleaseButton |
-| `/admin/provisioning/[portalId]` | app/admin/provisioning/[portalId]/page.tsx | server | 0 | 0 | 0/0/0 | StatusBadge, ReadinessBars, SlaBlock, ReleasePanel, CurationNotesPanel, Row +1 |
+| `/admin/provisioning/[portalId]` | app/admin/provisioning/[portalId]/page.tsx | server | 0 | 0 | 0/0/0 | ProvisioningGuide, StatusBadge, ReadinessBars, SlaBlock, ReleasePanel, CurationNotesPanel +2 |
 | `/admin/purchases` | app/admin/purchases/page.tsx | server | 0 | 0 | 0/0/0 | Link, CompCodesPanel |
-| `/admin/rfp-curation` | app/admin/rfp-curation/page.tsx | server | 0 | 0 | 0/0/0 | IntakeStageStrip, TriageTodos, TriageQueue |
-| `/admin/rfp-curation/[solId]` | app/admin/rfp-curation/[solId]/page.tsx | server | 0 | 0 | 0/0/0 | SpotlightSummaryEditor, CurationWorkspace |
+| `/admin/rfp-curation` | app/admin/rfp-curation/page.tsx | server | 0 | 0 | 0/0/0 | IntakeStageStrip, CurationQueueGuide, TriageTodos, TriageQueue |
+| `/admin/rfp-curation/[solId]` | app/admin/rfp-curation/[solId]/page.tsx | server | 0 | 0 | 0/0/0 | SpotlightSummaryEditor, CurationGuide, CurationWorkspace |
 | `/admin/rfp-curation/[solId]/topic/[topicId]` | app/admin/rfp-curation/[solId]/topic/[topicId]/page.tsx | server | 0 | 0 | 0/0/0 | Link, TopicDetail |
 | `/admin/rfp-curation/upload` | app/admin/rfp-curation/upload/page.tsx | server | 0 | 0 | 0/0/0 | UploadForm |
-| `/admin/scouts` | app/admin/scouts/page.tsx | server | 0 | 0 | 0/0/0 | IntakeStageStrip, Link, ScoutCandidateQueue |
+| `/admin/scouts` | app/admin/scouts/page.tsx | server | 0 | 0 | 0/0/0 | IntakeStageStrip, ScoutsGuide, Link, ScoutCandidateQueue |
 | `/admin/site` | app/admin/site/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/admin/site/[pageKey]` | app/admin/site/[pageKey]/page.tsx | server | 0 | 0 | 0/0/0 | Link, EditorClient |
 | `/admin/site/docs/[type]/[slug]` | app/admin/site/docs/[type]/[slug]/page.tsx | server | 0 | 0 | 0/0/0 | SiteDocCanvasEditor |
-| `/admin/sources` | app/admin/sources/page.tsx | server | 0 | 0 | 0/0/0 | IntakeStageStrip, SourcesHub |
+| `/admin/sources` | app/admin/sources/page.tsx | server | 0 | 0 | 0/0/0 | IntakeStageStrip, SourcesGuide, SourcesHub |
 | `/admin/sources/[profileId]` | app/admin/sources/[profileId]/page.tsx | server | 0 | 0 | 0/0/0 | SourceDetailClient |
 | `/admin/storage` | app/admin/storage/page.tsx | server | 0 | 0 | 0/0/0 | AdminFileManager |
 | `/admin/system` | app/admin/system/page.tsx | server | 0 | 0 | 0/0/0 | StatCard |
@@ -77,6 +79,7 @@ tree carries far more, listed per component in §2.
 | `/admin/tenants/[tenantId]` | app/admin/tenants/[tenantId]/page.tsx | server | 0 | 0 | 0/0/0 | Link, TenantArchiveControl, StatCard, TenantDetailsEditor, TenantAiConfigCard |
 | `/admin/waitlist` | app/admin/waitlist/page.tsx | server | 0 | 0 | 0/0/0 | Link |
 | `/admin/workflows` | app/admin/workflows/page.tsx | server | 0 | 0 | 1/2/1 | Link, LaunchContentClient, LaunchCollaborationClient, WorkflowMonitorClient |
+| `/admin/workspace-access` | app/admin/workspace-access/page.tsx | server | 0 | 0 | 0/0/0 | EndAccessButton |
 | `/apply` | app/(marketing)/apply/page.tsx | server | 0 | 0 | 0/0/0 | ApplicationForm, CustomSections |
 | `/blog/[slug]` | app/(marketing)/blog/[slug]/page.tsx | server | 0 | 0 | 0/0/0 | — |
 | `/change-password` | app/(auth)/change-password/page.tsx | server | 0 | 0 | 0/0/0 | ChangePasswordForm |
@@ -156,21 +159,29 @@ tree carries far more, listed per component in §2.
 | app/admin/automation/automation-client.tsx | client | 2/0 | 1 | /admin/automation |
 | app/admin/documents/document-list-client.tsx | client | 7/0 | 3 | /admin/documents |
 | app/admin/events/event-stream-client.tsx | client | 9/0 | 0 | /admin/events |
+| app/admin/intake/intake-guide.tsx | server | 0/0 | 0 | /admin/intake |
+| app/admin/observe/companion-guide.tsx | server | 0/0 | 0 | /admin/observe |
 | app/admin/process/process-monitor-client.tsx | client | 4/0 | 0 | /admin/process |
 | app/admin/processes/admin-processes-client.tsx | client | 4/0 | 1 | /admin/processes |
+| app/admin/provisioning/[portalId]/provisioning-guide.tsx | server | 0/0 | 0 | /admin/provisioning/[portalId] |
 | app/admin/provisioning/[portalId]/release-panel.tsx | client | 3/0 | 1 | /admin/provisioning/[portalId], /admin/provisioning |
 | app/admin/provisioning/instant-release-button.tsx | client | 1/0 | 1 | /admin/provisioning |
+| app/admin/rfp-curation/[solId]/curation-guide.tsx | server | 0/0 | 0 | /admin/rfp-curation/[solId] |
 | app/admin/rfp-curation/[solId]/spotlight-summary-editor.tsx | client | 7/0 | 4 | /admin/rfp-curation/[solId] |
+| app/admin/rfp-curation/curation-queue-guide.tsx | server | 0/0 | 0 | /admin/rfp-curation |
 | app/admin/rfp-curation/triage-todos.tsx | server | 0/0 | 0 | /admin/rfp-curation |
+| app/admin/scouts/scouts-guide.tsx | server | 0/0 | 0 | /admin/scouts |
 | app/admin/site/[pageKey]/editor-client.tsx | client | 15/1 | 2 | /admin/site/[pageKey] |
 | app/admin/site/docs/[type]/[slug]/doc-canvas-editor.tsx | client | 12/3 | 3 | /admin/site/docs/[type]/[slug] |
 | app/admin/sources/[profileId]/source-detail-client.tsx | client | 9/4 | 4 | /admin/sources/[profileId] |
+| app/admin/sources/sources-guide.tsx | server | 0/0 | 0 | /admin/sources |
 | app/admin/system-state/system-state-client.tsx | client | 8/2 | 0 | /admin/system-state |
 | app/admin/workflows/launch-collaboration-client.tsx | client | 11/0 | 1 | /admin/workflows |
 | app/admin/workflows/launch-content-client.tsx | client | 5/0 | 1 | /admin/workflows |
 | app/admin/workflows/workflow-graph.tsx | client | 0/0 | 0 | /admin/workflows |
 | app/admin/workflows/workflow-map.tsx | client | 3/2 | 2 | /admin/workflows |
 | app/admin/workflows/workflow-monitor-client.tsx | client | 13/0 | 5 | /admin/workflows |
+| app/admin/workspace-access/end-access-button.tsx | client | 1/0 | 1 | /admin/workspace-access |
 | app/partner/add-company-flow.tsx | client | 20/0 | 3 | /partner |
 | app/partner/partner-guide.tsx | server | 0/0 | 0 | /partner |
 | app/portal/[tenantSlug]/activity/activity-stream-client.tsx | client | 8/0 | 0 | /portal/[tenantSlug]/activity |
@@ -178,23 +189,29 @@ tree carries far more, listed per component in §2.
 | app/portal/[tenantSlug]/processes/processes-client.tsx | client | 3/0 | 2 | /portal/[tenantSlug]/command, /portal/[tenantSlug]/processes |
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | 14/0 | 12 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/admin/admin-file-manager.tsx | client | 35/0 | 8 | /admin/storage |
-| components/admin/admin-nav-context.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +47 |
-| components/admin/admin-nav-link.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +47 |
-| components/admin/admin-nav-trail.tsx | client | 0/3 | 0 | /admin/agents, /admin/analytics, /admin/applications +47 |
+| components/admin/admin-nav-context.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +50 |
+| components/admin/admin-nav-link.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +50 |
+| components/admin/admin-nav-trail.tsx | client | 0/3 | 0 | /admin/agents, /admin/analytics, /admin/applications +50 |
 | components/admin/agent-usage-summary.tsx | client | 0/0 | 1 | /admin/agents |
 | components/admin/agent-workforce.tsx | client | 0/0 | 1 | /admin/agents |
 | components/admin/application-review.tsx | client | 7/0 | 4 | /admin/applications |
 | components/admin/automation-health.tsx | server | 0/0 | 0 | /admin/automation |
 | components/admin/comp-codes-panel.tsx | client | 5/0 | 3 | /admin/purchases |
+| components/admin/companion-button.tsx | client | 2/0 | 1 | /admin/observe |
 | components/admin/crawl-settings.tsx | client | 5/0 | 4 | /admin/sources/[profileId] |
 | components/admin/create-partner-org-form.tsx | client | 11/0 | 1 | /admin/tenants |
+| components/admin/descent-timeout-notice.tsx | server | 0/0 | 0 | /admin/dashboard |
 | components/admin/diff-history.tsx | client | 1/0 | 1 | /admin/sources/[profileId] |
 | components/admin/guardrail-defaults.tsx | client | 2/0 | 2 | /admin/guardrail-defaults |
+| components/admin/guide-note.tsx | client | 5/0 | 1 | /admin/intake, /admin/observe, /admin/provisioning/[portalId] +4 |
+| components/admin/guide.tsx | server | 0/0 | 0 | /admin/intake, /admin/observe, /admin/provisioning/[portalId] +4 |
 | components/admin/image-upload-field.tsx | client | 2/0 | 1 | /admin/site/[pageKey], /admin/site/docs/[type]/[slug] |
 | components/admin/intake-form.tsx | client | 16/0 | 1 | /admin/intake |
 | components/admin/intake-stage-strip.tsx | server | 0/0 | 0 | /admin/cards, /admin/intake, /admin/rfp-curation +2 |
 | components/admin/master-cards.tsx | client | 4/0 | 1 | /admin/cards |
 | components/admin/new-company-form.tsx | client | 4/0 | 1 | /admin/tenants |
+| components/admin/note-actions.tsx | client | 1/0 | 1 | /admin/notes |
+| components/admin/note-composer.tsx | client | 3/0 | 1 | /admin/notes |
 | components/admin/opp-watch-toggle.tsx | client | 1/0 | 1 | /admin/opportunities |
 | components/admin/platform-ai-config-card.tsx | client | 7/0 | 2 | /admin/agents |
 | components/admin/proposal-autodrive.tsx | client | 3/0 | 2 | /admin/agents |
@@ -252,7 +269,7 @@ tree carries far more, listed per component in §2.
 | components/marketing/value-comparison.tsx | server | 0/0 | 0 | /pricing, /value |
 | components/marketing/waitlist-form.tsx | client | 3/0 | 1 | /federal-rd-101 |
 | components/marketing/wordmark.tsx | server | 0/0 | 0 | /about, /apply, /blog/[slug] +20 |
-| components/nav-link.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +47 |
+| components/nav-link.tsx | client | 0/0 | 0 | /admin/agents, /admin/analytics, /admin/applications +50 |
 | components/portal/agent-usage-panel.tsx | client | 1/0 | 1 | /portal/[tenantSlug]/agents, /portal/[tenantSlug]/manage |
 | components/portal/amendment-banner.tsx | client | 3/0 | 3 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/portal/archive-portal-button.tsx | client | 1/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId] |
@@ -285,6 +302,7 @@ tree carries far more, listed per component in §2.
 | components/portal/pending-build-banner.tsx | client | 0/0 | 0 | /portal/[tenantSlug]/dashboard |
 | components/portal/pipeline-cards.tsx | client | 11/2 | 3 | /portal/[tenantSlug]/cards, /portal/[tenantSlug]/command, /portal/[tenantSlug]/dashboard |
 | components/portal/portal-nav-link.tsx | client | 0/0 | 0 | **no route** |
+| components/portal/presence-heartbeat.tsx | client | 0/0 | 1 | /portal/[tenantSlug]/activity, /portal/[tenantSlug]/agents, /portal/[tenantSlug]/atoms +35 |
 | components/portal/profile-editor.tsx | client | 5/11 | 1 | /portal/[tenantSlug]/profile, /portal/[tenantSlug]/manage |
 | components/portal/proposal-admin-panel.tsx | client | 19/0 | 10 | /portal/[tenantSlug]/proposals/[proposalId] |
 | components/portal/proposal-contributor-view.tsx | client | 3/0 | 0 | /portal/[tenantSlug]/proposals/[proposalId] |
@@ -345,26 +363,27 @@ tree carries far more, listed per component in §2.
 | components/rfp-curation/upload-form.tsx | client | 14/2 | 4 | /admin/rfp-curation/upload |
 | components/scout/candidate-queue.tsx | client | 9/0 | 2 | /admin/scouts |
 | components/tasks/assign-task-form.tsx | client | 7/0 | 1 | /portal/[tenantSlug]/proposals/[proposalId], /portal/[tenantSlug]/dashboard, /portal/[tenantSlug]/command +1 |
+| components/tasks/task-claim.tsx | client | 2/0 | 1 | /admin/command, /admin/dashboard, /admin/rfp-curation +3 |
 | components/tasks/task-queue.tsx | client | 14/7 | 3 | /admin/command, /admin/dashboard, /admin/rfp-curation +3 |
 | components/tasks/todos-panel.tsx | client | 1/1 | 0 | /portal/[tenantSlug]/command, /portal/[tenantSlug]/todos |
 | components/ui/advisory-overlay.tsx | client | 3/0 | 0 | /admin/rfp-curation/[solId] |
 | components/ui/autocomplete.tsx | client | 5/0 | 0 | /admin/rfp-curation/[solId], /admin/rfp-curation/upload |
 | components/ui/count-badge.tsx | server | 0/0 | 0 | /admin/command, /portal/[tenantSlug]/command |
-| components/ui/drawer.tsx | client | 1/0 | 0 | /portal/[tenantSlug]/dashboard, /portal/[tenantSlug]/manage, /admin/agents +85 |
+| components/ui/drawer.tsx | client | 1/0 | 0 | /portal/[tenantSlug]/dashboard, /portal/[tenantSlug]/manage, /admin/agents +88 |
 | components/ui/modal.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/portals, /portal/[tenantSlug]/manage |
-| components/ui/nav-shell.tsx | client | 1/1 | 0 | /admin/agents, /admin/analytics, /admin/applications +85 |
+| components/ui/nav-shell.tsx | client | 1/1 | 0 | /admin/agents, /admin/analytics, /admin/applications +88 |
 | components/ui/tabs.tsx | client | 2/0 | 0 | /portal/[tenantSlug]/proposals/[proposalId], /admin/command, /portal/[tenantSlug]/command |
-| components/ui/time-ago.tsx | client | 0/0 | 0 | /admin/process, /admin/processes, /admin/system-state +12 |
+| components/ui/time-ago.tsx | client | 0/0 | 0 | /admin/documents, /admin/process, /admin/processes +51 |
 
 ## 3. Handler census — what kind of interaction, and how much of it
 
 | handler | count | distinct files |
 |---|---:|---:|
-| `onClick` | 775 | 165 |
-| `onChange` | 517 | 115 |
+| `onClick` | 784 | 170 |
+| `onChange` | 521 | 118 |
 | `onClose` | 39 | 11 |
 | `onKeyDown` | 24 | 16 |
-| `onSubmit` | 21 | 18 |
+| `onSubmit` | 22 | 19 |
 | `onDrop` | 12 | 8 |
 | `onDragOver` | 10 | 8 |
 | `onDragLeave` | 10 | 8 |
@@ -488,6 +507,7 @@ tree carries far more, listed per component in §2.
 | `POST /api/portal/:p/proposals/:p/ai/research` | 2 |
 | `GET /api/portal/:p/proposals/:p/ai/research?taskId=:p` | 2 |
 | `POST /api/admin/sources/:p/scout` | 2 |
+| `POST '/api/admin/notes'` | 2 |
 | `GET '/api/admin/sources'` | 2 |
 | `POST /api/portal/:p/proposals/:p/sections/:p/lock` | 2 |
 | `POST /api/portal/:p/proposals/:p/sections/:p/atomize-node` | 2 |
@@ -548,6 +568,7 @@ tree carries far more, listed per component in §2.
 | `POST /api/admin/workflows/:p/retry` | 1 |
 | `POST /api/admin/workflows/:p/cancel` | 1 |
 | `GET /api/admin/workflows/:p` | 1 |
+| `POST '/api/admin/workspace-access/force-ascend'` | 1 |
 | `GET /api/invite?token=:p` | 1 |
 | `POST '/api/invite'` | 1 |
 | `POST '/api/partner/manager-requests'` | 1 |
@@ -579,6 +600,7 @@ tree carries far more, listed per component in §2.
 | `GET '/api/admin/promo-codes'` | 1 |
 | `POST '/api/admin/promo-codes'` | 1 |
 | `PATCH '/api/admin/promo-codes'` | 1 |
+| `POST '/api/admin/observe'` | 1 |
 | `POST '/api/admin/partners'` | 1 |
 | `PATCH /api/admin/sources/:p/diffs` | 1 |
 | `GET '/api/admin/guardrail-defaults'` | 1 |
@@ -587,6 +609,7 @@ tree carries far more, listed per component in §2.
 | `POST '/api/admin/intake'` | 1 |
 | `POST /api/admin/opportunities/:p/lifecycle` | 1 |
 | `POST '/api/admin/tenants'` | 1 |
+| `PATCH /api/admin/notes/:p` | 1 |
 | `GET /api/admin/opportunities/:p/watch` | 1 |
 | `GET '/api/admin/agents/platform-config'` | 1 |
 | `PATCH '/api/admin/agents/platform-config'` | 1 |
@@ -660,6 +683,7 @@ tree carries far more, listed per component in §2.
 | `GET /api/portal/:p/cards:p : ''}` | 1 |
 | `GET /api/portal/:p/cards/:p/documents:p` | 1 |
 | `POST /api/portal/:p/cards/:p/pursuit` | 1 |
+| `POST '/api/presence/heartbeat'` | 1 |
 | `PATCH /api/portal/:p/profile` | 1 |
 | `POST /api/portal/:p/proposals/:p/package?format=:p` | 1 |
 | `POST /api/portal/:p/proposals/:p/package-review` | 1 |
@@ -759,6 +783,7 @@ tree carries far more, listed per component in §2.
 | `GET '/api/admin/scout-review'` | 1 |
 | `POST /api/admin/scout-review/:p` | 1 |
 | `POST /api/portal/:p/tasks/assign` | 1 |
+| `GET :p/:p/claim` | 1 |
 | `GET apiBase` | 1 |
 | `POST apiBase` | 1 |
 

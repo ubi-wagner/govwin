@@ -1,4 +1,20 @@
 'use client';
+import { LocalTime } from '@/components/ui/time-ago';
+
+/**
+ * B156 — a `toLocale*` with no `timeZone` formats in the AMBIENT zone: UTC on the server, the
+ * viewer's in the browser. The strings disagree, React throws #418, and hydration fails for the
+ * WHOLE subtree while the route answers HTTP 200. `<LocalTime>` owns its own mount state — a
+ * deterministic UTC stamp on the first paint, the viewer's zone on the next tick.
+ *
+ * This one was INLINE IN JSX rather than in a named helper, which is why the first sweep for this
+ * class did not see it: `__tests__/client-timezone-in-render.test.ts` matched module-level
+ * `function` declarations only. The guard now covers inline calls and arrows too.
+ */
+const USAGE_STAMP: Intl.DateTimeFormatOptions = {
+  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+};
+const ACTIVITY_DAY: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
 
 import { useState, useEffect, useCallback } from 'react';
 import { agentDisplayName, titleizeIdentifier } from '@/lib/agent-labels';
@@ -168,12 +184,7 @@ export function AgentUsagePanel({ tenantSlug }: AgentUsagePanelProps) {
                     <td className="px-4 py-2 text-right text-gray-600">{agent.calls}</td>
                     <td className="px-4 py-2 text-gray-500 text-xs">
                       {agent.lastUsed
-                        ? new Date(agent.lastUsed).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
+                        ? <LocalTime iso={agent.lastUsed} opts={USAGE_STAMP} />
                         : 'Never'}
                     </td>
                   </tr>
@@ -212,10 +223,7 @@ export function AgentUsagePanel({ tenantSlug }: AgentUsagePanelProps) {
                     </span>
                   )}
                   <span className="text-gray-400">
-                    {new Date(activity.createdAt).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
+                    <LocalTime iso={activity.createdAt} opts={ACTIVITY_DAY} />
                   </span>
                 </div>
               </div>

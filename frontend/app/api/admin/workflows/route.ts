@@ -12,6 +12,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 // Admin cross-tenant route — reads/writes span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md)
 import { sqlBypass as sql, enterBypass } from '@/lib/db';
@@ -258,9 +259,9 @@ export async function POST(request: Request) {
     });
 
     if (!result.ok) {
-      return NextResponse.json(
-        { error: result.error, code: result.code },
-        { status: result.status },
+      return await refuse(
+        result,
+        { namespace: 'system', action: 'workflow.launch', tenantId: tenantId, actor: { id: sessionUser.id, email: session.user.email ?? null } },
       );
     }
     return NextResponse.json({ data: result.data });

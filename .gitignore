@@ -9,6 +9,9 @@ node_modules/
 
 frontend/.next/
 .next/
+# The dev-only dist dir (NEXT_DIST_DIR, see frontend/next.config.mjs). `.next/` above does NOT
+# match it — a trailing-slash pattern matches that exact name, not a prefix.
+.next-dev/
 frontend/out/
 frontend/.turbo/
 *.tsbuildinfo

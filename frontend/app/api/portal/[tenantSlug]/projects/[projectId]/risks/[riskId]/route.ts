@@ -12,6 +12,7 @@
  * No DELETE. A register you can delete from cannot answer "when did we know".
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { updateRisk, raiseAsIssue, closeRisk, mitigationTask } from '@/lib/projects/risks';
 
@@ -29,12 +30,22 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
       if (body?.action === 'raise_issue') {
         const r = await raiseAsIssue(gate.actor, projectId, riskId);
-        if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+        if (!r.ok) {
+        return await refuse(r, {
+          namespace: 'project', action: 'risk', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
         return NextResponse.json({ data: { risk: r.data } });
       }
       if (body?.action === 'close') {
         const r = await closeRisk(gate.actor, projectId, riskId, (body.note as string) ?? null);
-        if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+        if (!r.ok) {
+        return await refuse(r, {
+          namespace: 'project', action: 'risk', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
         return NextResponse.json({ data: { risk: r.data } });
       }
       if (body?.action === 'mitigate') {
@@ -43,7 +54,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
           assigneeUserId: (body.assigneeUserId as string) ?? null,
           dueDate: (body.dueDate as string) ?? null,
         });
-        if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+        if (!r.ok) {
+        return await refuse(r, {
+          namespace: 'project', action: 'risk', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
         return NextResponse.json({ data: r.data }, { status: 201 });
       }
 
@@ -58,7 +74,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
       const patch: Record<string, unknown> = {};
       for (const k of edits) patch[k] = body[k];
       const r = await updateRisk(gate.actor, projectId, riskId, patch);
-      if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+      if (!r.ok) {
+        return await refuse(r, {
+          namespace: 'project', action: 'risk', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { risk: r.data } });
     });
   } catch (err) {

@@ -1,21 +1,19 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
+import { LocalTime } from '@/components/ui/time-ago';
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function formatDate(iso: string | null): string {
-  if (!iso) return 'Never';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
+/**
+ * B156 — a `toLocale*` with no `timeZone` formats in the AMBIENT zone: UTC on the server, the
+ * viewer's in the browser. The strings disagree, React throws #418, and hydration fails for the
+ * WHOLE subtree while the route answers HTTP 200. `<LocalTime>` owns its own mount state — a
+ * deterministic UTC stamp on the first paint, the viewer's zone on the next tick.
+ */
+const STAMP: Intl.DateTimeFormatOptions = {
+  year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+};
 const CRON_PRESETS: { label: string; value: string }[] = [
   { label: 'Daily 6am UTC', value: '0 6 * * *' },
   { label: 'Every 12 hours', value: '0 */12 * * *' },
@@ -222,7 +220,7 @@ export default function CrawlSettings({
 
       {/* Last crawl */}
       <div className="text-xs text-gray-400">
-        Last crawl: {formatDate(lastCrawlAt)}
+        Last crawl: <LocalTime iso={lastCrawlAt} opts={STAMP} fallback="Never" />
       </div>
 
       {/* Scout Now */}

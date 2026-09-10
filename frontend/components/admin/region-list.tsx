@@ -1,4 +1,5 @@
 'use client';
+import { LocalTime } from '@/components/ui/time-ago';
 
 import { useCallback, useState } from 'react';
 
@@ -28,14 +29,13 @@ const REGION_TYPE_COLORS: Record<string, string> = {
   navigation: 'bg-gray-100 text-gray-700',
 };
 
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-}
+/**
+ * B156 — a `toLocale*` with no `timeZone` formats in the AMBIENT zone: UTC on the server, the
+ * viewer's in the browser. The strings disagree, React throws #418, and hydration fails for the
+ * WHOLE subtree while the route answers HTTP 200. `<LocalTime>` owns its own mount state — a
+ * deterministic UTC stamp on the first paint, the viewer's zone on the next tick.
+ */
+const DATE_ONLY: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' };
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -152,7 +152,7 @@ export default function RegionList({ profileId, regions, onDeleted }: RegionList
                   No baseline
                 </span>
               )}
-              <span>Created {formatDate(region.createdAt)}</span>
+              <span>Created <LocalTime iso={region.createdAt} opts={DATE_ONLY} /></span>
             </div>
           </div>
         );

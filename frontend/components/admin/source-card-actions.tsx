@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { useClientNow } from '@/components/ui/time-ago';
+import { useClientNow, localFrom } from '@/components/ui/time-ago';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -77,16 +77,31 @@ const ACTION_COLORS: Record<string, string> = {
   note: 'bg-gray-100 text-gray-700',
 };
 
-function formatDate(iso: string | null): string {
-  if (!iso) return 'Never';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', {
+/**
+ * B156 — this took the whole page to its error boundary, at HTTP 200, for every non-UTC admin.
+ *
+ * It used to call `toLocaleDateString('en-US', {…hour, minute})` with NO `timeZone`, so it
+ * formatted in whatever zone the renderer sat in: UTC on the server, the viewer's in the browser.
+ * Captured on a dev build with the browser pinned to America/New_York, inside `<SourceCard>`:
+ *
+ *     +  Aug 25, 2026, 04:02 PM        (client)
+ *     -  Aug 25, 2026, 08:02 PM        (server)
+ *
+ * That is React #418 — hydration fails for the WHOLE subtree, not one cell. It read as a rare
+ * intermittent only because this sandbox runs the server and the browser in the same zone.
+ *
+ * `mounted` comes from the `useClientNow()` this component already holds (`now !== null`), so the
+ * first paint is a deterministic UTC stamp on both sides and the viewer's own zone arrives on the
+ * next tick — the same mount rule `formatRelative` below already follows.
+ */
+function formatDate(iso: string | null, mounted: boolean): string {
+  return localFrom(iso, mounted, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  });
+  }, 'Never');
 }
 
 /**
@@ -109,7 +124,8 @@ function formatRelative(iso: string, now: number | null): string {
   if (diffHr < 24) return `${diffHr}h ago`;
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 7) return `${diffDay}d ago`;
-  return formatDate(iso);
+  // Reached only when `now !== null`, i.e. after mount — which is exactly `mounted`.
+  return formatDate(iso, true);
 }
 
 function formatCron(cron: string | null): string {
@@ -282,7 +298,7 @@ function SourceCard({ source, onRefresh }: SourceCardProps) {
           </div>
           <div className="text-right text-xs text-gray-400 shrink-0">
             <div>{Number(source.visitCount)} visits</div>
-            <div>{formatDate(source.lastActivity)}</div>
+            <div>{formatDate(source.lastActivity, now !== null)}</div>
           </div>
         </div>
 

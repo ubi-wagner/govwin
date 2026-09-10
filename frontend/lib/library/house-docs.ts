@@ -8,6 +8,7 @@
  * (clearHouseDocs removes the prior set first).
  */
 import { sql } from '@/lib/db';
+import { withTenant } from '@/lib/rls';
 import { createAtom } from '@/lib/atoms';
 import type { CanvasNode } from '@/lib/types/canvas-document';
 import { splitMarkdownSections, type DocSection } from '@/lib/library/markdown-sections';
@@ -82,15 +83,35 @@ export async function ingestHouseDoc(
   return { groupId, sectionAtomIds, sectionCount: sections.length };
 }
 
-/** Remove a tenant's previously-seeded house-library atoms (idempotent re-seed). */
+/**
+ * Remove a tenant's previously-seeded house-library atoms (idempotent re-seed).
+ *
+ * ── B161 · THIS DELETED NOTHING, AND SAID SO IN A WAY THAT READ LIKE SUCCESS ──────────────────
+ * `library_atoms` is FORCE-RLS. Issued through the context-aware `sql` with no `app.tenant_id` set,
+ * the tenant-equality USING clause matches ZERO rows — and Postgres does not consider "your
+ * predicate excluded everything" an error. The statement returned, `rows.length` was 0, and the
+ * only caller printed `cleared 0 prior house atoms` and re-seeded on top.
+ *
+ * Measured on this box: the owner connection sees 355 atoms for a tenant; the app connection with
+ * no context sees 0.
+ *
+ * The asymmetry is what hid it. The INSERT half goes through `createAtom`, which wraps every write
+ * in `withTenant` (`lib/atoms.ts`) and therefore worked — so the seed appeared to run correctly
+ * while its "idempotent" clear did nothing, and each run added another full copy. A function that
+ * fails loudly gets fixed; one that returns 0 gets believed.
+ *
+ * `withTenant` rather than `sqlBypass`: this is a tenant's own data and the predicate is already
+ * tenant-scoped, so the honest fix is to supply the context the predicate assumes — not to step
+ * around the policy that caught the omission.
+ */
 export async function clearHouseDocs(tenantId: string): Promise<number> {
-  const rows = await sql<Array<{ id: string }>>`
+  const rows = await withTenant(tenantId, async (tx) => tx<Array<{ id: string }>>`
     DELETE FROM library_atoms
     WHERE tenant_id = ${tenantId}::uuid
       AND id IN (
         SELECT atom_id FROM atom_tags
         WHERE dimension = 'collection' AND value = ${HOUSE_COLLECTION}
       )
-    RETURNING id`;
+    RETURNING id`);
   return rows.length;
 }

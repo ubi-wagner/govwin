@@ -352,6 +352,16 @@ recording, because "a known issue" that nobody re-measures becomes a permanent o
   varies. Attribution matters here — the same symptom was misattributed to a clock-in-render bug
   earlier in this work, five components were changed for it, and a later sweep hit a page none of
   them touched.
+  **Update 2026-09-08 — DIAGNOSED AND FIXED (B155 → B156), and the correction matters.** #418 is
+  **not** an intermittent and **not** an RSC-preamble artifact. Seven client components formatted
+  dates with `toLocale*` and no `timeZone`, so the server formatted in UTC and the browser in the
+  viewer's zone; the strings disagree and hydration fails for the whole subtree at HTTP 200. It
+  read as rare only because **this sandbox runs the server and the browser both in UTC**, where the
+  defect cannot occur — in production it fires for every admin whose browser is not UTC, i.e. all
+  of them. Pinning the capture browser to `America/New_York` reproduced it on the first attempt and
+  named the component (`<SourceCard>`, `04:02 PM` vs `08:02 PM`). Both earlier hypotheses — the
+  clock read and a write-during-render — were separately disproven by measurement first. All seven
+  are fixed, with `__tests__/client-timezone-in-render.test.ts` guarding the shape (7 → 0).
 
 ## 6. Not blocking, worth knowing
 

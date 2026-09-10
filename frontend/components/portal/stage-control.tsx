@@ -1,4 +1,7 @@
 'use client';
+import { localFrom, useMounted, useClientNow, deltaMsFrom } from '@/components/ui/time-ago';
+
+const DAY_STAMP: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' };
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -105,26 +108,30 @@ export function StageControl({
   const isAtFinal = currentStage === 'final' || currentStage === 'submitted';
   const isAtLastGate = isAtFinal || currentIndex >= gateConfig.length - 1;
 
-  // Format deadline
-  const deadlineStr = unlockDeadline
-    ? new Date(unlockDeadline).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : null;
+  /**
+   * B156 — these format in the AMBIENT zone (UTC on the server, the viewer's in the browser), so
+   * the strings disagree and React #418 fails hydration for the whole subtree at HTTP 200.
+   *
+   * `localFrom` rather than `<LocalTime>` because these stay STRINGS: both are used as truthiness
+   * gates (`{closeDateStr && …}`) as well as rendered, and a component is always truthy — swapping
+   * in an element would silently open two sections that are meant to stay closed when the date is
+   * absent. Same mount rule either way.
+   */
+  const mounted = useMounted();
+  const now = useClientNow();
+  const deadlineStr = unlockDeadline ? localFrom(unlockDeadline, mounted, DAY_STAMP) : null;
+  const closeDateStr = closeDate ? localFrom(closeDate, mounted, DAY_STAMP) : null;
 
-  const closeDateStr = closeDate
-    ? new Date(closeDate).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : null;
-
-  const daysUntilClose = closeDate
-    ? Math.ceil((new Date(closeDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : null;
+  /**
+   * B160 — the clock half of the same defect the block above fixes for the ZONE. Reading
+   * `Date.now()` here made the countdown a function of when it rendered, so a server and client
+   * render straddling a day boundary disagreed and React #418 took the whole control to its error
+   * boundary at HTTP 200. `now` is null until mounted and the two consumers below already require
+   * `daysUntilClose !== null`, so the countdown simply appears on the next tick — the date beside
+   * it, which is the load-bearing fact, is there from the first paint either way.
+   */
+  const closeDeltaMs = deltaMsFrom(closeDate, now);
+  const daysUntilClose = closeDeltaMs === null ? null : Math.ceil(closeDeltaMs / (1000 * 60 * 60 * 24));
 
   const handleAdvance = useCallback(async (opts: { force?: boolean; acknowledgeBlockers?: boolean } = {}) => {
     const { force = false, acknowledgeBlockers = false } = opts;

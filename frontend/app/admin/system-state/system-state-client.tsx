@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
+import { TimeAgo, Elapsed, LocalTime, useClientNow } from '@/components/ui/time-ago';
 import { useState, useEffect } from 'react';
 import type {
   HealthSummary,
@@ -78,10 +78,13 @@ function truncateJson(obj: unknown, maxLen = 120): string {
   return s.slice(0, maxLen) + '...';
 }
 
-function formatHour(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-}
+/**
+ * B156 — a `toLocale*` with no `timeZone` formats in the AMBIENT zone: UTC on the server, the
+ * viewer's in the browser. The strings disagree, React throws #418, and hydration fails for the
+ * WHOLE subtree while the route answers HTTP 200. `<LocalTime>` owns its own mount state — a
+ * deterministic UTC stamp on the first paint, the viewer's zone on the next tick.
+ */
+const HOUR_MIN: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
 
 // ─── Sub-components ───────────────────────────────────────────────────
 
@@ -665,7 +668,7 @@ function EventVolumeChart({ data }: { data: EventVolumeRow[] }) {
               {/* Tooltip */}
               <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 hidden group-hover:block z-10">
                 <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
-                  <div className="font-medium">{formatHour(hour)}</div>
+                  <div className="font-medium"><LocalTime iso={hour} opts={HOUR_MIN} /></div>
                   {namespaces.map((ns) => {
                     const count = nsMap.get(ns) ?? 0;
                     if (count === 0) return null;
@@ -700,7 +703,7 @@ function EventVolumeChart({ data }: { data: EventVolumeRow[] }) {
               {/* Hour label - show every 3rd to avoid overlap */}
               {hours.indexOf(hour) % 3 === 0 && (
                 <div className="text-center mt-1">
-                  <span className="text-xs text-gray-400 font-mono">{formatHour(hour)}</span>
+                  <span className="text-xs text-gray-400 font-mono"><LocalTime iso={hour} opts={HOUR_MIN} /></span>
                 </div>
               )}
             </div>
@@ -868,14 +871,27 @@ const EMAIL_EVENT_LABELS: Record<string, { label: string; color: string }> = {
   'action.enroll_drip': { label: 'Enroll Drip', color: 'bg-indigo-100 text-indigo-700' },
 };
 
+/**
+ * B160 — this section server-renders from props, so `const now = Date.now()` made every count below
+ * a function of when it rendered: a log entry near the 24-hour edge falls inside the window on one
+ * side and outside it on the other, and the `failures > 0` branches drive inline STYLES as well as
+ * text. React #418 then fails hydration for the whole panel at HTTP 200.
+ *
+ * Until mounted the window is unknown, and the counts read `—` rather than `0`. That is this repo's
+ * own rule about measures — a figure with no denominator is "not measured", never a confident zero
+ * — and here it is also the difference between "no failures in the last day" and "we do not yet
+ * know", which an operator reading a health panel should not have to guess between.
+ */
 function EmailAutomationSection({ data }: { data: EmailAutomationData }) {
-  const now = Date.now();
-  const oneDayAgo = now - 24 * 60 * 60 * 1000;
-  const recentLogs = data.automationLogs.filter((l) => new Date(l.executedAt).getTime() > oneDayAgo);
-  const rulesFired24h = recentLogs.length;
+  const now = useClientNow();
+  const oneDayAgo = now === null ? null : now - 24 * 60 * 60 * 1000;
+  const recentLogs = oneDayAgo === null
+    ? null
+    : data.automationLogs.filter((l) => new Date(l.executedAt).getTime() > oneDayAgo);
+  const rulesFired24h = recentLogs?.length ?? null;
   const emailsSent = data.emailEvents.filter((e) => e.type === 'email.sent').length;
   const emailsPendingHitl = data.emailEvents.filter((e) => e.type === 'email.claimed').length;
-  const failures = recentLogs.filter((l) => l.status === 'failed').length;
+  const failures = recentLogs?.filter((l) => l.status === 'failed').length ?? null;
 
   return (
     <div className="space-y-6">
@@ -883,7 +899,7 @@ function EmailAutomationSection({ data }: { data: EmailAutomationData }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="border-l-4 border-blue-400 bg-blue-50 rounded-lg p-3">
           <p className="text-xs text-gray-500 uppercase font-medium">Rules Fired (24h)</p>
-          <p className="text-2xl font-bold mt-1 text-blue-700">{rulesFired24h}</p>
+          <p className="text-2xl font-bold mt-1 text-blue-700">{rulesFired24h ?? '—'}</p>
         </div>
         <div className="border-l-4 border-green-400 bg-green-50 rounded-lg p-3">
           <p className="text-xs text-gray-500 uppercase font-medium">Emails Sent</p>
@@ -893,9 +909,9 @@ function EmailAutomationSection({ data }: { data: EmailAutomationData }) {
           <p className="text-xs text-gray-500 uppercase font-medium">Emails Pending HITL</p>
           <p className={`text-2xl font-bold mt-1 ${emailsPendingHitl > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>{emailsPendingHitl}</p>
         </div>
-        <div className="border-l-4 rounded-lg p-3" style={{ borderColor: failures > 0 ? '#f87171' : '#d1d5db', backgroundColor: failures > 0 ? '#fef2f2' : '#f9fafb' }}>
+        <div className="border-l-4 rounded-lg p-3" style={{ borderColor: failures ? '#f87171' : '#d1d5db', backgroundColor: failures ? '#fef2f2' : '#f9fafb' }}>
           <p className="text-xs text-gray-500 uppercase font-medium">Failures (24h)</p>
-          <p className={`text-2xl font-bold mt-1 ${failures > 0 ? 'text-red-700' : 'text-gray-400'}`}>{failures}</p>
+          <p className={`text-2xl font-bold mt-1 ${failures ? 'text-red-700' : 'text-gray-400'}`}>{failures ?? '—'}</p>
         </div>
       </div>
 
@@ -1020,6 +1036,15 @@ export function SystemStateClient({
   const [expandedWorkflows, setExpandedWorkflows] = useState<Set<string>>(new Set());
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [, setTick] = useState(0);
+  /**
+   * The 24-hour failure count behind the Email tab's badge — computed once, from the mounted clock
+   * (B160). Null until mounted, which is what keeps the badge absent on both the server render and
+   * the first client render instead of appearing on hydration.
+   */
+  const tabNow = useClientNow();
+  const recentEmailFailures = tabNow === null ? null : emailAutomation.automationLogs.filter(
+    (l) => l.status === 'failed' && (tabNow - new Date(l.executedAt).getTime()) < 86_400_000,
+  ).length;
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -1108,9 +1133,14 @@ export function SystemStateClient({
                   {contentPipeline.pendingByPage.reduce((sum, p) => sum + p.pendingCount, 0)}
                 </span>
               )}
-              {tab.key === 'email' && emailAutomation.automationLogs.filter((l) => l.status === 'failed' && (Date.now() - new Date(l.executedAt).getTime()) < 86_400_000).length > 0 && (
+              {/* B160 — computed ONCE above from the mounted clock. This was two copies of the same
+                  `Date.now()` filter, one deciding whether the badge exists and one printing its
+                  number, so the two could disagree with each other as well as with the server.
+                  Null until mounted means no badge until the answer is known: absent on both
+                  sides is a match, a badge that appears on hydration is not. */}
+              {tab.key === 'email' && recentEmailFailures !== null && recentEmailFailures > 0 && (
                 <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold rounded-full bg-red-100 text-red-700">
-                  {emailAutomation.automationLogs.filter((l) => l.status === 'failed' && (Date.now() - new Date(l.executedAt).getTime()) < 86_400_000).length}
+                  {recentEmailFailures}
                 </span>
               )}
             </button>

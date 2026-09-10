@@ -10,6 +10,7 @@
  * Approving is not accepting. A review gates the tenant_admin's acceptance; it does not perform it.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { listProjectReviews, requestReview } from '@/lib/projects/reviews';
@@ -45,7 +46,12 @@ export async function POST(request: Request, ctx: Ctx) {
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
       const result = await requestReview(gate.actor, projectId, body ?? {});
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'review', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { review: result.data } }, { status: 201 });
     });
   } catch (err) {

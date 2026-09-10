@@ -86,6 +86,22 @@ const LABELS: Record<string, string | ((p: Record<string, unknown>) => string)> 
     return `${n === null ? 'Recurring patterns' : `${n} recurring pattern${n === 1 ? '' : 's'}`} promoted into your library`;
   },
   'memory.preferences_extracted': 'Your team\u2019s drafting preferences updated',
+  // These two had no sentence because they had never FIRED. `agents/lifecycle/__init__.py`
+  // imported with a root the container has no package for, so the whole memory-lifecycle cohort
+  // \u2014 decay, compaction, contradiction resolution, GC \u2014 raised ModuleNotFoundError inside the
+  // scheduler's per-job catch and was reported as a completed daily run. Repairing that import
+  // is what made these reachable, and an unreachable event type is exactly the one nobody writes
+  // a label for. Say what it means for the customer's library, not what the job was called.
+  'memory.contradictions_resolved': (p) => {
+    const n = typeof p.resolved === 'number' ? p.resolved : null;
+    return n === null
+      ? 'Conflicting facts in your library reconciled'
+      : `${n} conflicting fact${n === 1 ? '' : 's'} in your library reconciled`;
+  },
+  'agent.calibrated': (p) => {
+    const who = str(p.archetype)?.replace(/_/g, ' ');
+    return `AI assistant tuned to your past results${who ? `: ${who}` : ''}`;
+  },
 
   // Library + documents. "Exported" without the format or the compliance verdict is the row a
   // person has to click to understand, and the verdict is the whole point of the export gate.

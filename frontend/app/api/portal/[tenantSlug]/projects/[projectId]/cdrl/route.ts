@@ -9,6 +9,7 @@
  * by a person deciding it no longer applies.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { listCdrlItems, addCdrlItem, markSubmitted } from '@/lib/projects/cdrl';
@@ -53,9 +54,14 @@ export async function POST(request: Request, ctx: Ctx) {
         recurrenceDays: (body.recurrenceDays as number) ?? null,
         notes: (body.notes as string) ?? null,
       });
-      return result.ok
-        ? NextResponse.json({ data: { item: result.data } }, { status: 201 })
-        : NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'cdrl', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
+
+      return NextResponse.json({ data: { item: result.data } }, { status: 201 });
     });
   } catch (err) {
     console.error('[api/portal/projects/cdrl POST]', err);
@@ -85,9 +91,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
         submittedAt: body.submittedAt as string,
         transmittalRef: (body.transmittalRef as string) ?? null,
       });
-      return result.ok
-        ? NextResponse.json({ data: result.data })
-        : NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'cdrl', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
+
+      return NextResponse.json({ data: result.data });
     });
   } catch (err) {
     console.error('[api/portal/projects/cdrl PATCH]', err);
