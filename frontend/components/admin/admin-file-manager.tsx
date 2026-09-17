@@ -1,5 +1,7 @@
 'use client';
 
+import { LocalTime } from '@/components/ui/time-ago';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from '@/lib/toast';
 
@@ -34,17 +36,15 @@ function displayName(key: string): string {
   return clean.split('/').pop() ?? key;
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+/**
+ * B156 — a `toLocale*` with no `timeZone` formats in the AMBIENT zone: UTC on the server, the
+ * viewer's in the browser. The strings disagree, React throws #418, and hydration fails for the
+ * WHOLE subtree while the route answers HTTP 200. `<LocalTime>` owns its own mount state — a
+ * deterministic UTC stamp on the first paint, the viewer's zone on the next tick.
+ */
+const STAMP: Intl.DateTimeFormatOptions = {
+  year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+};
 
 const TOP_LEVEL_PREFIXES = [
   { prefix: 'rfp-admin/', label: 'Curation Files', writable: true },
@@ -726,7 +726,7 @@ export default function AdminFileManager() {
                     {humanSize(obj.size)}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
-                    {formatDate(obj.lastModified)}
+                    <LocalTime iso={obj.lastModified} opts={STAMP} fallback="-" />
                   </td>
                   <td className="px-4 py-3 text-right space-x-3">
                     <button

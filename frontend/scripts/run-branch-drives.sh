@@ -404,6 +404,13 @@ DRIVES=(
   "library-starter-copy|scripts/drive-library-starter-copy.mts"
   "submit-gate|scripts/drive-submit-gate.mts"
   "review-gate|scripts/drive-review-gate.mts"
+  # THE EMAIL SPINE WAS NEVER IN THE SUITE. `drive-email-spine.mts` proves the whole outbound path
+  # end to end — send → ledger row → idempotency (a replayed key reaches the provider zero times) →
+  # webhook → suppression → the bounced/delivered events — against the committed emulator, so it
+  # needs no live Postmark key. It has existed and been documented all along, and nothing ran it:
+  # `docs/SCRIPT_INVENTORY.md` files it under DOCUMENTED, which is the category for "a doc points at
+  # it", not "something runs it". Every outbound email the product sends was uncovered here.
+  "email-spine|scripts/drive-email-spine.mts"
   "full-draft|scripts/drive-full-draft.mts"
   "collaborator-boundary|scripts/drive-collaborator-boundary.mts"
   "partner-lifecycle|scripts/drive-p3-lifecycle.mts"

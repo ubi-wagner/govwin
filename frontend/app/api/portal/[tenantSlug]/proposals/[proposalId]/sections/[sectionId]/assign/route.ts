@@ -8,6 +8,7 @@
  * (canManageTeam) OR a delegated portal manager; assignee must have edit access to the section.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyProposalAccess, enterTenant, sql } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
@@ -71,7 +72,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
 
     const actor = { id: g.userId, email: g.email, role: g.role, tenantId: g.tenantId };
     const result = await assignSection(actor, g.tenantId, proposalId, sectionId, assigneeUserId, { isManager });
-    if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+    if (!result.ok) {
+      return await refuse(result, {
+        namespace: 'proposal', action: 'section.assign',
+        tenantId: g.tenantId, actor: { id: g.userId, email: g.email },
+      });
+    }
     return NextResponse.json({ data: result });
   } catch (err) {
     console.error('[sections/assign] PATCH error', err);

@@ -12,6 +12,7 @@
  * project before anything is written (there is no database FK; see migration 222).
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { listProjectComments, postComment } from '@/lib/projects/comments';
@@ -48,7 +49,12 @@ export async function POST(request: Request, ctx: Ctx) {
         parentId: body?.parentId ?? null,
         body: body?.body ?? '',
       });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'comment', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
 
       // `notified` and `unmatched` come back so the UI can say who was actually reached. A mention
       // feature that silently drops an unrecognised name lets the author believe they were heard.

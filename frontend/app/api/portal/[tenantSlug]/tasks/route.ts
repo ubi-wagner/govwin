@@ -7,6 +7,7 @@
  * process instance via the shared completeTask core (tenant-scoped auth).
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess, sql, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
@@ -90,7 +91,10 @@ export async function POST(request: Request, ctx: RouteContext) {
 
     const out = await completeTask({ taskId, result, actor: r.actor });
     if (!out.ok) {
-      return NextResponse.json({ error: out.error, code: out.code }, { status: out.status });
+        return await refuse(out, {
+          namespace: 'system', action: 'task',
+          tenantId: r.actor.tenantId, actor: r.actor,
+        });
     }
 
     // Portal build-stage advance hook (HITL G8): a stage's ToDos are standalone (no parked instance),

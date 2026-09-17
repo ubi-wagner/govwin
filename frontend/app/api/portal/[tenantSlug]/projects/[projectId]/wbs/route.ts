@@ -9,6 +9,7 @@
  * second copy to drift.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { listClins } from '@/lib/projects/clins';
@@ -47,7 +48,17 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
 
       const result = await createWbsNode(gate.actor, projectId, body ?? ({} as WbsInput));
       if (!result.ok) {
-        return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+        {
+
+          return await refuse(result, {
+
+            namespace: 'project', action: 'wb', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
       }
       return NextResponse.json({ data: { node: result.data } }, { status: 201 });
     });

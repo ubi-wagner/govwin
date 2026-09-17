@@ -15,6 +15,7 @@
  * Returns: { data: { eventId, workflowName, trigger } } | { error, code }.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
 import { isValidUUID } from '@/lib/validation';
@@ -110,7 +111,12 @@ export async function POST(request: Request) {
     });
 
     if (!result.ok) {
-      return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      {
+        return await refuse(result, {
+          namespace: 'proposal', action: 'collaboration.launch',
+          tenantId: tenantId, actor: { id: u?.id, email: u?.email ?? null },
+        });
+      }
     }
     return NextResponse.json({ data: result.data });
   } catch (err) {

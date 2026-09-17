@@ -6,6 +6,7 @@
  * DELETED. Shows how long ago it was archived and flags purge-eligibility per the retention window.
  */
 import { useState } from 'react';
+import { useClientNow, deltaMsFrom } from '@/components/ui/time-ago';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -18,11 +19,16 @@ export interface ArchivedItem {
   archivedAt: string | null;
 }
 
-function daysAgo(iso: string | null): number | null {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  if (isNaN(t)) return null;
-  return Math.floor((Date.now() - t) / 86_400_000);
+/**
+ * B160 — reading the clock during render made this a function of WHEN it rendered, so the server
+ * and the client could disagree across a day boundary and React #418 would take the whole list to
+ * its error boundary at HTTP 200. `now` is null until mounted; both existing null branches already
+ * do the right thing — the row reads plain "archived" and nothing is flagged purge-eligible until
+ * the real answer is known, which is the honest state rather than a guess.
+ */
+function daysAgo(iso: string | null, now: number | null): number | null {
+  const delta = deltaMsFrom(iso, now);
+  return delta === null ? null : Math.floor(-delta / 86_400_000);
 }
 
 export function ArchivedProposals({
@@ -43,6 +49,8 @@ export function ArchivedProposals({
   const [list, setList] = useState(items);
   const [err, setErr] = useState<string | null>(null);
   const router = useRouter();
+  // Null until mounted — see daysAgo() above. Ticks so an open list does not go stale.
+  const now = useClientNow();
 
   const act = async (id: string, action: 'restore') => {
     setBusy(id);
@@ -110,7 +118,7 @@ export function ArchivedProposals({
       {open && (
         <ul className="mt-3 space-y-2">
           {list.map((p) => {
-            const d = daysAgo(p.archivedAt);
+            const d = daysAgo(p.archivedAt, now);
             const purgeEligible = d !== null && d >= retentionDays;
             return (
               <li key={p.id} className="flex items-start justify-between gap-3 bg-gray-50/70 border border-gray-200 rounded-lg px-4 py-3">

@@ -18,6 +18,7 @@
  * set of people could take than could finish would let someone park work they cannot do.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess } from '@/lib/db';
 import { runInTenant } from '@/lib/tenant-context';
@@ -70,7 +71,19 @@ export async function POST(_req: Request, ctx: Ctx) {
     const g = await gate(ctx);
     if ('err' in g) return g.err;
     const r = await runInTenant(g.tenantId, () => claimTask({ taskId: g.taskId, actor: g.actor }));
-    if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+    if (!r.ok) {
+      /**
+       * NARROWED HERE, not by weakening `Refusal` for everyone. `ClaimResult` declares
+       * `ok: boolean` with optional `error`/`code` rather than a discriminated union, so TypeScript
+       * cannot prove this branch carries them. Loosening the shared type to fit one result shape
+       * would have removed the guarantee from every other call site; making the fallback visible at
+       * the one loose site costs three lines and keeps the type honest.
+       */
+      return await refuse(
+        { status: r.status, error: r.error, code: r.code ?? 'CLAIM_REFUSED' },
+        { namespace: 'system', action: 'task.claim', tenantId: g.tenantId, actor: g.actor },
+      );
+    }
     return NextResponse.json({ data: r.data });
   } catch (e) {
     console.error('[tasks/claim] POST failed:', e);
@@ -83,7 +96,19 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     const g = await gate(ctx);
     if ('err' in g) return g.err;
     const r = await runInTenant(g.tenantId, () => releaseTask({ taskId: g.taskId, actor: g.actor }));
-    if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+    if (!r.ok) {
+      /**
+       * NARROWED HERE, not by weakening `Refusal` for everyone. `ClaimResult` declares
+       * `ok: boolean` with optional `error`/`code` rather than a discriminated union, so TypeScript
+       * cannot prove this branch carries them. Loosening the shared type to fit one result shape
+       * would have removed the guarantee from every other call site; making the fallback visible at
+       * the one loose site costs three lines and keeps the type honest.
+       */
+      return await refuse(
+        { status: r.status, error: r.error, code: r.code ?? 'CLAIM_REFUSED' },
+        { namespace: 'system', action: 'task.claim', tenantId: g.tenantId, actor: g.actor },
+      );
+    }
     return NextResponse.json({ data: r.data });
   } catch (e) {
     console.error('[tasks/claim] DELETE failed:', e);

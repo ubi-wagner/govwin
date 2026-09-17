@@ -11,6 +11,7 @@
  * answers a textbook `{data:{...}}` envelope over rows RLS matched none of.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import {
@@ -53,9 +54,14 @@ export async function POST(request: Request, ctx: Ctx) {
         sourceDocId: (body.sourceDocId as string) ?? null,
         changes: Array.isArray(body.changes) ? (body.changes as ChangeInput[]) : [],
       });
-      return result.ok
-        ? NextResponse.json({ data: { modification: result.data } }, { status: 201 })
-        : NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'modification', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
+
+      return NextResponse.json({ data: { modification: result.data } }, { status: 201 });
     });
   } catch (err) {
     console.error('[api/portal/projects/modifications POST]', err);
@@ -85,9 +91,14 @@ export async function PATCH(request: Request, ctx: Ctx) {
         executedOn: body.executedOn as string,
         sourceDocId: (body.sourceDocId as string) ?? null,
       });
-      return result.ok
-        ? NextResponse.json({ data: result.data })
-        : NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'modification', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
+
+      return NextResponse.json({ data: result.data });
     });
   } catch (err) {
     console.error('[api/portal/projects/modifications PATCH]', err);
@@ -104,9 +115,14 @@ export async function DELETE(request: Request, ctx: Ctx) {
         return NextResponse.json({ error: 'modificationId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
       }
       const result = await deleteModification(gate.actor, projectId, modificationId);
-      return result.ok
-        ? NextResponse.json({ data: result.data })
-        : NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'modification', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
+
+      return NextResponse.json({ data: result.data });
     });
   } catch (err) {
     console.error('[api/portal/projects/modifications DELETE]', err);

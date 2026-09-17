@@ -4,6 +4,7 @@
  * partner_admin (owner-scoped) or rfp_admin+.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { isRole, canManagePartnerTenants } from '@/lib/rbac';
 import { createManagerRequest } from '@/lib/partner/manager-request';
@@ -35,7 +36,12 @@ export async function POST(request: Request) {
     try { orgName = (await partnerOwnOrg(me.id))?.name ?? me.name; } catch { /* fall back to the person */ }
 
     const result = await createManagerRequest({ partner: { ...me, name: orgName }, tenantId });
-    if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+    if (!result.ok) {
+      return await refuse(result, {
+        namespace: 'finder', action: 'manager_request',
+        tenantId, actor: { id: me.id, email: me.email ?? null },
+      });
+    }
     return NextResponse.json({ data: { taskId: result.taskId, assignedTo: result.assignedTo } }, { status: 201 });
   } catch (e) {
     console.error('[partner/manager-requests] POST error:', e);

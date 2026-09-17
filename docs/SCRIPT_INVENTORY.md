@@ -24,35 +24,38 @@ a stale green nobody re-checks. The live answer is `bash scripts/run-branch-driv
 table is the record. Everything in **SUITE** below ran in that suite; everything else did not.
 
 
-## SUITE — 60
+## SUITE — 66
 
 Runs on every `run-branch-drives.sh`. This is the regression net.
 
 | script | rot | touched |
 |---|---|---|
 | `audit-empty-not-null.mjs` | — | 2026-08-30 |
-| `audit-env-inventory.mjs` | — | 2026-08-28 |
+| `audit-env-inventory.mjs` | — | 2026-09-04 |
 | `audit-pipeline-coherence.mjs` | — | 2026-08-28 |
-| `audit-row-type-truth.mjs` | — | 2026-08-28 |
+| `audit-row-type-truth.mjs` | — | 2026-09-08 |
 | `close-e2e-cms.mjs` | — | 2026-08-30 |
 | `demo-canvas-capabilities.mts` | — | 2026-08-24 |
 | `drive-admin-demand.mts` | — | 2026-08-31 |
 | `drive-application-intake.mts` | — | 2026-09-01 |
-| `drive-archive.mts` | — | — |
+| `drive-archive.mts` | — | 2026-09-01 |
 | `drive-atomization.mts` | — | 2026-08-30 |
 | `drive-award-to-contract.mts` | — | 2026-08-24 |
 | `drive-bridge-buckets.mjs` | — | 2026-08-30 |
 | `drive-bucket-authoring.mts` | — | 2026-08-30 |
-| `drive-canvas-authoring.mts` | — | 2026-08-24 |
-| `drive-card-decision.mts` | — | 2026-08-30 |
+| `drive-canvas-authoring.mts` | — | 2026-09-03 |
+| `drive-card-decision.mts` | — | 2026-09-04 |
 | `drive-cms-generate.mts` | — | 2026-08-24 |
 | `drive-collaborator-boundary.mts` | — | 2026-08-30 |
-| `drive-commercial-path.mts` | — | 2026-09-01 |
+| `drive-commercial-path.mts` | — | 2026-09-03 |
 | `drive-copy-starter.mts` | — | 2026-08-23 |
 | `drive-corpus-copy-inward.mts` | — | 2026-08-30 |
 | `drive-curate-baa.mts` | — | 2026-08-30 |
 | `drive-curated-ranking.mts` | — | 2026-08-30 |
-| `drive-end-to-end.mjs` | — | 2026-08-28 |
+| `drive-descent-timeout.mts` | — | 2026-09-03 |
+| `drive-email-spine.mts` | — | 2026-08-26 |
+| `drive-end-to-end.mjs` | — | 2026-09-03 |
+| `drive-force-ascend.mts` | — | 2026-09-04 |
 | `drive-full-draft.mts` | — | 2026-08-24 |
 | `drive-identity-deeplink.mts` | — | 2026-08-24 |
 | `drive-library-starter-copy.mts` | — | 2026-08-30 |
@@ -74,16 +77,19 @@ Runs on every `run-branch-drives.sh`. This is the regression net.
 | `drive-scenario-factory.mts` | — | 2026-08-30 |
 | `drive-scout-intake.mts` | — | 2026-08-23 |
 | `drive-shadow-tenant-admin.mts` | — | 2026-08-24 |
+| `drive-space-presence.mts` | — | 2026-09-03 |
 | `drive-spine-t1-section-todo.mts` | — | 2026-08-24 |
 | `drive-spine-t4-buildout.mts` | — | 2026-08-24 |
 | `drive-spine-t7-anchor.mts` | — | 2026-08-15 |
 | `drive-starter-offer.mts` | — | 2026-08-24 |
 | `drive-submit-gate.mts` | — | 2026-08-15 |
+| `drive-task-claim.mts` | — | 2026-09-03 |
 | `drive-tenant-workflow-setup.mts` | — | 2026-08-15 |
-| `drive-uncovered-triggers.mts` | — | 2026-08-24 |
+| `drive-uncovered-triggers.mts` | — | 2026-09-03 |
 | `drive-vault-isolation.mts` | — | 2026-08-24 |
 | `drive-verdict-and-transfer.mts` | — | 2026-08-31 |
 | `estimate-full-build-cost.mts` | — | 2026-08-28 |
+| `probe-customer-finish.mts` | — | 2026-09-02 |
 | `probe-deck-overlap.mts` | — | 2026-08-25 |
 | `probe-interaction-mobile.mts` | — | 2026-08-31 |
 | `probe-measure-grid.mts` | — | 2026-08-24 |
@@ -125,7 +131,7 @@ Canvas measurement + calibration. Anything touching layout or export runs these.
 | `verify-ruler-on-proposals.mts` | — | 2026-08-23 |
 | `verify-ruler-on-stored-artifacts.mts` | — | 2026-08-23 |
 
-## LIBRARY — 7
+## LIBRARY — 8
 
 Imported by other scripts; never run directly.
 
@@ -135,27 +141,30 @@ Imported by other scripts; never run directly.
 | `lib/cross-company.mts` | — | 2026-08-24 |
 | `lib/drive-actor.mjs` | — | 2026-08-23 |
 | `lib/error-surface.mjs` | — | 2026-08-25 |
+| `lib/finish-measure.mts` | — | 2026-09-02 |
 | `lib/harness-residue.mts` | — | 2026-08-24 |
-| `lib/mobile-measure.mts` | — | 2026-08-31 |
+| `lib/mobile-measure.mts` | — | 2026-09-02 |
 | `lib/scenario.mts` | — | 2026-08-24 |
 
-## CALLED-BY-ANOTHER — 28
+## CALLED-BY-ANOTHER — 31
 
 Invoked by another script rather than by a person.
 
 | script | rot | touched | called by |
 |---|---|---|---|
+| `.run-pinned.sh` | — | — | run-branch-drives.sh |
 | `analyze-node-demand.mjs` | — | 2026-08-23 | verify-ruler-composition.mts |
-| `audit-card-fields.mjs` | — | 2026-08-30 | run-branch-drives.sh |
-| `audit-pinned-fixtures.mjs` | — | 2026-08-28 | run-branch-drives.sh |
+| `audit-card-fields.mjs` | — | 2026-08-30 | .run-pinned.sh, run-branch-drives.sh |
+| `audit-pinned-fixtures.mjs` | — | 2026-08-28 | .run-pinned.sh, run-branch-drives.sh |
 | `build-ui-contact-sheets.mjs` | — | 2026-08-25 | write-ui-docs.mjs |
 | `capture-ui-atlas.mjs` | — | 2026-08-30 | drive-ui-states.mjs, write-ui-docs.mjs |
 | `catalog-ui.mjs` | — | 2026-08-25 | capture-ui-atlas.mjs |
-| `check-office-filters.mjs` | — | 2026-08-25 | run-branch-drives.sh |
-| `check-rig-hydration.mjs` | — | 2026-08-24 | run-branch-drives.sh |
-| `check-rls-posture.mjs` | — | 2026-09-01 | run-branch-drives.sh |
-| `check-tenant-isolation-invariant.mjs` | — | 2026-08-23 | run-branch-drives.sh |
-| `drive-amendment.mjs` | — | 2026-08-30 | run-branch-drives.sh |
+| `check-async-workers.mjs` | — | 2026-09-03 | .run-pinned.sh, run-branch-drives.sh |
+| `check-office-filters.mjs` | — | 2026-08-25 | .run-pinned.sh, run-branch-drives.sh |
+| `check-rig-hydration.mjs` | — | 2026-08-24 | .run-pinned.sh, run-branch-drives.sh |
+| `check-rls-posture.mjs` | — | 2026-09-01 | .run-pinned.sh, run-branch-drives.sh |
+| `check-tenant-isolation-invariant.mjs` | — | 2026-08-23 | .run-pinned.sh, run-branch-drives.sh |
+| `drive-amendment.mjs` | — | 2026-08-30 | .run-pinned.sh, run-branch-drives.sh |
 | `drive-baa-forward.mjs` | — | 2026-08-30 | drive-end-to-end.mjs |
 | `drive-buy-and-build.mjs` | — | 2026-08-30 | drive-end-to-end.mjs |
 | `drive-finish-build.mjs` | — | 2026-08-30 | drive-end-to-end.mjs |
@@ -164,15 +173,16 @@ Invoked by another script rather than by a person.
 | `inventory-frontend.mjs` | — | 2026-08-28 | audit-pipeline-coherence.mjs, reconcile-capability.mjs |
 | `measure-char-width.mts` | — | 2026-08-23 | calibrate-page-ruler.mts |
 | `probe-node-vocabulary.mts` | — | 2026-08-23 | drive-canvas-authoring.mts |
+| `prove-session-cap.mts` | — | 2026-09-04 | audit-env-inventory.mjs |
 | `reconcile-capability.mjs` | — | 2026-08-30 | audit-producer-consumer.mjs |
 | `rehydrate-sandbox.sh` | — | 2026-09-01 | health-manager.sh, sandbox-heartbeat.sh |
-| `run-branch-drives.sh` | — | 2026-09-01 | audit-pinned-fixtures.mjs, inventory-scripts.mjs |
+| `run-branch-drives.sh` | — | 2026-09-04 | .run-pinned.sh, audit-pinned-fixtures.mjs |
 | `sandbox-heartbeat.sh` | — | 2026-09-01 | audit-producer-consumer.mjs |
 | `seed-isolation-fixture.mts` | 1 | 2026-08-24 | drive-agent-flows.mjs |
 | `seed-project-scenario.mjs` | — | 2026-08-28 | verify-ui-vs-db.mjs |
 | `seed-sheet-doc.mts` | — | 2026-08-11 | audit-producer-consumer.mjs |
 | `stage-collaborator-fixture.mts` | 1 | 2026-08-31 | capture-collab.mjs |
-| `verify-scorer-parity.mjs` | — | 2026-08-29 | run-branch-drives.sh |
+| `verify-scorer-parity.mjs` | — | 2026-08-29 | .run-pinned.sh, run-branch-drives.sh |
 
 ## NPM-WIRED — 1
 
@@ -182,7 +192,7 @@ Reachable via `npm run` — package.json names it.
 |---|---|---|
 | `sync-pdf-worker.mjs` | — | 2026-08-18 |
 
-## DOCUMENTED — 95
+## DOCUMENTED — 98
 
 No code references it, but a document tells someone to run it.
 
@@ -192,14 +202,17 @@ No code references it, but a document tells someone to run it.
 | `audit-doc-currency.mjs` | — | 2026-09-01 |
 | `audit-env-parity.mjs` | — | 2026-08-29 |
 | `audit-producer-consumer.mjs` | — | 2026-09-01 |
+| `audit-runtime-assets.mjs` | — | 2026-09-04 |
 | `backfill-buckets.mts` | — | 2026-08-15 |
 | `bug-log-status.mjs` | — | 2026-08-24 |
 | `capture-guides.mjs` | — | 2026-08-30 |
+| `capture-hydration-diff.mjs` | — | 2026-09-08 |
 | `capture-mobile-guide.mts` | — | 2026-08-28 |
 | `capture-projects-guide.mjs` | — | 2026-08-28 |
 | `capture-shots.mts` | 14 | 2026-07-19 |
 | `capture-templates.mts` | — | 2026-08-24 |
 | `capture-vaults.mjs` | 2 | 2026-07-25 |
+| `catalog-guides.mjs` | — | 2026-09-02 |
 | `check-cms-content-retirable.mjs` | — | 2026-09-01 |
 | `check-harness-syntax.mjs` | — | 2026-08-27 |
 | `classify-migrations.mjs` | — | 2026-08-29 |
@@ -210,7 +223,6 @@ No code references it, but a document tells someone to run it.
 | `drive-control-reachability.mts` | — | 2026-08-24 |
 | `drive-corpus-verbatim.mts` | — | 2026-08-19 |
 | `drive-dormant-surface.mjs` | — | 2026-08-26 |
-| `drive-email-spine.mts` | — | 2026-08-26 |
 | `drive-foundation-tvsf.mts` | — | 2026-08-19 |
 | `drive-item-template-picker.mts` | 1 | 2026-08-30 |
 | `drive-milestone-construct.mts` | — | 2026-08-27 |
@@ -235,7 +247,7 @@ No code references it, but a document tells someone to run it.
 | `gen-sample-proposal.mts` | — | 2026-07-19 |
 | `gen-starter-set-seed.mts` | — | 2026-08-04 |
 | `hitl-setup.mts` | 1 | 2026-07-19 |
-| `ingest-assist-e2e.mts` | — | 2026-07-19 |
+| `ingest-assist-e2e.mts` | — | 2026-09-07 |
 | `inventory-crm.mjs` | — | 2026-08-26 |
 | `inventory-scripts.mjs` | — | 2026-08-24 |
 | `measure-canvas-flow.mts` | — | 2026-07-19 |
@@ -249,6 +261,7 @@ No code references it, but a document tells someone to run it.
 | `probe-deliverable-artifacts.mts` | 1 | 2026-08-27 |
 | `probe-pattern-extract.mts` | — | 2026-08-22 |
 | `probe-project-mobile.mts` | — | 2026-08-31 |
+| `probe-session-lifecycle.mts` | — | 2026-09-03 |
 | `probe-style-matrix.mts` | — | 2026-08-24 |
 | `prove-pdf-export.mts` | — | 2026-08-15 |
 | `render-artifact-pages.mts` | — | 2026-08-24 |
@@ -284,7 +297,7 @@ No code references it, but a document tells someone to run it.
 | `verify-write-contract.mjs` | — | 2026-08-30 |
 | `write-ui-docs.mjs` | — | 2026-08-31 |
 
-## UNREFERENCED — 95
+## UNREFERENCED — 98
 
 Nothing references it and it holds no dead identifier. It may still work — nobody knows. **Needs a call.**
 
@@ -310,6 +323,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `drive-f1-fluid.mts` | — | 2026-08-30 |
 | `drive-f2-annotate.mts` | — | 2026-08-30 |
 | `drive-full-journey.mts` | — | 2026-08-24 |
+| `drive-guide-note.mts` | — | 2026-09-02 |
 | `drive-immobileyes.mts` | — | 2026-07-19 |
 | `drive-leakage.mts` | — | 2026-08-11 |
 | `drive-librarian-review.mts` | — | 2026-08-30 |
@@ -329,6 +343,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `make-dsip-fixture.mts` | — | 2026-08-18 |
 | `measure-volumes.mts` | — | 2026-08-19 |
 | `mirage-ingest.mts` | — | 2026-08-19 |
+| `note.mts` | — | 2026-09-01 |
 | `parity-score-ts.mts` | — | 2026-08-30 |
 | `probe-bucket-merge.mjs` | — | 2026-08-30 |
 | `probe-comp-codes.mjs` | — | 2026-08-30 |
@@ -376,6 +391,7 @@ Nothing references it and it holds no dead identifier. It may still work — nob
 | `verify-assembled-flow.mts` | — | 2026-07-19 |
 | `verify-atom-enrich.mts` | — | 2026-08-11 |
 | `verify-capture-backend.mts` | — | 2026-08-11 |
+| `verify-guide-controls.mjs` | — | 2026-09-02 |
 | `verify-insert-fidelity.mts` | — | 2026-08-11 |
 | `verify-library-soundness.mts` | — | 2026-08-11 |
 | `verify-media-export.mts` | — | 2026-08-11 |
@@ -420,13 +436,13 @@ longer has. They will fail confusingly rather than loudly. Either the script nee
 
 | class | count |
 |---|---|
-| SUITE | 60 |
+| SUITE | 66 |
 | LENS | 4 |
 | CROSS-CHECK | 2 |
 | RULER | 7 |
-| LIBRARY | 7 |
-| CALLED-BY-ANOTHER | 28 |
+| LIBRARY | 8 |
+| CALLED-BY-ANOTHER | 31 |
 | NPM-WIRED | 1 |
-| DOCUMENTED | 95 |
-| UNREFERENCED | 95 |
-| **total** | **299** |
+| DOCUMENTED | 98 |
+| UNREFERENCED | 98 |
+| **total** | **315** |

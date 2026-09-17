@@ -6,6 +6,7 @@
  * round trips would each repeat the same access check.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { closeProject, reopenProject } from '@/lib/projects/closeout';
 import { getProject, listSourceDocuments, readiness } from '@/lib/projects/project';
@@ -63,7 +64,12 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
 
       if (body?.action === 'reopen') {
         const r = await reopenProject(gate.actor, projectId, body.reason ?? null);
-        if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+        if (!r.ok) {
+        return await refuse(r, {
+          namespace: 'project', action: 'route.t', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
         return NextResponse.json({ data: { project: r.data } });
       }
       if (body?.action !== 'close') {
@@ -73,7 +79,14 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
         );
       }
       const r = await closeProject(gate.actor, projectId, { note: body.note ?? null, metrics: body.metrics ?? null });
-      if (!r.ok) return NextResponse.json({ error: r.error, code: r.code }, { status: r.status });
+      // B162 — MILESTONES/TASKS/DELIVERABLES_OUTSTANDING are the system declining to do real work
+      // after looking at it. Returning the code told the caller; nothing told anyone else.
+      if (!r.ok) {
+        return await refuse(r, {
+          namespace: 'project', action: 'close', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { project: r.data } });
     });
   } catch (err) {

@@ -6,6 +6,7 @@
  *          acceptance. Three separate acts, on purpose.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { createDeliverable, listDeliverables } from '@/lib/projects/milestones';
@@ -42,7 +43,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
         milestoneId: body.milestoneId, title: body.title ?? '', requiredBy: body.requiredBy ?? null,
         sortIndex: body.sortIndex,
       });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'deliverable', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { deliverable: result.data } }, { status: 201 });
     });
   } catch (err) {

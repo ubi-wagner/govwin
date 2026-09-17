@@ -7,6 +7,7 @@
  *   POST — open a workspace. tenant_admin+ only.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { listProjectsForActor } from '@/lib/projects/access';
 import { createProject } from '@/lib/projects/project';
@@ -36,7 +37,17 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
 
       const result = await createProject(gate.actor, { name: body?.name ?? '', contractId: body?.contractId ?? null });
       if (!result.ok) {
-        return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+        {
+
+          return await refuse(result, {
+
+            namespace: 'project', action: 'project', entityId: null,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
       }
       return NextResponse.json({ data: { project: result.data } }, { status: 201 });
     });

@@ -22,7 +22,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-atoms__vp-phone-open.jpg",
-   "bytes": 2290557
+   "bytes": 2244468
   },
   {
    "lane": "tenant",
@@ -30,7 +30,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-library__vp-phone-open.jpg",
-   "bytes": 2290557
+   "bytes": 2244468
   },
   {
    "lane": "tenant",
@@ -38,7 +38,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-documents__vp-phone-open.jpg",
-   "bytes": 363825
+   "bytes": 365939
   },
   {
    "lane": "tenant",
@@ -54,7 +54,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-proposals-c3db60b1-2f0e-4bc8__vp-phone-open.jpg",
-   "bytes": 117986
+   "bytes": 117985
   },
   {
    "lane": "tenant",
@@ -78,7 +78,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-workflows__vp-phone-open.jpg",
-   "bytes": 990427
+   "bytes": 942479
   },
   {
    "lane": "admin",
@@ -86,7 +86,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-agents__vp-phone-open.jpg",
-   "bytes": 637814
+   "bytes": 637853
   },
   {
    "lane": "admin",
@@ -103,11 +103,11 @@
    "route": "/portal/foundation/cards",
    "status": 200,
    "probed": true,
-   "opened": 37,
-   "candidates": 236,
+   "opened": 35,
+   "candidates": 223,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 342
+   "smallTargets": 324
   },
   {
    "lane": "tenant",
@@ -129,7 +129,7 @@
    "candidates": 1779,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 2054
+   "smallTargets": 2048
   },
   {
    "lane": "tenant",
@@ -140,7 +140,7 @@
    "candidates": 1779,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 2054
+   "smallTargets": 2048
   },
   {
    "lane": "tenant",
@@ -151,7 +151,7 @@
    "candidates": 0,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 125
+   "smallTargets": 126
   },
   {
    "lane": "tenant",
@@ -202,11 +202,11 @@
    "route": "/admin/workflows",
    "status": 200,
    "probed": true,
-   "opened": 7,
-   "candidates": 144,
+   "opened": 6,
+   "candidates": 138,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 224
+   "smallTargets": 218
   },
   {
    "lane": "admin",

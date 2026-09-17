@@ -1,13 +1,13 @@
 {
  "totals": {
-  "routes": 123,
-  "components": 202,
-  "handlers": 1622,
-  "binding": 1381,
-  "fetches": 357,
-  "forms": 24,
-  "inputs": 530,
-  "buttons": 758,
+  "routes": 126,
+  "components": 218,
+  "handlers": 1636,
+  "binding": 1395,
+  "fetches": 364,
+  "forms": 25,
+  "inputs": 534,
+  "buttons": 768,
   "orphans": 1
  },
  "records": [
@@ -1079,7 +1079,7 @@
   },
   {
    "file": "app/admin/architecture/page.tsx",
-   "lines": 61,
+   "lines": 66,
    "client": false,
    "kind": "page",
    "exports": [
@@ -1398,7 +1398,7 @@
   },
   {
    "file": "app/admin/dashboard/page.tsx",
-   "lines": 272,
+   "lines": 281,
    "client": false,
    "kind": "page",
    "exports": [
@@ -1406,6 +1406,7 @@
     "DashboardPage"
    ],
    "renders": [
+    "DescentTimeoutNotice",
     "StatCard",
     "TaskQueue",
     "Link"
@@ -1417,6 +1418,7 @@
    "buttons": 0,
    "links": 4,
    "localImports": [
+    "@/components/admin/descent-timeout-notice",
     "@/components/tasks/task-queue",
     "@/components/admin/stat-card"
    ],
@@ -1504,55 +1506,57 @@
   },
   {
    "file": "app/admin/documents/document-list-client.tsx",
-   "lines": 306,
+   "lines": 309,
    "client": true,
    "kind": "app-component",
    "exports": [
     "DocumentListClient"
    ],
-   "renders": [],
+   "renders": [
+    "LocalTime"
+   ],
    "handlers": [
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 152
+     "line": 155
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 169
+     "line": 172
     },
     {
      "on": "onChange",
      "element": "textarea",
      "binds": true,
-     "line": 178
+     "line": 181
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 200
+     "line": 203
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 215
+     "line": 218
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 227
+     "line": 230
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 289
+     "line": 292
     }
    ],
    "fetches": [
@@ -1573,7 +1577,9 @@
    "inputs": 3,
    "buttons": 4,
    "links": 2,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/admin/documents/page.tsx"
    ],
@@ -1614,7 +1620,7 @@
   },
   {
    "file": "app/admin/events/event-stream-client.tsx",
-   "lines": 320,
+   "lines": 324,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -1672,13 +1678,13 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 253
+     "line": 257
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 301
+     "line": 305
     }
    ],
    "fetches": [],
@@ -1847,8 +1853,72 @@
    "passedHandlers": 0
   },
   {
+   "file": "app/admin/guides/page.tsx",
+   "lines": 154,
+   "client": false,
+   "kind": "page",
+   "exports": [
+    "dynamic",
+    "GuideCoveragePage"
+   ],
+   "renders": [
+    "Link"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 2,
+   "localImports": [],
+   "route": "/admin/guides",
+   "renderedBy": [],
+   "reachableFrom": [
+    "/admin/guides"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/admin/intake/intake-guide.tsx",
+   "lines": 105,
+   "client": false,
+   "kind": "app-component",
+   "exports": [
+    "IntakeGuide"
+   ],
+   "renders": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Careful",
+    "Ctl",
+    "Code",
+    "Ul",
+    "Unwritten",
+    "Canon"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [
+    "@/components/admin/guide"
+   ],
+   "renderedBy": [
+    "app/admin/intake/page.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/intake"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
    "file": "app/admin/intake/page.tsx",
-   "lines": 33,
+   "lines": 35,
    "client": false,
    "kind": "page",
    "exports": [
@@ -1857,6 +1927,7 @@
    ],
    "renders": [
     "IntakeStageStrip",
+    "IntakeGuide",
     "IntakeForm"
    ],
    "handlers": [],
@@ -1867,7 +1938,8 @@
    "links": 1,
    "localImports": [
     "@/components/admin/intake-form",
-    "@/components/admin/intake-stage-strip"
+    "@/components/admin/intake-stage-strip",
+    "./intake-guide"
    ],
    "route": "/admin/intake",
    "renderedBy": [],
@@ -1879,7 +1951,7 @@
   },
   {
    "file": "app/admin/layout.tsx",
-   "lines": 70,
+   "lines": 88,
    "client": false,
    "kind": "layout",
    "exports": [
@@ -1926,7 +1998,9 @@
     "/admin/expert-time",
     "/admin/funnel",
     "/admin/guardrail-defaults",
+    "/admin/guides",
     "/admin/intake",
+    "/admin/notes",
     "/admin/observe",
     "/admin/opportunities",
     "/admin",
@@ -1957,14 +2031,75 @@
     "/admin/tenants/[tenantId]",
     "/admin/tenants",
     "/admin/waitlist",
-    "/admin/workflows"
+    "/admin/workflows",
+    "/admin/workspace-access"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/admin/notes/page.tsx",
+   "lines": 226,
+   "client": false,
+   "kind": "page",
+   "exports": [
+    "dynamic",
+    "NotesPage"
+   ],
+   "renders": [
+    "Link",
+    "NoteComposer",
+    "NoteActions"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 3,
+   "localImports": [
+    "@/components/admin/note-composer",
+    "@/components/admin/note-actions"
+   ],
+   "route": "/admin/notes",
+   "renderedBy": [],
+   "reachableFrom": [
+    "/admin/notes"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/admin/observe/companion-guide.tsx",
+   "lines": 112,
+   "client": false,
+   "kind": "app-component",
+   "exports": [
+    "CompanionGuide"
+   ],
+   "renders": [
+    "H",
+    "Code"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/admin/observe/page.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/observe"
    ],
    "bindingHandlers": 0,
    "passedHandlers": 0
   },
   {
    "file": "app/admin/observe/page.tsx",
-   "lines": 211,
+   "lines": 226,
    "client": false,
    "kind": "page",
    "exports": [
@@ -1973,6 +2108,8 @@
    ],
    "renders": [
     "Link",
+    "CompanionGuide",
+    "CompanionButton",
     "Card",
     "Empty"
    ],
@@ -1982,7 +2119,10 @@
    "inputs": 0,
    "buttons": 0,
    "links": 3,
-   "localImports": [],
+   "localImports": [
+    "@/components/admin/companion-button",
+    "./companion-guide"
+   ],
    "route": "/admin/observe",
    "renderedBy": [],
    "reachableFrom": [
@@ -2102,7 +2242,7 @@
   },
   {
    "file": "app/admin/process/process-monitor-client.tsx",
-   "lines": 485,
+   "lines": 490,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -2118,25 +2258,25 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 178
+     "line": 183
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 193
+     "line": 198
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 337
+     "line": 342
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 361
+     "line": 366
     }
    ],
    "fetches": [],
@@ -2301,7 +2441,7 @@
   },
   {
    "file": "app/admin/provisioning/[portalId]/page.tsx",
-   "lines": 268,
+   "lines": 270,
    "client": false,
    "kind": "page",
    "exports": [
@@ -2309,6 +2449,7 @@
     "ProvisioningCockpitPage"
    ],
    "renders": [
+    "ProvisioningGuide",
     "StatusBadge",
     "ReadinessBars",
     "SlaBlock",
@@ -2325,10 +2466,47 @@
    "links": 3,
    "localImports": [
     "./release-panel",
-    "@/components/rfp-curation/curation-notes-panel"
+    "@/components/rfp-curation/curation-notes-panel",
+    "./provisioning-guide"
    ],
    "route": "/admin/provisioning/[portalId]",
    "renderedBy": [],
+   "reachableFrom": [
+    "/admin/provisioning/[portalId]"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/admin/provisioning/[portalId]/provisioning-guide.tsx",
+   "lines": 98,
+   "client": false,
+   "kind": "app-component",
+   "exports": [
+    "ProvisioningGuide"
+   ],
+   "renders": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Careful",
+    "Ctl",
+    "Ul",
+    "Unwritten",
+    "Canon"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [
+    "@/components/admin/guide"
+   ],
+   "renderedBy": [
+    "app/admin/provisioning/[portalId]/page.tsx"
+   ],
    "reachableFrom": [
     "/admin/provisioning/[portalId]"
    ],
@@ -2487,8 +2665,45 @@
    "passedHandlers": 0
   },
   {
+   "file": "app/admin/rfp-curation/[solId]/curation-guide.tsx",
+   "lines": 137,
+   "client": false,
+   "kind": "app-component",
+   "exports": [
+    "CurationGuide"
+   ],
+   "renders": [
+    "GuideCard",
+    "P",
+    "Ctl",
+    "Step",
+    "Code",
+    "Careful",
+    "Ul",
+    "Unwritten",
+    "Canon"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [
+    "@/components/admin/guide"
+   ],
+   "renderedBy": [
+    "app/admin/rfp-curation/[solId]/page.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/rfp-curation/[solId]"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
    "file": "app/admin/rfp-curation/[solId]/page.tsx",
-   "lines": 424,
+   "lines": 426,
    "client": false,
    "kind": "page",
    "exports": [
@@ -2497,6 +2712,7 @@
    ],
    "renders": [
     "SpotlightSummaryEditor",
+    "CurationGuide",
     "CurationWorkspace"
    ],
    "handlers": [],
@@ -2507,7 +2723,8 @@
    "links": 0,
    "localImports": [
     "@/components/rfp-curation/curation-workspace",
-    "./spotlight-summary-editor"
+    "./spotlight-summary-editor",
+    "./curation-guide"
    ],
    "route": "/admin/rfp-curation/[solId]",
    "renderedBy": [],
@@ -2633,8 +2850,44 @@
    "passedHandlers": 0
   },
   {
+   "file": "app/admin/rfp-curation/curation-queue-guide.tsx",
+   "lines": 60,
+   "client": false,
+   "kind": "app-component",
+   "exports": [
+    "CurationQueueGuide"
+   ],
+   "renders": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Ctl",
+    "Unwritten",
+    "Ul",
+    "Careful",
+    "Canon"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [
+    "@/components/admin/guide"
+   ],
+   "renderedBy": [
+    "app/admin/rfp-curation/page.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/rfp-curation"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
    "file": "app/admin/rfp-curation/page.tsx",
-   "lines": 113,
+   "lines": 115,
    "client": false,
    "kind": "page",
    "exports": [
@@ -2643,6 +2896,7 @@
    ],
    "renders": [
     "IntakeStageStrip",
+    "CurationQueueGuide",
     "TriageTodos",
     "TriageQueue"
    ],
@@ -2655,7 +2909,8 @@
    "localImports": [
     "@/components/rfp-curation/triage-queue",
     "./triage-todos",
-    "@/components/admin/intake-stage-strip"
+    "@/components/admin/intake-stage-strip",
+    "./curation-queue-guide"
    ],
    "route": "/admin/rfp-curation",
    "renderedBy": [],
@@ -2728,7 +2983,7 @@
   },
   {
    "file": "app/admin/scouts/page.tsx",
-   "lines": 294,
+   "lines": 296,
    "client": false,
    "kind": "page",
    "exports": [
@@ -2737,6 +2992,7 @@
    ],
    "renders": [
     "IntakeStageStrip",
+    "ScoutsGuide",
     "Link",
     "ScoutCandidateQueue"
    ],
@@ -2748,10 +3004,48 @@
    "links": 3,
    "localImports": [
     "@/components/scout/candidate-queue",
-    "@/components/admin/intake-stage-strip"
+    "@/components/admin/intake-stage-strip",
+    "./scouts-guide"
    ],
    "route": "/admin/scouts",
    "renderedBy": [],
+   "reachableFrom": [
+    "/admin/scouts"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/admin/scouts/scouts-guide.tsx",
+   "lines": 107,
+   "client": false,
+   "kind": "app-component",
+   "exports": [
+    "ScoutsGuide"
+   ],
+   "renders": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Ul",
+    "Ctl",
+    "Careful",
+    "Unwritten",
+    "Code",
+    "Canon"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [
+    "@/components/admin/guide"
+   ],
+   "renderedBy": [
+    "app/admin/scouts/page.tsx"
+   ],
    "reachableFrom": [
     "/admin/scouts"
    ],
@@ -3281,7 +3575,7 @@
   },
   {
    "file": "app/admin/sources/page.tsx",
-   "lines": 201,
+   "lines": 203,
    "client": false,
    "kind": "page",
    "exports": [
@@ -3290,6 +3584,7 @@
    ],
    "renders": [
     "IntakeStageStrip",
+    "SourcesGuide",
     "SourcesHub"
    ],
    "handlers": [],
@@ -3300,10 +3595,47 @@
    "links": 1,
    "localImports": [
     "@/components/admin/source-card-actions",
-    "@/components/admin/intake-stage-strip"
+    "@/components/admin/intake-stage-strip",
+    "./sources-guide"
    ],
    "route": "/admin/sources",
    "renderedBy": [],
+   "reachableFrom": [
+    "/admin/sources"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/admin/sources/sources-guide.tsx",
+   "lines": 80,
+   "client": false,
+   "kind": "app-component",
+   "exports": [
+    "SourcesGuide"
+   ],
+   "renders": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Unwritten",
+    "Ctl",
+    "Careful",
+    "Code",
+    "Canon"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [
+    "@/components/admin/guide"
+   ],
+   "renderedBy": [
+    "app/admin/sources/page.tsx"
+   ],
    "reachableFrom": [
     "/admin/sources"
    ],
@@ -3400,7 +3732,7 @@
   },
   {
    "file": "app/admin/system-state/system-state-client.tsx",
-   "lines": 1309,
+   "lines": 1312,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -3410,6 +3742,7 @@
     "Elapsed",
     "TimeAgo",
     "TreeNode",
+    "LocalTime",
     "HealthBar",
     "WorkflowCard",
     "PipelineSection",
@@ -3424,61 +3757,61 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 167
+     "line": 170
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 445
+     "line": 448
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1088
+     "line": 1091
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1139
+     "line": 1142
     },
     {
      "on": "onToggle",
      "element": "WorkflowCard",
      "binds": false,
-     "line": 1157
+     "line": 1160
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1184
+     "line": 1187
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1199
+     "line": 1202
     },
     {
      "on": "onToggle",
      "element": "WorkflowCard",
      "binds": false,
-     "line": 1227
+     "line": 1230
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1268
+     "line": 1271
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1274
+     "line": 1277
     }
    ],
    "fetches": [],
@@ -3579,7 +3912,7 @@
   },
   {
    "file": "app/admin/templates/page.tsx",
-   "lines": 448,
+   "lines": 451,
    "client": true,
    "kind": "page",
    "exports": [
@@ -3666,7 +3999,7 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 430
+     "line": 433
     }
    ],
    "fetches": [
@@ -4258,6 +4591,73 @@
    "passedHandlers": 0
   },
   {
+   "file": "app/admin/workspace-access/end-access-button.tsx",
+   "lines": 73,
+   "client": true,
+   "kind": "app-component",
+   "exports": [
+    "EndAccessButton"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 64
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "'/api/admin/workspace-access/force-ascend'"
+    }
+   ],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 1,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/admin/workspace-access/page.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/workspace-access"
+   ],
+   "bindingHandlers": 1,
+   "passedHandlers": 0
+  },
+  {
+   "file": "app/admin/workspace-access/page.tsx",
+   "lines": 182,
+   "client": false,
+   "kind": "page",
+   "exports": [
+    "dynamic",
+    "metadata",
+    "WorkspaceAccessPage"
+   ],
+   "renders": [
+    "EndAccessButton"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [
+    "./end-access-button"
+   ],
+   "route": "/admin/workspace-access",
+   "renderedBy": [],
+   "reachableFrom": [
+    "/admin/workspace-access"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
    "file": "app/dashboard/page.tsx",
    "lines": 66,
    "client": false,
@@ -4490,7 +4890,9 @@
     "/admin/expert-time",
     "/admin/funnel",
     "/admin/guardrail-defaults",
+    "/admin/guides",
     "/admin/intake",
+    "/admin/notes",
     "/admin/observe",
     "/admin/opportunities",
     "/admin",
@@ -4522,6 +4924,7 @@
     "/admin/tenants",
     "/admin/waitlist",
     "/admin/workflows",
+    "/admin/workspace-access",
     "/dashboard",
     "/go",
     "/invite/[token]",
@@ -4733,7 +5136,7 @@
   },
   {
    "file": "app/partner/page.tsx",
-   "lines": 243,
+   "lines": 254,
    "client": false,
    "kind": "page",
    "exports": [
@@ -4791,7 +5194,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/activity/activity-stream-client.tsx",
-   "lines": 544,
+   "lines": 561,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -4807,25 +5210,19 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 276
+     "line": 283
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 298
+     "line": 305
     },
     {
      "on": "onKeyDown",
      "element": "input",
      "binds": true,
-     "line": 299
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 304
+     "line": 306
     },
     {
      "on": "onClick",
@@ -4837,19 +5234,25 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 330
+     "line": 318
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 346
+     "line": 337
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 444
+     "line": 362
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 460
     }
    ],
    "fetches": [],
@@ -4871,7 +5274,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/activity/page.tsx",
-   "lines": 182,
+   "lines": 217,
    "client": false,
    "kind": "page",
    "exports": [
@@ -5354,7 +5757,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/layout.tsx",
-   "lines": 202,
+   "lines": 283,
    "client": false,
    "kind": "layout",
    "exports": [
@@ -5366,7 +5769,8 @@
     "NotificationBell",
     "PortalNavLink",
     "SignOutButton",
-    "ShadowSpaceBanner"
+    "ShadowSpaceBanner",
+    "PresenceHeartbeat"
    ],
    "handlers": [],
    "fetches": [],
@@ -5379,6 +5783,7 @@
     "@/components/portal/portal-nav-link",
     "@/components/portal/notification-panel",
     "@/components/portal/shadow-space-banner",
+    "@/components/portal/presence-heartbeat",
     "@/components/ui/nav-shell"
    ],
    "renderedBy": [],
@@ -5682,7 +6087,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/portals/[portalId]/workflow-setup-client.tsx",
-   "lines": 403,
+   "lines": 405,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -5772,61 +6177,61 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 320
+     "line": 322
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 323
+     "line": 325
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 330
+     "line": 332
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 354
+     "line": 356
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 366
+     "line": 368
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 377
+     "line": 379
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 386
+     "line": 388
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 389
+     "line": 391
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 390
+     "line": 392
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 395
+     "line": 397
     }
    ],
    "fetches": [
@@ -5921,7 +6326,7 @@
   },
   {
    "file": "app/portal/[tenantSlug]/processes/processes-client.tsx",
-   "lines": 350,
+   "lines": 354,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -5935,19 +6340,19 @@
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 273
+     "line": 274
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 310
+     "line": 311
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 319
+     "line": 320
     }
    ],
    "fetches": [
@@ -6734,7 +7139,9 @@
    "exports": [
     "AdminFileManager"
    ],
-   "renders": [],
+   "renders": [
+    "LocalTime"
+   ],
    "handlers": [
     {
      "on": "onClick",
@@ -6985,7 +7392,9 @@
    "inputs": 7,
    "buttons": 22,
    "links": 0,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/admin/storage/page.tsx"
    ],
@@ -7037,7 +7446,9 @@
     "/admin/expert-time",
     "/admin/funnel",
     "/admin/guardrail-defaults",
+    "/admin/guides",
     "/admin/intake",
+    "/admin/notes",
     "/admin/observe",
     "/admin/opportunities",
     "/admin",
@@ -7068,14 +7479,15 @@
     "/admin/tenants/[tenantId]",
     "/admin/tenants",
     "/admin/waitlist",
-    "/admin/workflows"
+    "/admin/workflows",
+    "/admin/workspace-access"
    ],
    "bindingHandlers": 0,
    "passedHandlers": 0
   },
   {
    "file": "components/admin/admin-nav-data.ts",
-   "lines": 190,
+   "lines": 204,
    "client": false,
    "kind": "module",
    "exports": [
@@ -7138,7 +7550,9 @@
     "/admin/expert-time",
     "/admin/funnel",
     "/admin/guardrail-defaults",
+    "/admin/guides",
     "/admin/intake",
+    "/admin/notes",
     "/admin/observe",
     "/admin/opportunities",
     "/admin",
@@ -7169,7 +7583,8 @@
     "/admin/tenants/[tenantId]",
     "/admin/tenants",
     "/admin/waitlist",
-    "/admin/workflows"
+    "/admin/workflows",
+    "/admin/workspace-access"
    ],
    "bindingHandlers": 0,
    "passedHandlers": 0
@@ -7235,7 +7650,9 @@
     "/admin/expert-time",
     "/admin/funnel",
     "/admin/guardrail-defaults",
+    "/admin/guides",
     "/admin/intake",
+    "/admin/notes",
     "/admin/observe",
     "/admin/opportunities",
     "/admin",
@@ -7266,7 +7683,8 @@
     "/admin/tenants/[tenantId]",
     "/admin/tenants",
     "/admin/waitlist",
-    "/admin/workflows"
+    "/admin/workflows",
+    "/admin/workspace-access"
    ],
    "bindingHandlers": 0,
    "passedHandlers": 3
@@ -7303,7 +7721,7 @@
   },
   {
    "file": "components/admin/agent-workforce.tsx",
-   "lines": 222,
+   "lines": 229,
    "client": true,
    "kind": "component",
    "exports": [
@@ -7333,7 +7751,7 @@
   },
   {
    "file": "components/admin/application-review.tsx",
-   "lines": 685,
+   "lines": 686,
    "client": true,
    "kind": "component",
    "exports": [
@@ -7354,37 +7772,37 @@
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 595
+     "line": 596
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 614
+     "line": 615
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 626
+     "line": 627
     },
     {
      "on": "onChange",
      "element": "textarea",
      "binds": true,
-     "line": 648
+     "line": 649
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 661
+     "line": 662
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 669
+     "line": 670
     }
    ],
    "fetches": [
@@ -7516,44 +7934,89 @@
    "passedHandlers": 0
   },
   {
+   "file": "components/admin/companion-button.tsx",
+   "lines": 61,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "CompanionButton"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 36
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 44
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "'/api/admin/observe'"
+    }
+   ],
+   "forms": 0,
+   "inputs": 1,
+   "buttons": 1,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/admin/observe/page.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/observe"
+   ],
+   "bindingHandlers": 2,
+   "passedHandlers": 0
+  },
+  {
    "file": "components/admin/crawl-settings.tsx",
-   "lines": 241,
+   "lines": 244,
    "client": true,
    "kind": "component",
    "exports": [
     "CrawlSettings"
    ],
-   "renders": [],
+   "renders": [
+    "LocalTime"
+   ],
    "handlers": [
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 161
+     "line": 162
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 186
+     "line": 189
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 202
+     "line": 205
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 207
+     "line": 210
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 225
+     "line": 228
     }
    ],
    "fetches": [
@@ -7578,7 +8041,9 @@
    "inputs": 2,
    "buttons": 3,
    "links": 0,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/admin/sources/[profileId]/source-detail-client.tsx"
    ],
@@ -7686,8 +8151,33 @@
    "passedHandlers": 0
   },
   {
+   "file": "components/admin/descent-timeout-notice.tsx",
+   "lines": 51,
+   "client": false,
+   "kind": "component",
+   "exports": [
+    "DescentTimeoutNotice"
+   ],
+   "renders": [],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/admin/dashboard/page.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/dashboard"
+   ],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
    "file": "components/admin/diff-history.tsx",
-   "lines": 189,
+   "lines": 196,
    "client": true,
    "kind": "component",
    "exports": [
@@ -7699,7 +8189,7 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 175
+     "line": 182
     }
    ],
    "fetches": [
@@ -7769,6 +8259,123 @@
     "/admin/guardrail-defaults"
    ],
    "bindingHandlers": 2,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/admin/guide-note.tsx",
+   "lines": 137,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "GuideNoteBox"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 79
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 95
+    },
+    {
+     "on": "onChange",
+     "element": "textarea",
+     "binds": true,
+     "line": 108
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 119
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 127
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "'/api/admin/notes'"
+    }
+   ],
+   "forms": 0,
+   "inputs": 1,
+   "buttons": 4,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "components/admin/guide.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/intake",
+    "/admin/observe",
+    "/admin/provisioning/[portalId]",
+    "/admin/rfp-curation/[solId]",
+    "/admin/rfp-curation",
+    "/admin/scouts",
+    "/admin/sources"
+   ],
+   "bindingHandlers": 5,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/admin/guide.tsx",
+   "lines": 104,
+   "client": false,
+   "kind": "component",
+   "exports": [
+    "GuideCard",
+    "Step",
+    "P",
+    "Ul",
+    "Ctl",
+    "Code",
+    "Careful",
+    "Unwritten",
+    "Canon"
+   ],
+   "renders": [
+    "GuideNoteBox",
+    "Code"
+   ],
+   "handlers": [],
+   "fetches": [],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [
+    "./guide-note"
+   ],
+   "renderedBy": [
+    "app/admin/intake/intake-guide.tsx",
+    "app/admin/observe/companion-guide.tsx",
+    "app/admin/provisioning/[portalId]/provisioning-guide.tsx",
+    "app/admin/rfp-curation/[solId]/curation-guide.tsx",
+    "app/admin/rfp-curation/curation-queue-guide.tsx",
+    "app/admin/scouts/scouts-guide.tsx",
+    "app/admin/sources/sources-guide.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/intake",
+    "/admin/observe",
+    "/admin/provisioning/[portalId]",
+    "/admin/rfp-curation/[solId]",
+    "/admin/rfp-curation",
+    "/admin/scouts",
+    "/admin/sources"
+   ],
+   "bindingHandlers": 0,
    "passedHandlers": 0
   },
   {
@@ -8091,6 +8698,92 @@
    "passedHandlers": 0
   },
   {
+   "file": "components/admin/note-actions.tsx",
+   "lines": 38,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "NoteActions"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 32
+    }
+   ],
+   "fetches": [
+    {
+     "method": "PATCH",
+     "url": "`/api/admin/notes/${id}`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 1,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/admin/notes/page.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/notes"
+   ],
+   "bindingHandlers": 1,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/admin/note-composer.tsx",
+   "lines": 61,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "NoteComposer"
+   ],
+   "renders": [],
+   "handlers": [
+    {
+     "on": "onSubmit",
+     "element": "form",
+     "binds": true,
+     "line": 40
+    },
+    {
+     "on": "onChange",
+     "element": "textarea",
+     "binds": true,
+     "line": 42
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 48
+    }
+   ],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "'/api/admin/notes'"
+    }
+   ],
+   "forms": 1,
+   "inputs": 2,
+   "buttons": 1,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/admin/notes/page.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/notes"
+   ],
+   "bindingHandlers": 3,
+   "passedHandlers": 0
+  },
+  {
    "file": "components/admin/opp-watch-toggle.tsx",
    "lines": 48,
    "client": true,
@@ -8383,7 +9076,9 @@
    "exports": [
     "RegionList"
    ],
-   "renders": [],
+   "renders": [
+    "LocalTime"
+   ],
    "handlers": [
     {
      "on": "onClick",
@@ -8414,7 +9109,9 @@
    "inputs": 0,
    "buttons": 3,
    "links": 0,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/admin/sources/[profileId]/source-detail-client.tsx"
    ],
@@ -8426,7 +9123,7 @@
   },
   {
    "file": "components/admin/source-card-actions.tsx",
-   "lines": 624,
+   "lines": 640,
    "client": true,
    "kind": "component",
    "exports": [
@@ -8442,25 +9139,13 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 321
+     "line": 337
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 339
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 359
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 368
+     "line": 355
     },
     {
      "on": "onClick",
@@ -8472,61 +9157,73 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 381
+     "line": 384
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 391
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 397
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 396
+     "line": 412
     },
     {
      "on": "onDragOver",
      "element": "div",
      "binds": true,
-     "line": 407
+     "line": 423
     },
     {
      "on": "onDragLeave",
      "element": "div",
      "binds": true,
-     "line": 411
+     "line": 427
     },
     {
      "on": "onDrop",
      "element": "div",
      "binds": true,
-     "line": 412
+     "line": 428
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 428
+     "line": 444
     },
     {
      "on": "onKeyDown",
      "element": "input",
      "binds": true,
-     "line": 429
+     "line": 445
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 435
+     "line": 451
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 587
+     "line": 603
     },
     {
      "on": "onRefresh",
      "element": "SourceCard",
      "binds": false,
-     "line": 596
+     "line": 612
     }
    ],
    "fetches": [
@@ -10543,7 +11240,7 @@
   },
   {
    "file": "components/canvas/canvas-sidebar.tsx",
-   "lines": 1210,
+   "lines": 1220,
    "client": true,
    "kind": "component",
    "exports": [
@@ -10552,6 +11249,7 @@
    ],
    "renders": [
     "CommentThread",
+    "LocalTime",
     "LibraryPicker",
     "NodeFormatControls",
     "CommentsSection",
@@ -10563,61 +11261,37 @@
      "on": "onAddComment",
      "element": "CommentThread",
      "binds": false,
-     "line": 207
+     "line": 222
     },
     {
      "on": "onResolve",
      "element": "CommentThread",
      "binds": false,
-     "line": 208
+     "line": 223
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 374
+     "line": 389
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 417
+     "line": 427
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 537
+     "line": 547
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 560
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 695
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 696
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 699
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 701
+     "line": 570
     },
     {
      "on": "onClick",
@@ -10629,121 +11303,139 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 708
+     "line": 706
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 709
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 711
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 715
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 718
     },
     {
      "on": "onSelect",
      "element": "LibraryPicker",
      "binds": false,
-     "line": 725
+     "line": 735
     },
     {
      "on": "onClose",
      "element": "LibraryPicker",
      "binds": false,
-     "line": 729
+     "line": 739
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 745
+     "line": 755
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 764
+     "line": 774
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 785
+     "line": 795
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 801
+     "line": 811
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 809
+     "line": 819
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 826
+     "line": 836
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 832
+     "line": 842
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 849
+     "line": 859
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 864
+     "line": 874
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 882
+     "line": 892
     },
     {
      "on": "onStyle",
      "element": "NodeFormatControls",
      "binds": false,
-     "line": 897
+     "line": 907
     },
     {
      "on": "onContent",
      "element": "NodeFormatControls",
      "binds": false,
-     "line": 898
+     "line": 908
     },
     {
      "on": "onPosition",
      "element": "NodeFormatControls",
      "binds": false,
-     "line": 899
+     "line": 909
     },
     {
      "on": "onRevised",
      "element": "AIRevisionPanel",
      "binds": false,
-     "line": 951
+     "line": 961
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 973
+     "line": 983
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 997
-    },
-    {
-     "on": "onChange",
-     "element": "input",
-     "binds": true,
-     "line": 1035
+     "line": 1007
     },
     {
      "on": "onChange",
@@ -10765,63 +11457,69 @@
     },
     {
      "on": "onChange",
-     "element": "select",
-     "binds": true,
-     "line": 1080
-    },
-    {
-     "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 1095
+     "line": 1075
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 1110
+     "line": 1090
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 1130
+     "line": 1105
     },
     {
-     "on": "onClick",
-     "element": "button",
+     "on": "onChange",
+     "element": "select",
      "binds": true,
-     "line": 1149
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
-     "line": 1156
+     "line": 1120
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 1163
+     "line": 1140
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1178
+     "line": 1159
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1185
+     "line": 1166
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 1192
+     "line": 1173
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 1188
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 1195
+    },
+    {
+     "on": "onChange",
+     "element": "input",
+     "binds": true,
+     "line": 1202
     }
    ],
    "fetches": [
@@ -10855,6 +11553,7 @@
    "buttons": 20,
    "links": 0,
    "localImports": [
+    "@/components/ui/time-ago",
     "./library-picker",
     "./ai-revision-panel",
     "./collaboration",
@@ -12986,19 +13685,21 @@
   },
   {
    "file": "components/marketing/resources-filter.tsx",
-   "lines": 132,
+   "lines": 135,
    "client": true,
    "kind": "component",
    "exports": [
     "ResourcesFilter"
    ],
-   "renders": [],
+   "renders": [
+    "LocalTime"
+   ],
    "handlers": [
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 45
+     "line": 48
     }
    ],
    "fetches": [],
@@ -13006,7 +13707,9 @@
    "inputs": 0,
    "buttons": 1,
    "links": 2,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/(marketing)/resources/page.tsx"
    ],
@@ -13323,7 +14026,9 @@
     "/admin/expert-time",
     "/admin/funnel",
     "/admin/guardrail-defaults",
+    "/admin/guides",
     "/admin/intake",
+    "/admin/notes",
     "/admin/observe",
     "/admin/opportunities",
     "/admin",
@@ -13354,26 +14059,29 @@
     "/admin/tenants/[tenantId]",
     "/admin/tenants",
     "/admin/waitlist",
-    "/admin/workflows"
+    "/admin/workflows",
+    "/admin/workspace-access"
    ],
    "bindingHandlers": 0,
    "passedHandlers": 0
   },
   {
    "file": "components/portal/agent-usage-panel.tsx",
-   "lines": 225,
+   "lines": 237,
    "client": true,
    "kind": "component",
    "exports": [
     "AgentUsagePanel"
    ],
-   "renders": [],
+   "renders": [
+    "LocalTime"
+   ],
    "handlers": [
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 107
+     "line": 124
     }
    ],
    "fetches": [
@@ -13386,7 +14094,9 @@
    "inputs": 0,
    "buttons": 1,
    "links": 0,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/portal/[tenantSlug]/agents/page.tsx",
     "components/portal/manage-console.tsx"
@@ -13987,7 +14697,7 @@
   },
   {
    "file": "components/portal/automation-overview-card.tsx",
-   "lines": 164,
+   "lines": 195,
    "client": true,
    "kind": "component",
    "exports": [
@@ -15492,25 +16202,27 @@
   },
   {
    "file": "components/portal/notification-panel.tsx",
-   "lines": 190,
+   "lines": 200,
    "client": true,
    "kind": "component",
    "exports": [
     "NotificationBell"
    ],
-   "renders": [],
+   "renders": [
+    "LocalTime"
+   ],
    "handlers": [
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 86
+     "line": 101
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 114
+     "line": 129
     }
    ],
    "fetches": [
@@ -15527,7 +16239,9 @@
    "inputs": 0,
    "buttons": 2,
    "links": 1,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/portal/[tenantSlug]/layout.tsx"
    ],
@@ -15767,7 +16481,7 @@
   },
   {
    "file": "components/portal/pipeline-cards.tsx",
-   "lines": 609,
+   "lines": 613,
    "client": true,
    "kind": "component",
    "exports": [
@@ -15782,79 +16496,79 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 169
+     "line": 170
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 407
+     "line": 408
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 410
+     "line": 411
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 412
+     "line": 413
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 416
+     "line": 417
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 502
+     "line": 506
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 526
+     "line": 530
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 540
+     "line": 544
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 569
+     "line": 573
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 576
+     "line": 580
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 584
+     "line": 588
     },
     {
      "on": "onClose",
      "element": "PurchaseModal",
      "binds": false,
-     "line": 598
+     "line": 602
     },
     {
      "on": "onPurchased",
      "element": "PurchaseModal",
      "binds": false,
-     "line": 599
+     "line": 603
     }
    ],
    "fetches": [
@@ -15907,6 +16621,73 @@
    "localImports": [],
    "renderedBy": [],
    "reachableFrom": [],
+   "bindingHandlers": 0,
+   "passedHandlers": 0
+  },
+  {
+   "file": "components/portal/presence-heartbeat.tsx",
+   "lines": 62,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "PresenceHeartbeat"
+   ],
+   "renders": [],
+   "handlers": [],
+   "fetches": [
+    {
+     "method": "POST",
+     "url": "'/api/presence/heartbeat'"
+    }
+   ],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 0,
+   "links": 0,
+   "localImports": [],
+   "renderedBy": [
+    "app/portal/[tenantSlug]/layout.tsx"
+   ],
+   "reachableFrom": [
+    "/portal/[tenantSlug]/activity",
+    "/portal/[tenantSlug]/agents",
+    "/portal/[tenantSlug]/atoms",
+    "/portal/[tenantSlug]/automation",
+    "/portal/[tenantSlug]/billing",
+    "/portal/[tenantSlug]/buckets",
+    "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
+    "/portal/[tenantSlug]/cards",
+    "/portal/[tenantSlug]/command",
+    "/portal/[tenantSlug]/contracts/[contractId]",
+    "/portal/[tenantSlug]/contracts",
+    "/portal/[tenantSlug]/dashboard",
+    "/portal/[tenantSlug]/documents/[documentId]",
+    "/portal/[tenantSlug]/documents/new",
+    "/portal/[tenantSlug]/documents",
+    "/portal/[tenantSlug]/library/foundation/[foundationId]",
+    "/portal/[tenantSlug]/library",
+    "/portal/[tenantSlug]/library/review",
+    "/portal/[tenantSlug]/library/upload",
+    "/portal/[tenantSlug]/manage",
+    "/portal/[tenantSlug]",
+    "/portal/[tenantSlug]/pipeline",
+    "/portal/[tenantSlug]/portals/[portalId]",
+    "/portal/[tenantSlug]/portals",
+    "/portal/[tenantSlug]/processes",
+    "/portal/[tenantSlug]/profile",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/portal/[tenantSlug]/projects",
+    "/portal/[tenantSlug]/proposals/[proposalId]",
+    "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+    "/portal/[tenantSlug]/proposals",
+    "/portal/[tenantSlug]/spotlights/[spotlightId]",
+    "/portal/[tenantSlug]/spotlights",
+    "/portal/[tenantSlug]/team",
+    "/portal/[tenantSlug]/templates",
+    "/portal/[tenantSlug]/todos",
+    "/portal/[tenantSlug]/vaults/[vaultId]",
+    "/portal/[tenantSlug]/vaults"
+   ],
    "bindingHandlers": 0,
    "passedHandlers": 0
   },
@@ -16608,7 +17389,7 @@
   },
   {
    "file": "components/portal/proposal-workspace.tsx",
-   "lines": 432,
+   "lines": 441,
    "client": true,
    "kind": "component",
    "exports": [
@@ -16617,6 +17398,7 @@
    "renders": [
     "StageControl",
     "OutcomeRecorder",
+    "LocalTime",
     "ProposalTimeline",
     "FluidDocumentTab",
     "DraftAllSections",
@@ -16628,25 +17410,25 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 237
+     "line": 250
     },
     {
      "on": "onSectionDrafted",
      "element": "DraftAllSections",
      "binds": false,
-     "line": 369
+     "line": 378
     },
     {
      "on": "onComplete",
      "element": "DraftAllSections",
      "binds": false,
-     "line": 370
+     "line": 379
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 378
+     "line": 387
     }
    ],
    "fetches": [],
@@ -16655,6 +17437,7 @@
    "buttons": 2,
    "links": 1,
    "localImports": [
+    "@/components/ui/time-ago",
     "@/components/canvas/draft-all-sections",
     "./proposal-admin-panel",
     "./proposal-contributor-view",
@@ -16861,7 +17644,7 @@
   },
   {
    "file": "components/portal/shadow-space-banner.tsx",
-   "lines": 85,
+   "lines": 95,
    "client": true,
    "kind": "component",
    "exports": [
@@ -16873,19 +17656,19 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 53
+     "line": 63
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 72
+     "line": 82
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 75
+     "line": 85
     }
    ],
    "fetches": [
@@ -17078,7 +17861,7 @@
   },
   {
    "file": "components/portal/stage-control.tsx",
-   "lines": 452,
+   "lines": 451,
    "client": true,
    "kind": "component",
    "exports": [
@@ -17090,43 +17873,43 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 264
+     "line": 263
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 277
+     "line": 276
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 287
+     "line": 286
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 297
+     "line": 296
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 363
+     "line": 362
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 389
+     "line": 388
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 433
+     "line": 432
     }
    ],
    "fetches": [
@@ -17155,7 +17938,9 @@
    "inputs": 0,
    "buttons": 7,
    "links": 1,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "components/portal/proposal-workspace.tsx"
    ],
@@ -18219,7 +19004,7 @@
   },
   {
    "file": "components/projects/comment-thread.tsx",
-   "lines": 231,
+   "lines": 233,
    "client": true,
    "kind": "component",
    "exports": [
@@ -18233,37 +19018,37 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 134
+     "line": 136
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 142
+     "line": 144
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 156
+     "line": 158
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 187
+     "line": 189
     },
     {
      "on": "onChange",
      "element": "textarea",
      "binds": true,
-     "line": 194
+     "line": 196
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 207
+     "line": 209
     }
    ],
    "fetches": [
@@ -21600,8 +22385,60 @@
    "passedHandlers": 0
   },
   {
+   "file": "components/tasks/task-claim.tsx",
+   "lines": 116,
+   "client": true,
+   "kind": "component",
+   "exports": [
+    "TaskClaim"
+   ],
+   "renders": [
+    "TimeAgo"
+   ],
+   "handlers": [
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 96
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 107
+    }
+   ],
+   "fetches": [
+    {
+     "method": "GET",
+     "url": "`${apiBase}/${task.id}/claim`"
+    }
+   ],
+   "forms": 0,
+   "inputs": 0,
+   "buttons": 2,
+   "links": 1,
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
+   "renderedBy": [
+    "components/tasks/task-queue.tsx"
+   ],
+   "reachableFrom": [
+    "/admin/command",
+    "/admin/dashboard",
+    "/admin/rfp-curation",
+    "/portal/[tenantSlug]/dashboard",
+    "/portal/[tenantSlug]/command",
+    "/portal/[tenantSlug]/todos"
+   ],
+   "bindingHandlers": 2,
+   "passedHandlers": 0
+  },
+  {
    "file": "components/tasks/task-queue.tsx",
-   "lines": 550,
+   "lines": 577,
    "client": true,
    "kind": "component",
    "exports": [
@@ -21609,6 +22446,7 @@
    ],
    "renders": [
     "WorkflowTrail",
+    "TaskClaim",
     "TaskCompleter",
     "ManagerRequestCompleter",
     "ThreadCompleter",
@@ -21624,127 +22462,127 @@
      "on": "onComplete",
      "element": "TaskCompleter",
      "binds": false,
-     "line": 174
+     "line": 201
     },
     {
      "on": "onComplete",
      "element": "AcknowledgeCompleter",
      "binds": false,
-     "line": 252
+     "line": 279
     },
     {
      "on": "onComplete",
      "element": "ReadReceiptCompleter",
      "binds": false,
-     "line": 253
+     "line": 280
     },
     {
      "on": "onComplete",
      "element": "TextMemoCompleter",
      "binds": false,
-     "line": 254
+     "line": 281
     },
     {
      "on": "onComplete",
      "element": "FormCompleter",
      "binds": false,
-     "line": 255
+     "line": 282
     },
     {
      "on": "onComplete",
      "element": "UploadCompleter",
      "binds": false,
-     "line": 257
+     "line": 284
     },
     {
      "on": "onComplete",
      "element": "ReviewCompleter",
      "binds": false,
-     "line": 259
+     "line": 286
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 271
+     "line": 298
     },
     {
      "on": "onChange",
      "element": "textarea",
      "binds": true,
-     "line": 294
+     "line": 321
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 301
+     "line": 328
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 305
+     "line": 332
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 309
+     "line": 336
     },
     {
      "on": "onChange",
      "element": "textarea",
      "binds": true,
-     "line": 369
+     "line": 396
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 376
+     "line": 403
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 422
+     "line": 449
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 441
+     "line": 468
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 448
+     "line": 475
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 478
+     "line": 505
     },
     {
      "on": "onChange",
      "element": "textarea",
      "binds": true,
-     "line": 526
+     "line": 553
     },
     {
      "on": "onChange",
      "element": "input",
      "binds": true,
-     "line": 533
+     "line": 560
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 541
+     "line": 568
     }
    ],
    "fetches": [
@@ -21765,7 +22603,9 @@
    "inputs": 4,
    "buttons": 10,
    "links": 3,
-   "localImports": [],
+   "localImports": [
+    "./task-claim"
+   ],
    "renderedBy": [
     "app/admin/command/page.tsx",
     "app/admin/dashboard/page.tsx",
@@ -22008,7 +22848,9 @@
     "/admin/expert-time",
     "/admin/funnel",
     "/admin/guardrail-defaults",
+    "/admin/guides",
     "/admin/intake",
+    "/admin/notes",
     "/admin/observe",
     "/admin/opportunities",
     "/admin",
@@ -22040,6 +22882,7 @@
     "/admin/tenants",
     "/admin/waitlist",
     "/admin/workflows",
+    "/admin/workspace-access",
     "/portal/[tenantSlug]/activity",
     "/portal/[tenantSlug]/agents",
     "/portal/[tenantSlug]/atoms",
@@ -22175,7 +23018,9 @@
     "/admin/expert-time",
     "/admin/funnel",
     "/admin/guardrail-defaults",
+    "/admin/guides",
     "/admin/intake",
+    "/admin/notes",
     "/admin/observe",
     "/admin/opportunities",
     "/admin",
@@ -22207,6 +23052,7 @@
     "/admin/tenants",
     "/admin/waitlist",
     "/admin/workflows",
+    "/admin/workspace-access",
     "/portal/[tenantSlug]/activity",
     "/portal/[tenantSlug]/agents",
     "/portal/[tenantSlug]/atoms",
@@ -22294,13 +23140,16 @@
   },
   {
    "file": "components/ui/time-ago.tsx",
-   "lines": 71,
+   "lines": 128,
    "client": true,
    "kind": "component",
    "exports": [
     "useClientNow",
     "relativeFrom",
     "elapsedFrom",
+    "useMounted",
+    "localFrom",
+    "LocalTime",
     "TimeAgo",
     "Elapsed"
    ],
@@ -22313,33 +23162,82 @@
    "links": 0,
    "localImports": [],
    "renderedBy": [
+    "app/admin/documents/document-list-client.tsx",
     "app/admin/process/process-monitor-client.tsx",
     "app/admin/processes/admin-processes-client.tsx",
     "app/admin/system-state/system-state-client.tsx",
     "app/admin/workflows/workflow-monitor-client.tsx",
     "app/portal/[tenantSlug]/activity/activity-stream-client.tsx",
+    "components/admin/admin-file-manager.tsx",
+    "components/admin/crawl-settings.tsx",
     "components/admin/recent-sessions.tsx",
+    "components/admin/region-list.tsx",
+    "components/canvas/canvas-sidebar.tsx",
+    "components/marketing/resources-filter.tsx",
+    "components/portal/agent-usage-panel.tsx",
+    "components/portal/notification-panel.tsx",
     "components/portal/proposal-timeline.tsx",
+    "components/portal/proposal-workspace.tsx",
     "components/projects/comment-thread.tsx",
     "components/projects/review-panel.tsx",
-    "components/scout/candidate-queue.tsx"
+    "components/scout/candidate-queue.tsx",
+    "components/tasks/task-claim.tsx"
    ],
    "reachableFrom": [
+    "/admin/documents",
     "/admin/process",
     "/admin/processes",
     "/admin/system-state",
     "/admin/workflows",
     "/portal/[tenantSlug]/activity",
+    "/admin/storage",
+    "/admin/sources/[profileId]",
     "/admin/analytics",
-    "/portal/[tenantSlug]/proposals/[proposalId]",
-    "/portal/[tenantSlug]/projects/[projectId]",
     "/admin/documents/[documentId]",
     "/admin/site/docs/[type]/[slug]",
     "/admin/templates/[templateId]/edit",
     "/portal/[tenantSlug]/documents/[documentId]",
     "/portal/[tenantSlug]/library/foundation/[foundationId]",
     "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
-    "/admin/scouts"
+    "/resources",
+    "/portal/[tenantSlug]/agents",
+    "/portal/[tenantSlug]/manage",
+    "/portal/[tenantSlug]/atoms",
+    "/portal/[tenantSlug]/automation",
+    "/portal/[tenantSlug]/billing",
+    "/portal/[tenantSlug]/buckets",
+    "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
+    "/portal/[tenantSlug]/cards",
+    "/portal/[tenantSlug]/command",
+    "/portal/[tenantSlug]/contracts/[contractId]",
+    "/portal/[tenantSlug]/contracts",
+    "/portal/[tenantSlug]/dashboard",
+    "/portal/[tenantSlug]/documents/new",
+    "/portal/[tenantSlug]/documents",
+    "/portal/[tenantSlug]/library",
+    "/portal/[tenantSlug]/library/review",
+    "/portal/[tenantSlug]/library/upload",
+    "/portal/[tenantSlug]",
+    "/portal/[tenantSlug]/pipeline",
+    "/portal/[tenantSlug]/portals/[portalId]",
+    "/portal/[tenantSlug]/portals",
+    "/portal/[tenantSlug]/processes",
+    "/portal/[tenantSlug]/profile",
+    "/portal/[tenantSlug]/projects/[projectId]",
+    "/portal/[tenantSlug]/projects",
+    "/portal/[tenantSlug]/proposals/[proposalId]",
+    "/portal/[tenantSlug]/proposals",
+    "/portal/[tenantSlug]/spotlights/[spotlightId]",
+    "/portal/[tenantSlug]/spotlights",
+    "/portal/[tenantSlug]/team",
+    "/portal/[tenantSlug]/templates",
+    "/portal/[tenantSlug]/todos",
+    "/portal/[tenantSlug]/vaults/[vaultId]",
+    "/portal/[tenantSlug]/vaults",
+    "/admin/scouts",
+    "/admin/command",
+    "/admin/dashboard",
+    "/admin/rfp-curation"
    ],
    "bindingHandlers": 0,
    "passedHandlers": 0

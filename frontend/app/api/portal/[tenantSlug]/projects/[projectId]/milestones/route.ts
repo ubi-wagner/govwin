@@ -17,6 +17,7 @@
  *                         start someone pinned.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { createMilestone, listMilestones, listDeliverables, markMilestoneMet } from '@/lib/projects/milestones';
@@ -53,7 +54,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
       const result = await createMilestone(gate.actor, projectId, { title: body?.title ?? '', ...body });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'milestone', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { milestone: result.data } }, { status: 201 });
     });
   } catch (err) {
@@ -78,7 +84,17 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
 
       if (body?.action === 'resequence') {
         const seq = await resequence(gate.actor, projectId);
-        if (!seq.ok) return NextResponse.json({ error: seq.error, code: seq.code }, { status: seq.status });
+        if (!seq.ok) {
+
+          return await refuse(seq, {
+
+            namespace: 'project', action: 'milestone', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
         return NextResponse.json({ data: seq.data });
       }
 
@@ -99,7 +115,17 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
           );
         }
         const dep = await setMilestoneDependency(gate.actor, projectId, body.milestoneId, body.dependsOnId ?? null);
-        if (!dep.ok) return NextResponse.json({ error: dep.error, code: dep.code }, { status: dep.status });
+        if (!dep.ok) {
+
+          return await refuse(dep, {
+
+            namespace: 'project', action: 'milestone', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
         return NextResponse.json({ data: dep.data });
       }
 
@@ -108,7 +134,17 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
           return NextResponse.json({ error: 'forecastDate is required to reschedule', code: 'VALIDATION_ERROR' }, { status: 400 });
         }
         const moved = await rescheduleMilestone(gate.actor, projectId, body.milestoneId, body.forecastDate, { cascade: body.cascade });
-        if (!moved.ok) return NextResponse.json({ error: moved.error, code: moved.code }, { status: moved.status });
+        if (!moved.ok) {
+
+          return await refuse(moved, {
+
+            namespace: 'project', action: 'milestone', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
         return NextResponse.json({ data: moved.data });
       }
 
@@ -121,7 +157,12 @@ export async function PATCH(request: Request, ctx: { params: Promise<{ tenantSlu
 
       const result = await markMilestoneMet(gate.actor, projectId, body.milestoneId,
         { note: body.note ?? null, metrics: body.metrics ?? null });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'milestone', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { milestone: result.data } });
     });
   } catch (err) {

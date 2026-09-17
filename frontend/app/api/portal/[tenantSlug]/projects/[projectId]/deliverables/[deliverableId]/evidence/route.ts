@@ -10,6 +10,7 @@
  * partner_user boundary that `lib/projects/access.ts` closes.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { fileAcceptanceEvidence, listAcceptanceEvidence } from '@/lib/projects/evidence';
 
@@ -55,7 +56,12 @@ export async function POST(request: Request, ctx: Ctx) {
         body: Buffer.from(await file.arrayBuffer()),
         contentType: file.type || null,
       });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'deliverable.evidence', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { evidence: result.data } }, { status: 201 });
     });
   } catch (err) {

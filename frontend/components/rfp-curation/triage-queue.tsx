@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTool } from '@/lib/hooks/use-tool';
 import { toast } from '@/lib/toast';
 import { fmtDate } from '@/lib/fmt';
+import { useClientNow, deltaMsFrom } from '@/components/ui/time-ago';
 
 interface TriageItem {
   solicitationId: string;
@@ -60,14 +61,32 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function isStale(item: TriageItem): boolean {
-  if (item.status !== 'claimed' || !item.claimedAt) return false;
-  const claimedMs = Date.now() - new Date(item.claimedAt).getTime();
-  return claimedMs > 24 * 60 * 60 * 1000;
+/**
+ * B160 — this component server-renders real rows (`initialItems` is a prop), so reading the clock
+ * here made the STALE BADGE a function of when it rendered: a claim sitting near the 24-hour mark
+ * could be stale on the server and fresh on the client, and that is a DOM-structure mismatch — a
+ * whole element present on one side and absent on the other — not merely different text. React
+ * #418 then fails hydration for the entire queue while the route answers HTTP 200.
+ *
+ * `now` is null until mounted, and an unknown age is NOT stale: the badge appears on the next tick
+ * rather than being asserted before the answer is known.
+ */
+function isStale(item: TriageItem, now: number | null): boolean {
+  if (item.status !== 'claimed') return false;
+  const delta = deltaMsFrom(item.claimedAt, now);
+  return delta !== null && -delta > 24 * 60 * 60 * 1000;
+}
+
+/** Hours since the claim, for the badge's tooltip. Empty until mounted — same rule. */
+function claimedHours(item: TriageItem, now: number | null): string {
+  const delta = deltaMsFrom(item.claimedAt, now);
+  return delta === null ? '' : `Claimed ${Math.floor(-delta / 3_600_000)}h ago with no progress`;
 }
 
 export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Props) {
   const [items, setItems] = useState(initialItems);
+  // Null until mounted — see isStale(). Ticks so a queue left open does not go stale-blind.
+  const now = useClientNow();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [forceReleasing, setForceReleasing] = useState<string | null>(null);
   const { invoke, loading, error } = useTool();
@@ -177,7 +196,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
       {['ai_analyzed', 'curation_in_progress', 'review_requested'].includes(item.status) && (
         <button onClick={() => handleOpenWorkspace(item.solicitationId)} className={btnCls('bg-indigo-600 text-white hover:bg-indigo-700', big)}>Open</button>
       )}
-      {isMasterAdmin && isStale(item) && (
+      {isMasterAdmin && isStale(item, now) && (
         <button onClick={(e) => { e.stopPropagation(); handleForceRelease(item.solicitationId); }} disabled={forceReleasing === item.solicitationId} className={btnCls('bg-red-600 text-white hover:bg-red-700', big)}>{forceReleasing === item.solicitationId ? '...' : 'Force Release'}</button>
       )}
     </div>
@@ -253,10 +272,10 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <StatusBadge status={item.status} />
-                    {isStale(item) && (
+                    {isStale(item, now) && (
                       <span
                         className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800"
-                        title={`Claimed ${Math.floor((Date.now() - new Date(item.claimedAt!).getTime()) / 3_600_000)}h ago with no progress`}
+                        title={claimedHours(item, now)}
                       >
                         stale
                       </span>
@@ -290,7 +309,7 @@ export function TriageQueue({ initialItems, currentUserId, currentUserRole }: Pr
             </button>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <StatusBadge status={item.status} />
-              {isStale(item) && (
+              {isStale(item, now) && (
                 <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-800">stale</span>
               )}
             </div>

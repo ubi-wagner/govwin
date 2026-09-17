@@ -5,6 +5,7 @@
  * Auth: partner_admin (owner-scoped) or rfp_admin+.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { isRole, canManagePartnerTenants } from '@/lib/rbac';
 import { submitPartnerRegistration } from '@/lib/partner/registration';
@@ -42,7 +43,10 @@ export async function POST(request: Request) {
     });
 
     if (!result.ok) {
-      return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+        return await refuse(result, {
+          namespace: 'finder', action: 'partner.register',
+          tenantId: null, actor: { id: me.id, email: me.email ?? null },
+        });
     }
     return NextResponse.json({ data: { applicationId: result.applicationId } }, { status: 201 });
   } catch (e) {

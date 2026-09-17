@@ -8,6 +8,7 @@
  *          nobody can open.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { createClin, listClins, type ClinInput } from '@/lib/projects/clins';
@@ -46,7 +47,17 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
 
       const result = await createClin(gate.actor, projectId, body ?? ({} as ClinInput));
       if (!result.ok) {
-        return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+        {
+
+          return await refuse(result, {
+
+            namespace: 'project', action: 'clin', entityId: projectId,
+
+            tenantId: gate.actor.tenantId, actor: gate.actor,
+
+          });
+
+        }
       }
       return NextResponse.json({ data: { clin: result.data } }, { status: 201 });
     });

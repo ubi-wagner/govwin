@@ -8,6 +8,7 @@
  * same separation that keeps uploading a deliverable from accepting it.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { attachToTask, detachFromTask, listTaskAttachments } from '@/lib/projects/task-attachments';
 import { isValidUUID } from '@/lib/validation';
@@ -43,7 +44,12 @@ export async function POST(request: Request, ctx: Ctx) {
       const result = await attachToTask(gate.actor, projectId, taskId, {
         filename: file.name, body: Buffer.from(await file.arrayBuffer()), contentType: file.type || null,
       });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'task.attachment', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { attachment: result.data } }, { status: 201 });
     });
   } catch (err) {
@@ -61,7 +67,12 @@ export async function DELETE(request: Request, ctx: Ctx) {
         return NextResponse.json({ error: 'attachmentId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
       }
       const result = await detachFromTask(gate.actor, projectId, attachmentId);
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'task.attachment', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: result.data });
     });
   } catch (err) {

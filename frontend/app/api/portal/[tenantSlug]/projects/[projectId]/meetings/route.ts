@@ -11,6 +11,7 @@
  * nobody can send.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { listProjectMeetings, recordMeeting } from '@/lib/projects/meetings';
@@ -41,7 +42,12 @@ export async function POST(request: Request, ctx: Ctx) {
       catch { return NextResponse.json({ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }, { status: 400 }); }
 
       const result = await recordMeeting(gate.actor, projectId, body ?? {});
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'meeting', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { meeting: result.data } }, { status: 201 });
     });
   } catch (err) {

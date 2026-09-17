@@ -13,6 +13,7 @@
  * to stop halfway, leaving notes that claim five agreements beside a plan holding two.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { listMeetingActions, raiseActionItems } from '@/lib/projects/meetings';
 
@@ -50,7 +51,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
         : [];
 
       const result = await raiseActionItems(gate.actor, projectId, meetingId, items);
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'meeting', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       // `refused` comes back so the UI can name what did not land — silently dropping one would
       // leave the notes and the plan disagreeing about what was agreed.
       return NextResponse.json({ data: result.data }, { status: 201 });

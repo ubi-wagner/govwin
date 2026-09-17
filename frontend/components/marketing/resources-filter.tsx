@@ -1,4 +1,5 @@
 'use client';
+import { LocalTime } from '@/components/ui/time-ago';
 
 import { useState } from 'react';
 
@@ -22,11 +23,13 @@ const TABS = [
   { key: 'blog_post', label: 'Blog Posts' },
 ] as const;
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-}
+/**
+ * B156 — a `toLocale*` with no `timeZone` formats in the AMBIENT zone: UTC on the server, the
+ * viewer's in the browser. The strings disagree, React throws #418, and hydration fails for the
+ * WHOLE subtree while the route answers HTTP 200. `<LocalTime>` owns its own mount state — a
+ * deterministic UTC stamp on the first paint, the viewer's zone on the next tick.
+ */
+const MONTH_YEAR: Intl.DateTimeFormatOptions = { month: 'short', year: 'numeric' };
 
 export default function ResourcesFilter({ content }: { content: ContentItem[] }) {
   const [activeTab, setActiveTab] = useState<string>('all');
@@ -80,7 +83,7 @@ export default function ResourcesFilter({ content }: { content: ContentItem[] })
                     {item.contentType.replace('_', ' ')}
                   </span>
                   {item.publishedAt && (
-                    <span className="text-xs text-navy-400">{formatDate(item.publishedAt)}</span>
+                    <span className="text-xs text-navy-400"><LocalTime iso={item.publishedAt} opts={MONTH_YEAR} fallback="" /></span>
                   )}
                 </div>
                 <h3 className="font-display font-bold text-navy-900">{item.title}</h3>

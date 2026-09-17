@@ -14,6 +14,7 @@
  * without anybody re-tagging an entry.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { listTimeEntries, logTime, approveTime, deleteTimeEntry } from '@/lib/projects/time';
@@ -53,7 +54,12 @@ export async function POST(request: Request, ctx: Ctx) {
         note: (body.note as string) ?? null,
         userId: (body.userId as string) ?? null,
       });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'time', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { entry: result.data } }, { status: 201 });
     });
   } catch (err) {
@@ -78,7 +84,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
       }
       const ids = Array.isArray(body.entryIds) ? (body.entryIds as string[]).filter(isValidUUID) : [];
       const result = await approveTime(gate.actor, projectId, ids);
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'time', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: result.data });
     });
   } catch (err) {
@@ -96,7 +107,12 @@ export async function DELETE(request: Request, ctx: Ctx) {
         return NextResponse.json({ error: 'entryId is required', code: 'VALIDATION_ERROR' }, { status: 400 });
       }
       const result = await deleteTimeEntry(gate.actor, projectId, entryId);
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'time', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: result.data });
     });
   } catch (err) {

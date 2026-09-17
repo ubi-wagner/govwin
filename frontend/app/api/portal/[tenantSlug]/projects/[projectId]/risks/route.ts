@@ -8,6 +8,7 @@
  *           `asIssue: true` logs something that has already happened.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { listProjectRisks, raiseRisk } from '@/lib/projects/risks';
@@ -49,7 +50,12 @@ export async function POST(request: Request, ctx: Ctx) {
         reviewOn: (body.reviewOn as string) ?? null,
         asIssue: body.asIssue === true,
       });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'risk', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { risk: result.data } }, { status: 201 });
     });
   } catch (err) {

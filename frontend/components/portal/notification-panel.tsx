@@ -1,4 +1,19 @@
 'use client';
+import { LocalTime } from '@/components/ui/time-ago';
+
+/**
+ * B156 — a `toLocale*` with no `timeZone` formats in the AMBIENT zone: UTC on the server, the
+ * viewer's in the browser. The strings disagree, React throws #418, and hydration fails for the
+ * WHOLE subtree while the route answers HTTP 200.
+ *
+ * This is the SEVENTH occurrence, and the one that nearly escaped twice: it is inline in JSX (so
+ * the first guard, which matched named functions, could not see it) AND its options object runs
+ * past the fixed-width argument window the second guard used (so that one silently dropped it and
+ * reported clean). Both instruments are fixed; this comment is the reason they are.
+ */
+const NOTIF_STAMP: Intl.DateTimeFormatOptions = {
+  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+};
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { eventHref } from '@/lib/event-labels';
@@ -162,12 +177,7 @@ export function NotificationBell({ tenantSlug }: NotificationPanelProps) {
                         <p className="text-[10px] text-gray-500 mt-0.5 truncate">{n.summary}</p>
                       )}
                       <p className="text-[10px] text-gray-400 mt-0.5">
-                        {new Date(n.created_at).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        <LocalTime iso={n.created_at} opts={NOTIF_STAMP} />
                       </p>
                     </div>
                     {n.is_for_you && (

@@ -11,6 +11,7 @@
  * resumedStep } }.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess, enterTenant } from '@/lib/db';
 import { isRole, hasRoleAtLeast, type Role } from '@/lib/rbac';
@@ -96,9 +97,9 @@ export async function POST(request: Request, ctx: RouteContext) {
     });
 
     if (!result.ok) {
-      return NextResponse.json(
-        { error: result.error, code: result.code },
-        { status: result.status },
+      return await refuse(
+        result,
+        { namespace: 'system', action: 'process.advance', tenantId: tenantId, actor: { id: sessionUser.id, email: sessionUser.email ?? null } },
       );
     }
     return NextResponse.json({ data: result.data });

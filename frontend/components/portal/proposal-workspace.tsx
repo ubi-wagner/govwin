@@ -1,4 +1,17 @@
 'use client';
+import { LocalTime } from '@/components/ui/time-ago';
+
+/**
+ * B156 — a `toLocale*` with no `timeZone` formats in the AMBIENT zone: UTC on the server, the
+ * viewer's in the browser. The strings disagree, React throws #418, and hydration fails for the
+ * WHOLE subtree while the route answers HTTP 200. `<LocalTime>` owns its own mount state — a
+ * deterministic UTC stamp on the first paint, the viewer's zone on the next tick.
+ *
+ * This one was INLINE IN JSX rather than in a named helper, which is why the first sweep for this
+ * class did not see it: `__tests__/client-timezone-in-render.test.ts` matched module-level
+ * `function` declarations only. The guard now covers inline calls and arrows too.
+ */
+const LONG_DAY: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -267,11 +280,7 @@ export function ProposalWorkspace({
                         )}
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {new Date(h.completedAt).toLocaleDateString('en-US', {
-                          month: 'long',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                        <LocalTime iso={h.completedAt} opts={LONG_DAY} />
                         {' -- '}
                         {h.totalSections} sections, {h.sectionsComplete} complete, {h.sectionsApproved} approved
                       </p>

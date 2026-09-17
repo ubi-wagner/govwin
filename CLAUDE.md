@@ -420,6 +420,13 @@ the committed emulator, so every path is drivable with no live key.
    social are live. Its content/page-block routers are **superseded** for front-facing content (that moved
    to the frontend per §1 — content is frontend-owned in the main DB) — the service's forward scope is
    **CRM** (customer identification / acquisition / management), **still to be built out**.
+   **`scripts/sandbox-up.sh` starts it locally** (`:8000`, migrations first exactly as the Dockerfile
+   does, `CMS_API_KEY` defaulted so its routes do not fail closed) and the verdict now checks it.
+   It did not, for as long as it has existed — and because this service is the CONSUMER half of the
+   `system_events` bridge, running without it meant a `system:notification.requested` was written and
+   nothing consumed it: no ledger row, no send, no `notification.failed`. **That reads as a working
+   emit, because the emitting side succeeds** (B159). Every API route fails closed with 503
+   `auth_not_configured` when `CMS_API_KEY` is unset, and 401 on a wrong key.
 
 Frontend + Pipeline share the main PostgreSQL database (`govtech_intel`, Railway service `Postgres`); the
 `rfp-crm` CRM service has its own (`cms-postgres`) and bridges via the shared `system_events` table. Object
@@ -462,9 +469,12 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - Portal routes MUST verify tenant access — never query by ID alone
 - **Before running or reviving a harness script, check docs/SCRIPT_INVENTORY.md** — generated from
   the tree + the live DB (`frontend/scripts/inventory-scripts.mjs`). It says who references each of
-  the 325 scripts and whether it still drives identifiers that exist. 52 classify as branch suite, 4 the
+  the 325 scripts and whether it still drives identifiers that exist. 66 classify as branch suite, 4 the
   lenses, 2 the cross-checks, 7 the canvas rulers — note the SUITE column counts *scripts*, and
-  `run-branch-drives.sh` registers **64 drives**, because two of them are filed elsewhere (RULER,
+  `run-branch-drives.sh` registers **65 drives** (`drive-email-spine.mts` joined it — it proves the
+  whole outbound-email path against the committed emulator and had NEVER been in the suite, filed
+  under DOCUMENTED, which is the category for "a doc points at it" and not "something runs it";
+  every outbound email the product sends was uncovered, B159), because two of them are filed elsewhere (RULER,
   and the deck probe under DOCUMENTED) and one is the first **Python** entry the runner has ever
   had (`spend-guardrails`, dispatched by extension — never via the `pytest` on PATH, which is a uv
   tool that cannot see asyncpg); both
@@ -803,7 +813,32 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   never on a single local load. **Eight occurrences.** Use `<TimeAgo iso={x}/>` or
   `relativeFrom(x, useClientNow())` (`components/ui/time-ago.tsx`): `now` is null until mounted, so
   the first paint is a deterministic UTC stamp on both sides. `__tests__/client-clock-in-render.test.ts`
-  guards the shape.
+  guards the shape — and now guards **reachability** too (B160), because the original check matched
+  only a module-level helper building an "ago"-shaped string and missed **seven** reads that decided
+  a filter, a count, an inline style, or **whether an element exists at all** (a DOM-structure
+  mismatch, worse than different text, with nothing in the code reading as "time"). Use
+  `deltaMsFrom(iso, useClientNow())` for a countdown or an age: it returns signed milliseconds and
+  deliberately does NOT round, so each caller keeps its own arithmetic and the rendered text is
+  unchanged. **A count that is unknown before mount renders `—`, never `0`.** ⚠️ Whether a clock read
+  is dangerous depends on whether its value reaches the SERVER render — a component that fetches its
+  rows in an effect renders an empty list there and is safe. Five of twelve candidates were exactly
+  that, and "fixing" them would have been change with no defect behind it; they are ENUMERATED in
+  the test's `SAFE_BECAUSE` table with a reason each, and a third check prunes an exemption that no
+  longer applies.
+- **…and it must NEVER format a date in the AMBIENT TIME ZONE either — the same #418, and the one
+  the sandbox is STRUCTURALLY BLIND TO (B156).** The clock rule above guards *when* a value was
+  computed; this guards *where*. `toLocale*` with no `timeZone` formats in the container's zone on
+  the server and the viewer's in the browser — React's own mismatch list names it — so the strings
+  disagree and hydration fails for the whole subtree at HTTP 200. **This box runs the server AND
+  the browser in UTC, so it cannot happen here and every sweep is clean**, while in production it
+  fires for every admin whose browser is not UTC, i.e. all of them. It was recorded five times on
+  five routes as "observed, unreproduced" and misattributed to the clock rule above before anyone
+  pinned a non-UTC browser. Seven components carried it. Use `<LocalTime iso={x} opts={…}/>` or
+  `localFrom(x, mounted)` (`components/ui/time-ago.tsx`) — or an explicit `timeZone` where the
+  value really IS defined in one (cron schedules). `__tests__/client-timezone-in-render.test.ts`
+  guards the shape; `frontend/scripts/capture-hydration-diff.mjs` reproduces it on a dev build,
+  where React names the component and prints the diff (`NEXT_DIST_DIR` + `NODE_ENV=development` —
+  see `next.config.mjs`, B155; **`next dev` in this tree otherwise deletes the standalone build**).
 - **`next/dynamic({ssr:false})` drops `ref`** (Next 15 sets `ref.current={retry}`, a truthy non-handle):
   pass an imperative handle via a normal prop (`innerRef`), not `ref`. And load browser-only libs
   (react-pdf / pdfjs) via `next/dynamic({ssr:false})` — a static import into a `'use client'` component

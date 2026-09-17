@@ -14,6 +14,7 @@
  * work is not a management act and a checklist only one person may touch is not a checklist.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { getProject } from '@/lib/projects/project';
 import { createMilestoneTask, listMilestoneTasks } from '@/lib/projects/milestone-tasks';
@@ -57,7 +58,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ tenantSlug
         estimatedCompletion: body.estimatedCompletion ?? null,
         sortIndex: body.sortIndex,
       });
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'task', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { task: result.data } }, { status: 201 });
     });
   } catch (err) {

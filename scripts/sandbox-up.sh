@@ -160,6 +160,44 @@ else
   [ -n "$(worker_pids)" ] && say "worker      started" || say "worker      FAILED"
 fi
 
+# ── CRM service (:8000) ─────────────────────────────────────────────────────
+# THE THIRD SERVICE WAS NOT IN THE "BRING THE WHOLE SANDBOX UP" SCRIPT.
+#
+# `rfp-crm` owns outbound email and the drip/campaign engine, and it bridges to the main database
+# through `system_events` — it is the half of the email spine the frontend does not implement. With
+# it down, a `system:notification.requested` event is written and NOTHING consumes it: no ledger
+# row, no send, no `notification.failed`. That reads as a working emit, because the emitting side
+# succeeds. Every local check of the mail path was therefore measuring one end of a two-ended seam.
+#
+# Migrations first, exactly as the Dockerfile CMD does, so a schema drift fails here rather than at
+# the first request. CMS_API_KEY must be set or every API route fails closed with 503
+# `auth_not_configured` — correct in production, useless in a sandbox, so a fixed local value.
+if curl -sf -o /dev/null --max-time 3 http://127.0.0.1:8000/health 2>/dev/null; then
+  say "crm         already up"
+elif [ ! -d "$ROOT/services/cms" ]; then
+  say "crm         SKIPPED (services/cms not present)"
+else
+  if ( cd "$ROOT/services/cms" && CRM_DATABASE="$CRM_DATABASE" bash db/run.sh ) \
+       > "$GOVWIN_RUN_DIR/crm-migrate.log" 2>&1; then
+    ( cd "$ROOT/services/cms" && env PORT=8000 \
+        CMS_API_KEY="${CMS_API_KEY:-sandbox-crm-key-0000}" \
+        CRM_DATABASE="$CRM_DATABASE" SHARED_DATABASE_URL="$SHARED_DATABASE_URL" \
+        nohup python3 -m uvicorn src.main:app --host 127.0.0.1 --port 8000 \
+        > "$GOVWIN_RUN_DIR/crm.log" 2>&1 & )
+    for _ in $(seq 1 20); do
+      curl -sf -o /dev/null --max-time 2 http://127.0.0.1:8000/health 2>/dev/null && break
+      sleep 1
+    done
+    if curl -sf -o /dev/null --max-time 3 http://127.0.0.1:8000/health 2>/dev/null; then
+      say "crm         started (:8000)"
+    else
+      say "crm         FAILED to serve — see $GOVWIN_RUN_DIR/crm.log"
+    fi
+  else
+    say "crm         MIGRATION FAILED — refusing to start on an unmigrated schema (see $GOVWIN_RUN_DIR/crm-migrate.log)"
+  fi
+fi
+
 # ── Stale build ─────────────────────────────────────────────────────────────
 # The build is a SNAPSHOT of the source, and nothing here rebuilds it — so a box that is "already
 # up" can be serving code from days ago while every test reads the current tree and concludes the
@@ -276,7 +314,12 @@ pg_isready -q 2>/dev/null || { echo "  ✗ postgres not serving"; fail=1; }
 curl -sf -o /dev/null --max-time 3 -X POST -H 'content-type: application/json' \
   -d '{"model":"x","max_tokens":5,"messages":[{"role":"user","content":"hi"}]}' \
   http://127.0.0.1:8787/v1/messages 2>/dev/null || { echo "  ✗ emulator not serving"; fail=1; }
-pgrep -f "python3 src/main.py" >/dev/null 2>&1 || { echo "  ✗ worker not running"; fail=1; }
+# ASK THE SAME QUESTION THE START BLOCK ASKED. This line used the single spelling
+# `python3 src/main.py`, while `worker_pids()` above deliberately matches BOTH that and
+# `python3 -m main` — its comment explains at length why one spelling is not enough. So a worker
+# started the second way was started correctly, reported "already up", and then failed the verdict
+# as "not running", exiting 1 on a healthy stack. Two predicates for one fact is how this drifts.
+[ -n "$(worker_pids)" ] || { echo "  ✗ worker not running"; fail=1; }
 if curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null; then
   # A 200 on / says the server is alive, not that the app is dressed. Follow the stylesheet the
   # login page actually links and check it comes back — a 404 here is the unstyled-app failure, and
@@ -291,6 +334,13 @@ if curl -sf -o /dev/null --max-time 3 http://localhost:3000/ 2>/dev/null; then
   fi
 else
   echo "  ✗ frontend not serving"; fail=1
+fi
+# The CRM is started above, so it is checked here — a "✓ stack up" that is silent about a service
+# this script starts is the same unearned green the rest of the tree is instrumented against. Only
+# when the service is present: a checkout without services/cms legitimately has no CRM to serve.
+if [ -d "$ROOT/services/cms" ]; then
+  curl -sf -o /dev/null --max-time 3 http://127.0.0.1:8000/health 2>/dev/null \
+    || { echo "  ✗ crm not serving (:8000) — outbound email and the system_events bridge are down"; fail=1; }
 fi
 [ "$fail" -eq 0 ] && echo "  ✓ stack up" || echo "  ✗ stack incomplete"
 exit "$fail"

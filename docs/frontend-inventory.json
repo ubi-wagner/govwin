@@ -4,8 +4,8 @@
  "summary": [
   {
    "kind": "api-route",
-   "files": 285,
-   "lines": 43316
+   "files": 294,
+   "lines": 44131
   },
   {
    "kind": "app-boundary",
@@ -14,18 +14,18 @@
   },
   {
    "kind": "app-component",
-   "files": 26,
-   "lines": 9173
+   "files": 34,
+   "lines": 9983
   },
   {
    "kind": "auth",
    "files": 2,
-   "lines": 241
+   "lines": 320
   },
   {
    "kind": "component",
-   "files": 180,
-   "lines": 46165
+   "files": 188,
+   "lines": 47017
   },
   {
    "kind": "e2e",
@@ -35,17 +35,17 @@
   {
    "kind": "layout",
    "files": 6,
-   "lines": 461
+   "lines": 560
   },
   {
    "kind": "lib",
-   "files": 333,
-   "lines": 69975
+   "files": 341,
+   "lines": 71843
   },
   {
    "kind": "middleware",
    "files": 1,
-   "lines": 330
+   "lines": 349
   },
   {
    "kind": "other",
@@ -54,13 +54,13 @@
   },
   {
    "kind": "page",
-   "files": 123,
-   "lines": 19911
+   "files": 126,
+   "lines": 20563
   },
   {
    "kind": "script",
-   "files": 177,
-   "lines": 30573
+   "files": 187,
+   "lines": 33056
   },
   {
    "kind": "server-action",
@@ -69,8 +69,8 @@
   },
   {
    "kind": "test",
-   "files": 244,
-   "lines": 33926
+   "files": 256,
+   "lines": 35530
   }
  ],
  "records": [
@@ -219,6 +219,70 @@
     "expect(emitArg.payload.tenant_id).toBe",
     "expect(emitArg.payload.mode).toBe",
     "expect(emitEventEndMock).toHaveBeenCalledTimes"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/admin-guides-invariants.test.ts",
+   "kind": "test",
+   "lines": 166,
+   "bytes": 8503,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync",
+      "existsSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "join",
+    "readFileSync",
+    "describe",
+    "it",
+    "expect(existsSync(join(ROOT, g.guide)), g.guide).toBe",
+    "expect",
+    "existsSync",
+    "read",
+    "expect(page).toMatch",
+    "expect(read(g.guide)).toContain",
+    "src.match",
+    "expect(steps, 'a guide with no steps has nothing to note against').toBeGreaterThan",
+    "expect(src).toMatch",
+    "expect(box).toContain",
+    "expect(box).not.toMatch",
+    "expect(box).toMatch",
+    "expect(route).toMatch",
+    "expect(g).toMatch",
+    "GUIDES.some",
+    "read(g.guide).includes",
+    "expect(anyUnwritten).toBe",
+    "readFileSync(join(ROOT, p), 'utf8')\n    .replace(/<\\/?[A-Za-z][^>]*>/g, '')\n    .replace(/\\{'\\s*'\\}/g, ' ')\n    // Entities too: the guide writes `tenant&rsquo;s`, a person reads `tenant's`, and a test that\n    // matched the entity would pin typography rather than the claim.\n    .replace(/&[a-z]+;/g, (m) => ENTITIES[m] ?? m).replace",
+    "readFileSync(join(ROOT, p), 'utf8')\n    .replace(/<\\/?[A-Za-z][^>]*>/g, '')\n    .replace(/\\{'\\s*'\\}/g, ' ').replace",
+    "readFileSync(join(ROOT, p), 'utf8')\n    .replace(/<\\/?[A-Za-z][^>]*>/g, '').replace",
+    "readFileSync(join(ROOT, p), 'utf8').replace"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -485,6 +549,170 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/agent-labels.test.ts",
+   "kind": "test",
+   "lines": 73,
+   "bytes": 3778,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    },
+    {
+     "spec": "@/lib/agent-labels",
+     "names": [
+      "AGENT_LABELS",
+      "agentDisplayName",
+      "titleizeIdentifier"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "Object.keys",
+    "agentDisplayName",
+    "expect(label, `${role} rendered with an underscore`).not.toMatch",
+    "expect",
+    "expect(label, `${role} rendered with a colon`).not.toMatch",
+    "expect(label.trim().length, `${role} rendered empty`).toBeGreaterThan",
+    "label.trim",
+    "expect(titleizeIdentifier('outcome_analyst')).toBe",
+    "titleizeIdentifier",
+    "expect(titleizeIdentifier('library_seed_suggester')).toBe",
+    "expect(titleizeIdentifier('some_new_agent')).toBe",
+    "expect(titleizeIdentifier('rfp_ingest_manager')).toBe",
+    "expect(titleizeIdentifier('curation_qa')).toBe",
+    "expect(titleizeIdentifier('review_of_record')).toBe",
+    "expect(titleizeIdentifier('of_counsel')).toBe",
+    "expect(agentDisplayName(null)).toBe",
+    "expect(agentDisplayName(undefined)).toBe",
+    "expect(agentDisplayName('')).toBe",
+    "readFileSync",
+    "join",
+    "process.cwd",
+    "[...src.matchAll(/role: '([a-z_]+)'/g)].map",
+    "src.matchAll",
+    "expect(roles.length, 'the roster regex matched nothing — this test is not testing anything').toBeGreaterThan",
+    "roles.filter",
+    "expect(missing, `roles the admin roster shows but lib/agent-labels.ts does not name: ${missing.join(', ')}`).toEqual",
+    "missing.join",
+    "pairs\n      .filter(([, role, label]) => AGENT_LABELS[role] && AGENT_LABELS[role] !== label).map",
+    "pairs.filter",
+    "expect(disagree).toEqual"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/agent-roster-complete.test.ts",
+   "kind": "test",
+   "lines": 119,
+   "bytes": 5796,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    },
+    {
+     "spec": "@/lib/agent-labels",
+     "names": [
+      "AGENT_LABELS"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "join",
+    "process.cwd",
+    "readFileSync",
+    "[...src.matchAll(/\\{ role: '([a-z_]+)'/g)].map",
+    "src.matchAll",
+    "describe",
+    "it",
+    "expect(rosterRoles().length).toBeGreaterThan",
+    "expect",
+    "rosterRoles",
+    "Object.keys(AGENT_LABELS).filter",
+    "Object.keys",
+    "rosterRoles().includes",
+    "expect(missing, `registered but INVISIBLE at /admin/agents: ${missing.join(', ')}`).toEqual",
+    "missing.join",
+    "rosterRoles().filter",
+    "expect(phantom, `on the roster but not in the registry: ${phantom.join(', ')}`).toEqual",
+    "phantom.join",
+    "roles.filter",
+    "roles.indexOf",
+    "expect(dupes).toEqual",
+    "entries\n      .filter(([e]) => !/trigger: '[^']{8,}'/.test(e) || !/does: '[^']{20,}/.test(e)).map",
+    "entries.filter",
+    "/trigger: '[^']{8,}'/.test",
+    "/does: '[^']{20,}/.test",
+    "expect(thin, `roster entries with no real trigger or description: ${thin.join(', ')}`).toEqual",
+    "thin.join",
+    "expect(manual().length).toBeGreaterThan",
+    "manual",
+    "expect(roster).not.toContain",
+    "expect(roster).toMatch",
+    "expect(agent()).toMatch",
+    "agent",
+    "expect(manual()).toContain",
+    "expect(agent()).toContain",
+    "expect(manual().toLowerCase()).toContain",
+    "manual().toLowerCase",
+    "agent().toUpperCase",
+    "expect(src).not.toContain",
+    "expect(manual().toLowerCase()).toMatch",
+    "expect(m, `the manual never explains the \"${field}\" field`).toContain",
+    "expect(manual()).toMatch"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/ai-endpoint-single-source.test.ts",
    "kind": "test",
    "lines": 93,
@@ -721,6 +949,60 @@
     "expect(evt.namespace).toBe",
     "expect(evt.type).toBe",
     "expect(evt.tenantId).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/architecture-live.test.ts",
+   "kind": "test",
+   "lines": 85,
+   "bytes": 3957,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/architecture-live",
+     "names": [
+      "classifyActivity"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "classifyActivity",
+    "row",
+    "expect(tables.system_events.klass).toBe",
+    "expect",
+    "expect(tables.reference_codes.klass).toBe",
+    "expect(tables.write_only_ledger.klass).toBe",
+    "expect(tables.deploy_baseline.klass).toBe",
+    "expect(counts).toEqual",
+    "expect(tables.tenants.klass).toBe",
+    "expect(tables.tenants.writes).toBe",
+    "expect(tables.library_atoms.klass).toBe",
+    "expect(untouched).toEqual",
+    "expect(tables.atom_tags.klass).toBe",
+    "expect(r.writtenUnread).toEqual",
+    "expect(r.untouched).toEqual",
+    "expect(r.hottest.map((h) => h.table)).toEqual",
+    "r.hottest.map",
+    "expect(r.hottest[0].writes).toBe",
+    "expect(r.counts).toEqual",
+    "expect(r.hottest).toEqual"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -1298,6 +1580,67 @@
     "expect(a.vol).toBeNull",
     "expect(a.kind).toBeNull",
     "expect(parseLibrarianCatalog(raw, validAtoms, 'x')).toBeNull"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/atom-titles.test.ts",
+   "kind": "test",
+   "lines": 95,
+   "bytes": 4848,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/library/foundation",
+     "names": [
+      "nodeLabel"
+     ]
+    },
+    {
+     "spec": "@/lib/types/canvas-document",
+     "names": [
+      "CanvasNode"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "nodeLabel",
+    "node",
+    "expect(title).toBe",
+    "expect",
+    "expect(nodeLabel(node('image', { caption: 'Figure 2 — thrust curve', alt_text: 'a chart' })).title).toBe",
+    "expect(nodeLabel(node('image', { alt_text: 'System block diagram', storage_key: 'k' })).title).toBe",
+    "expect(nodeLabel(node('url', { display_text: 'SBIR topic page', href: 'https://x.test' })).title).toBe",
+    "expect(nodeLabel(node('url', { href: 'https://sbir.test/topic/1', display_text: '' })).title).toBe",
+    "expect(nodeLabel(node('caption', { prefix: 'Figure', number: 1, text: 'Airframe layout' })).title).toBe",
+    "expect(nodeLabel(node('footnote', { marker: '1', text: 'Per FAR 15.403-4' })).title).toBe",
+    "expect(title, `${t} fell back to its raw type`).not.toBe",
+    "expect(title, `${t} produced a snake_case title`).not.toMatch",
+    "expect(title.length, `${t} produced an empty title`).toBeGreaterThan",
+    "expect(nodeLabel(node('heading', { text: 'Technical Approach' })).title).toBe",
+    "expect(nodeLabel(node('text_block', { text: 'We propose a two-phase effort.' })).title).toBe",
+    "expect(nodeLabel(node('table', { sheet_name: 'Budget' })).title).toBe",
+    "expect(nodeLabel(node('heading', {})).title).toBe",
+    "expect(nodeLabel(node('text_block', {})).title).toBe",
+    "expect(nodeLabel(node('table', {})).title).toBe",
+    "'x'.repeat",
+    "expect(nodeLabel(node('bulleted_list', { items: [{ text: long }] })).title.length).toBe"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -3646,6 +3989,99 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/client-timezone-in-render.test.ts",
+   "kind": "test",
+   "lines": 225,
+   "bytes": 12617,
+   "client": false,
+   "exports": [
+    {
+     "name": "unchecked",
+     "form": "const",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readdirSync",
+      "readFileSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join",
+      "relative"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "join",
+    "readdirSync(dir, { withFileTypes: true }).flatMap",
+    "readdirSync",
+    "e.isDirectory",
+    "walk",
+    "/\\.tsx$/.test",
+    "src.replace(/\\/\\*[\\s\\S]*?\\*\\//g, '').replace",
+    "src.replace",
+    "re.exec",
+    "src.indexOf",
+    "out.push",
+    "src.slice",
+    "LOCALE_CALL.exec",
+    "callArgs",
+    "unchecked.push",
+    "/toLocale(Date|Time)String|Intl\\.DateTimeFormat/.test",
+    "DATE_OPTS.test",
+    "/timeZone\\s*:/.test",
+    "out.indexOf",
+    "out.slice",
+    "formatsAmbientDate",
+    "stripNonRenderBodies",
+    "stripComments",
+    "describe",
+    "it",
+    "expect(detect(unsafe), 'must flag an unpinned date format rendered from JSX').toBe",
+    "expect",
+    "detect",
+    "expect(detect(inlineJsx), 'must flag an INLINE toLocale* in JSX — 4 live cases hid here').toBe",
+    "expect(detect(arrowConst), 'must flag an arrow const, not just a function declaration').toBe",
+    "expect(detect(inComponent), 'must flag a helper inside the component body — 2 live cases').toBe",
+    "expect(detect(intl), 'must flag Intl.DateTimeFormat with no timeZone').toBe",
+    "expect(detect(pinned), 'must leave an explicit timeZone alone').toBe",
+    "expect(detect(numeric), 'must not flag Number.toLocaleString').toBe",
+    "expect(detect(currency), 'must not flag currency formatting — 3 live false positives').toBe",
+    "expect(detect(commented), 'must not flag a bug described in a comment').toBe",
+    "expect(detect(inEffect), 'must not flag a useEffect body — it never server-renders').toBe",
+    "statSync(dir).isDirectory",
+    "statSync",
+    "relative",
+    "EXEMPT.includes",
+    "readFileSync",
+    "/^['\"]use client['\"]/m.test",
+    "offenders.push",
+    "expect(\n      offenders,\n      'use <LocalTime iso={x} opts={…}/> or localFrom(x, mounted) from components/ui/time-ago, '\n        + 'or pass an explicit timeZone when the value really is defined in one',\n    ).toEqual",
+    "expect(unchecked, 'unresolvable toLocale*/Intl.DateTimeFormat call sites — widen the parser, '\n      + 'do not ignore them').toEqual"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/color-team-scope-rollup.test.ts",
    "kind": "test",
    "lines": 129,
@@ -3773,6 +4209,60 @@
     "expect((await res.json()).data).toHaveLength",
     "staffSession",
     "expect(resolveUserAccessMock).not.toHaveBeenCalled"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/companion-guide-invariants.test.ts",
+   "kind": "test",
+   "lines": 70,
+   "bytes": 2912,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync",
+      "existsSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "join",
+    "process.cwd",
+    "readFileSync",
+    "describe",
+    "it",
+    "expect(existsSync(GUIDE)).toBe",
+    "expect",
+    "existsSync",
+    "expect(page).toContain",
+    "expect(page).toMatch",
+    "guide",
+    "expect(g).toMatch",
+    "expect(guide()).toMatch",
+    "expect(g).not.toContain",
+    "expect(g).not.toMatch"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -3986,6 +4476,85 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/cron-paths-reachable.test.ts",
+   "kind": "test",
+   "lines": 92,
+   "bytes": 4471,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync",
+      "readdirSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join",
+      "relative",
+      "sep"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "join",
+    "readFileSync",
+    "s.replace(/\\/\\*[\\s\\S]*?\\*\\//g, '').replace",
+    "s.replace",
+    "readdirSync",
+    "statSync(p).isDirectory",
+    "statSync",
+    "routeFiles",
+    "out.push",
+    "relative(join(ROOT, 'app'), file).split(sep).slice(0, -1).join",
+    "relative(join(ROOT, 'app'), file).split(sep).slice",
+    "relative(join(ROOT, 'app'), file).split",
+    "relative",
+    "stripComments(MIDDLEWARE).match",
+    "stripComments",
+    "[...block[1].matchAll(/'([^']+)'/g)].map",
+    "block[1].matchAll",
+    "describe",
+    "cronExactPaths",
+    "it",
+    "expect(listed.length).toBeGreaterThan",
+    "expect",
+    "expect(listed).toContain",
+    "routeFiles(API)\n      .filter((f) => /CRON_SECRET/.test(stripComments(readFileSync(f, 'utf8'))))\n      .map(urlOf).sort",
+    "routeFiles(API)\n      .filter((f) => /CRON_SECRET/.test(stripComments(readFileSync(f, 'utf8')))).map",
+    "routeFiles(API).filter",
+    "/CRON_SECRET/.test",
+    "expect(cronRoutes.length, 'no route reads CRON_SECRET — the scan is broken').toBeGreaterThan",
+    "cronRoutes.filter",
+    "listed.includes",
+    "expect(\n      missing,\n      `these routes authenticate by Bearer CRON_SECRET but middleware refuses them before the `\n        + `handler runs, answering 401 {\"error\":\"unauthenticated\"} forever:\\n  ${missing.join('\\n  ')}`,\n    ).toEqual",
+    "missing.join",
+    "routeFiles(API).map",
+    "listed.filter",
+    "all.has",
+    "expect(dangling, `listed in CRON_EXACT_PATHS with no route on disk: ${dangling.join(', ')}`).toEqual",
+    "dangling.join"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/curation-republish.test.ts",
    "kind": "test",
    "lines": 170,
@@ -4060,8 +4629,8 @@
   {
    "file": "__tests__/deployment-migrations.test.ts",
    "kind": "test",
-   "lines": 113,
-   "bytes": 5653,
+   "lines": 173,
+   "bytes": 9104,
    "client": false,
    "exports": [],
    "imports": [
@@ -4107,10 +4676,22 @@
     "ENTRYPOINT.split",
     "expect(ENTRYPOINT).toMatch",
     "expect(\n      ENTRYPOINT,\n      'the migration invocation must override DATABASE_URL with the owner connection',\n    ).toMatch",
+    "expect(migrate, 'the runner must ask whether the role can bypass RLS').toMatch",
+    "expect(migrate, 'and refuse rather than warn').toMatch",
+    "ENTRYPOINT.split('\\n')\n      .filter((l) => /^\\s*echo /.test(l)).join",
+    "ENTRYPOINT.split('\\n').filter",
+    "/^\\s*echo /.test",
+    "expect(\n      echoed,\n      'the unset-owner warning must state the boot consequence, not just the risk',\n    ).toMatch",
+    "env.split('\\n').find",
+    "env.split",
+    "l.includes",
+    "l.startsWith",
+    "expect(row, 'DATABASE_URL_OWNER must have a row in the frontend table').toBeTruthy",
+    "expect(row, 'the row must not read as optional').not.toMatch",
+    "expect(row).toMatch",
     "expect(FRONTEND_DOCKERFILE).toMatch",
     "CMS_DOCKERFILE.split('\\n').find",
     "CMS_DOCKERFILE.split",
-    "l.startsWith",
     "expect(cmd, 'the CRM Dockerfile has no CMD').toBeTruthy",
     "expect(cmd.indexOf('db/run.sh')).toBeGreaterThan",
     "cmd.indexOf",
@@ -4119,6 +4700,56 @@
     "expect(CMS_DOCKERFILE).toMatch",
     "expect(WF).toMatch",
     "expect(WF, 'a push trigger would race the in-deployment migration').not.toMatch"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/describe-actor.test.ts",
+   "kind": "test",
+   "lines": 68,
+   "bytes": 3156,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "@/lib/event-labels",
+     "names": [
+      "describeActor"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "describe",
+    "it",
+    "expect(describeActor({ actorName: 'Kate Ulepic', actorEmail: 'k@x.com', actorId: UUID, actorType: 'user' })).toEqual",
+    "expect",
+    "describeActor",
+    "expect(describeActor({ actorEmail: 'k@x.com', actorId: UUID, actorType: 'user' }).label).toBe",
+    "expect(r.label).toBe",
+    "expect(r.label).not.toContain",
+    "expect(r.title).toBe",
+    "expect(describeActor({ actorId: 'workflow_manager', actorType: 'system' }).label).toBe",
+    "expect(describeActor({ actorId: 'lifecycle_scheduler', actorType: 'system' }).label).toBe",
+    "expect(describeActor({ actorId: 'fabric', actorType: 'agent' }).label).toBe",
+    "expect(r.label).not.toMatch",
+    "expect(describeActor({ actorId: 'ingest:sbir_gov', actorType: 'pipeline' }).label).toBe",
+    "expect(describeActor({}).label).toBe",
+    "expect(describeActor({ actorType: 'system' }).label).toBe",
+    "expect(label, JSON.stringify(i)).not.toMatch",
+    "JSON.stringify"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -5847,6 +6478,92 @@
     "validateMock.mockReturnValue",
     "expect(j.data.template.name).toBe",
     "expect(emitMock).toHaveBeenCalled"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/guide-coverage-state.test.ts",
+   "kind": "test",
+   "lines": 149,
+   "bytes": 7823,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:child_process",
+     "names": [
+      "execFileSync"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync",
+      "existsSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    },
+    {
+     "spec": "@/lib/guides/coverage",
+     "names": [
+      "effectiveState",
+      "CoverageRow"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "join",
+    "execFileSync('git', args, { cwd: REPO, encoding: 'utf8' }).trim",
+    "execFileSync",
+    "Number",
+    "git",
+    "describe",
+    "it",
+    "expect(effectiveState(row({ state: 'open', unwritten: 2 }), {})).toBe",
+    "expect",
+    "effectiveState",
+    "row",
+    "expect(effectiveState(row({ state: 'open', unwritten: 2 }), { '/admin/x': 3 })).toBe",
+    "expect(effectiveState(row({ state: 'ready' }), {})).toBe",
+    "expect(effectiveState(row({ state: 'ready' }), { '/admin/x': 1 })).toBe",
+    "expect(effectiveState(row({ state: 'stale' }), {})).toBe",
+    "expect(effectiveState(row({ state: 'stale' }), { '/admin/x': 5 })).toBe",
+    "expect(effectiveState(row({ state: 'none', guide: null }), { '/admin/x': 9 })).toBe",
+    "expect(effectiveState(row({ route: '/admin/sources' }), { '/admin/sources-archive': 4 })).toBe",
+    "execFileSync('git', ['log', '-1', '--format=%ct', '--', ...args], { cwd: REPO, encoding: 'utf8' }).trim",
+    "expect(gitWorksHere, `git could not answer in ${REPO} — the repo root is wrong`).toBe",
+    "it.skipIf",
+    "expect(at('frontend/app/admin/scouts')).toBeGreaterThan",
+    "at",
+    "expect(withoutGuide).toBeGreaterThan",
+    "expect(withoutGuide).toBeLessThanOrEqual",
+    "readFileSync",
+    "expect(src).toMatch",
+    "expect(existsSync(P)).toBe",
+    "existsSync",
+    "JSON.parse",
+    "expect(art.rows.length).toBe",
+    "expect(art.summary.none).toBeGreaterThan",
+    "expect(art.rows.some((r) => r.state === 'none')).toBe",
+    "art.rows.some"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -7637,8 +8354,8 @@
   {
    "file": "__tests__/observe-discrepancies.test.ts",
    "kind": "test",
-   "lines": 101,
-   "bytes": 5003,
+   "lines": 132,
+   "bytes": 6898,
    "client": false,
    "exports": [],
    "imports": [
@@ -7672,6 +8389,12 @@
     "expect",
     "run",
     "ev",
+    "expect(closed).toEqual",
+    "expect(open).toHaveLength",
+    "expect(open[0].what).toMatch",
+    "Date.now",
+    "expect(open[0].detail).toMatch",
+    "expect(open[0].meaning).toMatch",
     "expect(unclosed.map((d) => d.severity)).toContain",
     "unclosed.map",
     "expect(unclosed[0].what).toMatch",
@@ -11846,8 +12569,8 @@
   {
    "file": "__tests__/prospect-tables-admin-only.test.ts",
    "kind": "test",
-   "lines": 105,
-   "bytes": 4952,
+   "lines": 107,
+   "bytes": 5149,
    "client": false,
    "exports": [],
    "imports": [
@@ -12991,6 +13714,84 @@
    "jsonResponses": []
   },
   {
+   "file": "__tests__/session-policy.test.ts",
+   "kind": "test",
+   "lines": 155,
+   "bytes": 7263,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect",
+      "vi",
+      "afterEach"
+     ]
+    },
+    {
+     "spec": "@/lib/session-policy",
+     "names": [
+      "sessionEndReason",
+      "idleLimitFor",
+      "ABSOLUTE_MAX_MS",
+      "IDLE_MS",
+      "IDLE_DEFAULT_MS",
+      "HOUR",
+      "MINUTE"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "Date.UTC",
+    "describe",
+    "it",
+    "expect(sessionEndReason({ startedAt: NOW - 11 * HOUR, lastSeenAt: NOW }, 'rfp_admin', NOW)).toBeNull",
+    "expect",
+    "sessionEndReason",
+    "expect(sessionEndReason({ startedAt: NOW - 13 * HOUR, lastSeenAt: NOW }, 'rfp_admin', NOW)).toBe",
+    "expect(sessionEndReason({ startedAt: NOW - ABSOLUTE_MAX_MS, lastSeenAt: NOW }, 'rfp_admin', NOW)).toBe",
+    "expect(sessionEndReason({ startedAt: NOW + 2 * HOUR, lastSeenAt: NOW }, 'rfp_admin', NOW)).toBe",
+    "expect(sessionEndReason({ startedAt: NOW + 30_000, lastSeenAt: NOW }, 'rfp_admin', NOW)).toBeNull",
+    "expect(IDLE_MS.rfp_admin).toBeLessThan",
+    "expect(sessionEndReason({ startedAt: NOW - idle, lastSeenAt: NOW - idle }, 'tenant_admin', NOW)).toBe",
+    "expect(sessionEndReason({ startedAt: NOW - gap, lastSeenAt: NOW - gap }, 'rfp_admin', NOW)).toBe",
+    "expect(sessionEndReason({ startedAt: NOW - gap, lastSeenAt: NOW - gap }, 'tenant_admin', NOW)).toBeNull",
+    "expect(idleLimitFor('nonsense')).toBe",
+    "idleLimitFor",
+    "expect(idleLimitFor(undefined)).toBe",
+    "expect(idleLimitFor(null)).toBe",
+    "expect(IDLE_DEFAULT_MS).toBe",
+    "Math.min",
+    "Object.values",
+    "expect(sessionEndReason({}, 'tenant_admin', NOW)).toBeNull",
+    "expect(sessionEndReason({ startedAt: NOW - HOUR }, 'tenant_admin', NOW)).toBeNull",
+    "expect(sessionEndReason({ lastSeenAt: NOW - MINUTE }, 'tenant_admin', NOW)).toBeNull",
+    "expect(sessionEndReason({ startedAt: 'yesterday', lastSeenAt: null }, 'rfp_admin', NOW)).toBeNull",
+    "expect(sessionEndReason(\n      { startedAt: NOW - 20 * HOUR, lastSeenAt: NOW - 9 * HOUR }, 'rfp_admin', NOW,\n    )).toBe",
+    "afterEach",
+    "vi.unstubAllEnvs",
+    "vi.resetModules",
+    "vi.stubEnv",
+    "String",
+    "expect(fresh.ABSOLUTE_MAX_MS).toBe",
+    "expect(wide.ABSOLUTE_MAX_MS).toBe",
+    "expect(prod.idleLimitFor('rfp_admin')).toBe",
+    "prod.idleLimitFor",
+    "expect(wide.idleLimitFor('rfp_admin')).toBe",
+    "wide.idleLimitFor",
+    "expect(short.ABSOLUTE_MAX_MS).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "__tests__/source-text-cap.test.ts",
    "kind": "test",
    "lines": 114,
@@ -13046,6 +13847,108 @@
     "expect(back?.originalChars).toBe",
     "expect(extractionOf(m)).toBeNull",
     "expect(back?.capChars).toBe"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "__tests__/space-presence-invariants.test.ts",
+   "kind": "test",
+   "lines": 214,
+   "bytes": 12356,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "vitest",
+     "names": [
+      "describe",
+      "it",
+      "expect"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "readFileSync",
+      "readdirSync",
+      "statSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "join",
+    "readFileSync",
+    "readdirSync",
+    "statSync(join(ROOT, rel)).isDirectory",
+    "statSync",
+    "walk",
+    "/\\.(ts|tsx)$/.test",
+    "out.push",
+    "['app', 'lib', 'components'].flatMap",
+    "s.replace(/\\/\\*[\\s\\S]*?\\*\\//g, '').replace",
+    "s.replace",
+    "describe",
+    "it",
+    "SOURCES.filter",
+    "stripComments",
+    "read",
+    "PAIRED.some",
+    "new RegExp(`type:\\\\s*['\"\\`]${t.replace('.', '\\\\.')}['\"\\`]`).test",
+    "t.replace",
+    "/EVENTS\\s*\\[\\s*kind\\s*\\]\\s*\\.(enter|exit)/.test",
+    "expect(emitters, `unexpected emitter(s): ${emitters.join(', ')}`).toEqual",
+    "expect",
+    "emitters.join",
+    "src.slice",
+    "src.indexOf",
+    "block.matchAll",
+    "expect(doors.length, 'no door parsed — the shape changed').toBeGreaterThanOrEqual",
+    "expect(enter, `${kind} has no enter`).toBeTruthy",
+    "expect(exit, `${kind} has no exit`).toBeTruthy",
+    "expect(enter, `${kind}: enter and exit are the same event`).not.toBe",
+    "expect(src).toMatch",
+    "expect(src).not.toMatch",
+    "expect(src, `${f} still emits directly`).not.toMatch",
+    "expect(src, `${f} does not use the seam`).toMatch",
+    "expect(src, 'the explicit ascend is still wired').toMatch",
+    "expect(lib, `${r} missing from the CloseReason type`).toContain",
+    "expect(mig, `${r} missing from the CHECK`).toContain",
+    "['app/portal/[tenantSlug]/layout.tsx', 'app/admin/layout.tsx',\n                     'app/partner/page.tsx', 'app/api/partner/exit/route.ts',\n                     'app/api/admin/shadow-transition/route.ts', 'lib/space-presence.ts',\n                     'auth.ts']\n      .map((f) => stripComments(read(f))).join",
+    "['app/portal/[tenantSlug]/layout.tsx', 'app/admin/layout.tsx',\n                     'app/partner/page.tsx', 'app/api/partner/exit/route.ts',\n                     'app/api/admin/shadow-transition/route.ts', 'lib/space-presence.ts',\n                     'auth.ts'].map",
+    "expect(callers, `nothing ever closes with '${r}'`).toContain",
+    "expect(src, 'no signOut event').toMatch",
+    "expect(lib).not.toMatch",
+    "lib.slice",
+    "lib.indexOf",
+    "expect(fn, 'touchPresence must not INSERT').not.toMatch",
+    "expect(fn, 'must only touch open brackets').toMatch",
+    "expect(fn, 'must not clear closed_at').not.toMatch",
+    "expect(fn).toMatch",
+    "Number",
+    "/INTERVAL_MS = (\\d+)/.exec",
+    "expect(mins, 'INTERVAL_MS shape changed').toBeGreaterThan",
+    "/idleMinutes = (\\d+)/.exec",
+    "expect(floor, 'sweep floor shape changed').toBeGreaterThan",
+    "expect(mins * 2, 'ping interval is not comfortably inside the sweep floor').toBeLessThan",
+    "expect(layout).toMatch",
+    "expect(lib, `${r} has no written sentence`).toMatch",
+    "expect(page).toMatch",
+    "expect(page).not.toMatch",
+    "expect(page, 'must not be a client component').not.toMatch",
+    "expect(lib, 'duration must come from getTime(), not a sliced string').toMatch",
+    "expect(lib).toMatch",
+    "expect(read('middleware.ts')).toContain"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -19575,7 +20478,7 @@
    "file": "app/(marketing)/resources/[slug]/page.tsx",
    "kind": "page",
    "lines": 151,
-   "bytes": 5172,
+   "bytes": 5176,
    "client": false,
    "exports": [
     {
@@ -20488,8 +21391,8 @@
   {
    "file": "app/admin/architecture/page.tsx",
    "kind": "page",
-   "lines": 61,
-   "bytes": 2789,
+   "lines": 66,
+   "bytes": 3149,
    "client": false,
    "exports": [
     {
@@ -21289,8 +22192,8 @@
   {
    "file": "app/admin/dashboard/page.tsx",
    "kind": "page",
-   "lines": 272,
-   "bytes": 11355,
+   "lines": 281,
+   "bytes": 11980,
    "client": false,
    "exports": [
     {
@@ -21309,6 +22212,12 @@
      "spec": "@/auth",
      "names": [
       "auth"
+     ]
+    },
+    {
+     "spec": "@/components/admin/descent-timeout-notice",
+     "names": [
+      "DescentTimeoutNotice"
      ]
     },
     {
@@ -21347,35 +22256,23 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 84
+     "line": 92
     },
     {
      "tag": "sql",
-     "line": 85
+     "line": 93
     },
     {
      "tag": "sql",
-     "line": 86
+     "line": 94
     },
     {
      "tag": "sql",
-     "line": 87
+     "line": 95
     },
     {
      "tag": "sql",
-     "line": 88
-    },
-    {
-     "tag": "sql",
-     "line": 89
-    },
-    {
-     "tag": "sql",
-     "line": 90
-    },
-    {
-     "tag": "sql",
-     "line": 91
+     "line": 96
     },
     {
      "tag": "sql",
@@ -21383,11 +22280,23 @@
     },
     {
      "tag": "sql",
-     "line": 132
+     "line": 98
+    },
+    {
+     "tag": "sql",
+     "line": 99
+    },
+    {
+     "tag": "sql",
+     "line": 105
     },
     {
      "tag": "sql",
      "line": 140
+    },
+    {
+     "tag": "sql",
+     "line": 148
     }
    ],
    "calls": [
@@ -21408,6 +22317,7 @@
     "recentEvents.map"
    ],
    "jsx": [
+    "DescentTimeoutNotice",
     "StatCard",
     "TaskQueue",
     "Link"
@@ -21514,8 +22424,8 @@
   {
    "file": "app/admin/documents/document-list-client.tsx",
    "kind": "app-component",
-   "lines": 306,
-   "bytes": 11176,
+   "lines": 309,
+   "bytes": 11488,
    "client": true,
    "exports": [
     {
@@ -21540,6 +22450,12 @@
      ]
     },
     {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "LocalTime"
+     ]
+    },
+    {
      "spec": "@/lib/toast",
      "names": [
       "toast"
@@ -21550,7 +22466,6 @@
    "sqlTags": [],
    "calls": [
     "PRESETS.find",
-    "d.toLocaleDateString",
     "useRouter",
     "useState",
     "useCallback",
@@ -21578,10 +22493,11 @@
     "setPreset",
     "documents.map",
     "formatPresetLabel",
-    "formatDate",
     "handleDelete"
    ],
-   "jsx": [],
+   "jsx": [
+    "LocalTime"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -21643,8 +22559,8 @@
   {
    "file": "app/admin/events/event-stream-client.tsx",
    "kind": "app-component",
-   "lines": 320,
-   "bytes": 13704,
+   "lines": 324,
+   "bytes": 13838,
    "client": true,
    "exports": [
     {
@@ -22049,10 +22965,140 @@
    "params": []
   },
   {
+   "file": "app/admin/guides/page.tsx",
+   "kind": "page",
+   "lines": 154,
+   "bytes": 8087,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "GuideCoveragePage",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/link",
+     "names": [
+      "Link"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "redirect"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/guides/coverage",
+     "names": [
+      "getCoverage",
+      "effectiveState",
+      "STATE_COPY",
+      "GuideState"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "redirect",
+    "hasRoleAtLeast",
+    "getCoverage",
+    "cov.rows.map",
+    "effectiveState",
+    "rows.filter",
+    "[...rows].sort",
+    "a.route.localeCompare",
+    "(['stale', 'open', 'none', 'ready'] as GuideState[]).map",
+    "count",
+    "sorted.map",
+    "r.route.includes",
+    "new Date(cov.generatedAt).toISOString().slice",
+    "new Date(cov.generatedAt).toISOString"
+   ],
+   "jsx": [
+    "Link"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [],
+   "route": "/admin/guides",
+   "dynamic": true,
+   "params": []
+  },
+  {
+   "file": "app/admin/intake/intake-guide.tsx",
+   "kind": "app-component",
+   "lines": 105,
+   "bytes": 5087,
+   "client": false,
+   "exports": [
+    {
+     "name": "IntakeGuide",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/components/admin/guide",
+     "names": [
+      "GuideCard",
+      "Step",
+      "P",
+      "Ul",
+      "Ctl",
+      "Code",
+      "Careful",
+      "Unwritten",
+      "Canon"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Careful",
+    "Ctl",
+    "Code",
+    "Ul",
+    "Unwritten",
+    "Canon"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "app/admin/intake/page.tsx",
    "kind": "page",
-   "lines": 33,
-   "bytes": 1430,
+   "lines": 35,
+   "bytes": 1494,
    "client": false,
    "exports": [
     {
@@ -22102,6 +23148,12 @@
      "names": [
       "loadIntakeStageCounts"
      ]
+    },
+    {
+     "spec": "./intake-guide",
+     "names": [
+      "IntakeGuide"
+     ]
     }
    ],
    "tryCount": 0,
@@ -22113,6 +23165,7 @@
    ],
    "jsx": [
     "IntakeStageStrip",
+    "IntakeGuide",
     "IntakeForm"
    ],
    "snakeRowTypes": [],
@@ -22125,8 +23178,8 @@
   {
    "file": "app/admin/layout.tsx",
    "kind": "layout",
-   "lines": 70,
-   "bytes": 3384,
+   "lines": 88,
+   "bytes": 4359,
    "client": false,
    "exports": [
     {
@@ -22189,6 +23242,12 @@
      "names": [
       "NavShell"
      ]
+    },
+    {
+     "spec": "@/lib/space-presence",
+     "names": [
+      "closePresence"
+     ]
     }
    ],
    "tryCount": 0,
@@ -22197,6 +23256,7 @@
     "auth",
     "isRole",
     "visibleAdminNav",
+    "closePresence",
     "nav.map",
     "section.items.map",
     "item.children.map"
@@ -22216,10 +23276,153 @@
    "params": []
   },
   {
+   "file": "app/admin/notes/page.tsx",
+   "kind": "page",
+   "lines": 226,
+   "bytes": 10896,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "NotesPage",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "redirect"
+     ]
+    },
+    {
+     "spec": "next/link",
+     "names": [
+      "Link"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "existsSync"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "join"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/working-notes",
+     "names": [
+      "listNotes",
+      "staleAnchors",
+      "WorkingNote",
+      "AnchorKind"
+     ]
+    },
+    {
+     "spec": "@/components/admin/note-composer",
+     "names": [
+      "NoteComposer"
+     ]
+    },
+    {
+     "spec": "@/components/admin/note-actions",
+     "names": [
+      "NoteActions"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "new Date(d).toISOString().slice(0, 16).replace",
+    "new Date(d).toISOString().slice",
+    "new Date(d).toISOString",
+    "process.cwd",
+    "join",
+    "existsSync",
+    "anchor.split('?')[0].replace",
+    "anchor.split",
+    "anchor.replace",
+    "auth",
+    "redirect",
+    "hasRoleAtLeast",
+    "listNotes",
+    "console.error",
+    "repoRoot",
+    "staleAnchors(notes, makeAnchorCheck(root)).map",
+    "staleAnchors",
+    "makeAnchorCheck",
+    "notes.filter",
+    "notes.some",
+    "notes.map",
+    "stale.has",
+    "day",
+    "n.commitSha.slice"
+   ],
+   "jsx": [
+    "Link",
+    "NoteComposer",
+    "NoteActions"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [],
+   "route": "/admin/notes",
+   "dynamic": true,
+   "params": []
+  },
+  {
+   "file": "app/admin/observe/companion-guide.tsx",
+   "kind": "app-component",
+   "lines": 112,
+   "bytes": 6728,
+   "client": false,
+   "exports": [
+    {
+     "name": "CompanionGuide",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [
+    "H",
+    "Code"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "app/admin/observe/page.tsx",
    "kind": "page",
-   "lines": 211,
-   "bytes": 10384,
+   "lines": 226,
+   "bytes": 11472,
    "client": false,
    "exports": [
     {
@@ -22266,6 +23469,18 @@
       "clampWindow",
       "Observation"
      ]
+    },
+    {
+     "spec": "@/components/admin/companion-button",
+     "names": [
+      "CompanionButton"
+     ]
+    },
+    {
+     "spec": "./companion-guide",
+     "names": [
+      "CompanionGuide"
+     ]
     }
    ],
    "tryCount": 1,
@@ -22292,6 +23507,8 @@
    ],
    "jsx": [
     "Link",
+    "CompanionGuide",
+    "CompanionButton",
     "Card",
     "Empty"
    ],
@@ -22600,8 +23817,8 @@
   {
    "file": "app/admin/process/process-monitor-client.tsx",
    "kind": "app-component",
-   "lines": 485,
-   "bytes": 20413,
+   "lines": 490,
+   "bytes": 20611,
    "client": true,
    "exports": [
     {
@@ -23019,8 +24236,8 @@
   {
    "file": "app/admin/provisioning/[portalId]/page.tsx",
    "kind": "page",
-   "lines": 268,
-   "bytes": 12959,
+   "lines": 270,
+   "bytes": 13041,
    "client": false,
    "exports": [
     {
@@ -23072,21 +24289,27 @@
      "names": [
       "CurationNotesPanel"
      ]
+    },
+    {
+     "spec": "./provisioning-guide",
+     "names": [
+      "ProvisioningGuide"
+     ]
     }
    ],
    "tryCount": 3,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 42
+     "line": 43
     },
     {
      "tag": "sql",
-     "line": 63
+     "line": 64
     },
     {
      "tag": "sql",
-     "line": 80
+     "line": 81
     }
    ],
    "calls": [
@@ -23101,6 +24324,7 @@
     "new Date(createdAt).toLocaleDateString"
    ],
    "jsx": [
+    "ProvisioningGuide",
     "StatusBadge",
     "ReadinessBars",
     "SlaBlock",
@@ -23117,6 +24341,51 @@
    "params": [
     "[portalId]"
    ]
+  },
+  {
+   "file": "app/admin/provisioning/[portalId]/provisioning-guide.tsx",
+   "kind": "app-component",
+   "lines": 98,
+   "bytes": 4933,
+   "client": false,
+   "exports": [
+    {
+     "name": "ProvisioningGuide",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/components/admin/guide",
+     "names": [
+      "GuideCard",
+      "Step",
+      "P",
+      "Ul",
+      "Ctl",
+      "Careful",
+      "Unwritten",
+      "Canon"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Careful",
+    "Ctl",
+    "Ul",
+    "Unwritten",
+    "Canon"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
   },
   {
    "file": "app/admin/provisioning/[portalId]/release-panel.tsx",
@@ -23430,10 +24699,57 @@
    "params": []
   },
   {
+   "file": "app/admin/rfp-curation/[solId]/curation-guide.tsx",
+   "kind": "app-component",
+   "lines": 137,
+   "bytes": 7106,
+   "client": false,
+   "exports": [
+    {
+     "name": "CurationGuide",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/components/admin/guide",
+     "names": [
+      "GuideCard",
+      "Step",
+      "P",
+      "Ul",
+      "Ctl",
+      "Code",
+      "Careful",
+      "Unwritten",
+      "Canon"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [
+    "GuideCard",
+    "P",
+    "Ctl",
+    "Step",
+    "Code",
+    "Careful",
+    "Ul",
+    "Unwritten",
+    "Canon"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "app/admin/rfp-curation/[solId]/page.tsx",
    "kind": "page",
-   "lines": 424,
-   "bytes": 14702,
+   "lines": 426,
+   "bytes": 14772,
    "client": false,
    "exports": [
     {
@@ -23478,49 +24794,55 @@
      "names": [
       "SpotlightSummaryEditor"
      ]
+    },
+    {
+     "spec": "./curation-guide",
+     "names": [
+      "CurationGuide"
+     ]
     }
    ],
    "tryCount": 5,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 80
+     "line": 81
     },
     {
      "tag": "sql",
-     "line": 97
+     "line": 98
     },
     {
      "tag": "sql",
-     "line": 101
+     "line": 102
     },
     {
      "tag": "sql",
-     "line": 108
+     "line": 109
     },
     {
      "tag": "sql",
-     "line": 119
+     "line": 120
     },
     {
      "tag": "sql",
-     "line": 128
+     "line": 129
     },
     {
      "tag": "sql",
-     "line": 218
+     "line": 219
     },
     {
      "tag": "sql",
-     "line": 241
+     "line": 242
     },
     {
      "tag": "sql",
-     "line": 329
+     "line": 330
     },
     {
      "tag": "sql",
-     "line": 386
+     "line": 387
     }
    ],
    "calls": [
@@ -23551,6 +24873,7 @@
    ],
    "jsx": [
     "SpotlightSummaryEditor",
+    "CurationGuide",
     "CurationWorkspace"
    ],
    "snakeRowTypes": [],
@@ -23704,10 +25027,55 @@
    ]
   },
   {
+   "file": "app/admin/rfp-curation/curation-queue-guide.tsx",
+   "kind": "app-component",
+   "lines": 60,
+   "bytes": 2798,
+   "client": false,
+   "exports": [
+    {
+     "name": "CurationQueueGuide",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/components/admin/guide",
+     "names": [
+      "GuideCard",
+      "Step",
+      "P",
+      "Ul",
+      "Ctl",
+      "Careful",
+      "Unwritten",
+      "Canon"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Ctl",
+    "Unwritten",
+    "Ul",
+    "Careful",
+    "Canon"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "app/admin/rfp-curation/page.tsx",
    "kind": "page",
-   "lines": 113,
-   "bytes": 3416,
+   "lines": 115,
+   "bytes": 3502,
    "client": false,
    "exports": [
     {
@@ -23763,13 +25131,19 @@
      "names": [
       "loadIntakeStageCounts"
      ]
+    },
+    {
+     "spec": "./curation-queue-guide",
+     "names": [
+      "CurationQueueGuide"
+     ]
     }
    ],
    "tryCount": 1,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 37
+     "line": 38
     }
    ],
    "calls": [
@@ -23785,6 +25159,7 @@
    ],
    "jsx": [
     "IntakeStageStrip",
+    "CurationQueueGuide",
     "TriageTodos",
     "TriageQueue"
    ],
@@ -23888,8 +25263,8 @@
   {
    "file": "app/admin/scouts/page.tsx",
    "kind": "page",
-   "lines": 294,
-   "bytes": 15026,
+   "lines": 296,
+   "bytes": 15090,
    "client": false,
    "exports": [
     {
@@ -23945,21 +25320,27 @@
      "names": [
       "loadIntakeStageCounts"
      ]
+    },
+    {
+     "spec": "./scouts-guide",
+     "names": [
+      "ScoutsGuide"
+     ]
     }
    ],
    "tryCount": 3,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 134
+     "line": 135
     },
     {
      "tag": "sql",
-     "line": 146
+     "line": 147
     },
     {
      "tag": "sql",
-     "line": 152
+     "line": 153
     }
    ],
    "calls": [
@@ -23987,6 +25368,7 @@
    ],
    "jsx": [
     "IntakeStageStrip",
+    "ScoutsGuide",
     "Link",
     "ScoutCandidateQueue"
    ],
@@ -23996,6 +25378,53 @@
    "route": "/admin/scouts",
    "dynamic": true,
    "params": []
+  },
+  {
+   "file": "app/admin/scouts/scouts-guide.tsx",
+   "kind": "app-component",
+   "lines": 107,
+   "bytes": 5532,
+   "client": false,
+   "exports": [
+    {
+     "name": "ScoutsGuide",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/components/admin/guide",
+     "names": [
+      "GuideCard",
+      "Step",
+      "P",
+      "Ul",
+      "Ctl",
+      "Code",
+      "Careful",
+      "Unwritten",
+      "Canon"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Ul",
+    "Ctl",
+    "Careful",
+    "Unwritten",
+    "Code",
+    "Canon"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
   },
   {
    "file": "app/admin/site/[pageKey]/editor-client.tsx",
@@ -24729,8 +26158,8 @@
   {
    "file": "app/admin/sources/page.tsx",
    "kind": "page",
-   "lines": 201,
-   "bytes": 5910,
+   "lines": 203,
+   "bytes": 5977,
    "client": false,
    "exports": [
     {
@@ -24783,21 +26212,27 @@
      "names": [
       "loadIntakeStageCounts"
      ]
+    },
+    {
+     "spec": "./sources-guide",
+     "names": [
+      "SourcesGuide"
+     ]
     }
    ],
    "tryCount": 3,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 82
+     "line": 83
     },
     {
      "tag": "sql",
-     "line": 95
+     "line": 96
     },
     {
      "tag": "sql",
-     "line": 107
+     "line": 108
     }
    ],
    "calls": [
@@ -24818,6 +26253,7 @@
    ],
    "jsx": [
     "IntakeStageStrip",
+    "SourcesGuide",
     "SourcesHub"
    ],
    "snakeRowTypes": [],
@@ -24826,6 +26262,52 @@
    "route": "/admin/sources",
    "dynamic": true,
    "params": []
+  },
+  {
+   "file": "app/admin/sources/sources-guide.tsx",
+   "kind": "app-component",
+   "lines": 80,
+   "bytes": 3848,
+   "client": false,
+   "exports": [
+    {
+     "name": "SourcesGuide",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/components/admin/guide",
+     "names": [
+      "GuideCard",
+      "Step",
+      "P",
+      "Ul",
+      "Ctl",
+      "Code",
+      "Careful",
+      "Unwritten",
+      "Canon"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [
+    "GuideCard",
+    "P",
+    "Step",
+    "Unwritten",
+    "Ctl",
+    "Careful",
+    "Code",
+    "Canon"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
   },
   {
    "file": "app/admin/storage/page.tsx",
@@ -25184,8 +26666,8 @@
   {
    "file": "app/admin/system-state/system-state-client.tsx",
    "kind": "app-component",
-   "lines": 1309,
-   "bytes": 52384,
+   "lines": 1312,
+   "bytes": 52754,
    "client": true,
    "exports": [
     {
@@ -25205,7 +26687,8 @@
      "spec": "@/components/ui/time-ago",
      "names": [
       "TimeAgo",
-      "Elapsed"
+      "Elapsed",
+      "LocalTime"
      ]
     },
     {
@@ -25249,7 +26732,6 @@
     "c.toUpperCase",
     "JSON.stringify",
     "s.slice",
-    "d.toLocaleTimeString",
     "cards.map",
     "fmtNum",
     "Object.values(workflow.stepStatus).filter",
@@ -25290,7 +26772,6 @@
     "nsMap.values",
     "namespaces.map",
     "hours.map",
-    "formatHour",
     "nsMap.get",
     "hours.indexOf",
     "names.reduce",
@@ -25339,6 +26820,7 @@
     "Elapsed",
     "TimeAgo",
     "TreeNode",
+    "LocalTime",
     "HealthBar",
     "WorkflowCard",
     "PipelineSection",
@@ -25494,8 +26976,8 @@
   {
    "file": "app/admin/templates/page.tsx",
    "kind": "page",
-   "lines": 448,
-   "bytes": 18937,
+   "lines": 451,
+   "bytes": 19057,
    "client": true,
    "exports": [
     {
@@ -26335,7 +27817,7 @@
    "file": "app/admin/workflows/workflow-monitor-client.tsx",
    "kind": "app-component",
    "lines": 692,
-   "bytes": 31391,
+   "bytes": 31472,
    "client": true,
    "exports": [
     {
@@ -26585,6 +28067,150 @@
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
+  },
+  {
+   "file": "app/admin/workspace-access/end-access-button.tsx",
+   "kind": "app-component",
+   "lines": 73,
+   "bytes": 2842,
+   "client": true,
+   "exports": [
+    {
+     "name": "EndAccessButton",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useState"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "useRouter"
+     ]
+    },
+    {
+     "spec": "@/lib/toast",
+     "names": [
+      "toast"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "useState",
+    "useRouter",
+    "confirm",
+    "setBusy",
+    "fetch",
+    "JSON.stringify",
+    "res.json().catch",
+    "res.json",
+    "toast",
+    "router.refresh"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "app/admin/workspace-access/page.tsx",
+   "kind": "page",
+   "lines": 182,
+   "bytes": 9785,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "metadata",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "WorkspaceAccessPage",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "./end-access-button",
+     "names": [
+      "EndAccessButton"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "redirect"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "isRole",
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/space-presence-oversight",
+     "names": [
+      "openPresences",
+      "recentPresences",
+      "REASON_COPY",
+      "minutesBetween",
+      "humanDuration"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "isRole",
+    "hasRoleAtLeast",
+    "redirect",
+    "Promise.all",
+    "openPresences",
+    "recentPresences",
+    "now.toISOString().replace('T', ' ').slice",
+    "now.toISOString().replace",
+    "now.toISOString",
+    "open.map",
+    "minutesBetween",
+    "humanDuration",
+    "recent.map",
+    "p.closedAt.toISOString().replace('T', ' ').slice",
+    "p.closedAt.toISOString().replace",
+    "p.closedAt.toISOString"
+   ],
+   "jsx": [
+    "EndAccessButton"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [],
+   "route": "/admin/workspace-access",
+   "dynamic": true,
+   "params": []
   },
   {
    "file": "app/api/admin/agent-gates/sweep/route.ts",
@@ -27722,6 +29348,84 @@
    ],
    "runtime": null,
    "dynamic": false
+  },
+  {
+   "file": "app/api/admin/architecture/live/route.ts",
+   "kind": "api-route",
+   "lines": 44,
+   "bytes": 2018,
+   "client": false,
+   "exports": [
+    {
+     "name": "dynamic",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "GET",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/architecture-live",
+     "names": [
+      "architectureLive"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "NextResponse.json",
+    "architectureLive",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 30
+    },
+    {
+     "arg": "{ error: 'Admin access required', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 34
+    },
+    {
+     "arg": "{ data: await architectureLive() }",
+     "opts": "",
+     "line": 38
+    },
+    {
+     "arg": "{ error: 'Failed to read table activity', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 41
+    }
+   ],
+   "route": "/api/admin/architecture/live",
+   "methods": [
+    "GET"
+   ],
+   "runtime": null,
+   "dynamic": true
   },
   {
    "file": "app/api/admin/architecture/schema/route.ts",
@@ -29980,6 +31684,311 @@
     }
    ],
    "route": "/api/admin/intake",
+   "methods": [
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/admin/notes/[noteId]/route.ts",
+   "kind": "api-route",
+   "lines": 51,
+   "bytes": 2414,
+   "client": false,
+   "exports": [
+    {
+     "name": "PATCH",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/working-notes",
+     "names": [
+      "setNoteState",
+      "NoteState"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "STATES.includes",
+    "auth",
+    "NextResponse.json",
+    "hasRoleAtLeast",
+    "request.json",
+    "isState",
+    "setNoteState",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Not signed in', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 20
+    },
+    {
+     "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 25
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
+     "opts": "{ status: 400 }",
+     "line": 31
+    },
+    {
+     "arg": "{ error: 'from and to must be watching, seen or resolved', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 34
+    },
+    {
+     "arg": "{ error: 'That note is no longer in the state you saw — someone moved it first.', code: 'STALE_STATE' }",
+     "opts": "{ status: 409 }",
+     "line": 40
+    },
+    {
+     "arg": "{ data: { id: noteId, state: body.to } }",
+     "opts": "",
+     "line": 45
+    },
+    {
+     "arg": "{ error: 'Failed to update the note', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 48
+    }
+   ],
+   "route": "/api/admin/notes/[noteId]",
+   "methods": [
+    "PATCH"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/admin/notes/route.ts",
+   "kind": "api-route",
+   "lines": 83,
+   "bytes": 3924,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/working-notes",
+     "names": [
+      "addNote",
+      "AnchorKind"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "anchor.startsWith",
+    "/\\.[a-z]{2,4}$/i.test",
+    "anchor.includes",
+    "auth",
+    "NextResponse.json",
+    "hasRoleAtLeast",
+    "request.json",
+    "body.note.trim",
+    "body.anchor.trim",
+    "DISPOSITIONS.find",
+    "addNote",
+    "inferKind",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Not signed in', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 26
+    },
+    {
+     "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 31
+    },
+    {
+     "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
+     "opts": "{ status: 400 }",
+     "line": 36
+    },
+    {
+     "arg": "{ error: 'note is required', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 40
+    },
+    {
+     "arg": "{ error: 'note is too long (max 4000)', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 43
+    },
+    {
+     "arg": "{ error: 'Could not save the note', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 75
+    },
+    {
+     "arg": "{ data: { id } }",
+     "opts": "{ status: 201 }",
+     "line": 77
+    },
+    {
+     "arg": "{ error: 'Failed to add the note', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 80
+    }
+   ],
+   "route": "/api/admin/notes",
+   "methods": [
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/admin/observe/route.ts",
+   "kind": "api-route",
+   "lines": 85,
+   "bytes": 4535,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "hasRoleAtLeast",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "withEventBracket",
+      "userActor"
+     ]
+    },
+    {
+     "spec": "@/lib/observe",
+     "names": [
+      "clampWindow",
+      "observe"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "NextResponse.json",
+    "hasRoleAtLeast",
+    "request.json",
+    "clampWindow",
+    "body.doing.trim().slice",
+    "body.doing.trim",
+    "observe",
+    "console.error",
+    "withEventBracket",
+    "userActor"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Not signed in', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 24
+    },
+    {
+     "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 29
+    },
+    {
+     "arg": "{ data: { minutes, requested: true, findingCount: findings.length } }",
+     "opts": "",
+     "line": 79
+    },
+    {
+     "arg": "{ error: 'Failed to request the read', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 82
+    }
+   ],
+   "route": "/api/admin/observe",
    "methods": [
     "POST"
    ],
@@ -36068,8 +38077,8 @@
   {
    "file": "app/api/admin/shadow-transition/route.ts",
    "kind": "api-route",
-   "lines": 50,
-   "bytes": 2732,
+   "lines": 68,
+   "bytes": 3731,
    "client": false,
    "exports": [
     {
@@ -36106,10 +38115,10 @@
      ]
     },
     {
-     "spec": "@/lib/events",
+     "spec": "@/lib/space-presence",
      "names": [
-      "emitEventSingle",
-      "userActor"
+      "openPresence",
+      "closePresence"
      ]
     }
    ],
@@ -36122,8 +38131,8 @@
     "hasRoleAtLeast",
     "request.json",
     "isValidUUID",
-    "emitEventSingle",
-    "userActor",
+    "openPresence",
+    "closePresence",
     "console.error"
    ],
    "jsx": [],
@@ -36156,14 +38165,19 @@
      "line": 32
     },
     {
+     "arg": "{ error: 'tenantId is required to record a descent', code: 'VALIDATION_ERROR' }",
+     "opts": "{ status: 400 }",
+     "line": 52
+    },
+    {
      "arg": "{ data: { ok: true } }",
      "opts": "",
-     "line": 44
+     "line": 62
     },
     {
      "arg": "{ error: 'Failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 47
+     "line": 65
     }
    ],
    "route": "/api/admin/shadow-transition",
@@ -38240,6 +40254,91 @@
    "dynamic": false
   },
   {
+   "file": "app/api/admin/space-presence/sweep/route.ts",
+   "kind": "api-route",
+   "lines": 67,
+   "bytes": 3458,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/space-presence",
+     "names": [
+      "sweepStalePresence"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "request.headers.get",
+    "auth",
+    "NextResponse.json",
+    "request.json",
+    "Number.isFinite",
+    "Math.min",
+    "Math.max",
+    "Math.trunc",
+    "sweepStalePresence",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 40
+    },
+    {
+     "arg": "{ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 44
+    },
+    {
+     "arg": "{ data: { closed, idleMinutes } }",
+     "opts": "",
+     "line": 61
+    },
+    {
+     "arg": "{ error: 'Sweep failed', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 64
+    }
+   ],
+   "route": "/api/admin/space-presence/sweep",
+   "methods": [
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
    "file": "app/api/admin/storage/route.ts",
    "kind": "api-route",
    "lines": 510,
@@ -38824,6 +40923,92 @@
    "route": "/api/admin/tasks",
    "methods": [
     "GET",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
+   "file": "app/api/admin/tasks/sweep-claims/route.ts",
+   "kind": "api-route",
+   "lines": 59,
+   "bytes": 2988,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/tasks/tasks",
+     "names": [
+      "sweepStaleClaims",
+      "CLAIM_STALE_MINUTES"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [],
+   "calls": [
+    "request.headers.get",
+    "auth",
+    "NextResponse.json",
+    "request.json",
+    "Number.isFinite",
+    "Math.min",
+    "Math.max",
+    "Math.trunc",
+    "sweepStaleClaims",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 32
+    },
+    {
+     "arg": "{ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 36
+    },
+    {
+     "arg": "{ data: { released, staleMinutes } }",
+     "opts": "",
+     "line": 53
+    },
+    {
+     "arg": "{ error: 'Sweep failed', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 56
+    }
+   ],
+   "route": "/api/admin/tasks/sweep-claims",
+   "methods": [
     "POST"
    ],
    "runtime": null,
@@ -41640,6 +43825,135 @@
    "dynamic": false
   },
   {
+   "file": "app/api/admin/workspace-access/force-ascend/route.ts",
+   "kind": "api-route",
+   "lines": 97,
+   "bytes": 4688,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sqlBypass"
+     ]
+    },
+    {
+     "spec": "@/lib/space-presence",
+     "names": [
+      "forceAscend",
+      "FORCED_ASCENT_COOLDOWN_MS"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "userActor"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sqlBypass",
+     "line": 63
+    }
+   ],
+   "calls": [
+    "auth",
+    "NextResponse.json",
+    "request.json",
+    "/^[0-9a-f-]{36}$/i.test",
+    "forceAscend",
+    "emitEventSingle({\n      namespace: 'identity',\n      type: 'presence.force_ended',\n      actor: userActor(me.id, me.email ?? undefined),\n      tenantId,\n      payload: {\n        targetUserId: userId,\n        targetEmail: target.email,\n        bracketsClosed: closed,\n        cooldownMs: FORCED_ASCENT_COOLDOWN_MS,\n      },\n    }).catch",
+    "emitEventSingle",
+    "userActor",
+    "Math.round",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 31
+    },
+    {
+     "arg": "{ error: 'rfp_admin or master_admin role required', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 34
+    },
+    {
+     "arg": "{ error: 'A JSON body is required', code: 'INVALID_INPUT' }",
+     "opts": "{ status: 400 }",
+     "line": 41
+    },
+    {
+     "arg": "{ error: 'A valid userId is required', code: 'INVALID_INPUT' }",
+     "opts": "{ status: 400 }",
+     "line": 46
+    },
+    {
+     "arg": "{ error: 'tenantId must be a uuid', code: 'INVALID_INPUT' }",
+     "opts": "{ status: 400 }",
+     "line": 49
+    },
+    {
+     "arg": "{ error: 'Use the exit control to leave a workspace yourself.', code: 'SELF_TARGET' }",
+     "opts": "{ status: 400 }",
+     "line": 56
+    },
+    {
+     "arg": "{ error: 'No such user', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 66
+    },
+    {
+     "arg": "{\n      data: { closed, cooldownMinutes: Math.round(FORCED_ASCENT_COOLDOWN_MS / 60_000) },\n    }",
+     "opts": "",
+     "line": 89
+    },
+    {
+     "arg": "{ error: 'Could not end the session', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 94
+    }
+   ],
+   "route": "/api/admin/workspace-access/force-ascend",
+   "methods": [
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
    "file": "app/api/analytics/pageview/route.ts",
    "kind": "api-route",
    "lines": 167,
@@ -43011,8 +45325,8 @@
   {
    "file": "app/api/health/route.ts",
    "kind": "api-route",
-   "lines": 129,
-   "bytes": 4072,
+   "lines": 296,
+   "bytes": 12968,
    "client": false,
    "exports": [
     {
@@ -43036,7 +45350,8 @@
     {
      "spec": "@/lib/db",
      "names": [
-      "sql"
+      "sql",
+      "sqlBypass"
      ]
     },
     {
@@ -43050,13 +45365,29 @@
      "names": [
       "createLogger"
      ]
+    },
+    {
+     "spec": "@/lib/session-policy",
+     "names": [
+      "ABSOLUTE_MAX_MS",
+      "IDLE_MS",
+      "idleLimitFor"
+     ]
     }
    ],
-   "tryCount": 3,
+   "tryCount": 5,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 90
+     "line": 126
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 177
+    },
+    {
+     "tag": "sql",
+     "line": 259
     }
    ],
    "calls": [
@@ -43066,12 +45397,19 @@
     "Promise.all",
     "checkDb",
     "checkS3",
+    "checkBypass",
+    "checkScoped",
     "log.warn",
+    "Object.fromEntries",
+    "Object.keys(IDLE_MS).map",
+    "Object.keys",
+    "idleLimitFor",
     "log.debug",
     "NextResponse.json",
     "log.error",
     "truncateDetail",
     "String",
+    "Boolean",
     "pingS3",
     "s.slice"
    ],
@@ -43082,7 +45420,7 @@
     {
      "arg": "body",
      "opts": "{ status: 200 }",
-     "line": 85
+     "line": 121
     }
    ],
    "route": "/api/health",
@@ -43273,8 +45611,8 @@
   {
    "file": "app/api/partner/enter/route.ts",
    "kind": "api-route",
-   "lines": 82,
-   "bytes": 4665,
+   "lines": 84,
+   "bytes": 4924,
    "client": false,
    "exports": [
     {
@@ -43319,14 +45657,13 @@
      ]
     },
     {
-     "spec": "@/lib/events",
+     "spec": "@/lib/space-presence",
      "names": [
-      "emitEventSingle",
-      "userActor"
+      "openPresence"
      ]
     }
    ],
-   "tryCount": 3,
+   "tryCount": 2,
    "sqlTags": [
     {
      "tag": "sqlBypass",
@@ -43348,8 +45685,7 @@
     "req.nextUrl.searchParams.get",
     "partnerCanEnter",
     "unstable_update",
-    "emitEventSingle",
-    "userActor",
+    "openPresence",
     "req.nextUrl.searchParams.get('next').trim",
     "next.startsWith",
     "next.includes",
@@ -43370,8 +45706,8 @@
   {
    "file": "app/api/partner/exit/route.ts",
    "kind": "api-route",
-   "lines": 53,
-   "bytes": 2546,
+   "lines": 60,
+   "bytes": 3004,
    "client": false,
    "exports": [
     {
@@ -43416,14 +45752,13 @@
      ]
     },
     {
-     "spec": "@/lib/events",
+     "spec": "@/lib/space-presence",
      "names": [
-      "emitEventSingle",
-      "userActor"
+      "closePresence"
      ]
     }
    ],
-   "tryCount": 4,
+   "tryCount": 3,
    "sqlTags": [
     {
      "tag": "sqlBypass",
@@ -43437,10 +45772,9 @@
     "url",
     "realRole",
     "canManagePartnerTenants",
+    "closePresence",
     "partnerOwnOrg",
     "unstable_update",
-    "emitEventSingle",
-    "userActor",
     "console.error"
    ],
    "jsx": [],
@@ -43874,8 +46208,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/agents/usage/route.ts",
    "kind": "api-route",
-   "lines": 265,
-   "bytes": 9500,
+   "lines": 257,
+   "bytes": 9342,
    "client": false,
    "exports": [
     {
@@ -43914,33 +46248,39 @@
       "hasRoleAtLeast",
       "Role"
      ]
+    },
+    {
+     "spec": "@/lib/agent-labels",
+     "names": [
+      "agentDisplayName"
+     ]
     }
    ],
    "tryCount": 6,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 113
+     "line": 105
     },
     {
      "tag": "sql",
-     "line": 132
+     "line": 124
     },
     {
      "tag": "sql",
-     "line": 137
+     "line": 129
     },
     {
      "tag": "sql",
-     "line": 164
+     "line": 156
     },
     {
      "tag": "sql",
-     "line": 192
+     "line": 184
     },
     {
      "tag": "sql",
-     "line": 224
+     "line": 216
     }
    ],
    "calls": [
@@ -43957,6 +46297,7 @@
     "Math.round",
     "Math.max",
     "byAgent.map",
+    "agentDisplayName",
     "recentActivity.map"
    ],
    "jsx": [],
@@ -43966,62 +46307,62 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 50
+     "line": 42
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 63
+     "line": 55
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 70
+     "line": 62
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 78
+     "line": 70
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 87
+     "line": 79
     },
     {
      "arg": "{ error: 'Invalid period. Use 7d, 30d, or 90d.', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 104
+     "line": 96
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 123
+     "line": 115
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 172
+     "line": 164
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 205
+     "line": 197
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 238
+     "line": 230
     },
     {
      "arg": "{\n      data: {\n        summary,\n        byAgent: byAgentMapped,\n        recentActivity: recentActivityMapped,\n      },\n    }",
      "opts": "",
-     "line": 250
+     "line": 242
     },
     {
      "arg": "{ error: 'Failed to query agent usage', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 259
+     "line": 251
     }
    ],
    "route": "/api/portal/[tenantSlug]/agents/usage",
@@ -66461,6 +68802,153 @@
    "dynamic": true
   },
   {
+   "file": "app/api/portal/[tenantSlug]/tasks/[taskId]/claim/route.ts",
+   "kind": "api-route",
+   "lines": 93,
+   "bytes": 4556,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "DELETE",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "getTenantBySlug",
+      "verifyTenantAccess"
+     ]
+    },
+    {
+     "spec": "@/lib/tenant-context",
+     "names": [
+      "runInTenant"
+     ]
+    },
+    {
+     "spec": "@/lib/rbac",
+     "names": [
+      "isRole",
+      "Role"
+     ]
+    },
+    {
+     "spec": "@/lib/tasks/tasks",
+     "names": [
+      "claimTask",
+      "releaseTask"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "NextResponse.json",
+    "isRole",
+    "/^[0-9a-f-]{36}$/i.test",
+    "getTenantBySlug",
+    "verifyTenantAccess",
+    "gate",
+    "runInTenant",
+    "claimTask",
+    "console.error",
+    "releaseTask"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 43
+    },
+    {
+     "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 47
+    },
+    {
+     "arg": "{ error: 'Invalid task id', code: 'INVALID_INPUT' }",
+     "opts": "{ status: 400 }",
+     "line": 50
+    },
+    {
+     "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 56
+    },
+    {
+     "arg": "{ error: 'Workspace not found', code: 'NOT_FOUND' }",
+     "opts": "{ status: 404 }",
+     "line": 59
+    },
+    {
+     "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
+     "opts": "{ status: 403 }",
+     "line": 63
+    },
+    {
+     "arg": "{ error: r.error, code: r.code }",
+     "opts": "{ status: r.status }",
+     "line": 73
+    },
+    {
+     "arg": "{ data: r.data }",
+     "opts": "",
+     "line": 74
+    },
+    {
+     "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 77
+    },
+    {
+     "arg": "{ error: r.error, code: r.code }",
+     "opts": "{ status: r.status }",
+     "line": 86
+    },
+    {
+     "arg": "{ data: r.data }",
+     "opts": "",
+     "line": 87
+    },
+    {
+     "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 90
+    }
+   ],
+   "route": "/api/portal/[tenantSlug]/tasks/[taskId]/claim",
+   "methods": [
+    "DELETE",
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
    "file": "app/api/portal/[tenantSlug]/tasks/[taskId]/route.ts",
    "kind": "api-route",
    "lines": 66,
@@ -66754,8 +69242,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/tasks/route.ts",
    "kind": "api-route",
-   "lines": 113,
-   "bytes": 5327,
+   "lines": 116,
+   "bytes": 5630,
    "client": false,
    "exports": [
     {
@@ -66817,7 +69305,7 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 98
+     "line": 101
     }
    ],
    "calls": [
@@ -66866,39 +69354,39 @@
      "line": 45
     },
     {
-     "arg": "{ data: { tasks } }",
+     "arg": "{ data: { tasks, viewerId: r.actor.id } }",
      "opts": "",
-     "line": 60
+     "line": 63
     },
     {
      "arg": "{ error: 'Failed to load tasks', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 63
+     "line": 66
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 78
+     "line": 81
     },
     {
      "arg": "{ error: 'Invalid taskId', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 82
+     "line": 85
     },
     {
      "arg": "{ error: out.error, code: out.code }",
      "opts": "{ status: out.status }",
-     "line": 90
+     "line": 93
     },
     {
      "arg": "{ data: out.data }",
      "opts": "",
-     "line": 107
+     "line": 110
     },
     {
      "arg": "{ error: 'Failed to complete task', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 110
+     "line": 113
     }
    ],
    "route": "/api/portal/[tenantSlug]/tasks",
@@ -69656,6 +72144,79 @@
    "dynamic": false
   },
   {
+   "file": "app/api/presence/heartbeat/route.ts",
+   "kind": "api-route",
+   "lines": 47,
+   "bytes": 2472,
+   "client": false,
+   "exports": [
+    {
+     "name": "POST",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/auth",
+     "names": [
+      "auth"
+     ]
+    },
+    {
+     "spec": "@/lib/space-presence",
+     "names": [
+      "touchPresence"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "auth",
+    "NextResponse.json",
+    "touchPresence",
+    "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 34
+    },
+    {
+     "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
+     "opts": "{ status: 401 }",
+     "line": 38
+    },
+    {
+     "arg": "{ data: { touched } }",
+     "opts": "",
+     "line": 41
+    },
+    {
+     "arg": "{ error: 'Heartbeat failed', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 44
+    }
+   ],
+   "route": "/api/presence/heartbeat",
+   "methods": [
+    "POST"
+   ],
+   "runtime": null,
+   "dynamic": false
+  },
+  {
    "file": "app/api/storage/local/[...key]/route.ts",
    "kind": "api-route",
    "lines": 45,
@@ -70570,7 +73131,7 @@
    "file": "app/blog/feed.xml/route.ts",
    "kind": "api-route",
    "lines": 35,
-   "bytes": 1157,
+   "bytes": 1161,
    "client": false,
    "exports": [
     {
@@ -71001,8 +73562,8 @@
   {
    "file": "app/partner/page.tsx",
    "kind": "page",
-   "lines": 243,
-   "bytes": 12961,
+   "lines": 254,
+   "bytes": 13522,
    "client": false,
    "exports": [
     {
@@ -71069,6 +73630,12 @@
      ]
     },
     {
+     "spec": "@/lib/space-presence",
+     "names": [
+      "closePresence"
+     ]
+    },
+    {
      "spec": "./add-company-flow",
      "names": [
       "AddCompanyFlow"
@@ -71089,6 +73656,7 @@
     "isRole",
     "redirect",
     "canManagePartnerTenants",
+    "closePresence",
     "partnerOwnOrg",
     "ensurePartnerOwnOrgProvisioned",
     "partnerScopeTenants",
@@ -71142,8 +73710,8 @@
   {
    "file": "app/portal/[tenantSlug]/activity/activity-stream-client.tsx",
    "kind": "app-component",
-   "lines": 544,
-   "bytes": 21099,
+   "lines": 561,
+   "bytes": 22237,
    "client": true,
    "exports": [
     {
@@ -71182,7 +73750,8 @@
     {
      "spec": "@/lib/event-labels",
      "names": [
-      "describeEventLabel"
+      "describeEventLabel",
+      "describeActor"
      ]
     },
     {
@@ -71197,6 +73766,7 @@
    "calls": [
     "describeEventLabel",
     "fmtDateTime",
+    "describeActor",
     "byId.set",
     "byId.has",
     "childIds.add",
@@ -71246,8 +73816,8 @@
   {
    "file": "app/portal/[tenantSlug]/activity/page.tsx",
    "kind": "page",
-   "lines": 182,
-   "bytes": 5508,
+   "lines": 217,
+   "bytes": 7288,
    "client": false,
    "exports": [
     {
@@ -71301,7 +73871,7 @@
      ]
     }
    ],
-   "tryCount": 1,
+   "tryCount": 2,
    "sqlTags": [
     {
      "tag": "sql",
@@ -71318,6 +73888,10 @@
     {
      "tag": "sql",
      "line": 124
+    },
+    {
+     "tag": "sql",
+     "line": 159
     }
    ],
    "calls": [
@@ -71329,7 +73903,12 @@
     "hasRoleAtLeast",
     "typeFilter.replace",
     "console.error",
+    "rows\n    .filter((r) => !r.actorEmail && r.actorId && /^[0-9a-f-]{36}$/i.test(r.actorId)).map",
+    "rows.filter",
+    "/^[0-9a-f-]{36}$/i.test",
+    "nameById.set",
     "rows.map",
+    "nameById.get",
     "r.createdAt.toISOString",
     "Math.round"
    ],
@@ -72836,8 +75415,8 @@
   {
    "file": "app/portal/[tenantSlug]/layout.tsx",
    "kind": "layout",
-   "lines": 202,
-   "bytes": 10378,
+   "lines": 283,
+   "bytes": 15102,
    "client": false,
    "exports": [
     {
@@ -72905,6 +75484,28 @@
      ]
     },
     {
+     "spec": "@/lib/space-presence",
+     "names": [
+      "syncPortalPresence",
+      "idleDescent",
+      "closePresence",
+      "noteInteraction",
+      "inForcedCooldown"
+     ]
+    },
+    {
+     "spec": "@/lib/session-policy",
+     "names": [
+      "DESCENT_IDLE_MS"
+     ]
+    },
+    {
+     "spec": "@/components/portal/presence-heartbeat",
+     "names": [
+      "PresenceHeartbeat"
+     ]
+    },
+    {
      "spec": "@/lib/memberships",
      "names": [
       "getActiveMemberships",
@@ -72933,6 +75534,11 @@
     "isRole",
     "verifyTenantAccess",
     "hasActiveMembership",
+    "inForcedCooldown",
+    "idleDescent",
+    "closePresence",
+    "syncPortalPresence",
+    "noteInteraction",
     "getActiveMemberships",
     "hasRoleAtLeast",
     "canManageBuckets"
@@ -72942,7 +75548,8 @@
     "NotificationBell",
     "PortalNavLink",
     "SignOutButton",
-    "ShadowSpaceBanner"
+    "ShadowSpaceBanner",
+    "PresenceHeartbeat"
    ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
@@ -73592,8 +76199,8 @@
   {
    "file": "app/portal/[tenantSlug]/portals/[portalId]/workflow-setup-client.tsx",
    "kind": "app-component",
-   "lines": 403,
-   "bytes": 25964,
+   "lines": 405,
+   "bytes": 26244,
    "client": true,
    "exports": [
     {
@@ -73871,8 +76478,8 @@
   {
    "file": "app/portal/[tenantSlug]/processes/processes-client.tsx",
    "kind": "app-component",
-   "lines": 350,
-   "bytes": 14180,
+   "lines": 354,
+   "bytes": 14542,
    "client": true,
    "exports": [
     {
@@ -73907,6 +76514,12 @@
       "classifyProcessHealth",
       "healthSortWeight",
       "ProcessHealth"
+     ]
+    },
+    {
+     "spec": "@/lib/humanize",
+     "names": [
+      "humanizeIfIdentifier"
      ]
     }
    ],
@@ -73964,7 +76577,8 @@
     "decorated.map",
     "formatWorkflowName",
     "handleAdvance",
-    "toggleTimeline"
+    "toggleTimeline",
+    "humanizeIfIdentifier"
    ],
    "jsx": [
     "TransitionTimeline"
@@ -75910,7 +78524,7 @@
    "file": "app/sitemap.ts",
    "kind": "app-component",
    "lines": 58,
-   "bytes": 2735,
+   "bytes": 2739,
    "client": false,
    "exports": [
     {
@@ -76159,8 +78773,8 @@
   {
    "file": "auth.config.ts",
    "kind": "auth",
-   "lines": 108,
-   "bytes": 5537,
+   "lines": 149,
+   "bytes": 7839,
    "client": false,
    "exports": [
     {
@@ -76181,11 +78795,20 @@
      "names": [
       "Role"
      ]
+    },
+    {
+     "spec": "./lib/session-policy",
+     "names": [
+      "sessionEndReason"
+     ]
     }
    ],
    "tryCount": 0,
    "sqlTags": [],
-   "calls": [],
+   "calls": [
+    "Date.now",
+    "sessionEndReason"
+   ],
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
@@ -76194,8 +78817,8 @@
   {
    "file": "auth.ts",
    "kind": "auth",
-   "lines": 133,
-   "bytes": 4534,
+   "lines": 171,
+   "bytes": 6409,
    "client": false,
    "exports": [
     {
@@ -76246,7 +78869,7 @@
      ]
     }
    ],
-   "tryCount": 5,
+   "tryCount": 6,
    "sqlTags": [
     {
      "tag": "sql",
@@ -76276,7 +78899,8 @@
     "bcrypt.compare",
     "sql.json",
     "crypto.randomUUID",
-    "touchLastLogin"
+    "touchLastLogin",
+    "closePresence"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -76287,7 +78911,7 @@
    "file": "components/admin/admin-file-manager.tsx",
    "kind": "component",
    "lines": 779,
-   "bytes": 31112,
+   "bytes": 31455,
    "client": true,
    "exports": [
     {
@@ -76297,6 +78921,12 @@
     }
    ],
    "imports": [
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "LocalTime"
+     ]
+    },
     {
      "spec": "react",
      "names": [
@@ -76325,7 +78955,6 @@
     "key.slice",
     "clean.split('/').pop",
     "clean.split",
-    "d.toLocaleDateString",
     "TOP_LEVEL_PREFIXES.find",
     "path.startsWith",
     "useState",
@@ -76410,10 +79039,11 @@
     "renameValue.trim",
     "handleRename",
     "handleDelete",
-    "humanSize",
-    "formatDate"
+    "humanSize"
    ],
-   "jsx": [],
+   "jsx": [
+    "LocalTime"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -76490,8 +79120,8 @@
   {
    "file": "components/admin/admin-nav-data.ts",
    "kind": "component",
-   "lines": 190,
-   "bytes": 8831,
+   "lines": 204,
+   "bytes": 9898,
    "client": false,
    "exports": [
     {
@@ -76725,8 +79355,8 @@
   {
    "file": "components/admin/agent-workforce.tsx",
    "kind": "component",
-   "lines": 222,
-   "bytes": 18500,
+   "lines": 229,
+   "bytes": 20011,
    "client": true,
    "exports": [
     {
@@ -76780,8 +79410,8 @@
   {
    "file": "components/admin/application-review.tsx",
    "kind": "component",
-   "lines": 685,
-   "bytes": 29462,
+   "lines": 686,
+   "bytes": 29556,
    "client": true,
    "exports": [
     {
@@ -76977,10 +79607,49 @@
    "jsonResponses": []
   },
   {
+   "file": "components/admin/companion-button.tsx",
+   "kind": "component",
+   "lines": 61,
+   "bytes": 3068,
+   "client": true,
+   "exports": [
+    {
+     "name": "CompanionButton",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useState"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "useState",
+    "setState",
+    "setMsg",
+    "fetch",
+    "JSON.stringify",
+    "doing.trim",
+    "res.json().catch",
+    "res.json",
+    "setDoing"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "components/admin/crawl-settings.tsx",
    "kind": "component",
-   "lines": 241,
-   "bytes": 7979,
+   "lines": 244,
+   "bytes": 8734,
    "client": true,
    "exports": [
     {
@@ -76997,12 +79666,17 @@
       "useCallback",
       "useState"
      ]
+    },
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "LocalTime"
+     ]
     }
    ],
    "tryCount": 4,
    "sqlTags": [],
    "calls": [
-    "d.toLocaleDateString",
     "useState",
     "CRON_PRESETS.some",
     "useCallback",
@@ -77020,10 +79694,11 @@
     "setScouting",
     "CRON_PRESETS.find",
     "handleCronChange",
-    "CRON_PRESETS.map",
-    "formatDate"
+    "CRON_PRESETS.map"
    ],
-   "jsx": [],
+   "jsx": [
+    "LocalTime"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -77086,10 +79761,32 @@
    "jsonResponses": []
   },
   {
+   "file": "components/admin/descent-timeout-notice.tsx",
+   "kind": "component",
+   "lines": 51,
+   "bytes": 2822,
+   "client": false,
+   "exports": [
+    {
+     "name": "DescentTimeoutNotice",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "components/admin/diff-history.tsx",
    "kind": "component",
-   "lines": 189,
-   "bytes": 6877,
+   "lines": 196,
+   "bytes": 7306,
    "client": true,
    "exports": [
     {
@@ -77113,7 +79810,8 @@
     {
      "spec": "@/components/ui/time-ago",
      "names": [
-      "useClientNow"
+      "useClientNow",
+      "localFrom"
      ]
     }
    ],
@@ -77125,7 +79823,7 @@
     "d.toISOString",
     "d.getTime",
     "Math.floor",
-    "d.toLocaleDateString",
+    "localFrom",
     "useState",
     "useClientNow",
     "useCallback",
@@ -77190,6 +79888,121 @@
     "field"
    ],
    "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "components/admin/guide-note.tsx",
+   "kind": "component",
+   "lines": 137,
+   "bytes": 5437,
+   "client": true,
+   "exports": [
+    {
+     "name": "GuideNoteBox",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useState"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "useState",
+    "text.trim",
+    "setState",
+    "setErr",
+    "fetch",
+    "JSON.stringify",
+    "res.json().catch",
+    "res.json",
+    "setText",
+    "setOpen",
+    "CHOICES.map",
+    "setDisposition",
+    "save"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "components/admin/guide.tsx",
+   "kind": "component",
+   "lines": 104,
+   "bytes": 5474,
+   "client": false,
+   "exports": [
+    {
+     "name": "GuideCard",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "Step",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "P",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "Ul",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "Ctl",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "Code",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "Careful",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "Unwritten",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "Canon",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "./guide-note",
+     "names": [
+      "GuideNoteBox"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [],
+   "jsx": [
+    "GuideNoteBox",
+    "Code"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -77465,6 +80278,98 @@
     "setDone",
     "router.refresh",
     "setOpen"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "components/admin/note-actions.tsx",
+   "kind": "component",
+   "lines": 38,
+   "bytes": 1290,
+   "client": true,
+   "exports": [
+    {
+     "name": "NoteActions",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useState"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "useRouter"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "useRouter",
+    "useState",
+    "setBusy",
+    "fetch",
+    "JSON.stringify",
+    "router.refresh"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "components/admin/note-composer.tsx",
+   "kind": "component",
+   "lines": 61,
+   "bytes": 2590,
+   "client": true,
+   "exports": [
+    {
+     "name": "NoteComposer",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useState"
+     ]
+    },
+    {
+     "spec": "next/navigation",
+     "names": [
+      "useRouter"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "useRouter",
+    "useState",
+    "e.preventDefault",
+    "note.trim",
+    "setBusy",
+    "setErr",
+    "fetch",
+    "JSON.stringify",
+    "anchor.trim",
+    "res.json().catch",
+    "res.json",
+    "setNote",
+    "setAnchor",
+    "router.refresh"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -77756,7 +80661,7 @@
    "file": "components/admin/region-list.tsx",
    "kind": "component",
    "lines": 163,
-   "bytes": 5559,
+   "bytes": 5932,
    "client": true,
    "exports": [
     {
@@ -77771,6 +80676,12 @@
    ],
    "imports": [
     {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "LocalTime"
+     ]
+    },
+    {
      "spec": "react",
      "names": [
       "useCallback",
@@ -77781,7 +80692,6 @@
    "tryCount": 1,
    "sqlTags": [],
    "calls": [
-    "d.toLocaleDateString",
     "useState",
     "useCallback",
     "setDeletingId",
@@ -77793,10 +80703,11 @@
     "onDeleted",
     "regions.map",
     "region.contentContext.slice",
-    "handleDelete",
-    "formatDate"
+    "handleDelete"
    ],
-   "jsx": [],
+   "jsx": [
+    "LocalTime"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -77804,8 +80715,8 @@
   {
    "file": "components/admin/source-card-actions.tsx",
    "kind": "component",
-   "lines": 624,
-   "bytes": 21536,
+   "lines": 640,
+   "bytes": 22579,
    "client": true,
    "exports": [
     {
@@ -77838,14 +80749,15 @@
     {
      "spec": "@/components/ui/time-ago",
      "names": [
-      "useClientNow"
+      "useClientNow",
+      "localFrom"
      ]
     }
    ],
    "tryCount": 5,
    "sqlTags": [],
    "calls": [
-    "d.toLocaleDateString",
+    "localFrom",
     "d.toISOString().slice(0, 16).replace",
     "d.toISOString().slice",
     "d.toISOString",
@@ -79531,8 +82443,8 @@
   {
    "file": "components/canvas/canvas-sidebar.tsx",
    "kind": "component",
-   "lines": 1210,
-   "bytes": 57669,
+   "lines": 1220,
+   "bytes": 58323,
    "client": true,
    "exports": [
     {
@@ -79547,6 +82459,12 @@
     }
    ],
    "imports": [
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "LocalTime"
+     ]
+    },
     {
      "spec": "react",
      "names": [
@@ -79683,7 +82601,6 @@
     "window.location.reload",
     "versions.map",
     "handleViewVersion",
-    "new Date(v.created_at).toLocaleDateString",
     "fmtNum",
     "handleRestore",
     "shouldFocusNodeTab",
@@ -79738,6 +82655,7 @@
    ],
    "jsx": [
     "CommentThread",
+    "LocalTime",
     "LibraryPicker",
     "NodeFormatControls",
     "CommentsSection",
@@ -81705,8 +84623,8 @@
   {
    "file": "components/marketing/resources-filter.tsx",
    "kind": "component",
-   "lines": 132,
-   "bytes": 4472,
+   "lines": 135,
+   "bytes": 4832,
    "client": true,
    "exports": [
     {
@@ -81717,6 +84635,12 @@
    ],
    "imports": [
     {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "LocalTime"
+     ]
+    },
+    {
      "spec": "react",
      "names": [
       "useState"
@@ -81726,18 +84650,18 @@
    "tryCount": 0,
    "sqlTags": [],
    "calls": [
-    "d.toLocaleDateString",
     "useState",
     "content.filter",
     "TABS.map",
     "setActiveTab",
     "filtered.map",
     "item.contentType.replace",
-    "formatDate",
     "(item.tags ?? []).slice(0, 3).map",
     "(item.tags ?? []).slice"
    ],
-   "jsx": [],
+   "jsx": [
+    "LocalTime"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -82136,8 +85060,8 @@
   {
    "file": "components/portal/agent-usage-panel.tsx",
    "kind": "component",
-   "lines": 225,
-   "bytes": 8094,
+   "lines": 237,
+   "bytes": 9081,
    "client": true,
    "exports": [
     {
@@ -82148,11 +85072,24 @@
    ],
    "imports": [
     {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "LocalTime"
+     ]
+    },
+    {
      "spec": "react",
      "names": [
       "useState",
       "useEffect",
       "useCallback"
+     ]
+    },
+    {
+     "spec": "@/lib/agent-labels",
+     "names": [
+      "agentDisplayName",
+      "titleizeIdentifier"
      ]
     }
    ],
@@ -82172,12 +85109,14 @@
     "(['7d', '30d', '90d'] as const).map",
     "setPeriod",
     "data.byAgent.map",
-    "new Date(agent.lastUsed).toLocaleDateString",
     "data.recentActivity.map",
-    "(activity.durationMs / 1000).toFixed",
-    "new Date(activity.createdAt).toLocaleDateString"
+    "agentDisplayName",
+    "titleizeIdentifier",
+    "(activity.durationMs / 1000).toFixed"
    ],
-   "jsx": [],
+   "jsx": [
+    "LocalTime"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -82673,8 +85612,8 @@
   {
    "file": "components/portal/automation-overview-card.tsx",
    "kind": "component",
-   "lines": 164,
-   "bytes": 8872,
+   "lines": 195,
+   "bytes": 10102,
    "client": true,
    "exports": [
     {
@@ -82699,6 +85638,7 @@
     "Date.now",
     "Math.round",
     "Math.abs",
+    "t.replace",
     "useState",
     "useEffect",
     "fetch",
@@ -82711,6 +85651,7 @@
     "data.tasks.map",
     "relDue",
     "t.assigneeRole.replace",
+    "entityNoun",
     "data.portals.map",
     "p.status.replace",
     "p.nudgeDays.join"
@@ -84051,8 +86992,8 @@
   {
    "file": "components/portal/notification-panel.tsx",
    "kind": "component",
-   "lines": 190,
-   "bytes": 7193,
+   "lines": 200,
+   "bytes": 7802,
    "client": true,
    "exports": [
     {
@@ -84062,6 +87003,12 @@
     }
    ],
    "imports": [
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "LocalTime"
+     ]
+    },
     {
      "spec": "react",
      "names": [
@@ -84106,10 +87053,11 @@
     "notifications.some",
     "notifications.map",
     "newThisView.has",
-    "eventHref",
-    "new Date(n.created_at).toLocaleDateString"
+    "eventHref"
    ],
-   "jsx": [],
+   "jsx": [
+    "LocalTime"
+   ],
    "snakeRowTypes": [],
    "ownClientSql": 0,
    "jsonResponses": []
@@ -84304,8 +87252,8 @@
   {
    "file": "components/portal/pipeline-cards.tsx",
    "kind": "component",
-   "lines": 609,
-   "bytes": 33435,
+   "lines": 613,
+   "bytes": 33763,
    "client": true,
    "exports": [
     {
@@ -84342,6 +87290,12 @@
      "names": [
       "fmtDate",
       "fmtMoney"
+     ]
+    },
+    {
+     "spec": "@/lib/humanize",
+     "names": [
+      "titleizeIdentifier"
      ]
     }
    ],
@@ -84424,6 +87378,7 @@
     "Object.keys",
     "buckets.map",
     "sorted.map",
+    "titleizeIdentifier",
     "Math.round",
     "closeChip",
     "fitFromOutput",
@@ -84459,6 +87414,44 @@
    "tryCount": 0,
    "sqlTags": [],
    "calls": [],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "components/portal/presence-heartbeat.tsx",
+   "kind": "component",
+   "lines": 62,
+   "bytes": 3145,
+   "client": true,
+   "exports": [
+    {
+     "name": "PresenceHeartbeat",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useEffect"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "useEffect",
+    "fetch('/api/presence/heartbeat', { method: 'POST', keepalive: true }).catch",
+    "fetch",
+    "ping",
+    "setInterval",
+    "document.addEventListener",
+    "clearInterval",
+    "document.removeEventListener"
+   ],
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
@@ -85071,8 +88064,8 @@
   {
    "file": "components/portal/proposal-workspace.tsx",
    "kind": "component",
-   "lines": 432,
-   "bytes": 16344,
+   "lines": 441,
+   "bytes": 16991,
    "client": true,
    "exports": [
     {
@@ -85082,6 +88075,12 @@
     }
    ],
    "imports": [
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "LocalTime"
+     ]
+    },
     {
      "spec": "react",
      "names": [
@@ -85159,7 +88158,6 @@
     "([\n          // The editable whole-proposal one-canvas is the PRIMARY surface for tenant-wide members\n          // (fluid-canvas F-primary); the section list + Manage subtabs demote to \"All Sections\".\n          ...(isTenantWide ? [{ key: 'document' as const, label: 'Document' }] : []),\n          { key: 'workspace' as const, label: userRole === 'admin' ? 'All Sections' : 'All' },\n          { key: 'my-sections' as const, label: 'My Sections' },\n          // Proposal-wide activity/history — tenant-wide members only; a scoped/external collaborator\n          // must not see other actors' emails, event payloads, or stage history for ungranted work.\n          ...(isTenantWide ? [{ key: 'timeline' as const, label: 'Timeline' }] : []),\n        ]).map",
     "setWorkspaceTab",
     "stageCompletionHistory.map",
-    "new Date(h.completedAt).toLocaleDateString",
     "mySections.map",
     "sections.map",
     "setShowDrafter",
@@ -85168,6 +88166,7 @@
    "jsx": [
     "StageControl",
     "OutcomeRecorder",
+    "LocalTime",
     "ProposalTimeline",
     "FluidDocumentTab",
     "DraftAllSections",
@@ -85333,8 +88332,8 @@
   {
    "file": "components/portal/shadow-space-banner.tsx",
    "kind": "component",
-   "lines": 85,
-   "bytes": 3859,
+   "lines": 95,
+   "bytes": 4421,
    "client": true,
    "exports": [
     {
@@ -85514,8 +88513,8 @@
   {
    "file": "components/portal/stage-control.tsx",
    "kind": "component",
-   "lines": 452,
-   "bytes": 17442,
+   "lines": 451,
+   "bytes": 17966,
    "client": true,
    "exports": [
     {
@@ -85525,6 +88524,13 @@
     }
    ],
    "imports": [
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "localFrom",
+      "useMounted"
+     ]
+    },
     {
      "spec": "react",
      "names": [
@@ -85562,8 +88568,8 @@
     "prev.map",
     "requirements.filter",
     "gateConfig.indexOf",
-    "new Date(unlockDeadline).toLocaleDateString",
-    "new Date(closeDate).toLocaleDateString",
+    "useMounted",
+    "localFrom",
     "Math.ceil",
     "new Date(closeDate).getTime",
     "Date.now",
@@ -86540,8 +89546,8 @@
   {
    "file": "components/projects/comment-thread.tsx",
    "kind": "component",
-   "lines": 231,
-   "bytes": 9448,
+   "lines": 233,
+   "bytes": 9647,
    "client": true,
    "exports": [
     {
@@ -89337,10 +92343,66 @@
    "jsonResponses": []
   },
   {
+   "file": "components/tasks/task-claim.tsx",
+   "kind": "component",
+   "lines": 116,
+   "bytes": 4596,
+   "client": true,
+   "exports": [
+    {
+     "name": "ClaimableTask",
+     "form": "type"
+    },
+    {
+     "name": "TaskClaim",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "react",
+     "names": [
+      "useState"
+     ]
+    },
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "TimeAgo"
+     ]
+    },
+    {
+     "spec": "@/lib/toast",
+     "names": [
+      "toast"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "useState",
+    "setBusy",
+    "fetch",
+    "res.json().catch",
+    "res.json",
+    "toast",
+    "reload",
+    "act"
+   ],
+   "jsx": [
+    "TimeAgo"
+   ],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "components/tasks/task-queue.tsx",
    "kind": "component",
-   "lines": 550,
-   "bytes": 20829,
+   "lines": 577,
+   "bytes": 22171,
    "client": true,
    "exports": [
     {
@@ -89382,6 +92444,12 @@
      ]
     },
     {
+     "spec": "./task-claim",
+     "names": [
+      "TaskClaim"
+     ]
+    },
+    {
      "spec": "@/lib/tasks/workflows",
      "names": [
       "resolveTaskWorkflow",
@@ -89402,6 +92470,7 @@
     "setError",
     "res.json",
     "setTasks",
+    "setViewerId",
     "useEffect",
     "load",
     "setInterval",
@@ -89447,6 +92516,7 @@
    ],
    "jsx": [
     "WorkflowTrail",
+    "TaskClaim",
     "TaskCompleter",
     "ManagerRequestCompleter",
     "ThreadCompleter",
@@ -89840,8 +92910,8 @@
   {
    "file": "components/ui/time-ago.tsx",
    "kind": "component",
-   "lines": 71,
-   "bytes": 3317,
+   "lines": 128,
+   "bytes": 5988,
    "client": true,
    "exports": [
     {
@@ -89856,6 +92926,21 @@
     },
     {
      "name": "elapsedFrom",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "useMounted",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "localFrom",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "LocalTime",
      "form": "function",
      "async": false
     },
@@ -89895,6 +92980,11 @@
     "new Date(t).toISOString",
     "Math.max",
     "Math.floor",
+    "setM",
+    "d.getTime",
+    "d.toLocaleString",
+    "localFrom",
+    "useMounted",
     "relativeFrom",
     "useClientNow",
     "elapsedFrom"
@@ -96174,8 +99264,8 @@
   {
    "file": "lib/admin/review-queue.ts",
    "kind": "lib",
-   "lines": 294,
-   "bytes": 14297,
+   "lines": 307,
+   "bytes": 15243,
    "client": false,
    "exports": [
     {
@@ -96267,11 +99357,7 @@
     },
     {
      "tag": "sqlBypass",
-     "line": 169
-    },
-    {
-     "tag": "sqlBypass",
-     "line": 197
+     "line": 182
     },
     {
      "tag": "sqlBypass",
@@ -96279,35 +99365,39 @@
     },
     {
      "tag": "sqlBypass",
-     "line": 236
+     "line": 223
     },
     {
      "tag": "sqlBypass",
-     "line": 281
+     "line": 249
     },
     {
      "tag": "sqlBypass",
-     "line": 282
+     "line": 294
     },
     {
      "tag": "sqlBypass",
-     "line": 283
+     "line": 295
     },
     {
      "tag": "sqlBypass",
-     "line": 284
+     "line": 296
     },
     {
      "tag": "sqlBypass",
-     "line": 285
+     "line": 297
     },
     {
      "tag": "sqlBypass",
-     "line": 286
+     "line": 298
     },
     {
      "tag": "sqlBypass",
-     "line": 287
+     "line": 299
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 300
     }
    ],
    "calls": [
@@ -96418,8 +99508,8 @@
   {
    "file": "lib/agent-client.ts",
    "kind": "lib",
-   "lines": 49,
-   "bytes": 2072,
+   "lines": 62,
+   "bytes": 2887,
    "client": false,
    "exports": [
     {
@@ -96445,16 +99535,56 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 26
+     "line": 38
     },
     {
      "tag": "sql",
-     "line": 42
+     "line": 55
     }
    ],
    "calls": [
     "sql.json",
     "console.error"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/agent-labels.ts",
+   "kind": "lib",
+   "lines": 87,
+   "bytes": 4040,
+   "client": false,
+   "exports": [
+    {
+     "name": "titleizeIdentifier",
+     "form": "re-export"
+    },
+    {
+     "name": "AGENT_LABELS",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "agentDisplayName",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/humanize",
+     "names": [
+      "titleizeIdentifier"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "titleizeIdentifier"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -96976,6 +100106,77 @@
      "line": 56
     }
    ]
+  },
+  {
+   "file": "lib/architecture-live.ts",
+   "kind": "lib",
+   "lines": 158,
+   "bytes": 7966,
+   "client": false,
+   "exports": [
+    {
+     "name": "ActivityClass",
+     "form": "type"
+    },
+    {
+     "name": "TableActivity",
+     "form": "type"
+    },
+    {
+     "name": "ArchitectureLive",
+     "form": "type"
+    },
+    {
+     "name": "classifyActivity",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "architectureLive",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sqlBypass"
+     ]
+    }
+   ],
+   "tryCount": 0,
+   "sqlTags": [
+    {
+     "tag": "sqlBypass",
+     "line": 130
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 138
+    }
+   ],
+   "calls": [
+    "writtenUnread.push",
+    "untouched.push",
+    "Object.entries(tables)\n    .filter(([, a]) => a.writes > 0)\n    .sort((a, b) => b[1].writes - a[1].writes)\n    .slice(0, 12).map",
+    "Object.entries(tables)\n    .filter(([, a]) => a.writes > 0)\n    .sort((a, b) => b[1].writes - a[1].writes).slice",
+    "Object.entries(tables)\n    .filter(([, a]) => a.writes > 0).sort",
+    "Object.entries(tables).filter",
+    "Object.entries",
+    "writtenUnread.sort",
+    "untouched.sort",
+    "Promise.all",
+    "classifyActivity",
+    "activity.map",
+    "Number",
+    "new Date(statsReset).toISOString",
+    "new Date(epoch[0].serverStart).toISOString"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
   },
   {
    "file": "lib/artifact-spec.ts",
@@ -101854,8 +105055,8 @@
   {
    "file": "lib/event-labels.ts",
    "kind": "lib",
-   "lines": 731,
-   "bytes": 42142,
+   "lines": 895,
+   "bytes": 50617,
    "client": false,
    "exports": [
     {
@@ -101869,6 +105070,15 @@
     },
     {
      "name": "describeEvent",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "ActorLike",
+     "form": "type"
+    },
+    {
+     "name": "describeActor",
      "form": "function",
      "async": false
     },
@@ -101916,7 +105126,12 @@
     "Number",
     "type.endsWith",
     "entry",
+    "who.replace",
     "describeEventOrNull",
+    "UUID_RE.test",
+    "/^ingest:(.+)$/.exec",
+    "ingest[1].replace(/_/g, '.').toUpperCase",
+    "ingest[1].replace",
     "sectionEvents.includes",
     "ev.type.startsWith"
    ],
@@ -103487,6 +106702,84 @@
    "jsonResponses": []
   },
   {
+   "file": "lib/guides/coverage.ts",
+   "kind": "lib",
+   "lines": 113,
+   "bytes": 4678,
+   "client": false,
+   "exports": [
+    {
+     "name": "GuideState",
+     "form": "type"
+    },
+    {
+     "name": "CoverageRow",
+     "form": "type"
+    },
+    {
+     "name": "Coverage",
+     "form": "type"
+    },
+    {
+     "name": "getCoverage",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "effectiveState",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "STATE_COPY",
+     "form": "const",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "node:fs",
+     "names": [
+      "fs"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "path"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sqlBypass"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sqlBypass",
+     "line": 75
+    }
+   ],
+   "calls": [
+    "path.join",
+    "process.cwd",
+    "JSON.parse",
+    "fs.readFileSync",
+    "Object.fromEntries",
+    "rows.map",
+    "console.error",
+    "readArtifact",
+    "openNotesByRoute"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "lib/hooks/use-container-scale.ts",
    "kind": "lib",
    "lines": 36,
@@ -103560,6 +106853,48 @@
     "JSON.stringify",
     "resp.json",
     "String"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/humanize.ts",
+   "kind": "lib",
+   "lines": 50,
+   "bytes": 2308,
+   "client": false,
+   "exports": [
+    {
+     "name": "titleizeIdentifier",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "humanizeIfIdentifier",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "raw\n    .split(/[_\\-.:]+/)\n    .filter(Boolean)\n    .map((w, i) => {\n      const lower = w.toLowerCase();\n      if (INITIALISMS.has(lower)) return lower.toUpperCase();\n      if (i > 0 && SMALL.has(lower)) return lower;\n      return lower.charAt(0).toUpperCase() + lower.slice(1);\n    }).join",
+    "raw\n    .split(/[_\\-.:]+/)\n    .filter(Boolean).map",
+    "raw\n    .split(/[_\\-.:]+/).filter",
+    "raw.split",
+    "w.toLowerCase",
+    "INITIALISMS.has",
+    "lower.toUpperCase",
+    "SMALL.has",
+    "lower.charAt(0).toUpperCase",
+    "lower.charAt",
+    "lower.slice",
+    "/^[a-z][a-z0-9]*(?:[_.:-][a-z0-9]+)+$/.test",
+    "raw.trim",
+    "titleizeIdentifier"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -105933,8 +109268,8 @@
   {
    "file": "lib/library/foundation.ts",
    "kind": "lib",
-   "lines": 373,
-   "bytes": 20196,
+   "lines": 439,
+   "bytes": 23604,
    "client": false,
    "exports": [
     {
@@ -105944,6 +109279,11 @@
     {
      "name": "DecomposedArtifact",
      "form": "type"
+    },
+    {
+     "name": "nodeLabel",
+     "form": "function",
+     "async": false
     },
     {
      "name": "decomposeAndIngest",
@@ -106036,67 +109376,81 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 159
+     "line": 225
     },
     {
      "tag": "sql",
-     "line": 166
+     "line": 232
     },
     {
      "tag": "sql",
-     "line": 184
+     "line": 250
     },
     {
      "tag": "sql",
-     "line": 190
+     "line": 256
     },
     {
      "tag": "sql",
-     "line": 194
+     "line": 260
     },
     {
      "tag": "sql",
-     "line": 200
+     "line": 266
     },
     {
      "tag": "sql",
-     "line": 202
+     "line": 268
     },
     {
      "tag": "sqlBypass",
-     "line": 222
+     "line": 288
     },
     {
      "tag": "sqlBypass",
-     "line": 235
+     "line": 301
     },
     {
      "tag": "sqlBypass",
-     "line": 249
+     "line": 315
     },
     {
      "tag": "sqlBypass",
-     "line": 252
+     "line": 318
     },
     {
      "tag": "sqlBypass",
-     "line": 258
+     "line": 324
     },
     {
      "tag": "sqlBypass",
-     "line": 345
+     "line": 411
     },
     {
      "tag": "sqlBypass",
-     "line": 356
+     "line": 422
     }
    ],
    "calls": [
-    "String",
+    "(t.charAt(0).toUpperCase() + t.slice(1)).replace",
+    "t.charAt(0).toUpperCase",
+    "t.charAt",
     "t.slice",
+    "v.trim",
     "s.slice",
+    "String",
     "JSON.stringify(c).slice",
     "JSON.stringify",
+    "Array.isArray",
+    "firstText",
+    "humanNode",
+    "(meta.slug ?? '').trim",
+    "/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test",
+    "(meta.title ?? '')\n    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice",
+    "(meta.title ?? '')\n    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace",
+    "(meta.title ?? '')\n    .toLowerCase().replace",
+    "(meta.title ?? '').toLowerCase",
+    "readableDocSlug",
     "STRUCTURAL_NODES.has",
     "nodeLabel",
     "createAtom",
@@ -106777,8 +110131,8 @@
   {
    "file": "lib/observe.ts",
    "kind": "lib",
-   "lines": 232,
-   "bytes": 10995,
+   "lines": 252,
+   "bytes": 12627,
    "client": false,
    "exports": [
     {
@@ -106865,8 +110219,11 @@
     "events.map",
     "describeEvent",
     "findDiscrepancies",
+    "e.type.replace",
     "starts.set",
+    "bracketKey",
     "starts.delete",
+    "e.createdAt.getTime",
     "out.push",
     "e.createdAt.toISOString().slice",
     "e.createdAt.toISOString",
@@ -117726,6 +121083,77 @@
    "jsonResponses": []
   },
   {
+   "file": "lib/session-policy.ts",
+   "kind": "lib",
+   "lines": 167,
+   "bytes": 8613,
+   "client": false,
+   "exports": [
+    {
+     "name": "MINUTE",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "HOUR",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "ABSOLUTE_MAX_MS",
+     "form": "wrapped",
+     "async": false
+    },
+    {
+     "name": "IDLE_MS",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "DESCENT_IDLE_MS",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "IDLE_DEFAULT_MS",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "idleLimitFor",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "SessionEndReason",
+     "form": "type"
+    },
+    {
+     "name": "SessionClock",
+     "form": "type"
+    },
+    {
+     "name": "sessionEndReason",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [],
+   "tryCount": 0,
+   "sqlTags": [],
+   "calls": [
+    "Number",
+    "Number.isFinite",
+    "Math.min",
+    "idleOverrideMs",
+    "idleLimitFor"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "lib/site-chrome.ts",
    "kind": "lib",
    "lines": 157,
@@ -117785,6 +121213,223 @@
     "nav.groups.map",
     "g.items.map",
     "nav.links.map"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/space-presence-oversight.ts",
+   "kind": "lib",
+   "lines": 129,
+   "bytes": 5918,
+   "client": false,
+   "exports": [
+    {
+     "name": "PresenceRow",
+     "form": "type"
+    },
+    {
+     "name": "REASON_COPY",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "openPresences",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "recentPresences",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "minutesBetween",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "humanDuration",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sqlBypass"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sqlBypass",
+     "line": 65
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 86
+    }
+   ],
+   "calls": [
+    "console.error",
+    "b.getTime",
+    "a.getTime",
+    "Number.isFinite",
+    "Math.max",
+    "Math.round",
+    "Math.floor"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "lib/space-presence.ts",
+   "kind": "lib",
+   "lines": 454,
+   "bytes": 22177,
+   "client": false,
+   "exports": [
+    {
+     "name": "PresenceKind",
+     "form": "type"
+    },
+    {
+     "name": "CloseReason",
+     "form": "type"
+    },
+    {
+     "name": "openPresence",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "closePresence",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "syncPortalPresence",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "touchPresence",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "noteInteraction",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "idleDescent",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "sweepStalePresence",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "FORCED_ASCENT_COOLDOWN_MS",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "forceAscend",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "inForcedCooldown",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sql"
+     ]
+    },
+    {
+     "spec": "@/lib/tenant-context",
+     "names": [
+      "runInTenant",
+      "runInBypass"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "userActor"
+     ]
+    }
+   ],
+   "tryCount": 9,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 99
+    },
+    {
+     "tag": "sql",
+     "line": 145
+    },
+    {
+     "tag": "sql",
+     "line": 162
+    },
+    {
+     "tag": "sql",
+     "line": 269
+    },
+    {
+     "tag": "sql",
+     "line": 295
+    },
+    {
+     "tag": "sql",
+     "line": 329
+    },
+    {
+     "tag": "sql",
+     "line": 362
+    },
+    {
+     "tag": "sql",
+     "line": 407
+    },
+    {
+     "tag": "sql",
+     "line": 412
+    },
+    {
+     "tag": "sql",
+     "line": 440
+    }
+   ],
+   "calls": [
+    "runInTenant",
+    "emitEventSingle",
+    "userActor",
+    "console.error",
+    "runInBypass",
+    "openPresence",
+    "closePresence",
+    "Date.now",
+    "row.closedAt.getTime"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -118275,8 +121920,8 @@
   {
    "file": "lib/tasks/tasks.ts",
    "kind": "lib",
-   "lines": 584,
-   "bytes": 29202,
+   "lines": 823,
+   "bytes": 41307,
    "client": false,
    "exports": [
     {
@@ -118315,6 +121960,30 @@
      "name": "closeTasksForEntity",
      "form": "function",
      "async": true
+    },
+    {
+     "name": "CLAIM_STALE_MINUTES",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "ClaimResult",
+     "form": "type"
+    },
+    {
+     "name": "claimTask",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "releaseTask",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "sweepStaleClaims",
+     "form": "function",
+     "async": true
     }
    ],
    "imports": [
@@ -118349,55 +122018,76 @@
      "spec": "@/lib/events",
      "names": [
       "emitEventSingle",
-      "userActor"
+      "userActor",
+      "systemActor"
      ]
     }
    ],
-   "tryCount": 10,
+   "tryCount": 15,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 68
+     "line": 75
     },
     {
      "tag": "sql",
-     "line": 94
+     "line": 112
     },
     {
      "tag": "sql",
-     "line": 115
+     "line": 142
     },
     {
      "tag": "sql",
-     "line": 152
+     "line": 182
     },
     {
      "tag": "sql",
-     "line": 246
+     "line": 291
     },
     {
      "tag": "sql",
-     "line": 269
+     "line": 314
     },
     {
      "tag": "sql",
-     "line": 335
+     "line": 380
     },
     {
      "tag": "sql",
-     "line": 393
+     "line": 438
     },
     {
      "tag": "sql",
-     "line": 404
+     "line": 449
     },
     {
      "tag": "sql",
-     "line": 453
+     "line": 498
     },
     {
      "tag": "sqlBypass",
-     "line": 561
+     "line": 606
+    },
+    {
+     "tag": "sql",
+     "line": 681
+    },
+    {
+     "tag": "sql",
+     "line": 713
+    },
+    {
+     "tag": "sql",
+     "line": 724
+    },
+    {
+     "tag": "sql",
+     "line": 763
+    },
+    {
+     "tag": "sql",
+     "line": 799
     }
    ],
    "calls": [
@@ -118428,7 +122118,11 @@
     "rb.memo.trim().slice",
     "forceAdvanceProcess",
     "runInBypass",
-    "completeTask"
+    "completeTask",
+    "emitEventSingle({\n      type: 'task.claimed',\n      namespace: 'system',\n      tenantId: task.tenantId,\n      actor: userActor(actor.id, actor.email ?? undefined),\n      payload: { taskId, entityType: 'task', entityId: taskId },\n    }).catch",
+    "emitEventSingle({\n      type: 'task.released',\n      namespace: 'system',\n      tenantId: rows[0].tenantId,\n      actor: userActor(actor.id, actor.email ?? undefined),\n      payload: { taskId, entityType: 'task', entityId: taskId },\n    }).catch",
+    "emitEventSingle({\n        type: 'task.claim_expired',\n        namespace: 'system',\n        tenantId: r.tenantId,\n        actor: systemActor('claim-sweep'),\n        payload: { taskId: r.id, entityType: 'task', entityId: r.id, title: r.title, staleMinutes },\n      }).catch",
+    "systemActor"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -122131,8 +125825,8 @@
   {
    "file": "lib/tools/library-search-atoms.ts",
    "kind": "lib",
-   "lines": 182,
-   "bytes": 5870,
+   "lines": 199,
+   "bytes": 7022,
    "client": false,
    "exports": [
     {
@@ -122195,11 +125889,11 @@
     },
     {
      "tag": "sql",
-     "line": 103
+     "line": 105
     },
     {
      "tag": "sql",
-     "line": 145
+     "line": 149
     }
    ],
    "calls": [
@@ -122220,7 +125914,8 @@
     "parseInt",
     "console.error",
     "rows.map",
-    "String"
+    "row.createdAt.toISOString",
+    "row.updatedAt.toISOString"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -125689,10 +129384,129 @@
    "jsonResponses": []
   },
   {
+   "file": "lib/working-notes.ts",
+   "kind": "lib",
+   "lines": 178,
+   "bytes": 7438,
+   "client": false,
+   "exports": [
+    {
+     "name": "NoteAuthor",
+     "form": "type"
+    },
+    {
+     "name": "NoteState",
+     "form": "type"
+    },
+    {
+     "name": "AnchorKind",
+     "form": "type"
+    },
+    {
+     "name": "WorkingNote",
+     "form": "type"
+    },
+    {
+     "name": "NEXT_STATE",
+     "form": "const",
+     "async": false
+    },
+    {
+     "name": "WriteNote",
+     "form": "type"
+    },
+    {
+     "name": "addNote",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "setNoteState",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "listNotes",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "notesFor",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "staleAnchors",
+     "form": "function",
+     "async": false
+    }
+   ],
+   "imports": [
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sqlBypass"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "userActor",
+      "systemActor"
+     ]
+    }
+   ],
+   "tryCount": 4,
+   "sqlTags": [
+    {
+     "tag": "sqlBypass",
+     "line": 74
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 104
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 129
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 133
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 133
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 146
+    }
+   ],
+   "calls": [
+    "(input.note ?? '').trim",
+    "input.anchor.trim",
+    "sqlBypass.json",
+    "emitEventSingle({\n      namespace: 'system',\n      type: 'note.created',\n      actor: input.actorId ? userActor(input.actorId, input.authorEmail ?? undefined) : systemActor(input.author as string),\n      tenantId: null,\n      payload: { noteId: row?.id, author: input.author, anchor: input.anchor ?? null, state: 'watching' },\n    }).catch",
+    "emitEventSingle",
+    "userActor",
+    "systemActor",
+    "console.error",
+    "emitEventSingle({\n      namespace: 'system',\n      type: to === 'resolved' ? 'note.resolved' : 'note.advanced',\n      actor: userActor(actor.id, actor.email ?? undefined),\n      tenantId: null,\n      payload: { noteId: id, from, to },\n    }).catch",
+    "notes.filter",
+    "exists"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "middleware.ts",
    "kind": "middleware",
-   "lines": 330,
-   "bytes": 14927,
+   "lines": 349,
+   "bytes": 16430,
    "client": false,
    "exports": [
     {
@@ -125777,17 +129591,17 @@
     {
      "arg": "{ error: 'unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 280
+     "line": 299
     },
     {
      "arg": "{ error: 'password change required', code: 'PASSWORD_CHANGE_REQUIRED' }",
      "opts": "{ status: 403 }",
-     "line": 301
+     "line": 320
     },
     {
      "arg": "{ error: 'forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 318
+     "line": 337
     }
    ]
   },
@@ -128184,8 +131998,8 @@
   {
    "file": "scripts/drive-canvas-authoring.mts",
    "kind": "script",
-   "lines": 620,
-   "bytes": 36967,
+   "lines": 631,
+   "bytes": 37780,
    "client": false,
    "exports": [],
    "imports": [
@@ -128259,19 +132073,19 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 157
+     "line": 168
     },
     {
      "tag": "sql",
-     "line": 159
+     "line": 170
     },
     {
      "tag": "sql",
-     "line": 166
+     "line": 177
     },
     {
      "tag": "sql",
-     "line": 214
+     "line": 225
     }
    ],
    "calls": [
@@ -128592,8 +132406,8 @@
   {
    "file": "scripts/drive-card-decision.mts",
    "kind": "script",
-   "lines": 324,
-   "bytes": 20482,
+   "lines": 347,
+   "bytes": 21916,
    "client": false,
    "exports": [],
    "imports": [
@@ -128710,11 +132524,11 @@
     "page.locator('text=/Scores on \\\\d+ signal/').first",
     "/Scores on \\d+ signal/.test",
     "panel.split",
-    "new RegExp(`NAICS codes 0/${feed.n}`).test",
     "panel.match",
     "panel.slice",
-    "new RegExp(`None of your ${feed.n} opportunities carry NAICS codes`).test",
-    "new RegExp(`agency ${feed.n}/${feed.n}`).test",
+    "Number",
+    "new RegExp(`None of your ${shown} opportunities carry NAICS codes`).test",
+    "new RegExp(`agency ${shown}/${shown}`).test",
     "/A signal is skipped for any opportunity/.test",
     "page.screenshot({ path: `${SHOTS}/bucket-coverage.png` }).catch",
     "browser.close().catch",
@@ -128943,8 +132757,8 @@
   {
    "file": "scripts/drive-commercial-path.mts",
    "kind": "script",
-   "lines": 365,
-   "bytes": 22178,
+   "lines": 377,
+   "bytes": 23113,
    "client": false,
    "exports": [],
    "imports": [
@@ -128965,33 +132779,31 @@
      "names": [
       "scenario"
      ]
+    },
+    {
+     "spec": "../lib/terms",
+     "names": [
+      "TERMS_VERSION"
+     ]
     }
    ],
    "tryCount": 1,
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 116
+     "line": 128
     },
     {
      "tag": "sql",
-     "line": 124
+     "line": 136
     },
     {
      "tag": "sql",
-     "line": 159
+     "line": 171
     },
     {
      "tag": "sql",
-     "line": 164
-    },
-    {
-     "tag": "sql",
-     "line": 172
-    },
-    {
-     "tag": "sql",
-     "line": 179
+     "line": 176
     },
     {
      "tag": "sql",
@@ -128999,31 +132811,31 @@
     },
     {
      "tag": "sql",
-     "line": 199
+     "line": 191
     },
     {
      "tag": "sql",
-     "line": 217
+     "line": 196
     },
     {
      "tag": "sql",
-     "line": 248
+     "line": 211
     },
     {
      "tag": "sql",
-     "line": 264
+     "line": 229
     },
     {
      "tag": "sql",
-     "line": 268
+     "line": 260
     },
     {
      "tag": "sql",
-     "line": 272
+     "line": 276
     },
     {
      "tag": "sql",
-     "line": 283
+     "line": 280
     },
     {
      "tag": "sql",
@@ -129031,19 +132843,27 @@
     },
     {
      "tag": "sql",
-     "line": 294
+     "line": 295
     },
     {
      "tag": "sql",
-     "line": 327
+     "line": 296
     },
     {
      "tag": "sql",
-     "line": 337
+     "line": 306
+    },
+    {
+     "tag": "sql",
+     "line": 339
     },
     {
      "tag": "sql",
      "line": 349
+    },
+    {
+     "tag": "sql",
+     "line": 361
     }
    ],
    "calls": [
@@ -129650,6 +133470,127 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-descent-timeout.mts",
+   "kind": "script",
+   "lines": 239,
+   "bytes": 12499,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 60
+    },
+    {
+     "tag": "sql",
+     "line": 65
+    },
+    {
+     "tag": "sql",
+     "line": 71
+    },
+    {
+     "tag": "sql",
+     "line": 79
+    },
+    {
+     "tag": "sql",
+     "line": 84
+    },
+    {
+     "tag": "sql",
+     "line": 94
+    },
+    {
+     "tag": "sql",
+     "line": 99
+    },
+    {
+     "tag": "sql",
+     "line": 114
+    },
+    {
+     "tag": "sql",
+     "line": 143
+    },
+    {
+     "tag": "sql",
+     "line": 216
+    },
+    {
+     "tag": "sql",
+     "line": 229
+    }
+   ],
+   "calls": [
+    "postgres",
+    "console.log",
+    "'═'.repeat",
+    "Math.max",
+    "console.error",
+    "sql.end",
+    "process.exit",
+    "cannot",
+    "chromium.launch",
+    "browser.newContext",
+    "ctx.newPage",
+    "phase",
+    "page.goto",
+    "page.waitForSelector",
+    "page.fill",
+    "page.click",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "landed.includes",
+    "openRows",
+    "ok",
+    "age",
+    "ctx.request.post",
+    "hb.json().catch",
+    "hb.json",
+    "Number",
+    "Math.round",
+    "no",
+    "url3.includes",
+    "url3.replace",
+    "/descent=timeout/.test",
+    "page.evaluate",
+    "document.body.cloneNode",
+    "clone.querySelectorAll('script, style, template, noscript').forEach",
+    "clone.querySelectorAll",
+    "n.remove",
+    "(clone.textContent || '').replace",
+    "/timed out after 30 minutes|returned to your own console/i.test",
+    "body.slice",
+    "latest",
+    "trail.some",
+    "sql`UPDATE space_presence SET closed_at = now(), close_reason = 'timeout'\n             WHERE user_id = ${admin!.id}::uuid AND closed_at IS NULL`.catch",
+    "browser.close"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 11,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/drive-email-spine.mts",
    "kind": "script",
    "lines": 266,
@@ -129975,6 +133916,134 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-force-ascend.mts",
+   "kind": "script",
+   "lines": 195,
+   "bytes": 10376,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 47
+    },
+    {
+     "tag": "sql",
+     "line": 54
+    },
+    {
+     "tag": "sql",
+     "line": 60
+    },
+    {
+     "tag": "sql",
+     "line": 93
+    },
+    {
+     "tag": "sql",
+     "line": 95
+    },
+    {
+     "tag": "sql",
+     "line": 106
+    },
+    {
+     "tag": "sql",
+     "line": 122
+    },
+    {
+     "tag": "sql",
+     "line": 171
+    },
+    {
+     "tag": "sql",
+     "line": 180
+    },
+    {
+     "tag": "sql",
+     "line": 181
+    },
+    {
+     "tag": "sql",
+     "line": 184
+    }
+   ],
+   "calls": [
+    "postgres",
+    "console.log",
+    "'═'.repeat",
+    "Math.max",
+    "console.error",
+    "sql.end",
+    "process.exit",
+    "cannot",
+    "chromium.launch",
+    "browser.newContext",
+    "c.newPage",
+    "p.goto",
+    "p.waitForSelector",
+    "p.fill",
+    "p.click",
+    "p.waitForLoadState('networkidle').catch",
+    "p.waitForLoadState",
+    "p.waitForTimeout",
+    "p.url().includes",
+    "p.url",
+    "signIn",
+    "phase",
+    "T.page.goto",
+    "T.page.waitForLoadState('networkidle').catch",
+    "T.page.waitForLoadState",
+    "T.page.waitForTimeout",
+    "T.page.url().includes",
+    "T.page.url",
+    "ok",
+    "no",
+    "O.ctx.request.post",
+    "r.json().catch",
+    "r.json",
+    "r.status",
+    "JSON.stringify(body).slice",
+    "JSON.stringify",
+    "url3.includes",
+    "url3.replace",
+    "T.page.evaluate",
+    "document.body.cloneNode",
+    "c.querySelectorAll('script, style, template, noscript').forEach",
+    "c.querySelectorAll",
+    "n.remove",
+    "(c.textContent || '').replace",
+    "/ended by another administrator/i.test",
+    "text.slice",
+    "self.json().catch",
+    "self.json",
+    "self.status",
+    "sql`DELETE FROM system_events WHERE payload->>'targetUserId' = ${target!.id}`.catch",
+    "sql`DELETE FROM space_presence\n             WHERE user_id = ${target!.id}::uuid AND tenant_id = ${victim!.id}::uuid\n               AND close_reason = 'forced'`.catch",
+    "sql`UPDATE space_presence SET closed_at = now(), close_reason = 'timeout'\n             WHERE user_id = ${target!.id}::uuid AND closed_at IS NULL`.catch",
+    "browser.close"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 11,
    "jsonResponses": []
   },
   {
@@ -130519,6 +134588,81 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-guide-note.mts",
+   "kind": "script",
+   "lines": 118,
+   "bytes": 6030,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 82
+    },
+    {
+     "tag": "sql",
+     "line": 108
+    }
+   ],
+   "calls": [
+    "console.error",
+    "process.exit",
+    "postgres",
+    "console.log",
+    "chromium.launch",
+    "(await browser.newContext({ viewport: { width: 1440, height: 1000 } })).newPage",
+    "browser.newContext",
+    "page.goto",
+    "page.waitForSelector",
+    "page.fill",
+    "page.click",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "page.locator('details[data-guide] summary').first",
+    "page.locator",
+    "guide.count",
+    "guide.click",
+    "page.locator('button:has-text(\"Something wrong here? Note it\")').first().click",
+    "page.locator('button:has-text(\"Something wrong here? Note it\")').first",
+    "page.locator('button:has-text(\"Product is wrong\")').first().click",
+    "page.locator('button:has-text(\"Product is wrong\")').first",
+    "page.locator('textarea').first().fill",
+    "page.locator('textarea').first",
+    "page.locator('button:has-text(\"Save note\")').first().click",
+    "page.locator('button:has-text(\"Save note\")').first",
+    "A",
+    "page.locator('text=Saved to the board.').count",
+    "JSON.stringify",
+    "/seen at:.*admin\\/scouts/s.test",
+    "(await page.locator('body').innerText()).includes",
+    "page.locator('body').innerText",
+    "sql.end",
+    "browser.close"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 2,
    "jsonResponses": []
   },
   {
@@ -134592,6 +138736,122 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-space-presence.mts",
+   "kind": "script",
+   "lines": 280,
+   "bytes": 16086,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "./lib/cross-company.mts",
+     "names": [
+      "BASE",
+      "launch",
+      "signIn"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 58
+    },
+    {
+     "tag": "sql",
+     "line": 65
+    },
+    {
+     "tag": "sql",
+     "line": 84
+    },
+    {
+     "tag": "sql",
+     "line": 100
+    },
+    {
+     "tag": "sql",
+     "line": 107
+    },
+    {
+     "tag": "sql",
+     "line": 112
+    },
+    {
+     "tag": "sql",
+     "line": 128
+    },
+    {
+     "tag": "sql",
+     "line": 186
+    },
+    {
+     "tag": "sql",
+     "line": 211
+    },
+    {
+     "tag": "sql",
+     "line": 254
+    },
+    {
+     "tag": "sql",
+     "line": 261
+    },
+    {
+     "tag": "sql",
+     "line": 275
+    }
+   ],
+   "calls": [
+    "console.error",
+    "process.exit",
+    "postgres",
+    "console.log",
+    "ok",
+    "no",
+    "'═'.repeat",
+    "Math.max",
+    "launch",
+    "note",
+    "signIn",
+    "ctx.pages",
+    "phase",
+    "page.goto",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "openRows",
+    "A",
+    "events",
+    "latest",
+    "page.request.post",
+    "res.status",
+    "res.json",
+    "hb.status",
+    "hb.json",
+    "sweep2.status",
+    "sweep2.json",
+    "closeAllFor",
+    "hb2.json",
+    "page.click('button:has-text(\"Sign out\")').catch",
+    "page.click",
+    "setTimeout",
+    "String",
+    "browser.close",
+    "sql.end"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 12,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/drive-spine-t1-section-todo.mts",
    "kind": "script",
    "lines": 138,
@@ -135085,6 +139345,150 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-task-claim.mts",
+   "kind": "script",
+   "lines": 250,
+   "bytes": 13911,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "APIRequestContext"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 51
+    },
+    {
+     "tag": "sql",
+     "line": 65
+    },
+    {
+     "tag": "sql",
+     "line": 75
+    },
+    {
+     "tag": "sql",
+     "line": 116
+    },
+    {
+     "tag": "sql",
+     "line": 129
+    },
+    {
+     "tag": "sql",
+     "line": 139
+    },
+    {
+     "tag": "sql",
+     "line": 168
+    },
+    {
+     "tag": "sql",
+     "line": 187
+    },
+    {
+     "tag": "sql",
+     "line": 194
+    },
+    {
+     "tag": "sql",
+     "line": 238
+    },
+    {
+     "tag": "sql",
+     "line": 239
+    }
+   ],
+   "calls": [
+    "postgres",
+    "console.log",
+    "'═'.repeat",
+    "Math.max",
+    "console.error",
+    "sql.end",
+    "process.exit",
+    "cannot",
+    "chromium.launch",
+    "browser.newContext",
+    "c.newPage",
+    "p.goto",
+    "p.waitForSelector",
+    "p.fill",
+    "p.click",
+    "p.waitForLoadState('networkidle').catch",
+    "p.waitForLoadState",
+    "p.waitForTimeout",
+    "p.url().includes",
+    "p.url",
+    "r.post",
+    "claimUrl",
+    "signIn",
+    "phase",
+    "post",
+    "r1.json().catch",
+    "r1.json",
+    "r1.status",
+    "ok",
+    "no",
+    "JSON.stringify(b1).slice",
+    "JSON.stringify",
+    "Number",
+    "r2.json().catch",
+    "r2.json",
+    "r2.status",
+    "b2.error.includes",
+    "/is already working on this/.test",
+    "/^someone else is/i.test",
+    "String(b2?.error).slice",
+    "String",
+    "JSON.stringify(b2).slice",
+    "r3.status",
+    "A.ctx.request.post",
+    "tenantSweep.status",
+    "ADMIN.ctx.request.post",
+    "sweep.json().catch",
+    "sweep.json",
+    "ADMIN.ctx.close",
+    "bobClaim.status",
+    "A.page.goto",
+    "A.page.waitForLoadState('networkidle').catch",
+    "A.page.waitForLoadState",
+    "A.page.waitForSelector('li:has-text(\"Claim drive fixture\")', { timeout: 20_000 }).catch",
+    "A.page.waitForSelector",
+    "A.page.locator('li', { hasText: 'Claim drive fixture' }).first",
+    "A.page.locator",
+    "((await row.textContent().catch(() => '')) || '').replace",
+    "row.textContent().catch",
+    "row.textContent",
+    "/is on this/.test",
+    "rowText.slice",
+    "row.locator(`a[href=\"${RESUME}\"]`).count",
+    "row.locator",
+    "done.status",
+    "sql`DELETE FROM system_events WHERE payload->>'taskId' = ${taskId}`.catch",
+    "sql`DELETE FROM tasks WHERE id = ${taskId}::uuid`.catch",
+    "browser.close"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 11,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/drive-tenant-workflow-setup.mts",
    "kind": "script",
    "lines": 163,
@@ -135292,8 +139696,8 @@
   {
    "file": "scripts/drive-uncovered-triggers.mts",
    "kind": "script",
-   "lines": 216,
-   "bytes": 13590,
+   "lines": 221,
+   "bytes": 14008,
    "client": false,
    "exports": [],
    "imports": [
@@ -135346,67 +139750,67 @@
     },
     {
      "tag": "sql",
-     "line": 95
+     "line": 100
     },
     {
      "tag": "sql",
-     "line": 103
+     "line": 108
     },
     {
      "tag": "sql",
-     "line": 107
+     "line": 112
     },
     {
      "tag": "sql",
-     "line": 111
+     "line": 116
     },
     {
      "tag": "sql",
-     "line": 118
+     "line": 123
     },
     {
      "tag": "sql",
-     "line": 129
+     "line": 134
     },
     {
      "tag": "sql",
-     "line": 139
+     "line": 144
     },
     {
      "tag": "sql",
-     "line": 161
+     "line": 166
     },
     {
      "tag": "sql",
-     "line": 170
+     "line": 175
     },
     {
      "tag": "sql",
-     "line": 178
+     "line": 183
     },
     {
      "tag": "sql",
-     "line": 182
+     "line": 187
     },
     {
      "tag": "sql",
-     "line": 185
+     "line": 190
     },
     {
      "tag": "sql",
-     "line": 200
+     "line": 205
     },
     {
      "tag": "sql",
-     "line": 201
+     "line": 206
     },
     {
      "tag": "sql",
-     "line": 202
+     "line": 207
     },
     {
      "tag": "sql",
-     "line": 203
+     "line": 208
     }
    ],
    "calls": [
@@ -136760,15 +141164,16 @@
   {
    "file": "scripts/ingest-assist-e2e.mts",
    "kind": "script",
-   "lines": 40,
-   "bytes": 3263,
+   "lines": 106,
+   "bytes": 7165,
    "client": false,
    "exports": [],
    "imports": [
     {
      "spec": "@/lib/db",
      "names": [
-      "sql"
+      "sql",
+      "sqlBypass"
      ]
     },
     {
@@ -136805,32 +141210,44 @@
      "line": 31
     },
     {
-     "tag": "sql",
-     "line": 33
+     "tag": "sqlBypass",
+     "line": 52
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 76
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 82
     },
     {
      "tag": "sql",
-     "line": 33
+     "line": 82
     },
     {
      "tag": "sql",
-     "line": 34
+     "line": 83
     },
     {
      "tag": "sql",
-     "line": 34
+     "line": 83
     },
     {
      "tag": "sql",
-     "line": 34
+     "line": 83
     },
     {
      "tag": "sql",
-     "line": 34
+     "line": 83
     },
     {
      "tag": "sql",
-     "line": 35
+     "line": 84
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 97
     }
    ],
    "calls": [
@@ -136983,6 +141400,140 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/lib/finish-measure.mts",
+   "kind": "script",
+   "lines": 298,
+   "bytes": 16387,
+   "client": false,
+   "exports": [
+    {
+     "name": "Finding",
+     "form": "type"
+    },
+    {
+     "name": "brokenValues",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "visibleIdentifiers",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "visibleJargon",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "deadEndPage",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "rawTimestamps",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "unlabeledControls",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "internalLinks",
+     "form": "function",
+     "async": true
+    },
+    {
+     "name": "measureFinish",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "Page"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "page.evaluate",
+    "document.createTreeWalker",
+    "walker.nextNode",
+    "(n.nodeValue || '').trim",
+    "getComputedStyle(a).fontFamily.toLowerCase",
+    "getComputedStyle",
+    "SKIP_TAG.has",
+    "a.getAttribute",
+    "a.hasAttribute",
+    "font.includes",
+    "el.getBoundingClientRect",
+    "String(a.className || '').split(/\\s+/).filter(Boolean).slice(0, 2).join",
+    "String(a.className || '').split(/\\s+/).filter(Boolean).slice",
+    "String(a.className || '').split(/\\s+/).filter",
+    "String(a.className || '').split",
+    "String",
+    "parts.unshift",
+    "a.tagName.toLowerCase",
+    "out.push",
+    "parts.join",
+    "proseNodes",
+    "re.test",
+    "n.text.slice",
+    "nodes.filter((n) => UUID.test(n.text)).map",
+    "nodes.filter",
+    "UUID.test",
+    "TOKEN.exec",
+    "ALLOW.test",
+    "ABBREV.has",
+    "m[1].includes",
+    "m[1].split('.').every",
+    "m[1].split",
+    "document.querySelector",
+    "((main as HTMLElement).innerText || main.textContent || '').replace(/\\s+/g, ' ').trim",
+    "((main as HTMLElement).innerText || main.textContent || '').replace",
+    "EMPTY.test",
+    "main.querySelectorAll",
+    "text.slice",
+    "nodes.filter((n) => ISO.test(n.text) || EPOCH.test(n.text)).map",
+    "ISO.test",
+    "EPOCH.test",
+    "document.querySelectorAll",
+    "Array.from",
+    "el.getAttribute",
+    "(el.textContent || '').trim",
+    "(document.getElementById(el.getAttribute('aria-labelledby') as string)?.textContent || '').trim",
+    "document.getElementById",
+    "(el.querySelector('img[alt]')?.getAttribute('alt') || '').trim",
+    "el.querySelector('img[alt]').getAttribute",
+    "el.querySelector",
+    "(el.querySelector('svg title')?.textContent || '').trim",
+    "s.replace",
+    "sources.find",
+    "el.tagName.toLowerCase",
+    "String(named).slice",
+    "raw.startsWith",
+    "/^(mailto|tel|javascript|data|blob):/i.test",
+    "out.add",
+    "Promise.all",
+    "brokenValues",
+    "visibleIdentifiers",
+    "visibleJargon",
+    "deadEndPage",
+    "rawTimestamps",
+    "unlabeledControls"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/lib/harness-residue.mts",
    "kind": "script",
    "lines": 108,
@@ -137063,8 +141614,8 @@
   {
    "file": "scripts/lib/mobile-measure.mts",
    "kind": "script",
-   "lines": 238,
-   "bytes": 13227,
+   "lines": 246,
+   "bytes": 13844,
    "client": false,
    "exports": [
     {
@@ -137148,6 +141699,7 @@
     "page.getByRole('button', { name, exact: false }).all",
     "page.getByRole",
     "page.locator('details:not([open]) > summary').all",
+    "page.locator('[role=\"tab\"][aria-selected=\"false\"]').all",
     "page.waitForTimeout",
     "Array.from(document.querySelectorAll('button, [role=\"button\"], details > summary')).filter",
     "(el.textContent || '').trim",
@@ -139112,6 +143664,49 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/note.mts",
+   "kind": "script",
+   "lines": 40,
+   "bytes": 1631,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "node:child_process",
+     "names": [
+      "execSync"
+     ]
+    },
+    {
+     "spec": "../lib/working-notes",
+     "names": [
+      "addNote",
+      "AnchorKind"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "text.trim",
+    "console.error",
+    "process.exit",
+    "a.startsWith",
+    "/\\.[a-z]{2,4}$/i.test",
+    "a.includes",
+    "execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim",
+    "execSync",
+    "addNote",
+    "inferKind",
+    "console.log",
+    "sha.slice"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/parity-score-ts.mts",
    "kind": "script",
    "lines": 34,
@@ -139166,6 +143761,269 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/probe-customer-finish.mts",
+   "kind": "script",
+   "lines": 441,
+   "bytes": 24378,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "Page",
+      "Browser",
+      "BrowserContext"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "node:fs",
+     "names": [
+      "fs"
+     ]
+    },
+    {
+     "spec": "node:path",
+     "names": [
+      "path"
+     ]
+    },
+    {
+     "spec": "./lib/finish-measure.mts",
+     "names": [
+      "measureFinish",
+      "internalLinks",
+      "Finding"
+     ]
+    },
+    {
+     "spec": "./lib/mobile-measure.mts",
+     "names": [
+      "openEverything"
+     ]
+    }
+   ],
+   "tryCount": 7,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 309
+    },
+    {
+     "tag": "sql",
+     "line": 324
+    },
+    {
+     "tag": "sql",
+     "line": 325
+    },
+    {
+     "tag": "sql",
+     "line": 326
+    },
+    {
+     "tag": "sql",
+     "line": 327
+    },
+    {
+     "tag": "sql",
+     "line": 328
+    },
+    {
+     "tag": "sql",
+     "line": 329
+    },
+    {
+     "tag": "sql",
+     "line": 330
+    },
+    {
+     "tag": "sql",
+     "line": 331
+    },
+    {
+     "tag": "sql",
+     "line": 332
+    },
+    {
+     "tag": "sql",
+     "line": 333
+    },
+    {
+     "tag": "sql",
+     "line": 356
+    },
+    {
+     "tag": "sql",
+     "line": 357
+    },
+    {
+     "tag": "sql",
+     "line": 361
+    },
+    {
+     "tag": "sql",
+     "line": 362
+    },
+    {
+     "tag": "sql",
+     "line": 364
+    },
+    {
+     "tag": "sql",
+     "line": 365
+    },
+    {
+     "tag": "sql",
+     "line": 366
+    },
+    {
+     "tag": "sql",
+     "line": 368
+    },
+    {
+     "tag": "sql",
+     "line": 369
+    },
+    {
+     "tag": "sql",
+     "line": 370
+    },
+    {
+     "tag": "sql",
+     "line": 371
+    },
+    {
+     "tag": "sql",
+     "line": 372
+    },
+    {
+     "tag": "sql",
+     "line": 373
+    },
+    {
+     "tag": "sql",
+     "line": 375
+    },
+    {
+     "tag": "sql",
+     "line": 378
+    }
+   ],
+   "calls": [
+    "path.resolve",
+    "(process.argv.find((a) => a.startsWith('--lane=')) || '').split",
+    "process.argv.find",
+    "a.startsWith",
+    "path.join",
+    "fs.readFileSync(onDisk, 'utf8').trim",
+    "fs.readFileSync",
+    "(await browser.newContext()).newPage",
+    "browser.newContext",
+    "page.goto",
+    "res.ok",
+    "(await page.content()).includes",
+    "page.content",
+    "page.context().close",
+    "page.context",
+    "page.setContent",
+    "measureFinish",
+    "ALL_KINDS.filter",
+    "broken.some",
+    "(await measureFinish(page)).some",
+    "control.map((f) => `${f.kind}: ${f.text.slice(0, 70)}`).join",
+    "control.map",
+    "f.text.slice",
+    "fs.readdirSync",
+    "e.isDirectory",
+    "walk",
+    "out.push",
+    "(prefix + rel).replace",
+    "out.sort",
+    "page.waitForSelector",
+    "page.fill",
+    "page.click",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "ctx.newPage",
+    "login",
+    "routesUnder",
+    "r.match",
+    "segs.some",
+    "lane.onlyParams!.includes",
+    "segs.every",
+    "addressable.push",
+    "segs.reduce",
+    "a.replace",
+    "unreachable.push",
+    "segs.filter((x) => !bindings[x]).join",
+    "segs.filter",
+    "findings.push",
+    "internalLinks",
+    "seenLinks.has",
+    "seenLinks.add",
+    "linkQueue.push",
+    "openEverything",
+    "String(e).slice",
+    "String",
+    "page.request.get",
+    "res.status",
+    "page.close",
+    "console.error",
+    "process.exit",
+    "chromium.launch",
+    "servingCurrentBuild",
+    "selfTest",
+    "console.log",
+    "postgres",
+    "sql.end",
+    "one",
+    "TENANT_PARAMS.filter",
+    "[...candidates].sort",
+    "covers",
+    "candidates.indexOf",
+    "ranked.find",
+    "topUps.find",
+    "existing.params.push",
+    "topUps.push",
+    "topUps.map",
+    "t.params.join",
+    "lanes.push",
+    "lanes.filter",
+    "l.id.startsWith",
+    "results.push",
+    "walkLane",
+    "ctx.close",
+    "UNIVERSAL.includes",
+    "r.lane.id.toUpperCase",
+    "r.findings.filter",
+    "grade",
+    "kind.padEnd",
+    "String(hits.length).padStart",
+    "new Map(hits.map((h) => [`${h.route}|${h.text}`, h])).values",
+    "hits.map",
+    "uniq.slice",
+    "h.text.slice",
+    "browser.close",
+    "main().catch",
+    "main"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 26,
    "jsonResponses": []
   },
   {
@@ -140132,6 +144990,109 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/probe-session-lifecycle.mts",
+   "kind": "script",
+   "lines": 253,
+   "bytes": 13148,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "BrowserContext"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 113
+    },
+    {
+     "tag": "sql",
+     "line": 116
+    },
+    {
+     "tag": "sql",
+     "line": 229
+    },
+    {
+     "tag": "sql",
+     "line": 232
+    }
+   ],
+   "calls": [
+    "postgres",
+    "console.log",
+    "'═'.repeat",
+    "Math.max",
+    "ctx.cookies",
+    "cookies.find",
+    "/^(__Secure-)?authjs\\.session-token/.test",
+    "/^(__Secure-)?next-auth\\.session-token/.test",
+    "Math.round",
+    "ctx.newPage",
+    "page.goto",
+    "page.waitForSelector",
+    "page.fill",
+    "page.click",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "page.close",
+    "sessionExpiry",
+    "setTimeout",
+    "act",
+    "resolveActors",
+    "console.error",
+    "sql.end",
+    "process.exit",
+    "chromium.launch",
+    "phase",
+    "browser.newContext",
+    "signIn",
+    "browser.close",
+    "note",
+    "new Date(initial).toISOString",
+    "Date.now",
+    "movesDeadline",
+    "cctx.newPage",
+    "p.goto(`${BASE}/api/auth/session`, { waitUntil: 'domcontentloaded' }).catch",
+    "p.goto",
+    "p.close",
+    "ok",
+    "p.goto(`${BASE}/admin/dashboard`, { waitUntil: 'domcontentloaded' }).catch",
+    "p.waitForLoadState('networkidle').catch",
+    "p.waitForLoadState",
+    "cctx.request.get(`${BASE}/api/notifications`).catch",
+    "cctx.request.get",
+    "cctx.request.post(`${BASE}/api/presence/heartbeat`, { data: {} }).catch",
+    "cctx.request.post",
+    "results.push",
+    "results.some",
+    "results.find",
+    "r.label.startsWith",
+    "no",
+    "Number",
+    "cctx.close"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 4,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/probe-structural-nodes.mts",
    "kind": "script",
    "lines": 126,
@@ -140326,6 +145287,84 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/prove-session-cap.mts",
+   "kind": "script",
+   "lines": 244,
+   "bytes": 13481,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 49
+    }
+   ],
+   "calls": [
+    "Number",
+    "postgres",
+    "console.log",
+    "console.error",
+    "sql.end",
+    "process.exit",
+    "chromium.launch",
+    "browser.newContext",
+    "ctx.newPage",
+    "ctx.request.get",
+    "r.status",
+    "health.json().catch",
+    "health.json",
+    "browser.close",
+    "Math.round",
+    "ok",
+    "page.goto",
+    "page.waitForSelector",
+    "page.fill",
+    "page.click",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.waitForTimeout",
+    "page.url().includes",
+    "page.url",
+    "Date.now",
+    "stillSignedIn",
+    "setTimeout",
+    "no",
+    "ctx.cookies",
+    "cookies.some",
+    "/session-token/.test",
+    "c2.newPage",
+    "p2.goto",
+    "p2.waitForSelector",
+    "p2.fill",
+    "p2.click",
+    "p2.waitForLoadState('networkidle').catch",
+    "p2.waitForLoadState",
+    "p2.waitForTimeout",
+    "c2.request.get",
+    "alive",
+    "c2.close"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 1,
    "jsonResponses": []
   },
   {

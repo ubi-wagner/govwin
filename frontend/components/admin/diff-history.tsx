@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useClientNow } from '@/components/ui/time-ago';
+import { useClientNow, localFrom } from '@/components/ui/time-ago';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -55,7 +55,14 @@ function formatRelative(iso: string, now: number | null): string {
   if (diffHr < 24) return `${diffHr}h ago`;
   const diffDay = Math.floor(diffHr / 24);
   if (diffDay < 7) return `${diffDay}d ago`;
-  return d.toLocaleDateString('en-US', {
+  /**
+   * B156 — this branch used to format in the AMBIENT zone (UTC on the server, the viewer's in the
+   * browser), which is a second, independent hydration mismatch on top of the clock one this
+   * function already guards. `mounted` is `true` here by construction: the `now === null` early
+   * return above is the only unmounted path, so anything reaching this line has mounted and both
+   * client renders agree.
+   */
+  return localFrom(iso, true, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

@@ -30,9 +30,16 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 
-const REPO = '/home/user/govwin';
+/**
+ * DERIVED, not hardcoded. This read `'/home/user/govwin'`, which is one machine's checkout — it
+ * makes the script unrunnable in CI and on anyone else's clone, and the failure is a confusing
+ * ENOENT on a path that exists nowhere. Same defect class as the hardcoded path that blocked CI
+ * earlier in this cycle. `scripts/` sits one level under `frontend/`, which sits under the repo.
+ */
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DB = process.env.GUIDE_DB || process.env.DATABASE_URL_OWNER || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 const sql = postgres(DB, { max: 2, transform: { column: { from: (c) => c } } });
 
@@ -218,13 +225,59 @@ for (const f of uiFiles) {
 }
 const tailMatch = (n) => [...uiTails].find((t) => n.endsWith(t)) ?? null;
 
+
+/**
+ * The cron-called routes, read from `middleware.ts`'s CRON_EXACT_PATHS — ONE AUTHORITY, NO DRIFT.
+ *
+ * Middleware is what actually lets a `CRON_SECRET` request through, so it is the only list that
+ * can be right. Deriving from it means adding a sweep to middleware also explains it here, in the
+ * same edit, instead of leaving a second list to fall behind — which it had, by two of four.
+ *
+ * Throws rather than returning empty: a silently empty list would reclassify every scheduled route
+ * as UNSURFACED, which reads as eight new findings rather than as a broken parser.
+ */
+function cronPaths() {
+  const raw = fs.readFileSync(path.join(REPO, 'frontend/middleware.ts'), 'utf8');
+  /**
+   * COMMENTS OUT FIRST. Every entry in that list is preceded by a paragraph explaining which
+   * occurrence of the trap it closes, and English is full of apostrophes: `middleware's wording`
+   * made `'([^']+)'` capture "s wording and not the\n  // route" as a PATH, and the final quote
+   * swallowed the rest of the block — so `/api/admin/tasks/sweep-claims`, the entry this
+   * derivation exists to pick up, never appeared at all while the parse looked successful.
+   *
+   * Fourth time this session that an instrument read prose as code. The repo's own rule: strip
+   * comments before asking what a file DOES.
+   */
+  const mw = raw
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  const m = mw.match(/const CRON_EXACT_PATHS\s*=\s*\[([\s\S]*?)\]/);
+  if (!m) throw new Error('reconcile-capability: could not find CRON_EXACT_PATHS in middleware.ts');
+  const parsed = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  // VALIDATE, do not assume: anything that is not a path means the parse drifted again, and a
+  // corrupt entry silently reclassifies a real route. Fail loudly instead.
+  const bad = parsed.filter((x) => !/^\/[A-Za-z0-9/_[\]-]*$/.test(x));
+  if (bad.length) {
+    throw new Error(`reconcile-capability: CRON_EXACT_PATHS parse produced non-paths `
+      + `(${JSON.stringify(bad.slice(0, 3))}) — the parser drifted, fix it rather than trusting it`);
+  }
+  if (!parsed.length) throw new Error('reconcile-capability: CRON_EXACT_PATHS parsed empty');
+  return new Set(parsed);
+}
+const CRON_PATHS = cronPaths();
+
 /** Routes the UI legitimately never calls, with the reason. Annotated, never silently dropped. */
 const EXTERNAL_CALLER = [
   [/^\/api\/stripe\/webhook/, 'Stripe is the caller — an inbound webhook has no UI'],
   [/^\/api\/webhooks\/postmark/, 'Postmark is the caller — delivery outcomes arrive on their own connection, with POSTMARK_WEBHOOK_SECRET as the authorization'],
   [/^\/api\/auth\//, 'NextAuth owns these; the client calls them through the library, not by URL'],
   [/^\/api\/health/, 'load balancer / Railway probe'],
-  [/^\/api\/admin\/(reconcile-cards|agent-gates\/sweep)/, 'headless scheduler via CRON_SECRET (middleware CRON_EXACT_PATHS)'],
+  // The cron-called sweeps are DERIVED from middleware's own CRON_EXACT_PATHS below, not listed
+  // here — see cronPaths(). Hand-listing them drifted: the table named two of the four, so
+  // space-presence/sweep, event-brackets/sweep and tasks/sweep-claims were reported UNSURFACED
+  // while `pipeline/src/main.py` has been calling all four on a schedule. Three working scheduled
+  // capabilities reading as dead in the canonical capability doc is exactly how a real capability
+  // leaves an operator's checklist.
   [/^\/api\/tools\//, 'the generic tool adapter — invoked by agents and scripts, not by a page'],
   [/^\/api\/storage\/local\//, 'the local storage driver’s own serving route; signed URLs point at it'],
   [/^\/api\/uploads\//, 'public CMS image serving — referenced as an <img> src, never fetched'],
@@ -232,7 +285,10 @@ const EXTERNAL_CALLER = [
   [/^\/blog\/feed\.xml|^\/sitemap/, 'crawler-facing'],
   [/^\/api\/enter|^\/api\/partner\/(enter|exit)/, 'navigation endpoints — the browser follows them, it does not fetch them'],
 ];
-const reasonFor = (route) => EXTERNAL_CALLER.find(([re]) => re.test(route))?.[1] ?? null;
+const reasonFor = (route) => {
+  if (CRON_PATHS.has(route)) return 'headless scheduler via CRON_SECRET (derived from middleware CRON_EXACT_PATHS)';
+  return EXTERNAL_CALLER.find(([re]) => re.test(route))?.[1] ?? null;
+};
 
 /**
  * THE THIRD OUTCOME, which the first draft did not model and the self-test caught.

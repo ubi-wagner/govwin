@@ -12,6 +12,7 @@
  * There is no DELETE: a decided review is the record of who looked and what they said.
  */
 import { NextResponse } from 'next/server';
+import { refuse } from '@/lib/api-refusal';
 import { withProject } from '@/lib/projects/gate';
 import { decideReview } from '@/lib/projects/reviews';
 
@@ -34,7 +35,12 @@ export async function PATCH(request: Request, ctx: Ctx) {
       }
 
       const result = await decideReview(gate.actor, projectId, reviewId, decision, body.reason ?? null);
-      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      if (!result.ok) {
+        return await refuse(result, {
+          namespace: 'project', action: 'review', entityId: projectId,
+          tenantId: gate.actor.tenantId, actor: gate.actor,
+        });
+      }
       return NextResponse.json({ data: { review: result.data } });
     });
   } catch (err) {
