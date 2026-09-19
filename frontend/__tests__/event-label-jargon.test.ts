@@ -123,6 +123,54 @@ describe('events a customer sees carry a written label', () => {
     expect(label.toLowerCase()).toContain('administrator');
   });
 
+  /**
+   * ── REFUSALS (B164) ──────────────────────────────────────────────────────────────────────────
+   *
+   * `refuse()` gave every declined request an event, and the first eleven types it emitted reached
+   * a customer's notification bell reading `Risk.refused`, `Cdrl.refused`, `Invoice.refused` — the
+   * de-punctuated identifier again, in a namespace that had been swept for exactly this. It was
+   * caught by `drive-project-lifecycle.mts`, which asserts the PROPERTY rather than a list, which
+   * is why a brand-new family of types tripped it on the first run after the conversion.
+   *
+   * The property asserted here is the one that generalises: a refusal is labelled by its own
+   * payload, so a type nobody has ever seen is still a sentence.
+   */
+  for (const type of ['close.refused', 'baseline.set.refused', 'cdrl.refused', 'route.t.refused']) {
+    it(`${type} reads as a sentence, not a de-punctuated type`, () => {
+      const label = describeEvent({
+        namespace: 'project', type, phase: 'single',
+        payload: { code: 'ALREADY_CLOSED', status: 409, reason: 'That project is already closed out.' },
+      });
+      expect(label).not.toBe(fallback(type));
+      expect(label).toContain('That project is already closed out.');
+      // The act token is deliberately absent: humanising `route.t` or `cdrl` produces an
+      // identifier wearing a verb, which is the defect, not the fix.
+      expect(label.toLowerCase()).not.toContain('cdrl');
+      expect(label.toLowerCase()).not.toContain('route.t');
+    });
+  }
+
+  it('a FAULT is not described as a decision', () => {
+    // 409 and 5xx both emit through `refuse()`. Calling a crash "refused" tells the reader the
+    // system chose something when it broke.
+    const fault = describeEvent({
+      namespace: 'project', type: 'invoice.refused', phase: 'single',
+      payload: { code: 'DB_ERROR', status: 500, reason: 'Could not reach the database.' },
+    });
+    expect(fault).toContain('Failed');
+    expect(fault).not.toContain('Refused');
+  });
+
+  it('a refusal with no prose still says so, rather than inventing a sentence', () => {
+    const label = describeEvent({
+      namespace: 'system', type: 'task.claim.refused', phase: 'single',
+      payload: { code: 'NOT_CLAIMED', status: 409 },
+    });
+    expect(label).not.toBe(fallback('task.claim.refused'));
+    expect(label).toContain('NOT_CLAIMED');
+    expect(label).toContain('no reason recorded');
+  });
+
   it('still falls back for a type nobody has labelled', () => {
     // The fallback is correct behaviour and must survive — this guards the guard.
     const label = describeEvent({ namespace: 'library', type: 'widget.frobnicated', phase: 'single', payload: {} });

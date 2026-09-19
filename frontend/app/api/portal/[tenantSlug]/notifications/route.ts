@@ -121,6 +121,10 @@ export async function GET(request: Request, ctx: RouteContext) {
               AND namespace IN ('proposal', 'capture', 'library', 'system')
               AND phase IN ('single', 'end')
               AND actor_id IS DISTINCT FROM ${sessionUser.id}
+              -- Same rule as the member lane below, and it matters MORE here: a collaborator is
+              -- the narrowest actor on the platform, so an operator's error string is the last
+              -- thing their feed should carry.
+              AND type NOT LIKE '%.refused'
               -- collaborator scope: only their proposals, and (for section-tagged events) only granted sections
               AND (payload->>'proposalId') = ANY(${scopeProposalIds})
               AND ( (payload->>'sectionId') IS NULL OR (payload->>'sectionId') = ANY(${scopeSectionIds}) )
@@ -139,6 +143,24 @@ export async function GET(request: Request, ctx: RouteContext) {
               AND namespace IN ('proposal', 'capture', 'library', 'system', 'project')
               AND phase IN ('single', 'end')
               AND actor_id IS DISTINCT FROM ${sessionUser.id}
+              -- THE BELL CARRIES WORK THAT HAPPENED. refuse() (lib/api-refusal.ts) emits
+              -- <act>.refused for work the system declined, and a refusal leaves the world
+              -- unchanged -- so there is no new state for a reader to act on. The person who hit
+              -- it already has the reason, synchronously, in the response body; and this feed
+              -- excludes self-authored rows, so the ONLY refusals it could ever show are other
+              -- people's, which is exactly the case where the reader can do nothing.
+              --
+              -- The 5xx half settles it: shouldEmit() fires for status >= 500 too, so without
+              -- this every internal fault in a tenant's space would ring every teammate's bell
+              -- with an error string meant for an operator. Several hundred crash paths are still
+              -- to convert; this is the moment the first ones arrived.
+              --
+              -- They are NOT suppressed -- the Activity stream selects the whole namespace and
+              -- renders them through describeEvent(), which writes them as sentences.
+              --
+              -- (No backticks in here. A tagged template ends at the first one, and tsc then
+              --  reports five confusing errors on the lines BELOW the comment.)
+              AND type NOT LIKE '%.refused'
             ORDER BY created_at DESC
             LIMIT ${limit} OFFSET ${offset}`;
 

@@ -115,6 +115,9 @@ const addEmit = (ns, type, phase, file) => {
   emitters.get(k).add(file);
 };
 
+/** `refuse()` sites whose descriptor is not a literal object — REPORTED, never silently dropped. */
+const uncheckedRefusals = [];
+
 const walkFiles = (dir, re, out = []) => {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -147,9 +150,18 @@ for (const file of tsFiles) {
   // optimisation, not a rule — silently skipped every file that adopted the safe wrapper. The
   // parse below was correct all along; it was simply never reached. A filter that decides what to
   // look at is part of the instrument, and this one made two live workflows invisible.
-  if (!/emitEvent|withEventBracket/.test(src)) continue;
+  //
+  // IT HAPPENED AGAIN, to `refuse()` (lib/api-refusal.ts), and the second occurrence is the
+  // interesting one: the JOIN 1c parser below was written, run, and reported five refusal types —
+  // the five whose route ALSO happened to call `emitEvent` for something else. The other sixty
+  // call sites were never parsed, so the instrument looked like it was working at a twelfth of
+  // its reach. **Every new emit seam has to be added HERE as well as to the parser**, and the
+  // self-test now pins a type that only this filter can make reachable.
+  if (!/emitEvent|withEventBracket|\brefuse\(/.test(src)) continue;
   const rel = path.relative(REPO, file);
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true);
+  /** Is the `refuse` in this file THE seam, or something else that shares the name? */
+  const usesApiRefusalSeam = /from ['"]@\/lib\/api-refusal['"]/.test(src);
 
   /**
    * A TERNARY EMITS BOTH BRANCHES.
@@ -167,8 +179,12 @@ for (const file of tsFiles) {
     }
     return null;
   };
-  const literalArg = (node, name) => {
-    const arg = node.arguments?.[0];
+  /**
+   * `at` exists because not every seam puts its descriptor first: `refuse(refusal, ctx)` carries
+   * the namespace on its SECOND argument. Defaulting to 0 keeps every existing caller unchanged.
+   */
+  const literalArg = (node, name, at = 0) => {
+    const arg = node.arguments?.[at];
     if (!arg || !ts.isObjectLiteralExpression(arg)) return null;
     for (const p of arg.properties) {
       if (!ts.isPropertyAssignment(p) || p.name.getText(sf) !== name) continue;
@@ -208,6 +224,36 @@ for (const file of tsFiles) {
           // in the same line, that the database HAS such a row. The tool was arguing with itself,
           // and the honest annotation is what made the parser gap findable rather than believed.
           if (fn === 'withEventBracket') { addEmit(n1, t1, 'start', rel); addEmit(n1, t1, 'end', rel); }
+        }
+      }
+
+      /**
+       * JOIN 1c · THE REFUSAL SEAM (`lib/api-refusal.ts`), whose type exists nowhere as a literal.
+       *
+       * `refuse()` emits ``${ctx.action}.refused``, so every one of its types was landing in JOIN
+       * 4's "observed with no emitter" bucket — the bucket whose caption already admits it may be
+       * a parser gap, which is exactly what this was. It matters more than eleven rows suggest:
+       * the family is growing by design (several hundred crash paths still to convert), and a
+       * workflow triggering on a `.refused` event would have been reported by JOIN 1 as a trigger
+       * NOTHING CAN EMIT — a false dead-trigger, which is the finding this audit exists to make.
+       *
+       * The seam has one fixed shape, so the type IS derivable: namespace and action come off the
+       * SECOND argument, and the suffix is the one the seam appends. A site whose descriptor is
+       * not a literal object is reported UNCHECKED rather than dropped — a scanner that silently
+       * skips what it cannot parse reports a clean run.
+       */
+      //
+      // Gated on the IMPORT, not the name. `lib/email/index.ts` has its own local
+      // `refuse(correlationId, reason)` — a different function that emits nothing — and matching
+      // on the bare name reported both of its call sites as UNCHECKED. An instrument that lists
+      // two non-findings under a warning heading teaches a reader to skip the heading.
+      if (fn === 'refuse' && usesApiRefusalSeam) {
+        const rns = literalArg(node, 'namespace', 1);
+        const acts = literalArg(node, 'action', 1);
+        if (rns && acts) {
+          for (const n1 of rns) for (const a1 of acts) addEmit(n1, `${a1}.refused`, 'single', rel);
+        } else if ((node.arguments?.length ?? 0) >= 2) {
+          uncheckedRefusals.push(`${rel}:${sf.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
         }
       }
 
@@ -614,6 +660,12 @@ const T = [
     [...emitters.get(key('system', 'ops.digest_requested', 'single')) ?? []].some((f) => f.includes('cron'))],
   ['a single-phase trigger is launchable via process_templates',
     emitters.has(key('proposal', 'project.collaboration_requested', 'single'))],
+  // The refusal seam builds its type from a variable, so this pins a type the scanner can only
+  // know by understanding `refuse()` — never by finding the string.
+  ['a refusal type is derived, not found as a literal (api-refusal seam)',
+    emitters.has(key('project', 'close.refused', 'single'))
+    && !fs.readFileSync(path.join(FRONTEND, 'app/api/portal/[tenantSlug]/projects/[projectId]/route.ts'), 'utf8')
+      .includes("'close.refused'")],
 ];
 let bad = 0;
 console.log('── join self-test ──');
@@ -626,6 +678,10 @@ const steps = registry.reduce((a, w) => a + w.steps.length, 0);
 console.log(`\n══ 1 · workflow triggers ↔ something that emits them ══`);
 console.log(`   ${registry.length} workflows · ${steps} steps · ${emitters.size} distinct (ns,type,phase) emittable`);
 console.log(`   ${deadTriggers.length} trigger(s) nothing can emit — the workflow can never fire:`);
+if (uncheckedRefusals.length) {
+  console.log(`   ⚠ ${uncheckedRefusals.length} refuse() site(s) UNCHECKED — descriptor is not a literal object:`);
+  for (const s of uncheckedRefusals) console.log(`   · ${s}`);
+}
 for (const d of deadTriggers) console.log(`   · ${d.wf.padEnd(34)} waits on ${`${d.ns}:${d.type}`.padEnd(46)} phase=${d.phase}${d.seen ? '  (but the DB HAS such a row — parser gap)' : ''}`);
 
 console.log(`\n══ 2 · step wait_for ↔ something that emits them ══`);

@@ -355,6 +355,31 @@ export function describeEventOrNull(ev: EventLike): string | null {
     }
   }
 
+  // ── A refusal, in ANY namespace (`lib/api-refusal.ts`) ───────────────────────────────────────
+  //
+  // `refuse()` emits `<act>.refused` for work the system looked at and declined, and its payload
+  // already carries a `reason` written at the refusal site FOR THE PERSON WHO WAS TURNED AWAY. So
+  // no label is invented here: this surfaces that sentence. One clause covers every namespace
+  // because the emitter is one seam — a per-namespace case would have to be remembered at each of
+  // the several hundred sites still to convert, and B136 is what forgetting looks like.
+  //
+  // It deliberately does NOT name the act. The action tokens are inconsistent by design (`close`,
+  // `baseline.set`, `cdrl`, `route.t`, `error`), so humanising one produces "Cdrl was refused" and
+  // "Error was refused" — a de-punctuated identifier wearing a verb, which is the exact failure
+  // this clause exists to prevent. The reasons are self-describing; the prefix is the category.
+  if (/\.refused$/.test(type)) {
+    const reason = str(payload.reason);
+    const code = str(payload.code);
+    const status = typeof payload.status === 'number' ? payload.status : null;
+    // A 409 is a DECISION and a 5xx is a FAULT. Calling both "refused" would tell a reader the
+    // system chose something when in fact it broke.
+    const head = status !== null && status >= 500 ? 'Failed' : 'Refused';
+    if (reason) return `${head} — ${reason}`;
+    // No prose at the refusal site: the code is all there is, and saying so plainly beats
+    // dressing it up as a sentence nobody wrote.
+    return code ? `${head} — no reason recorded (${code})` : `${head} — no reason recorded`;
+  }
+
   // Post-award projects (migration 217). EVERY type here needs a case, or it reaches a customer's
   // Activity feed as a de-punctuated identifier — which is B136 ("Shadow descended") happening
   // again in a new namespace. The fallback humanizer produces "clin created", which is not wrong
