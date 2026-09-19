@@ -34,11 +34,41 @@
  */
 import { GuideNoteBox } from './guide-note';
 
-export const GuideCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+/**
+ * ── WHICH LANE IS READING THIS GUIDE ────────────────────────────────────────────────────────
+ *
+ * These primitives were written for `/admin`, where every reader is an rfp_admin and the note box
+ * posts to `/api/admin/notes`. That route requires `rfp_admin` and answers **403** to anyone else
+ * — so rendering the same guide on a CUSTOMER surface puts a note form in front of a tenant_admin
+ * that refuses every submission, directly under an `<Unwritten>` line reading "Note it below once
+ * you know."
+ *
+ * A guide that points at a control the reader would be REFUSED is worse than a guide with a gap.
+ * The gap is honest; the dead control teaches them the product is broken.
+ *
+ * ── WHY A FACTORY AND NOT A CONTEXT ─────────────────────────────────────────────────────────
+ * React context would be the obvious way to thread this, and it is the wrong one HERE: context
+ * needs `useContext`, `useContext` needs `'use client'`, and the posture this file holds (see
+ * above) is that guide bodies ship NO JavaScript — the note box is deliberately the only client
+ * component in the tree. A lane marker is not worth turning every guide into a bundle.
+ *
+ * So the lane is bound ONCE per guide file, at the import:
+ *
+ *     const { GuideCard, Step, Unwritten } = guideFor('tenant');
+ *
+ * One destructure cannot be forgotten halfway down a file the way a per-element prop can, and the
+ * tags it produces are still literally `<Step id=… title=…>`, so `catalog-guides.mjs` keeps
+ * parsing them.
+ */
+export type GuideLane = 'admin' | 'tenant';
+
+export const GuideCard = ({
+  title, children, lane = 'admin',
+}: { title: string; children: React.ReactNode; lane?: GuideLane }) => (
   // `data-guide` marks this subtree so `verify-guide-controls.mjs` can EXCLUDE it: the guide
   // renders the control labels it names, so a check that searched the whole page would always
   // find them and always pass.
-  <details data-guide className="mb-6 rounded-lg border border-sky-200 bg-sky-50/40 px-5 py-3">
+  <details data-guide data-guide-lane={lane} className="mb-6 rounded-lg border border-sky-200 bg-sky-50/40 px-5 py-3">
     <summary className="cursor-pointer text-sm font-semibold text-sky-900">{title}</summary>
     <div className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-700">{children}</div>
   </details>
@@ -49,12 +79,12 @@ export const GuideCard = ({ title, children }: { title: string; children: React.
  * stable: renaming it orphans every note already written about this step.
  */
 export const Step = ({
-  id, route, title, children,
-}: { id: string; route: string; title: string; children: React.ReactNode }) => (
+  id, route, title, children, lane = 'admin',
+}: { id: string; route: string; title: string; children: React.ReactNode; lane?: GuideLane }) => (
   <section className="mt-5 border-t border-sky-200/70 pt-4 first:mt-2 first:border-t-0 first:pt-0">
     <h3 className="mb-1.5 text-[13px] font-semibold uppercase tracking-wide text-sky-900">{title}</h3>
     {children}
-    <GuideNoteBox anchor={`${route}#${id}`} step={title} />
+    {lane === 'admin' ? <GuideNoteBox anchor={`${route}#${id}`} step={title} /> : null}
   </section>
 );
 
@@ -88,12 +118,32 @@ export const Careful = ({ children }: { children: React.ReactNode }) => (
 );
 
 /** A section nobody can honestly write yet. Visible, not absent. */
-export const Unwritten = ({ children }: { children: React.ReactNode }) => (
+export const Unwritten = ({ children, lane = 'admin' }: { children: React.ReactNode; lane?: GuideLane }) => (
   <p className="my-2 rounded border border-dashed border-gray-300 bg-white px-3 py-2 text-[13px] text-gray-500">
     <span className="font-semibold text-gray-600">Not written yet — </span>{children}
-    {' '}<span className="text-gray-400">Note it below once you know, and this section gets written from it.</span>
+    {lane === 'admin'
+      ? <>{' '}<span className="text-gray-400">Note it below once you know, and this section gets written from it.</span></>
+      : null}
   </p>
 );
+
+/**
+ * Bind a whole guide file to one lane. See the note above `GuideLane` for why this is a factory.
+ * The pass-through members are re-exported unchanged so a guide destructures ONE object rather
+ * than importing from two places and getting the lane right in only one of them.
+ */
+export function guideFor(lane: GuideLane) {
+  return {
+    lane,
+    // Bound, not passed through — otherwise a guide sets the lane in two places and they can
+    // disagree, which is the whole class of defect this factory exists to remove.
+    GuideCard: (props: { title: string; children: React.ReactNode }) => <GuideCard {...props} lane={lane} />,
+    P, Ul, Ctl, Code, Careful, Canon,
+    Step: (props: { id: string; route: string; title: string; children: React.ReactNode }) =>
+      <Step {...props} lane={lane} />,
+    Unwritten: (props: { children: React.ReactNode }) => <Unwritten {...props} lane={lane} />,
+  };
+}
 
 /** Where the long version lives. The guide distils; it must never fork the canonical doc. */
 export const Canon = ({ doc, children }: { doc: string; children?: React.ReactNode }) => (

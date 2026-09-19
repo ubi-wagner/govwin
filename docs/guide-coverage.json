@@ -1,10 +1,10 @@
 {
- "generatedAt": "2026-09-19T14:43:35.287Z",
+ "generatedAt": "2026-09-19T17:17:47.651Z",
  "summary": {
   "surfaces": 91,
-  "none": 84,
-  "open": 6,
-  "ready": 1,
+  "none": 82,
+  "open": 7,
+  "ready": 2,
   "stale": 0
  },
  "rows": [
@@ -912,12 +912,42 @@
    "route": "/portal/[tenantSlug]/buckets",
    "lane": "tenant",
    "dir": "app/portal/[tenantSlug]/buckets",
-   "guide": null,
-   "state": "none",
-   "steps": [],
-   "controls": [],
-   "unwritten": 0,
-   "canon": null,
+   "guide": "app/portal/[tenantSlug]/buckets/buckets-guide.tsx",
+   "state": "open",
+   "steps": [
+    {
+     "id": "empty",
+     "title": "1 · You start with none, and that is on purpose"
+    },
+    {
+     "id": "write",
+     "title": "2 · Writing one"
+    },
+    {
+     "id": "score",
+     "title": "3 · What the score is made of"
+    },
+    {
+     "id": "cap",
+     "title": "4 · The cap, and why more buckets is not better"
+    },
+    {
+     "id": "delete",
+     "title": "5 · Removing one"
+    },
+    {
+     "id": "see",
+     "title": "6 · Seeing the effect"
+    }
+   ],
+   "controls": [
+    "Create",
+    "Cancel",
+    "Save changes",
+    "Rank →"
+   ],
+   "unwritten": 1,
+   "canon": "docs/RANKING_SPINE.md",
    "surfaceChangedAt": null,
    "guideWrittenAt": null
   },
@@ -938,12 +968,36 @@
    "route": "/portal/[tenantSlug]/cards",
    "lane": "tenant",
    "dir": "app/portal/[tenantSlug]/cards",
-   "guide": null,
-   "state": "none",
-   "steps": [],
-   "controls": [],
+   "guide": "app/portal/[tenantSlug]/cards/cards-guide.tsx",
+   "state": "ready",
+   "steps": [
+    {
+     "id": "order",
+     "title": "1 · The order is yours, and it is computed"
+    },
+    {
+     "id": "rate",
+     "title": "2 · Rate a card — 👍 / 👎"
+    },
+    {
+     "id": "arrive",
+     "title": "3 · Where new cards come from, and when"
+    },
+    {
+     "id": "buy",
+     "title": "4 · Turning a card into a proposal"
+    },
+    {
+     "id": "who",
+     "title": "5 · Who can see this page, and who can buy"
+    }
+   ],
+   "controls": [
+    "Purchase",
+    "Build →"
+   ],
    "unwritten": 0,
-   "canon": null,
+   "canon": "docs/MASTER_MIRROR_OPP_DESIGN.md",
    "surfaceChangedAt": null,
    "guideWrittenAt": null
   },

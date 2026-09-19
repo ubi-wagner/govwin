@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess, canManageBuckets } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import SpotlightBuckets from '@/components/portal/spotlight-buckets';
+import BucketsGuide from './buckets-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,7 @@ export default async function BucketsPage({ params }: { params: Promise<{ tenant
         <h1 className="text-2xl font-bold">Spotlight Buckets</h1>
         <p className="text-gray-500 mt-1 text-sm">Your ranking lenses — each ranks the whole pipeline by the criteria you set.</p>
       </div>
+      <BucketsGuide />
       <SpotlightBuckets tenantSlug={tenantSlug} canEdit={canManage} />
     </div>
   );

@@ -8,7 +8,7 @@
 > the guide last did, which is the "new features, spin it up again" signal and does not depend
 > on anyone noticing. Unresolved notes are live and shown on `/admin/guides`, not here.
 
-**91 surfaces · 1 ready · 6 open · 0 stale · 84 with no guide at all.**
+**91 surfaces · 2 ready · 7 open · 0 stale · 82 with no guide at all.**
 
 ### By lane — who is left without a guide
 
@@ -20,7 +20,7 @@ the 38 portal surfaces were not `none`, they were ABSENT.
 | lane | surfaces | ready | open | none |
 |---|---:|---:|---:|---:|
 | admin | 53 | 1 | 6 | 46 |
-| tenant | 38 | 0 | 0 | 38 |
+| tenant | 38 | 1 | 1 | 36 |
 
 Uncovered is not passing. The `none` rows are the queue.
 
@@ -32,7 +32,9 @@ Uncovered is not passing. The `none` rows are the queue.
 | `open` | admin | `/admin/rfp-curation/[solId]` | `curation-guide.tsx` | 6 | 2 | `docs/INGEST_PROVENANCE.md` |
 | `open` | admin | `/admin/scouts` | `scouts-guide.tsx` | 5 | 2 | `docs/SCOUT_INTAKE_QUEUE.md` |
 | `open` | admin | `/admin/sources` | `sources-guide.tsx` | 5 | 2 | `docs/SCOUT_INTAKE_QUEUE.md` |
+| `open` | tenant | `/portal/[tenantSlug]/buckets` | `buckets-guide.tsx` | 6 | 1 | `docs/RANKING_SPINE.md` |
 | `ready` | admin | `/admin/observe` | `companion-guide.tsx` |  |  |  |
+| `ready` | tenant | `/portal/[tenantSlug]/cards` | `cards-guide.tsx` | 5 |  | `docs/MASTER_MIRROR_OPP_DESIGN.md` |
 | `none` | admin | `/admin` | — |  |  |  |
 | `none` | admin | `/admin/agents` | — |  |  |  |
 | `none` | admin | `/admin/analytics` | — |  |  |  |
@@ -85,8 +87,6 @@ Uncovered is not passing. The `none` rows are the queue.
 | `none` | tenant | `/portal/[tenantSlug]/atoms` | — |  |  |  |
 | `none` | tenant | `/portal/[tenantSlug]/automation` | — |  |  |  |
 | `none` | tenant | `/portal/[tenantSlug]/billing` | — |  |  |  |
-| `none` | tenant | `/portal/[tenantSlug]/buckets` | — |  |  |  |
-| `none` | tenant | `/portal/[tenantSlug]/cards` | — |  |  |  |
 | `none` | tenant | `/portal/[tenantSlug]/cards/[opportunityId]/solicitation` | — |  |  |  |
 | `none` | tenant | `/portal/[tenantSlug]/command` | — |  |  |  |
 | `none` | tenant | `/portal/[tenantSlug]/contracts` | — |  |  |  |

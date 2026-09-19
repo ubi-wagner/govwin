@@ -31,9 +31,9 @@
 
 | | |
 |---|---:|
-| files | **2363** |
-| total lines | 454,361 |
-| dependency edges (file → file) | 4,735 |
+| files | **2365** |
+| total lines | 454,733 |
+| dependency edges (file → file) | 4,739 |
 | distinct tables touched | 139 |
 | files with no header of their own | 555 |
 | files with no edge either way | 654 |
@@ -44,7 +44,7 @@
 
 | plane | files | lines | uses | used by |
 |---|---:|---:|---:|---:|
-| 01 UI | 362 | 78,493 | 877 | 371 |
+| 01 UI | 364 | 78,769 | 881 | 375 |
 | 02 API | 293 | 44,837 | 1449 | 45 |
 | 03 Domain | 413 | 87,557 | 1002 | 2481 |
 | 04 Data | 3 | 330 | 3 | 586 |
@@ -52,7 +52,7 @@
 | 06 Engine | 104 | 25,270 | 162 | 330 |
 | 07 Agents | 61 | 21,809 | 121 | 221 |
 | migration | 256 | 46,692 | 0 | 0 |
-| harness | 458 | 79,755 | 415 | 82 |
+| harness | 458 | 79,851 | 415 | 82 |
 | test | 396 | 57,471 | 696 | 0 |
 | config | 12 | 746 | 6 | 327 |
 | other | 1 | 9,783 | 0 | 0 |
@@ -62,17 +62,17 @@
 | area | files | lines |
 |---|---:|---:|
 | frontend · lib | 342 | 72,007 |
-| frontend · harnesses | 331 | 64,028 |
+| frontend · harnesses | 331 | 64,124 |
 | frontend · api routes | 292 | 44,488 |
 | db · migrations | 256 | 46,692 |
 | frontend · unit tests | 256 | 35,917 |
-| frontend · components | 188 | 47,091 |
+| frontend · components | 188 | 47,141 |
 | pipeline | 166 | 47,246 |
 | pipeline · tests | 118 | 18,167 |
 | services · rfp-crm | 99 | 20,718 |
 | frontend · admin pages | 82 | 17,926 |
 | frontend · e2e | 81 | 9,864 |
-| frontend · portal pages | 47 | 8,583 |
+| frontend · portal pages | 49 | 8,809 |
 | repo · scripts | 46 | 5,863 |
 | frontend · marketing pages | 25 | 3,000 |
 | frontend · other pages | 16 | 1,415 |
@@ -136,8 +136,8 @@ files is one whose invariants live in the application rather than in the schema.
 | table | written by | read by |
 |---|---:|---:|
 | `proposals` | 60 | 114 |
-| `tenants` | 36 | 121 |
-| `users` | 49 | 90 |
+| `tenants` | 36 | 122 |
+| `users` | 49 | 91 |
 | `opportunities` | 56 | 73 |
 | `proposal_sections` | 64 | 56 |
 | `curated_solicitations` | 61 | 51 |
@@ -933,7 +933,7 @@ which carries the per-edge reasons in full.
 | `frontend/components/admin/diff-history.tsx` | 196 | 1 | 1 | — |
 | `frontend/components/admin/guardrail-defaults.tsx` | 64 | 0 | 1 | — |
 | `frontend/components/admin/guide-note.tsx` | 137 | 0 | 1 | — |
-| `frontend/components/admin/guide.tsx` | 104 | 1 | 6 | The in-page guide kit — the shared shell for an admin surface's "how this works", and the affordance that lets the person reading it say the guide is  |
+| `frontend/components/admin/guide.tsx` | 154 | 1 | 8 | The in-page guide kit — the shared shell for an admin surface's "how this works", and the affordance that lets the person reading it say the guide is  |
 | `frontend/components/admin/image-upload-field.tsx` | 78 | 0 | 2 | — |
 | `frontend/components/admin/intake-form.tsx` | 68 | 0 | 1 | — |
 | `frontend/components/admin/intake-stage-strip.tsx` | 95 | 0 | 6 | The discovery river, drawn as one queue (#176). |
@@ -1250,7 +1250,7 @@ which carries the per-edge reasons in full.
 | `frontend/scripts/capture-templates.mts` | 175 | 2 | 0 | #151 — capture the THREE template surfaces as the real actors, and check what they show against what the system actually holds. |
 | `frontend/scripts/capture-ui-atlas.mjs` | 391 | 2 | 0 | — |
 | `frontend/scripts/capture-vaults.mjs` | 109 | 0 | 0 | Capture the two-sided collaboration-vault ("nook") UI for the manuals (P8.9/P8.7/P8.8): TENANT side — eric@immobileyes → /portal/immobileyes/vaults (i |
-| `frontend/scripts/catalog-guides.mjs` | 158 | 0 | 0 | — |
+| `frontend/scripts/catalog-guides.mjs` | 208 | 0 | 0 | — |
 | `frontend/scripts/catalog-ui.mjs` | 344 | 0 | 0 | — |
 | `frontend/scripts/check-async-workers.mjs` | 221 | 0 | 0 | — |
 | `frontend/scripts/check-cms-content-retirable.mjs` | 174 | 0 | 0 | — |
@@ -1515,7 +1515,7 @@ which carries the per-edge reasons in full.
 | `frontend/scripts/verify-embeddings.mts` | 109 | 2 | 0 | Live proof for the semantic-retrieval spine (mig 171 + lib/embeddings + hybrid selectForSection). Runs with the LOCAL engine so it needs no key. Prove |
 | `frontend/scripts/verify-exports-on-stored-artifacts.mts` | 122 | 7 | 0 | Can every stored volume actually be DOWNLOADED, in every format the product offers? |
 | `frontend/scripts/verify-groups-overlay.mjs` | 249 | 0 | 0 | THE GROUP LAYER, ON SCREEN — does a canvas that carries groups actually render, and can a person see them? |
-| `frontend/scripts/verify-guide-controls.mjs` | 215 | 0 | 0 | — |
+| `frontend/scripts/verify-guide-controls.mjs` | 261 | 0 | 0 | — |
 | `frontend/scripts/verify-ingest-coverage.mts` | 137 | 0 | 0 | Ingest Studio — the DB-side coverage verifier (run after e2e/ingest-coverage-drive). |
 | `frontend/scripts/verify-insert-fidelity.mts` | 37 | 1 | 0 | Proves FIX-INSERT-1's data path: selectForSection now returns an image atom's canvas_nodes, so a boxed figure/table can insert into a section (not jus |
 | `frontend/scripts/verify-keep-copy.mts` | 79 | 2 | 0 | Prove "keep + copy" + ISOLATION end-to-end against the seeded master library (mig 152). Runs the EXACT call the tenant-creation routes make — copyStar |
@@ -1943,7 +1943,7 @@ which carries the per-edge reasons in full.
 | `frontend/app/vaults/layout.tsx` | 33 | 2 | 0 | — |
 | `frontend/app/vaults/page.tsx` | 56 | 3 | 0 | — |
 
-### frontend · portal pages · 47 file(s)
+### frontend · portal pages · 49 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
@@ -1953,9 +1953,11 @@ which carries the per-edge reasons in full.
 | `frontend/app/portal/[tenantSlug]/atoms/page.tsx` | 57 | 8 | 0 | — |
 | `frontend/app/portal/[tenantSlug]/automation/page.tsx` | 45 | 4 | 0 | — |
 | `frontend/app/portal/[tenantSlug]/billing/page.tsx` | 134 | 4 | 0 | — |
-| `frontend/app/portal/[tenantSlug]/buckets/page.tsx` | 34 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/buckets/buckets-guide.tsx` | 111 | 1 | 1 | The in-page guide for spotlight buckets — the control that RANKS a customer's opportunity list. |
+| `frontend/app/portal/[tenantSlug]/buckets/page.tsx` | 36 | 5 | 0 | — |
 | `frontend/app/portal/[tenantSlug]/cards/[opportunityId]/solicitation/page.tsx` | 223 | 6 | 0 | — |
-| `frontend/app/portal/[tenantSlug]/cards/page.tsx` | 33 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/cards/cards-guide.tsx` | 111 | 1 | 1 | The in-page guide for a customer's opportunity list — the MIRROR half of the OPP spine. |
+| `frontend/app/portal/[tenantSlug]/cards/page.tsx` | 35 | 5 | 0 | — |
 | `frontend/app/portal/[tenantSlug]/command/page.tsx` | 396 | 11 | 0 | — |
 | `frontend/app/portal/[tenantSlug]/contracts/[contractId]/page.tsx` | 176 | 3 | 0 | — |
 | `frontend/app/portal/[tenantSlug]/contracts/page.tsx` | 156 | 3 | 0 | — |

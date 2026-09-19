@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { getTenantBySlug, verifyTenantAccess, canManageBuckets } from '@/lib/db';
 import { isRole, type Role } from '@/lib/rbac';
 import PipelineCards from '@/components/portal/pipeline-cards';
+import CardsGuide from './cards-guide';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,7 @@ export default async function CardsPage({ params }: { params: Promise<{ tenantSl
         <h1 className="text-2xl font-bold">Opportunity Pipeline</h1>
         <p className="text-gray-500 mt-1 text-sm">Every opportunity we carry, ranked by your spotlight buckets. Rate them 👍 / 👎 — that ranks what arrives next, and 👍 lets you pull the documents in.</p>
       </div>
+      <CardsGuide />
       <PipelineCards tenantSlug={tenantSlug} role={role} />
     </div>
   );

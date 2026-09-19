@@ -38,7 +38,24 @@ const BASE = process.env.GUIDE_BASE || process.env.BASE_URL || 'http://localhost
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const ADMIN = 'eric@rfppipeline.com';
 const ADMIN_PW = process.env.SANDBOX_PASSWORD || 'SandboxDrive2026!';
-const APP = path.join('/home/user/govwin/frontend', 'app/admin');
+const FE = '/home/user/govwin/frontend';
+const APP = path.join(FE, 'app/admin');
+/**
+ * ── THE TENANT LANE, AND WHY IT DRIVES AS A CUSTOMER ────────────────────────────────────────
+ *
+ * This walked `app/admin` only and signed in once, as an rfp_admin. Customer guides therefore
+ * went UNCHECKED — and that is not theoretical: the first draft of `cards-guide.tsx` named a
+ * control called "Start a build" that has never existed on that page (the real ones are
+ * `Purchase` and `Build →`). This lens is exactly what catches that, and it could not see the file.
+ *
+ * The tenant lane signs in as a TENANT, not as the admin. An rfp_admin can reach a customer's
+ * portal through its derived membership, so driving these routes as the admin would mostly work —
+ * and would be checking a page nobody reads. A guide is verified against the surface as the person
+ * who is being guided actually sees it, or it is not verified.
+ */
+const PORTAL = path.join(FE, 'app/portal/[tenantSlug]');
+const TENANT = process.env.GUIDE_TENANT_EMAIL || 'kate.ulepic@foundation3dp.com';
+const TENANT_PW = process.env.TENANT_PW || 'DemoPass123!';
 const DB = process.env.GUIDE_DB || process.env.DATABASE_URL_OWNER
   || 'postgresql://govtech:changeme@localhost:5432/govtech_intel';
 const sql = postgres(DB, { max: 2, onnotice: () => {} });
@@ -62,6 +79,16 @@ async function bindings() {
     solId: await one(sql`SELECT id FROM curated_solicitations ORDER BY created_at DESC LIMIT 1`),
     portalId: await one(sql`SELECT id FROM proposal_portals ORDER BY created_at DESC LIMIT 1`),
     profileId: await one(sql`SELECT id FROM source_profiles ORDER BY created_at DESC LIMIT 1`),
+    // The slug, not an id — `/portal/[tenantSlug]/…` is addressed by slug. Resolved from the
+    // tenant the lane signs in as, so a guide is checked against that person's own workspace.
+    tenantSlug: await (async () => {
+      try {
+        const [r] = await sql`SELECT t.slug AS id FROM tenants t
+                                JOIN users u ON u.tenant_id = t.id
+                               WHERE u.email = ${TENANT} LIMIT 1`;
+        return r?.id ?? null;
+      } catch { return null; }
+    })(),
   };
 }
 
@@ -103,33 +130,52 @@ const B = await bindings();
 const bind = (r) => r.replace(/\[(\w+)\]/g, (m, k) => B[k] ?? m);
 const unaddressable = [];
 
-const found = guides();
+const LANES = [
+  { id: 'admin', dir: APP, email: ADMIN, pw: ADMIN_PW },
+  { id: 'tenant', dir: PORTAL, email: TENANT, pw: TENANT_PW },
+];
+const found = LANES.flatMap((l) => (fs.existsSync(l.dir) ? guides(l.dir) : []).map((f) => ({ file: f, lane: l })));
 if (!found.length) {
-  console.error('✗ HARNESS DEFECT — no *-guide.tsx under app/admin. This lens would pass over nothing.');
+  console.error('✗ HARNESS DEFECT — no *-guide.tsx found at all. This lens would pass over nothing.');
   process.exit(2);
+}
+// Per-lane, because "some guides exist" is what let the customer lane go unchecked in the first
+// place. A lane with no guides is REPORTED rather than fatal — there may genuinely be none yet.
+for (const l of LANES) {
+  const n = found.filter((f) => f.lane.id === l.id).length;
+  if (!n) console.log(`· note: the ${l.id} lane has no *-guide.tsx — nothing to check there, which is not the same as clean`);
 }
 
 const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-const page = await ctx.newPage();
-try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#email', { timeout: 20_000 });
-  await page.fill('#email', ADMIN);
-  await page.fill('#password', ADMIN_PW);
-  await page.click('button[type="submit"]');
-  await page.waitForLoadState('networkidle').catch(() => {});
-  await page.waitForTimeout(2000);
-  if (page.url().includes('/login')) throw new Error('admin login failed');
-} catch (e) {
-  console.error(`✗ could not sign in as ${ADMIN}: ${String(e.message).slice(0, 80)}`);
-  await browser.close();
-  process.exit(2);
+/** One signed-in page per lane. A page that did not authenticate measures a logged-out browser. */
+const pages = {};
+for (const l of LANES) {
+  if (!found.some((f) => f.lane.id === l.id)) continue;
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const pg = await ctx.newPage();
+  try {
+    await pg.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+    await pg.waitForSelector('#email', { timeout: 20_000 });
+    await pg.fill('#email', l.email);
+    await pg.fill('#password', l.pw);
+    await pg.click('button[type="submit"]');
+    await pg.waitForLoadState('networkidle').catch(() => {});
+    await pg.waitForTimeout(2000);
+    if (pg.url().includes('/login')) throw new Error('login did not take');
+  } catch (e) {
+    console.error(`✗ could not sign in as ${l.email} (${l.id} lane): ${String(e.message).slice(0, 80)}`);
+    console.error('  Every control in that lane would read as ABSENT from a logged-out page, which is');
+    console.error('  indistinguishable from a guide naming a button that does not exist.');
+    await browser.close();
+    process.exit(2);
+  }
+  pages[l.id] = pg;
 }
 
-console.log(`· ${found.length} guide(s) · ${BASE}\n`);
+console.log(`· ${found.length} guide(s) across ${Object.keys(pages).length} lane(s) · ${BASE}\n`);
 
-for (const file of found.sort()) {
+for (const { file, lane } of found.sort((a, b) => a.file.localeCompare(b.file))) {
+  const page = pages[lane.id];
   const rel = path.relative('/home/user/govwin/frontend', file);
   const { route, controls } = parse(file);
   console.log(`── ${rel}`);

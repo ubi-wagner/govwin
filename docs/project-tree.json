@@ -8,9 +8,9 @@
  ],
  "selfTestPassed": true,
  "summary": {
-  "files": 2363,
-  "lines": 454361,
-  "edges": 4735,
+  "files": 2365,
+  "lines": 454733,
+  "edges": 4739,
   "tables": 139,
   "noDescription": 555,
   "orphans": 654,
@@ -39334,19 +39334,61 @@
    "parseError": null
   },
   {
+   "path": "frontend/app/portal/[tenantSlug]/buckets/buckets-guide.tsx",
+   "name": "buckets-guide.tsx",
+   "area": "frontend · portal pages",
+   "plane": "01 UI",
+   "lines": 111,
+   "bytes": 5588,
+   "sha256": "53866ba71c732c97",
+   "description": "The in-page guide for spotlight buckets — the control that RANKS a customer's opportunity list.",
+   "exports": [
+    "BucketsGuide"
+   ],
+   "uses": [
+    {
+     "path": "frontend/components/admin/guide.tsx",
+     "why": [
+      "guideFor"
+     ]
+    }
+   ],
+   "usedBy": [
+    {
+     "path": "frontend/app/portal/[tenantSlug]/buckets/page.tsx",
+     "why": [
+      "default as BucketsGuide"
+     ]
+    }
+   ],
+   "tables": {
+    "read": [],
+    "write": []
+   },
+   "external": [],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
    "path": "frontend/app/portal/[tenantSlug]/buckets/page.tsx",
    "name": "page.tsx",
    "area": "frontend · portal pages",
    "plane": "01 UI",
-   "lines": 34,
-   "bytes": 1553,
-   "sha256": "0922b4e360b58eab",
+   "lines": 36,
+   "bytes": 1620,
+   "sha256": "d5a463e227351b3b",
    "description": null,
    "exports": [
     "BucketsPage",
     "dynamic"
    ],
    "uses": [
+    {
+     "path": "frontend/app/portal/[tenantSlug]/buckets/buckets-guide.tsx",
+     "why": [
+      "default as BucketsGuide"
+     ]
+    },
     {
      "path": "frontend/auth.ts",
      "why": [
@@ -39456,19 +39498,61 @@
    "parseError": null
   },
   {
+   "path": "frontend/app/portal/[tenantSlug]/cards/cards-guide.tsx",
+   "name": "cards-guide.tsx",
+   "area": "frontend · portal pages",
+   "plane": "01 UI",
+   "lines": 111,
+   "bytes": 6062,
+   "sha256": "7af933cbfc7645f0",
+   "description": "The in-page guide for a customer's opportunity list — the MIRROR half of the OPP spine.",
+   "exports": [
+    "CardsGuide"
+   ],
+   "uses": [
+    {
+     "path": "frontend/components/admin/guide.tsx",
+     "why": [
+      "guideFor"
+     ]
+    }
+   ],
+   "usedBy": [
+    {
+     "path": "frontend/app/portal/[tenantSlug]/cards/page.tsx",
+     "why": [
+      "default as CardsGuide"
+     ]
+    }
+   ],
+   "tables": {
+    "read": [],
+    "write": []
+   },
+   "external": [],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
    "path": "frontend/app/portal/[tenantSlug]/cards/page.tsx",
    "name": "page.tsx",
    "area": "frontend · portal pages",
    "plane": "01 UI",
-   "lines": 33,
-   "bytes": 1598,
-   "sha256": "d48f3db156b07148",
+   "lines": 35,
+   "bytes": 1659,
+   "sha256": "e08fca5581eaa252",
    "description": null,
    "exports": [
     "CardsPage",
     "dynamic"
    ],
    "uses": [
+    {
+     "path": "frontend/app/portal/[tenantSlug]/cards/cards-guide.tsx",
+     "why": [
+      "default as CardsGuide"
+     ]
+    },
     {
      "path": "frontend/auth.ts",
      "why": [
@@ -44869,9 +44953,9 @@
    "name": "guide.tsx",
    "area": "frontend · components",
    "plane": "01 UI",
-   "lines": 104,
-   "bytes": 5816,
-   "sha256": "c9b0ce04bafb2adc",
+   "lines": 154,
+   "bytes": 8728,
+   "sha256": "3a53f0fcf44f0dea",
    "description": "The in-page guide kit — the shared shell for an admin surface's \"how this works\", and the affordance that lets the person reading it say the guide is wrong.",
    "exports": [
     "Canon",
@@ -44879,10 +44963,12 @@
     "Code",
     "Ctl",
     "GuideCard",
+    "GuideLane",
     "P",
     "Step",
     "Ul",
-    "Unwritten"
+    "Unwritten",
+    "guideFor"
    ],
    "uses": [
     {
@@ -44973,6 +45059,18 @@
       "Step",
       "Ul",
       "Unwritten"
+     ]
+    },
+    {
+     "path": "frontend/app/portal/[tenantSlug]/buckets/buckets-guide.tsx",
+     "why": [
+      "guideFor"
+     ]
+    },
+    {
+     "path": "frontend/app/portal/[tenantSlug]/cards/cards-guide.tsx",
+     "why": [
+      "guideFor"
      ]
     }
    ],
@@ -95235,9 +95333,9 @@
    "name": "catalog-guides.mjs",
    "area": "frontend · harnesses",
    "plane": "harness",
-   "lines": 158,
-   "bytes": 7584,
-   "sha256": "dcf87ee1f36be42b",
+   "lines": 208,
+   "bytes": 10761,
+   "sha256": "1df7d6346642ddd7",
    "description": null,
    "exports": [],
    "uses": [],
@@ -105297,9 +105395,9 @@
    "name": "verify-guide-controls.mjs",
    "area": "frontend · harnesses",
    "plane": "harness",
-   "lines": 215,
-   "bytes": 10872,
-   "sha256": "2d769802ccae0ef8",
+   "lines": 261,
+   "bytes": 13745,
+   "sha256": "0330a3e20ddac8c0",
    "description": null,
    "exports": [],
    "uses": [],
@@ -105308,7 +105406,9 @@
     "read": [
      "curated_solicitations",
      "proposal_portals",
-     "source_profiles"
+     "source_profiles",
+     "tenants",
+     "users"
     ],
     "write": []
    },
@@ -132592,6 +132692,7 @@
     "frontend/scripts/verify-collaborator-blast-radius.mjs",
     "frontend/scripts/verify-db-crud.mjs",
     "frontend/scripts/verify-groups-overlay.mjs",
+    "frontend/scripts/verify-guide-controls.mjs",
     "frontend/scripts/verify-scope-bar.mjs",
     "frontend/scripts/verify-scope-end-to-end.mjs",
     "frontend/scripts/verify-scoped-gates.mjs",
@@ -132840,6 +132941,7 @@
     "frontend/scripts/tier2-documents-e2e.mts",
     "frontend/scripts/verify-api-contract.mjs",
     "frontend/scripts/verify-atom-enrich.mts",
+    "frontend/scripts/verify-guide-controls.mjs",
     "pipeline/src/agents/archetypes/partner_coordinator.py",
     "pipeline/src/workflows/manager.py",
     "pipeline/tests/verify_stale_task_reaper.py",
