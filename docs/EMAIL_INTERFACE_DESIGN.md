@@ -270,7 +270,7 @@ added to `middleware.ts`'s public paths (it carries no session) and to the audit
 with a reason, or the existing guards will correctly reject it.
 
 **These three types must be registered.** The event namespace registry is closed
-(`finder · capture · identity · proposal · library · system · tool`) and `event-contract.test.ts`
+(`finder · capture · identity · proposal · library · system · tool · project`) and `event-contract.test.ts`
 fails on anything unregistered. These sit under `system`, so no new namespace is needed — but the
 types still need adding to `lib/event-labels.ts`, or they reach a customer's Activity feed as
 de-punctuated identifiers, which is B136 all over again.

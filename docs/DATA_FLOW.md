@@ -161,7 +161,7 @@ Break one and the failure is quiet: lost history, a stranded workflow, an off-le
    and an `input_map` may only reference a transitive `depends_on` ancestor. Together they make it
    *impossible* for a pipeline action to consume agent output — which is why agent output lands via a
    human-triggered frontend route, never a pipeline step. (`Workflow.validate()` enforces the second at boot.)
-3. **Events** — seven namespaces only (`finder · capture · identity · proposal · library · system · tool`);
+3. **Events** — eight namespaces only (`finder · capture · identity · proposal · library · system · tool · project`);
    type is `entity.action_past_tense` (snake_case, start/end paired); admin events carry `tenantId = null`;
    never `admin`, `cms`, or `spotlight`. The static guard `__tests__/event-contract.test.ts` enforces it.
 4. **Agents** — tenant-bound (tool schemas expose no `tenant_id`), untrusted content injection-fenced,

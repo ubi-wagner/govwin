@@ -524,7 +524,7 @@ class OnMyEvent(Workflow):
     description = "What this workflow does"
 
     trigger = EventTrigger(
-        namespace="finder",           # one of the 7 namespaces
+        namespace="finder",           # one of the 8 namespaces
         type="entity.verb_past_tense", # from EVENT_CONTRACT_V3.md
         phase="single",               # or "end" for paired events
         condition=lambda p: p.get("someField") is not None,  # optional

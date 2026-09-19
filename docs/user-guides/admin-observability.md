@@ -74,7 +74,7 @@ Each row is one event:
 - **Payload** — the structured detail of the action.
 
 **Filter** by **namespace** (finder · capture · proposal · library · system · tool
-· identity) and **time window** (1h / 6h / 24h / 7d), and flip **Auto-refresh** for
+· identity · project) and **time window** (1h / 6h / 24h / 7d), and flip **Auto-refresh** for
 a live tail.
 
 > **Namespaces** map to areas: `finder` (admin ingest/curation), `capture`

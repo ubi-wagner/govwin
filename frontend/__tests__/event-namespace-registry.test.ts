@@ -164,12 +164,70 @@ describe('the documents agree', () => {
   // Docs drift the most and matter the least at run time — but a doc that lists seven namespaces is
   // how the next person writes the eighth copy wrong. Each file is checked only where it actually
   // enumerates the set.
-  const DOCS = [
-    'docs/EVENT_CONTRACT.md',
-    'CLAUDE.md',
-    'ARCHITECTURE_V10.md',
-    'CLAUDE_CLIFFNOTES.md',
-  ];
+  /**
+   * ── DISCOVERED, NOT MAINTAINED (B173) ───────────────────────────────────────────────────────
+   *
+   * This was a hand-written list of four, and `docs/DATA_FLOW.md` — the canonical cross-section of
+   * the request path, whose invariant 3 read "**seven** namespaces only" and listed seven — was
+   * never on it. The guard passed for as long as that sentence was wrong, because the guard was
+   * never pointed at the file. A hand-maintained list of what to check has the same shape of
+   * problem as a hand-maintained schema doc: it is correct until the next thing is added.
+   *
+   * So the live documents are FOUND with the same `enumerates` predicate used below, and the
+   * historical ones are EXCUSED BY NAME WITH A REASON. An unexplained exclusion is how a real
+   * document leaves the checklist — and a dated audit or a superseded contract SHOULD still say
+   * seven, because that is what was true when it was written.
+   */
+  const HISTORICAL = [
+    [/^ARCHITECTURE_V9\.md$/, 'superseded by V10 — records the state at the time'],
+    [/^docs\/archive\//, 'archived by definition'],
+    [/^docs\/EVENT_CONTRACT_V[0-9]+\.md$/, 'superseded contract version'],
+    [/^docs\/EVENT_AUDIT_\d{4}-\d{2}-\d{2}\.md$/, 'a dated audit is a snapshot, not a claim about today'],
+    [/^docs\/V1_READY_REPORT\.md$/, 'a dated readiness report'],
+    [/^docs\/PROPOSAL_LIFECYCLE_V1\.md$/, 'V1 lifecycle, superseded'],
+    [/^docs\/BUG_LOG_/, 'a bug log quotes the state at the time of each entry'],
+    // NOT historical — excused because it does not enumerate the registry at all. It names
+    // EXAMPLE trigger types in a rule table (`capture:purchase.completed`,
+    // `proposal:document.locked`, `finder:source.change_detected` …), which puts four namespace
+    // words near each other without ever claiming to list the closed set. Every tightening of the
+    // discovery predicate that was tried still matched it, and the ones that would not also
+    // dropped EVENT_CONTRACT.md, whose §4 is a table with one namespace per ROW. Naming it here
+    // with the reason beats a predicate tuned until it happens to exclude one file.
+    [/^docs\/RFP_ADMIN_OPERATIONS_GUIDE\.md$/, 'names example trigger types, does not enumerate the set'],
+  ] as const;
+
+  const DOCS = (() => {
+    const out: string[] = [];
+    const walk = (dir: string) => {
+      const abs = path.join(REPO, dir);
+      if (!fs.existsSync(abs)) return;
+      for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
+        if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+        const next = dir === '.' ? e.name : `${dir}/${e.name}`;
+        if (e.isDirectory()) { walk(next); continue; }
+        if (!e.name.endsWith('.md')) continue;
+        if (HISTORICAL.some(([re]) => re.test(next))) continue;
+        const all = read(next).split('\n');
+        const enumerates = all.some((l, i) => {
+          const ctx = all.slice(i, i + 3).join(' ');
+          return /finder/.test(l) && /capture/.test(ctx) && /identity/.test(ctx);
+        });
+        if (enumerates) out.push(next);
+      }
+    };
+    walk('.');
+    walk('docs');
+    walk('docs/user-guides');
+    return out.sort();
+  })();
+
+  it('the discovery found the documents that matter, not none of them', () => {
+    // The guard's own guard: a discovery that silently finds nothing reports a clean run over
+    // every document at once — strictly worse than the four-item list it replaced.
+    expect(DOCS, 'namespace-enumerating docs were discovered').toContain('CLAUDE.md');
+    expect(DOCS).toContain('docs/DATA_FLOW.md');
+    expect(DOCS.length).toBeGreaterThan(6);
+  });
 
   for (const doc of DOCS) {
     it(`${doc} lists the whole registry where it enumerates it`, () => {
@@ -241,4 +299,116 @@ describe('the documents agree', () => {
       });
     });
   }
+});
+
+/**
+ * ── THE FOURTH PLACE THE REGISTRY IS COPIED: A UI CONSTANT (B173) ──────────────────────────────
+ *
+ * Everything above reconciles the three RUNTIMES and the DOCUMENTS. A hard-coded list in a React
+ * component is neither, and that is where the eighth namespace went missing for real:
+ *
+ *     app/portal/[tenantSlug]/activity/activity-stream-client.tsx
+ *
+ * held a hand-written `NAMESPACE_TABS` of seven. `project` — migration 217, and the whole
+ * post-award half of a customer's life with this product — had no tab. The rows were in the feed;
+ * the control to isolate them was not. `/admin/events` derived its filter from `EVENT_NAMESPACES`
+ * all along, so the OPERATOR console gained the tab automatically and the CUSTOMER's did not.
+ *
+ * The check is deliberately satisfied two ways, because both are correct: a file may DERIVE from
+ * `EVENT_NAMESPACES` (preferred — then it cannot drift), or it may name all of them. What it may
+ * not do is name most of them.
+ */
+/**
+ * Comments stripped BEFORE asking whether a file derives from the registry.
+ *
+ * ⚠️ THE FIRST VERSION OF THIS GUARD WAS INERT, and the red test is the only reason anyone knows.
+ * The escape hatch is "a file that mentions EVENT_NAMESPACES is deriving, so skip it" — and the
+ * fixed component carries a long comment EXPLAINING that it derives from EVENT_NAMESPACES. Revert
+ * the fix and the comment stays; the guard reads the word, takes the escape hatch, and reports a
+ * clean run over the exact defect it was written for.
+ *
+ * Third occurrence of "a scan that reads prose as code" in one sitting, this time inside the check
+ * built after the previous two.
+ */
+const stripComments = (src: string) => src
+  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  .replace(/(^|[^:"'`\\])\/\/[^\n]*/g, '$1');
+
+describe('a hard-coded namespace list in the UI is complete', () => {
+  /** Files that build a namespace list for a person to choose from. */
+  const UI_FILES = [
+    'app/portal/[tenantSlug]/activity/activity-stream-client.tsx',
+    'app/admin/events/event-stream-client.tsx',
+  ];
+
+  for (const f of UI_FILES) {
+    it(`${f} offers every namespace`, () => {
+      if (!exists(`frontend/${f}`)) return;
+      const src = stripComments(read(`frontend/${f}`));
+
+      // Deriving from the registry is the strongest form of agreement — nothing to drift.
+      // Measured on CODE: see the note above this describe block.
+      if (/EVENT_NAMESPACES/.test(src)) return;
+
+      for (const ns of CANON) {
+        expect(
+          new RegExp(`['"\`]${ns}['"\`]`).test(src),
+          `${f} hard-codes a namespace list and omits '${ns}'. A customer cannot filter by a `
+          + 'namespace that has no control, however many rows it holds. Derive the list from '
+          + 'EVENT_NAMESPACES instead of typing it out.',
+        ).toBe(true);
+      }
+    });
+  }
+
+  /**
+   * AND THE LIST OF UI FILES IS ITSELF DISCOVERED, not maintained — the failure above was a file
+   * nobody thought to add to a list, so a fixed list would reproduce it exactly one component from
+   * now. Anything that pairs three namespace string literals is a copy of the registry.
+   */
+  it('no OTHER component quietly holds a partial copy', () => {
+    const roots = ['app', 'components'];
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      const abs = path.join(REPO, 'frontend', dir);
+      if (!fs.existsSync(abs)) return;
+      for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
+        const next = path.join(dir, e.name);
+        if (e.isDirectory()) { walk(next); continue; }
+        if (!/\.tsx?$/.test(e.name)) continue;
+        const raw = stripComments(read(path.join('frontend', next)));
+        // ⚠️ AN EMIT IS NOT A LIST, and the first version could not tell them apart. A route that
+        // posts to three namespaces writes `namespace: 'library'` three times in three separate
+        // calls — normal, correct, and nothing to do with offering a person a choice. It reported
+        // three such routes as holding "a partial copy of the registry", which is the same
+        // signal-conflation this file exists to catch, committed by the check itself.
+        //
+        // So the emit sites are removed before counting. What is left is a namespace named for
+        // some OTHER reason, and three of those together is a list.
+        const src = raw
+          .replace(/namespace\s*[:=]\s*['"`][a-z]+['"`]/g, ' ')
+          .replace(/namespace\s+IN\s*\([^)]*\)/gi, ' ');
+        const quoted = CANON.filter((ns) => new RegExp(`['"\`]${ns}['"\`]`).test(src));
+        if (quoted.length >= 3 && quoted.length < CANON.length && !/EVENT_NAMESPACES/.test(raw)) {
+          found.push(`${next} — has ${quoted.join(',')} · missing ${CANON.filter((n) => !quoted.includes(n)).join(',')}`);
+        }
+      }
+    };
+    for (const r of roots) walk(r);
+
+    // A file may legitimately name a SUBSET — the notification bell selects four namespaces on
+    // purpose, and the reason is written at the query. Those are listed here with their reason
+    // rather than excluded by a pattern, because an unexplained exemption is how the next real one
+    // hides behind it.
+    const EXCUSED: Record<string, string> = {
+      'app/api/portal/[tenantSlug]/notifications/route.ts':
+        'the bell deliberately selects a subset; the omission of project for a partner_user is '
+        + 'load-bearing and documented at the query',
+      'app/portal/[tenantSlug]/activity/activity-stream-client.tsx':
+        'derives from EVENT_NAMESPACES (matched only by its label map)',
+    };
+    const real = found.filter((f) => !Object.keys(EXCUSED).some((k) => f.startsWith(k)));
+    expect(real, `component(s) holding a PARTIAL copy of the namespace registry:\n  ${real.join('\n  ')}`)
+      .toEqual([]);
+  });
 });

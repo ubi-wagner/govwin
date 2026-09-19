@@ -271,7 +271,7 @@ Where:
 - **entity** is singular, snake_case
 - **verb** is past tense, snake_case
 
-### The 7 Namespaces (Closed Set)
+### The 8 Namespaces (Closed Set)
 
 | Namespace | Owner | Scope | Admin tenantId | Portal tenantId |
 |-----------|-------|-------|----------------|-----------------|
@@ -321,7 +321,7 @@ Every event row in `system_events`:
 
 | Field | Required | Notes |
 |-------|----------|-------|
-| `namespace` | Yes | One of the 7 namespaces |
+| `namespace` | Yes | One of the 8 namespaces |
 | `type` | Yes | `entity.verb_past_tense` |
 | `phase` | Yes | `start`, `end`, or `single` |
 | `actor_type` | Yes | `user`, `system`, `pipeline`, or `agent` |

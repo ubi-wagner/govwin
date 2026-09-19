@@ -5,6 +5,7 @@ import { TimeAgo, Elapsed } from '@/components/ui/time-ago';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { describeEvent as describeEventLabel, describeActor } from '@/lib/event-labels';
 import { fmtDateTime } from '@/lib/fmt';
+import { EVENT_NAMESPACES } from '@/lib/event-namespaces';
 
 export type SerializedActivityEvent = {
   id: string;
@@ -31,15 +32,35 @@ export type SerializedActivityEvent = {
 // another, and React #418 took the whole page to its error boundary while the route kept
 // answering 200. They are now <TimeAgo> / <Elapsed>, which own their own mount state.
 // Bug log B82; the shared component is components/ui/time-ago.tsx.
+/**
+ * ── DERIVED FROM THE REGISTRY, NOT TYPED OUT ────────────────────────────────────────────────
+ *
+ * This was a hand-written list of seven, and `project` — added by migration 217 and carrying the
+ * whole post-award half of a customer's life with this product — was never added to it. So a
+ * customer could not filter their own activity feed by the namespace that holds their milestones,
+ * deliverables, invoices and CDRLs. The rows were in the feed; the tab to isolate them was not.
+ *
+ * Nothing could see it: `event-namespace-registry.test.ts` reconciles the three RUNTIMES and four
+ * DOCUMENTS, and a hard-coded UI constant is neither. `/admin/events` had been deriving its own
+ * filter from `EVENT_NAMESPACES` all along, which is why the operator console gained the tab and
+ * the customer's did not.
+ *
+ * `lib/event-namespaces` is a zero-import leaf precisely so a client component can import it
+ * without dragging `node:async_hooks` into the browser bundle — deriving here is the documented
+ * pattern, not a shortcut.
+ */
+const NAMESPACE_LABELS: Record<string, string> = {
+  finder: 'Finder', capture: 'Capture', identity: 'Identity', proposal: 'Proposal',
+  library: 'Library', system: 'System', tool: 'Tool', project: 'Project',
+};
 const NAMESPACE_TABS = [
   { label: 'All', value: '' },
-  { label: 'Proposal', value: 'proposal' },
-  { label: 'Library', value: 'library' },
-  { label: 'Capture', value: 'capture' },
-  { label: 'Tool', value: 'tool' },
-  { label: 'Identity', value: 'identity' },
-  { label: 'Finder', value: 'finder' },
-  { label: 'System', value: 'system' },
+  // A namespace with no label still gets a tab, titled by its own name — an unlabelled filter is a
+  // smaller problem than a missing one.
+  ...EVENT_NAMESPACES.map((ns) => ({
+    label: NAMESPACE_LABELS[ns] ?? ns.charAt(0).toUpperCase() + ns.slice(1),
+    value: ns,
+  })),
 ] as const;
 
 const NAMESPACE_COLORS: Record<string, string> = {
@@ -50,6 +71,10 @@ const NAMESPACE_COLORS: Record<string, string> = {
   proposal: 'border-purple-400 bg-purple-50',
   tool: 'border-orange-400 bg-orange-50',
   system: 'border-gray-400 bg-gray-50',
+  project: 'border-rose-400 bg-rose-50',
+  // `agent` is not a namespace and never has been — the registry is the eight above. It is left
+  // here because an unused key costs nothing and removing it proves nothing; the guard that now
+  // checks this file asserts the eight are PRESENT, not that nothing else is.
   agent: 'border-amber-400 bg-amber-50',
 };
 
@@ -61,6 +86,7 @@ const NAMESPACE_ICONS: Record<string, string> = {
   proposal: '\u{1F4DD}',   // memo
   tool: '\u{1F527}',       // wrench
   system: '⚙️',  // gear
+  project: '\u{1F3D7}',    // building construction — post-award delivery
   agent: '\u{1F916}',      // robot
 };
 
