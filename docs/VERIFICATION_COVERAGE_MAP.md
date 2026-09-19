@@ -26,9 +26,10 @@ weakest to strongest, and every claim below says which one it is standing on:
 
 Three rules govern how the rest reads. **A surface a lens has no expectation for is uncovered, not
 passing** — so every section ends by naming what it did not reach. **A drive that cannot run is a
-failure, not a skip**: this pass had 0 could-not-run across both suite runs, which is the number
+failure, not a skip**: this pass had 0 could-not-run in all three suite runs, which is the number
 that makes the passes mean something. And **the state of the box is an input**: the suite was run
-twice and the two runs failed on three different drives, none of them twice (§1).
+three times, the first two failed on three different drives with none repeating, and only the
+third was clean (§1).
 
 ---
 
@@ -39,7 +40,7 @@ twice and the two runs failed on three different drives, none of them twice (§1
 | `tsc --noEmit` | 1,526 files · 273,550 lines | **0 errors** |
 | `vitest run` | 256 files | **2,702 passed · 2 skipped** |
 | `next build` | standalone | **clean** |
-| `run-branch-drives.sh` | 70 registered drives (run twice — see below) | **run 1: 68 pass · 1 fail** · **run 2: 68 pass · 2 fail** · 0 could-not-run in either |
+| `run-branch-drives.sh` | 70 registered drives (run THREE times — see below) | **run 1: 68/1** · **run 2: 68/2** · **run 3: 70 pass · 0 fail**, exit 0 · 0 could-not-run in any |
 | `check-harness-syntax` | 270 harness files, parsed + bound | **clean** (makes no claim about types) |
 | `verify-surfaces` | 117 surfaces, 3 actor lanes | **117 clean · 0 broken** |
 | `verify-api-contract` | 157 GET routes on disk | **135 graded · 4 exempt · 18 unbound · 0 no-actor** |
@@ -82,7 +83,18 @@ probed route holds at 390px with its overlays open*, and `probe-customer-finish`
 on every customer-facing lane** (the 1,318 on the admin console are informational by design — a
 console exists to show you `proposal.section_saved`).
 
-**Two runs found four defects; one run would have found one.** The state of the box is an input.
+### Run 3 — the one that is allowed to be quoted
+
+**70 passed · 0 failed · 0 could-not-run · 0 missing, exit 0**, with all eight preflights holding:
+no cross-tenant references, no fixture pointing at a row that no longer exists, the rig serving
+this build, TS↔Python scorer parity, no card field declared-and-unwritten, RLS posture correct,
+LibreOffice able to open a deck, and both async workers up.
+
+`project-lifecycle`, `rfp-admin-role`, `mobile-interaction` and `customer-finish` all pass — the
+four drives that failed across runs 1 and 2, green together on one build.
+
+**Two runs found four defects; one run would have found one.** The state of the box is an input,
+and a single green run is a sample of it.
 
 ---
 
