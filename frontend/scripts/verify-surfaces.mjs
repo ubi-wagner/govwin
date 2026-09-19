@@ -329,7 +329,14 @@ async function preflight(page, who) {
  * /login and render clean — a page that never rendered, reported as a pass. That is the one
  * outcome this lens exists to prevent, so it declines instead.
  */
-const LANED = /^\/(admin|portal)(\/|$)/;
+/**
+ * `/admin` (the console root) IS driven — the admin lane walks `app/admin` and its own `page.tsx`
+ * comes out as `/admin`. `/portal` is NOT: the tenant lane walks `app/portal/[tenantSlug]`, so
+ * `app/portal/page.tsx` belongs to neither. Spelling this as `/(admin|portal)(\/|$)/` called it
+ * laned and it fell through both — a route driven by nothing, reported by nothing, which is the
+ * exact failure the unlaned list exists to prevent.
+ */
+const LANED = /^\/admin(\/|$)|^\/portal\//;
 const publicRoutes = [
   ...routesUnder(path.join(APP, '(marketing)'), ''),
   ...routesUnder(path.join(APP, '(auth)'), ''),

@@ -89,7 +89,9 @@ OPP lifecycle is a **master + mirror** model with **two releases** (Spotlight di
 proposal-portal build) over the one-way bridge; the only backflow is a ToDo event that routes an admin
 into a tenant's RLS shadow account. Canonical design: **docs/MASTER_MIRROR_OPP_DESIGN.md**, and the
 as-built start→end spine (bridge · engine · agent-automation, both directions, every message +
-trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **247** — migs 246/247 the
+trigger-step-trigger chain) in **docs/START_END_FRAMEWORK.md** (migration head now **254** — 248–251 finish the
+space-presence work below (interaction watermark · task claims · forced ascent) plus agent-task attribution,
+252 redoes the atom-title repair, 253 adds doc tag slugs, and 254 lets `govtech_app` log in; migs 246/247 the
 **space-presence bracket**: an outside actor inside a tenant space (rfp_admin shadowing, partner-manager
 descending) wrote an ENTER into that customer's audit trail and no reliable EXIT — `partner.exited` carried
 `tenantId: null` so it reached nobody, and `shadow.ascended` fired only from a button whose dedupe was per-TAB
@@ -695,6 +697,18 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
 - **Run all five on BACKWARD review too**, not just on new changes. A retrospective audit is exactly
   where "it's shipped, it's been fine for months" substitutes for evidence — B80 had shipped and
   survived every prior sweep. A surface a lens has no expectation for is **uncovered, not passing**.
+- **What is covered, by whom, and what is NOT: docs/VERIFICATION_COVERAGE_MAP.md.** The five
+  functions × the six actors × the six evidence rungs, joined from `map-coverage.mjs` (which
+  classifies all 194 instruments by the signals in each file and REFUSES to file one it cannot
+  place) against a live suite run. It carries the gap register — G1..G15, each naming the rung it
+  is missing. Three of those are **decisions, not work**, and are marked so: whether a data-boundary
+  read should bracket presence (G3), whether write verbs can be graded for EFFECT without mutating
+  the box that grades them (G4), and the ambient-timezone class this box is structurally blind to
+  (G11). Read it before claiming a surface is tested; the answer is per-rung, never one number.
+  ⚠️ **`rfp_admin` has ZERO accounts on the fixture** (G1) — every instrument but
+  `drive-rfp-admin-role`, which mints its own, signs in as a `master_admin` who outranks it at every
+  gate. A gate that wrongly refuses an RFP administrator stays green here and locks them out in
+  production.
 - **Four verification rules, each learned by breaking it** (full write-up: docs/TESTING_STRATEGY.md):
   (1) **Red first** — a check that has never failed proves nothing; show it failing on the unfixed
   code, then fix, then show it passing on the same build. (2) **The instrument before the finding** —
