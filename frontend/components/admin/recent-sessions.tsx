@@ -42,9 +42,21 @@ function SessionRow({ s }: { s: VisitorSession }) {
     <div>
       <button onClick={() => setOpen((o) => !o)} className="w-full text-left p-3 hover:bg-gray-50 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-sm text-gray-800 truncate">
-            <span className="font-mono">{s.firstPage || '/'}</span>
-            <span className="text-gray-400"> · {s.pageCount ?? s.events.length} pages</span>
+          {/*
+            TRUNCATE THE PATH, NEVER THE COUNT. This was one `truncate` over both spans, so on a
+            390px phone a long first-page path pushed " · 24 pages" past the edge and the clip ate
+            it — with no `title` anywhere, which is the difference between a deliberate truncation
+            and text a reader cannot recover. It is DATA-DEPENDENT and so it shipped: at 9 pages
+            the line fitted and every sweep was clean; at 24 it did not.
+
+            A `title` alone would satisfy the rule and not the person — there is no hover on a
+            phone. So the path truncates (and carries the title, matching the two other truncated
+            cells on this page) while the count is `flex-shrink-0` and always readable. The count
+            is the half worth keeping: the path is already visible in the row below it.
+          */}
+          <div className="text-sm text-gray-800 flex items-baseline gap-1 min-w-0">
+            <span className="font-mono truncate" title={s.firstPage || '/'}>{s.firstPage || '/'}</span>
+            <span className="text-gray-400 flex-shrink-0">· {s.pageCount ?? s.events.length} pages</span>
           </div>
           <div className="text-[11px] text-gray-400">
             {(s.deviceType || 'desktop')} · {browserFromUA(s.userAgent)}{loc ? ` · ${loc}` : ''} · {acq}

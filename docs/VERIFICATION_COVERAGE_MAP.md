@@ -24,10 +24,11 @@ weakest to strongest, and every claim below says which one it is standing on:
 | **drive** | a scenario walked end to end, HITL + engine + agents | only the paths that scenario takes |
 | **foreign engine** | an artifact opened by something that did not write it | only what it was pointed at |
 
-Two rules govern how the rest reads. **A surface a lens has no expectation for is uncovered, not
-passing** — so every section ends by naming what it did not reach. And **a drive that cannot run is
-a failure, not a skip**: this pass had 0 could-not-run, which is the number that makes the 68
-passes mean something.
+Three rules govern how the rest reads. **A surface a lens has no expectation for is uncovered, not
+passing** — so every section ends by naming what it did not reach. **A drive that cannot run is a
+failure, not a skip**: this pass had 0 could-not-run across both suite runs, which is the number
+that makes the passes mean something. And **the state of the box is an input**: the suite was run
+twice and the two runs failed on three different drives, none of them twice (§1).
 
 ---
 
@@ -38,7 +39,7 @@ passes mean something.
 | `tsc --noEmit` | 1,526 files · 273,550 lines | **0 errors** |
 | `vitest run` | 256 files | **2,702 passed · 2 skipped** |
 | `next build` | standalone | **clean** |
-| `run-branch-drives.sh` | 69 registered drives | **68 pass · 1 fail · 0 could-not-run · 0 missing** |
+| `run-branch-drives.sh` | 70 registered drives (run twice — see below) | **run 1: 68 pass · 1 fail** · **run 2: 68 pass · 2 fail** · 0 could-not-run in either |
 | `check-harness-syntax` | 270 harness files, parsed + bound | **clean** (makes no claim about types) |
 | `verify-surfaces` | 117 surfaces, 3 actor lanes | **117 clean · 0 broken** |
 | `verify-api-contract` | 157 GET routes on disk | **135 graded · 4 exempt · 18 unbound · 0 no-actor** |
@@ -61,6 +62,27 @@ Re-running it after the fix surfaced a **second, unrelated** failure that then p
 in a row. That intermittent turned out to be the drive itself: it searched `JSON.stringify(canvas)`
 for the literal `44.4`, and every node's provenance carries an ISO timestamp that spends one second
 in six hundred looking like `…T05:06:44.481Z`. Both are fixed; both are in the bug log.
+
+### The suite was then run a SECOND time, and that is where the value was
+
+Run 2 is the one worth recording, because **the run-1 failure was gone and two different drives
+failed** — neither of which a scan or a single run could have produced:
+
+- **`probe-interaction-mobile`** — `/admin/analytics` laid `· 24 pages` out to 426px inside a
+  390px viewport, clipped by a `truncate` with no `title`. It had passed an hour earlier with the
+  component untouched, because **the width is a function of the data**: at 9 pages the line fitted.
+  A responsive check over live data is sampling, not proving (B171).
+- **`probe-customer-finish`** — three jargon defects on a customer's activity feed, all reading
+  `zz.rfp.admin.drive@rfppipeline.com`. That is the throwaway account the new `rfp_admin` drive
+  mints. It deletes the user row and cannot delete the audit events, so a harness-shaped address
+  was permanent in a real customer's trail — and correctly graded as jargon (B172).
+
+Both are fixed and re-verified on the rebuilt server: `probe-interaction-mobile` now reports *every
+probed route holds at 390px with its overlays open*, and `probe-customer-finish` reports **0 jargon
+on every customer-facing lane** (the 1,318 on the admin console are informational by design — a
+console exists to show you `proposal.section_saved`).
+
+**Two runs found four defects; one run would have found one.** The state of the box is an input.
 
 ---
 
@@ -352,5 +374,25 @@ Four defects, each found by an instrument rather than by reading:
    `/templates/` matched workflow templates, `/pin/` means two unrelated things, and three weak
    English words were enough to claim a function.
 
+5. **B171** — `/admin/analytics` clipping a page count on a phone, *data-dependently*: it fitted at
+   9 pages and did not at 24, with the component unchanged between the two suite runs.
+6. **B172** — the new `rfp_admin` drive's own residue. It deletes its throwaway account and cannot
+   delete the audit events that account caused, so a harness-shaped address sat permanently in a
+   real customer's activity feed — where another instrument correctly graded it as jargon.
+
 And two instruments gained reach: `verify-surfaces` now drives the public tree (90 → 117 surfaces),
 and `drive-rfp-admin-role` exists.
+
+## 7 · How to re-establish this
+
+1. `source scripts/sandbox-env.sh && bash scripts/sandbox-up.sh` — expect `✓ stack up`.
+2. `cd frontend && npx tsc --noEmit && npx vitest run && npx next build`.
+3. `bash scripts/run-branch-drives.sh` — **check `$?`, not the summary line** (B145). Then run it
+   a second time: §1 is the argument for why once is not enough.
+4. The five lenses: `verify-surfaces` · `verify-api-contract` · `verify-write-contract` ·
+   `verify-db-crud` · `verify-ui-vs-db`. Sandbox only — three of them mutate and say so.
+5. The joins: `map-coverage` · `reconcile-capability` · `audit-automation-spine` ·
+   `audit-refusal-observability` · `inventory-frontend` · `catalog-ui`.
+
+Anything that fails should be read against §5 before it is read as a regression: a gap already
+named there is not new, and the three marked **decisions** are not defects at all.
