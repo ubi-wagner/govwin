@@ -1,8 +1,8 @@
 {
- "generatedAt": "2026-09-04T16:05:36.835Z",
+ "generatedAt": "2026-09-19T14:43:35.287Z",
  "summary": {
-  "surfaces": 53,
-  "none": 46,
+  "surfaces": 91,
+  "none": 84,
   "open": 6,
   "ready": 1,
   "stale": 0
@@ -10,6 +10,7 @@
  "rows": [
   {
    "route": "/admin/agents",
+   "lane": "admin",
    "dir": "app/admin/agents",
    "guide": null,
    "state": "none",
@@ -22,6 +23,7 @@
   },
   {
    "route": "/admin/analytics",
+   "lane": "admin",
    "dir": "app/admin/analytics",
    "guide": null,
    "state": "none",
@@ -34,6 +36,7 @@
   },
   {
    "route": "/admin/applications",
+   "lane": "admin",
    "dir": "app/admin/applications",
    "guide": null,
    "state": "none",
@@ -46,6 +49,7 @@
   },
   {
    "route": "/admin/architecture",
+   "lane": "admin",
    "dir": "app/admin/architecture",
    "guide": null,
    "state": "none",
@@ -58,6 +62,7 @@
   },
   {
    "route": "/admin/automation",
+   "lane": "admin",
    "dir": "app/admin/automation",
    "guide": null,
    "state": "none",
@@ -70,6 +75,7 @@
   },
   {
    "route": "/admin/automation-framework",
+   "lane": "admin",
    "dir": "app/admin/automation-framework",
    "guide": null,
    "state": "none",
@@ -82,6 +88,7 @@
   },
   {
    "route": "/admin/billing",
+   "lane": "admin",
    "dir": "app/admin/billing",
    "guide": null,
    "state": "none",
@@ -94,6 +101,7 @@
   },
   {
    "route": "/admin/cards",
+   "lane": "admin",
    "dir": "app/admin/cards",
    "guide": null,
    "state": "none",
@@ -106,6 +114,7 @@
   },
   {
    "route": "/admin/command",
+   "lane": "admin",
    "dir": "app/admin/command",
    "guide": null,
    "state": "none",
@@ -118,6 +127,7 @@
   },
   {
    "route": "/admin/contacts",
+   "lane": "admin",
    "dir": "app/admin/contacts",
    "guide": null,
    "state": "none",
@@ -130,6 +140,7 @@
   },
   {
    "route": "/admin/crm",
+   "lane": "admin",
    "dir": "app/admin/crm",
    "guide": null,
    "state": "none",
@@ -142,6 +153,7 @@
   },
   {
    "route": "/admin/dashboard",
+   "lane": "admin",
    "dir": "app/admin/dashboard",
    "guide": null,
    "state": "none",
@@ -154,6 +166,7 @@
   },
   {
    "route": "/admin/documents/[documentId]",
+   "lane": "admin",
    "dir": "app/admin/documents/[documentId]",
    "guide": null,
    "state": "none",
@@ -166,6 +179,7 @@
   },
   {
    "route": "/admin/documents",
+   "lane": "admin",
    "dir": "app/admin/documents",
    "guide": null,
    "state": "none",
@@ -178,6 +192,7 @@
   },
   {
    "route": "/admin/events",
+   "lane": "admin",
    "dir": "app/admin/events",
    "guide": null,
    "state": "none",
@@ -190,6 +205,7 @@
   },
   {
    "route": "/admin/expert-time",
+   "lane": "admin",
    "dir": "app/admin/expert-time",
    "guide": null,
    "state": "none",
@@ -202,6 +218,7 @@
   },
   {
    "route": "/admin/funnel",
+   "lane": "admin",
    "dir": "app/admin/funnel",
    "guide": null,
    "state": "none",
@@ -214,6 +231,7 @@
   },
   {
    "route": "/admin/guardrail-defaults",
+   "lane": "admin",
    "dir": "app/admin/guardrail-defaults",
    "guide": null,
    "state": "none",
@@ -226,6 +244,7 @@
   },
   {
    "route": "/admin/guides",
+   "lane": "admin",
    "dir": "app/admin/guides",
    "guide": null,
    "state": "none",
@@ -238,6 +257,7 @@
   },
   {
    "route": "/admin/intake",
+   "lane": "admin",
    "dir": "app/admin/intake",
    "guide": "app/admin/intake/intake-guide.tsx",
    "state": "open",
@@ -273,6 +293,7 @@
   },
   {
    "route": "/admin/notes",
+   "lane": "admin",
    "dir": "app/admin/notes",
    "guide": null,
    "state": "none",
@@ -285,6 +306,7 @@
   },
   {
    "route": "/admin/observe",
+   "lane": "admin",
    "dir": "app/admin/observe",
    "guide": "app/admin/observe/companion-guide.tsx",
    "state": "ready",
@@ -297,6 +319,7 @@
   },
   {
    "route": "/admin/opportunities",
+   "lane": "admin",
    "dir": "app/admin/opportunities",
    "guide": null,
    "state": "none",
@@ -309,6 +332,7 @@
   },
   {
    "route": "/admin",
+   "lane": "admin",
    "dir": "app/admin",
    "guide": null,
    "state": "none",
@@ -321,6 +345,7 @@
   },
   {
    "route": "/admin/pipeline",
+   "lane": "admin",
    "dir": "app/admin/pipeline",
    "guide": null,
    "state": "none",
@@ -333,6 +358,7 @@
   },
   {
    "route": "/admin/process",
+   "lane": "admin",
    "dir": "app/admin/process",
    "guide": null,
    "state": "none",
@@ -345,6 +371,7 @@
   },
   {
    "route": "/admin/processes",
+   "lane": "admin",
    "dir": "app/admin/processes",
    "guide": null,
    "state": "none",
@@ -357,6 +384,7 @@
   },
   {
    "route": "/admin/projects",
+   "lane": "admin",
    "dir": "app/admin/projects",
    "guide": null,
    "state": "none",
@@ -369,6 +397,7 @@
   },
   {
    "route": "/admin/proposals",
+   "lane": "admin",
    "dir": "app/admin/proposals",
    "guide": null,
    "state": "none",
@@ -381,6 +410,7 @@
   },
   {
    "route": "/admin/provisioning/[portalId]",
+   "lane": "admin",
    "dir": "app/admin/provisioning/[portalId]",
    "guide": "app/admin/provisioning/[portalId]/provisioning-guide.tsx",
    "state": "open",
@@ -412,6 +442,7 @@
   },
   {
    "route": "/admin/provisioning",
+   "lane": "admin",
    "dir": "app/admin/provisioning",
    "guide": null,
    "state": "none",
@@ -424,6 +455,7 @@
   },
   {
    "route": "/admin/purchases",
+   "lane": "admin",
    "dir": "app/admin/purchases",
    "guide": null,
    "state": "none",
@@ -436,6 +468,7 @@
   },
   {
    "route": "/admin/rfp-curation/[solId]",
+   "lane": "admin",
    "dir": "app/admin/rfp-curation/[solId]",
    "guide": "app/admin/rfp-curation/[solId]/curation-guide.tsx",
    "state": "open",
@@ -483,6 +516,7 @@
   },
   {
    "route": "/admin/rfp-curation/[solId]/topic/[topicId]",
+   "lane": "admin",
    "dir": "app/admin/rfp-curation/[solId]/topic/[topicId]",
    "guide": null,
    "state": "none",
@@ -495,6 +529,7 @@
   },
   {
    "route": "/admin/rfp-curation",
+   "lane": "admin",
    "dir": "app/admin/rfp-curation",
    "guide": "app/admin/rfp-curation/curation-queue-guide.tsx",
    "state": "open",
@@ -525,6 +560,7 @@
   },
   {
    "route": "/admin/rfp-curation/upload",
+   "lane": "admin",
    "dir": "app/admin/rfp-curation/upload",
    "guide": null,
    "state": "none",
@@ -537,6 +573,7 @@
   },
   {
    "route": "/admin/scouts",
+   "lane": "admin",
    "dir": "app/admin/scouts",
    "guide": "app/admin/scouts/scouts-guide.tsx",
    "state": "open",
@@ -575,6 +612,7 @@
   },
   {
    "route": "/admin/site/[pageKey]",
+   "lane": "admin",
    "dir": "app/admin/site/[pageKey]",
    "guide": null,
    "state": "none",
@@ -587,6 +625,7 @@
   },
   {
    "route": "/admin/site/docs/[type]/[slug]",
+   "lane": "admin",
    "dir": "app/admin/site/docs/[type]/[slug]",
    "guide": null,
    "state": "none",
@@ -599,6 +638,7 @@
   },
   {
    "route": "/admin/site",
+   "lane": "admin",
    "dir": "app/admin/site",
    "guide": null,
    "state": "none",
@@ -611,6 +651,7 @@
   },
   {
    "route": "/admin/sources/[profileId]",
+   "lane": "admin",
    "dir": "app/admin/sources/[profileId]",
    "guide": null,
    "state": "none",
@@ -623,6 +664,7 @@
   },
   {
    "route": "/admin/sources",
+   "lane": "admin",
    "dir": "app/admin/sources",
    "guide": "app/admin/sources/sources-guide.tsx",
    "state": "open",
@@ -660,6 +702,7 @@
   },
   {
    "route": "/admin/storage",
+   "lane": "admin",
    "dir": "app/admin/storage",
    "guide": null,
    "state": "none",
@@ -672,6 +715,7 @@
   },
   {
    "route": "/admin/system",
+   "lane": "admin",
    "dir": "app/admin/system",
    "guide": null,
    "state": "none",
@@ -684,6 +728,7 @@
   },
   {
    "route": "/admin/system-state",
+   "lane": "admin",
    "dir": "app/admin/system-state",
    "guide": null,
    "state": "none",
@@ -696,6 +741,7 @@
   },
   {
    "route": "/admin/template-stable",
+   "lane": "admin",
    "dir": "app/admin/template-stable",
    "guide": null,
    "state": "none",
@@ -708,6 +754,7 @@
   },
   {
    "route": "/admin/templates/[templateId]/edit",
+   "lane": "admin",
    "dir": "app/admin/templates/[templateId]/edit",
    "guide": null,
    "state": "none",
@@ -720,6 +767,7 @@
   },
   {
    "route": "/admin/templates",
+   "lane": "admin",
    "dir": "app/admin/templates",
    "guide": null,
    "state": "none",
@@ -732,6 +780,7 @@
   },
   {
    "route": "/admin/tenants/[tenantId]",
+   "lane": "admin",
    "dir": "app/admin/tenants/[tenantId]",
    "guide": null,
    "state": "none",
@@ -744,6 +793,7 @@
   },
   {
    "route": "/admin/tenants",
+   "lane": "admin",
    "dir": "app/admin/tenants",
    "guide": null,
    "state": "none",
@@ -756,6 +806,7 @@
   },
   {
    "route": "/admin/waitlist",
+   "lane": "admin",
    "dir": "app/admin/waitlist",
    "guide": null,
    "state": "none",
@@ -768,6 +819,7 @@
   },
   {
    "route": "/admin/workflows",
+   "lane": "admin",
    "dir": "app/admin/workflows",
    "guide": null,
    "state": "none",
@@ -780,7 +832,502 @@
   },
   {
    "route": "/admin/workspace-access",
+   "lane": "admin",
    "dir": "app/admin/workspace-access",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/activity",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/activity",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/agents",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/agents",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/atoms",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/atoms",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/automation",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/automation",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/billing",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/billing",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/buckets",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/buckets",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/cards/[opportunityId]/solicitation",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/cards",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/cards",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/command",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/command",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/contracts/[contractId]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/contracts/[contractId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/contracts",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/contracts",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/dashboard",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/dashboard",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/documents/[documentId]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/documents/[documentId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/documents/new",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/documents/new",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/documents",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/documents",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/library/foundation/[foundationId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/library",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/library",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/library/review",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/library/review",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/library/upload",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/library/upload",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/manage",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/manage",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/pipeline",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/pipeline",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/portals/[portalId]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/portals/[portalId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/portals",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/portals",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/processes",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/processes",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/profile",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/profile",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/projects/[projectId]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/projects/[projectId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/projects",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/projects",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/proposals/[proposalId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/proposals",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/proposals",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/spotlights/[spotlightId]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/spotlights/[spotlightId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/spotlights",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/spotlights",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/team",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/team",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/templates",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/templates",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/todos",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/todos",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/vaults/[vaultId]",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/vaults/[vaultId]",
+   "guide": null,
+   "state": "none",
+   "steps": [],
+   "controls": [],
+   "unwritten": 0,
+   "canon": null,
+   "surfaceChangedAt": null,
+   "guideWrittenAt": null
+  },
+  {
+   "route": "/portal/[tenantSlug]/vaults",
+   "lane": "tenant",
+   "dir": "app/portal/[tenantSlug]/vaults",
    "guide": null,
    "state": "none",
    "steps": [],

@@ -8,63 +8,113 @@
 > the guide last did, which is the "new features, spin it up again" signal and does not depend
 > on anyone noticing. Unresolved notes are live and shown on `/admin/guides`, not here.
 
-**53 admin surfaces · 1 ready · 6 open · 0 stale · 46 with no guide at all.**
+**91 surfaces · 1 ready · 6 open · 0 stale · 84 with no guide at all.**
+
+### By lane — who is left without a guide
+
+The two lanes are counted apart because they are read by different people with different
+authority. One number over both lets a well-covered operator console hide an untouched
+customer surface — which is exactly what happened: this catalog walked `app/admin` only, so
+the 38 portal surfaces were not `none`, they were ABSENT.
+
+| lane | surfaces | ready | open | none |
+|---|---:|---:|---:|---:|
+| admin | 53 | 1 | 6 | 46 |
+| tenant | 38 | 0 | 0 | 38 |
 
 Uncovered is not passing. The `none` rows are the queue.
 
-| state | route | guide | steps | unwritten | canonical doc |
-|---|---|---|---:|---:|---|
-| `open` | `/admin/intake` | `intake-guide.tsx` | 5 | 1 | `docs/INGEST_PROVENANCE.md` |
-| `open` | `/admin/provisioning/[portalId]` | `provisioning-guide.tsx` | 4 | 1 | `docs/PROVISIONING_WORKSPACE_DESIGN.md` |
-| `open` | `/admin/rfp-curation` | `curation-queue-guide.tsx` | 3 | 1 | `docs/RFP_ADMIN_OPERATIONS_GUIDE.md` |
-| `open` | `/admin/rfp-curation/[solId]` | `curation-guide.tsx` | 6 | 2 | `docs/INGEST_PROVENANCE.md` |
-| `open` | `/admin/scouts` | `scouts-guide.tsx` | 5 | 2 | `docs/SCOUT_INTAKE_QUEUE.md` |
-| `open` | `/admin/sources` | `sources-guide.tsx` | 5 | 2 | `docs/SCOUT_INTAKE_QUEUE.md` |
-| `ready` | `/admin/observe` | `companion-guide.tsx` |  |  |  |
-| `none` | `/admin` | — |  |  |  |
-| `none` | `/admin/agents` | — |  |  |  |
-| `none` | `/admin/analytics` | — |  |  |  |
-| `none` | `/admin/applications` | — |  |  |  |
-| `none` | `/admin/architecture` | — |  |  |  |
-| `none` | `/admin/automation` | — |  |  |  |
-| `none` | `/admin/automation-framework` | — |  |  |  |
-| `none` | `/admin/billing` | — |  |  |  |
-| `none` | `/admin/cards` | — |  |  |  |
-| `none` | `/admin/command` | — |  |  |  |
-| `none` | `/admin/contacts` | — |  |  |  |
-| `none` | `/admin/crm` | — |  |  |  |
-| `none` | `/admin/dashboard` | — |  |  |  |
-| `none` | `/admin/documents` | — |  |  |  |
-| `none` | `/admin/documents/[documentId]` | — |  |  |  |
-| `none` | `/admin/events` | — |  |  |  |
-| `none` | `/admin/expert-time` | — |  |  |  |
-| `none` | `/admin/funnel` | — |  |  |  |
-| `none` | `/admin/guardrail-defaults` | — |  |  |  |
-| `none` | `/admin/guides` | — |  |  |  |
-| `none` | `/admin/notes` | — |  |  |  |
-| `none` | `/admin/opportunities` | — |  |  |  |
-| `none` | `/admin/pipeline` | — |  |  |  |
-| `none` | `/admin/process` | — |  |  |  |
-| `none` | `/admin/processes` | — |  |  |  |
-| `none` | `/admin/projects` | — |  |  |  |
-| `none` | `/admin/proposals` | — |  |  |  |
-| `none` | `/admin/provisioning` | — |  |  |  |
-| `none` | `/admin/purchases` | — |  |  |  |
-| `none` | `/admin/rfp-curation/[solId]/topic/[topicId]` | — |  |  |  |
-| `none` | `/admin/rfp-curation/upload` | — |  |  |  |
-| `none` | `/admin/site` | — |  |  |  |
-| `none` | `/admin/site/[pageKey]` | — |  |  |  |
-| `none` | `/admin/site/docs/[type]/[slug]` | — |  |  |  |
-| `none` | `/admin/sources/[profileId]` | — |  |  |  |
-| `none` | `/admin/storage` | — |  |  |  |
-| `none` | `/admin/system` | — |  |  |  |
-| `none` | `/admin/system-state` | — |  |  |  |
-| `none` | `/admin/template-stable` | — |  |  |  |
-| `none` | `/admin/templates` | — |  |  |  |
-| `none` | `/admin/templates/[templateId]/edit` | — |  |  |  |
-| `none` | `/admin/tenants` | — |  |  |  |
-| `none` | `/admin/tenants/[tenantId]` | — |  |  |  |
-| `none` | `/admin/waitlist` | — |  |  |  |
-| `none` | `/admin/workflows` | — |  |  |  |
-| `none` | `/admin/workspace-access` | — |  |  |  |
+| state | lane | route | guide | steps | unwritten | canonical doc |
+|---|---|---|---|---:|---:|---|
+| `open` | admin | `/admin/intake` | `intake-guide.tsx` | 5 | 1 | `docs/INGEST_PROVENANCE.md` |
+| `open` | admin | `/admin/provisioning/[portalId]` | `provisioning-guide.tsx` | 4 | 1 | `docs/PROVISIONING_WORKSPACE_DESIGN.md` |
+| `open` | admin | `/admin/rfp-curation` | `curation-queue-guide.tsx` | 3 | 1 | `docs/RFP_ADMIN_OPERATIONS_GUIDE.md` |
+| `open` | admin | `/admin/rfp-curation/[solId]` | `curation-guide.tsx` | 6 | 2 | `docs/INGEST_PROVENANCE.md` |
+| `open` | admin | `/admin/scouts` | `scouts-guide.tsx` | 5 | 2 | `docs/SCOUT_INTAKE_QUEUE.md` |
+| `open` | admin | `/admin/sources` | `sources-guide.tsx` | 5 | 2 | `docs/SCOUT_INTAKE_QUEUE.md` |
+| `ready` | admin | `/admin/observe` | `companion-guide.tsx` |  |  |  |
+| `none` | admin | `/admin` | — |  |  |  |
+| `none` | admin | `/admin/agents` | — |  |  |  |
+| `none` | admin | `/admin/analytics` | — |  |  |  |
+| `none` | admin | `/admin/applications` | — |  |  |  |
+| `none` | admin | `/admin/architecture` | — |  |  |  |
+| `none` | admin | `/admin/automation` | — |  |  |  |
+| `none` | admin | `/admin/automation-framework` | — |  |  |  |
+| `none` | admin | `/admin/billing` | — |  |  |  |
+| `none` | admin | `/admin/cards` | — |  |  |  |
+| `none` | admin | `/admin/command` | — |  |  |  |
+| `none` | admin | `/admin/contacts` | — |  |  |  |
+| `none` | admin | `/admin/crm` | — |  |  |  |
+| `none` | admin | `/admin/dashboard` | — |  |  |  |
+| `none` | admin | `/admin/documents` | — |  |  |  |
+| `none` | admin | `/admin/documents/[documentId]` | — |  |  |  |
+| `none` | admin | `/admin/events` | — |  |  |  |
+| `none` | admin | `/admin/expert-time` | — |  |  |  |
+| `none` | admin | `/admin/funnel` | — |  |  |  |
+| `none` | admin | `/admin/guardrail-defaults` | — |  |  |  |
+| `none` | admin | `/admin/guides` | — |  |  |  |
+| `none` | admin | `/admin/notes` | — |  |  |  |
+| `none` | admin | `/admin/opportunities` | — |  |  |  |
+| `none` | admin | `/admin/pipeline` | — |  |  |  |
+| `none` | admin | `/admin/process` | — |  |  |  |
+| `none` | admin | `/admin/processes` | — |  |  |  |
+| `none` | admin | `/admin/projects` | — |  |  |  |
+| `none` | admin | `/admin/proposals` | — |  |  |  |
+| `none` | admin | `/admin/provisioning` | — |  |  |  |
+| `none` | admin | `/admin/purchases` | — |  |  |  |
+| `none` | admin | `/admin/rfp-curation/[solId]/topic/[topicId]` | — |  |  |  |
+| `none` | admin | `/admin/rfp-curation/upload` | — |  |  |  |
+| `none` | admin | `/admin/site` | — |  |  |  |
+| `none` | admin | `/admin/site/[pageKey]` | — |  |  |  |
+| `none` | admin | `/admin/site/docs/[type]/[slug]` | — |  |  |  |
+| `none` | admin | `/admin/sources/[profileId]` | — |  |  |  |
+| `none` | admin | `/admin/storage` | — |  |  |  |
+| `none` | admin | `/admin/system` | — |  |  |  |
+| `none` | admin | `/admin/system-state` | — |  |  |  |
+| `none` | admin | `/admin/template-stable` | — |  |  |  |
+| `none` | admin | `/admin/templates` | — |  |  |  |
+| `none` | admin | `/admin/templates/[templateId]/edit` | — |  |  |  |
+| `none` | admin | `/admin/tenants` | — |  |  |  |
+| `none` | admin | `/admin/tenants/[tenantId]` | — |  |  |  |
+| `none` | admin | `/admin/waitlist` | — |  |  |  |
+| `none` | admin | `/admin/workflows` | — |  |  |  |
+| `none` | admin | `/admin/workspace-access` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/activity` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/agents` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/atoms` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/automation` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/billing` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/buckets` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/cards` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/cards/[opportunityId]/solicitation` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/command` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/contracts` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/contracts/[contractId]` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/dashboard` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/documents` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/documents/[documentId]` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/documents/new` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/library` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/library/foundation/[foundationId]` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/library/review` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/library/upload` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/manage` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/pipeline` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/portals` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/portals/[portalId]` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/processes` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/profile` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/projects` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/projects/[projectId]` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/proposals` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/proposals/[proposalId]` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/spotlights` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/spotlights/[spotlightId]` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/team` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/templates` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/todos` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/vaults` | — |  |  |  |
+| `none` | tenant | `/portal/[tenantSlug]/vaults/[vaultId]` | — |  |  |  |
 

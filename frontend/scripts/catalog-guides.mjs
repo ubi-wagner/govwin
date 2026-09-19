@@ -39,6 +39,20 @@ import { execFileSync } from 'node:child_process';
 const REPO = '/home/user/govwin';
 const FE = path.join(REPO, 'frontend');
 const ADMIN = path.join(FE, 'app/admin');
+/**
+ * ── THE TENANT TREE, WHICH THIS CATALOG COULD NOT SEE ────────────────────────────────────────
+ *
+ * This walked `app/admin` and nothing else, then published itself as "which surfaces explain
+ * themselves" over a heading that said **53 admin surfaces**. Twenty-eight portal surfaces were
+ * outside the walk — including `/cards` (a customer's mirror opportunity list) and `/buckets` (the
+ * lenses that rank it), which are the halves of discovery a CUSTOMER touches. They had no guide,
+ * and more to the point they did not appear as `none`: they were not uncovered, they were absent.
+ *
+ * Third instrument on this branch whose scope was narrower than its claim, after `verify-surfaces`
+ * (no public lane) and the event-namespace guard (no UI arm). The pattern is worth naming: a walk
+ * that enumerates one directory will keep reporting a clean number for everything outside it.
+ */
+const PORTAL = path.join(FE, 'app/portal/[tenantSlug]');
 const OUT_JSON = path.join(REPO, 'docs/guide-coverage.json');
 const OUT_MD = path.join(REPO, 'docs/GUIDE_COVERAGE.md');
 
@@ -50,8 +64,8 @@ function lastCommit(...args) {
   } catch { return 0; }
 }
 
-/** Every admin surface: a directory under app/admin holding a page.tsx. */
-function surfaces(dir = ADMIN, out = []) {
+/** Every surface in a tree: a directory holding a page.tsx. */
+function surfaces(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) surfaces(p, out);
@@ -60,6 +74,10 @@ function surfaces(dir = ADMIN, out = []) {
       out.push({
         route: '/' + path.relative(path.join(FE, 'app'), dir),
         dir: relDir,
+        // Which ACTOR reads this guide. The two lanes are counted apart because they are read by
+        // different people with different authority, and one number over both would let a
+        // well-covered admin console hide an untouched customer surface.
+        lane: relDir.startsWith('app/admin') ? 'admin' : 'tenant',
       });
     }
   }
@@ -79,10 +97,18 @@ function readGuide(file) {
   };
 }
 
-const found = surfaces();
+const found = [...surfaces(ADMIN), ...surfaces(PORTAL)];
 if (!found.length) {
-  console.error('✗ HARNESS DEFECT — no admin surfaces found. A coverage report over nothing is not coverage.');
+  console.error('✗ HARNESS DEFECT — no surfaces found. A coverage report over nothing is not coverage.');
   process.exit(2);
+}
+// Each lane must be non-empty, or the report silently covers half of what it claims — which is the
+// defect this walk was widened to fix, and it would be poor form to be able to reintroduce it.
+for (const lane of ['admin', 'tenant']) {
+  if (!found.some((s) => s.lane === lane)) {
+    console.error(`✗ HARNESS DEFECT — the ${lane} lane enumerated NOTHING. Every "no guide" count below would be wrong.`);
+    process.exit(2);
+  }
 }
 
 const rows = found.map((s) => {
@@ -108,6 +134,9 @@ const rows = found.map((s) => {
 
   return {
     route: s.route,
+    // Carried onto the row, not just held on the surface — the lane counts read `rows`, and the
+    // first version dropped it here and printed `admin 0 · tenant 0` under a total of 91.
+    lane: s.lane,
     dir: s.dir,
     guide: guide?.file ?? null,
     state,
@@ -137,21 +166,42 @@ L.push('> `<Unwritten>` sections; `ready` means it does not; `stale` means the S
 L.push('> the guide last did, which is the "new features, spin it up again" signal and does not depend');
 L.push('> on anyone noticing. Unresolved notes are live and shown on `/admin/guides`, not here.');
 L.push('');
-L.push(`**${summary.surfaces} admin surfaces · ${summary.ready} ready · ${summary.open} open · `
+L.push(`**${summary.surfaces} surfaces · ${summary.ready} ready · ${summary.open} open · `
   + `${summary.stale} stale · ${summary.none} with no guide at all.**`);
+L.push('');
+L.push('### By lane — who is left without a guide');
+L.push('');
+L.push('The two lanes are counted apart because they are read by different people with different');
+L.push('authority. One number over both lets a well-covered operator console hide an untouched');
+L.push('customer surface — which is exactly what happened: this catalog walked `app/admin` only, so');
+L.push('the 38 portal surfaces were not `none`, they were ABSENT.');
+L.push('');
+L.push('| lane | surfaces | ready | open | none |');
+L.push('|---|---:|---:|---:|---:|');
+for (const lane of ['admin', 'tenant']) {
+  const mine = rows.filter((r) => r.lane === lane);
+  L.push(`| ${lane} | ${mine.length} | ${mine.filter((r) => r.state === 'ready').length} `
+    + `| ${mine.filter((r) => r.state === 'open').length} | ${mine.filter((r) => r.state === 'none').length} |`);
+}
 L.push('');
 L.push('Uncovered is not passing. The `none` rows are the queue.');
 L.push('');
-L.push('| state | route | guide | steps | unwritten | canonical doc |');
-L.push('|---|---|---|---:|---:|---|');
+L.push('| state | lane | route | guide | steps | unwritten | canonical doc |');
+L.push('|---|---|---|---|---:|---:|---|');
 const order = { stale: 0, open: 1, ready: 2, none: 3 };
 for (const r of [...rows].sort((a, b) => order[a.state] - order[b.state] || a.route.localeCompare(b.route))) {
-  L.push(`| \`${r.state}\` | \`${r.route}\` | ${r.guide ? `\`${path.basename(r.guide)}\`` : '—'} `
+  L.push(`| \`${r.state}\` | ${r.lane} | \`${r.route}\` | ${r.guide ? `\`${path.basename(r.guide)}\`` : '—'} `
     + `| ${r.steps.length || ''} | ${r.unwritten || ''} | ${r.canon ? `\`${r.canon}\`` : ''} |`);
 }
 L.push('');
 fs.writeFileSync(OUT_MD, `${L.join('\n')}\n`);
 
-console.log(`✓ ${summary.surfaces} admin surface(s) — ${summary.ready} ready · ${summary.open} open · `
+const byLane = (lane) => rows.filter((r) => r.lane === lane);
+console.log(`✓ ${summary.surfaces} surface(s) — ${summary.ready} ready · ${summary.open} open · `
   + `${summary.stale} stale · ${summary.none} unguided`);
+for (const lane of ['admin', 'tenant']) {
+  const m = byLane(lane);
+  console.log(`   ${lane.padEnd(7)} ${String(m.length).padStart(3)} surface(s) · `
+    + `${m.filter((r) => r.state === 'none').length} with no guide at all`);
+}
 console.log('  wrote docs/guide-coverage.json + docs/GUIDE_COVERAGE.md');
