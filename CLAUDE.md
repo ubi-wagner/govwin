@@ -554,6 +554,21 @@ cycle — nothing read it; `CMS_STORAGE_ROOT` is a different, live var for CMS m
   textbook `{error,code}` envelope, and carry no text any matcher knows, while being visibly broken —
   that is exactly how `/admin/storage` shipped a red "Failed to list storage objects" banner past
   every lens (B131). Per-route images are gitignored; one command regenerates them.
+- **In front of a file you did not write, start at `docs/PROJECT_TREE.md`** (regenerate:
+  `node frontend/scripts/build-project-tree.mjs`). The whole repository as ONE dependency graph —
+  2,363 files across frontend · pipeline · services/cms · scripts · db, 4,734 edges, each annotated
+  IN BOTH DIRECTIONS by the symbols that justify it, plus the tables each file reads and writes.
+  `docs/DATA_FLOW.md` is the request path in section (dynamic); `docs/SCHEMA_MAP.md` is the
+  database; **this is the static one**, and it answers the question the other two cannot: *what is
+  this, who calls it and for what, and if I change it what breaks?*
+  **Explore it, do not read it** — `--file lib/events.ts` prints one file both ways, `--table
+  proposals` prints who writes and reads a table. It **never invents a description** (the text is
+  the file's own header, verbatim; 555 files have none and are counted rather than papered over)
+  and **never drops an edge it cannot resolve**. Its own first run is the caution: it reported
+  **486 tables against a schema of 139**, because it read every Python `"""docstring"""` as a SQL
+  body — the "prose as code" trap this file already documents, walked into by the instrument built
+  to map the tree. The table index is now joined against SCHEMA_MAP's real 139 and the 265 rejected
+  names are counted, because a rejection count that grows means the extractor has drifted.
 - **Start from the MANIFEST, not from a walk you invent.** `docs/FRONTEND_INVENTORY.md`
   (regenerate: `node frontend/scripts/inventory-frontend.mjs`) is the full set a sweep has to touch —
   every page, API route, component, lib module and framework surface, with its exports, gates, SQL

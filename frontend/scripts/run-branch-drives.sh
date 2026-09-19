@@ -38,6 +38,23 @@ OUT="${OUT_DIR:-/tmp/branch-drives}"
 mkdir -p "$OUT"
 FILTER="${1:-}"
 
+# ── --reverse · RUN THE DRIVES BACK TO FRONT ─────────────────────────────────────────────────
+#
+# This suite's own header already records the lesson (B146/B147): **a suite that passes only when
+# run in the right order is not passing — it is reporting the order.** The 39 drives passed, then
+# gave four CANT-RUN and one FAIL an hour later with no code change, because a resolver picked
+# "whatever sorted first" and an earlier drive in the same run had created it.
+#
+# Nothing has ever tested that directly. Every run has gone front to back, so a drive that only
+# works because an EARLIER one left the box in the state it wanted is indistinguishable here from
+# a drive that stands on its own. Reversing the order is the cheapest experiment that can tell
+# them apart: the same 70 drives, the same box, the only variable being what ran before what.
+#
+# It is NOT a second opinion on the product — a failure here means a HARNESS depends on an
+# ordering nobody declared, which is a real defect in the evidence rather than in the code.
+REVERSE=0
+if [ "$FILTER" = "--reverse" ]; then REVERSE=1; FILTER=""; fi
+
 # THE DEFAULTS ARE THE TWO ROLES, not one role twice. Defaulting both to the owner made every
 # isolation drive refuse ("RLS posture wrong") on the plainest possible invocation — safe, since a
 # bypassed layer makes an isolation verdict meaningless rather than merely wrong, but it meant the
@@ -573,6 +590,15 @@ DRIVES=(
 
 pass=0; fail=0; missing=0; cantrun=0
 declare -a FAILED=()   # initialised: `${#FAILED[@]}` on a declared-but-unset array trips `set -u`
+
+if [ "$REVERSE" -eq 1 ]; then
+  declare -a REV=()
+  for ((i=${#DRIVES[@]}-1; i>=0; i--)); do REV+=("${DRIVES[$i]}"); done
+  DRIVES=("${REV[@]}")
+  echo "◀ REVERSE ORDER — the same ${#DRIVES[@]} drives, back to front. A failure here is a HARNESS"
+  echo "  that depends on an ordering nobody declared, not a product defect."
+  echo ""
+fi
 
 printf '%-24s %-8s %s\n' "DRIVE" "RESULT" "DETAIL"
 printf '%-24s %-8s %s\n' "------------------------" "--------" "------"

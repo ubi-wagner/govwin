@@ -11,7 +11,16 @@
  * mixed-case would never match the lowercased query from
  * auth.ts:38 and the user could never log in.
  */
-import { sql } from '../lib/db';
+// `../lib/db` — there is no `lib/` at the repo root, and there never has been on this branch. The
+// database module lives in the frontend, so from `scripts/` the path is `../frontend/lib/db`, and
+// tsc reported `TS2307: Cannot find module '../lib/db'` on the old one. That made the `--seed` arm
+// of `db/migrations/run.sh` — a documented bootstrap step — fail before it ran a line.
+//
+// It survived because nothing imports this file and nothing runs it in the suite: a rot no lens
+// could see, because a lens measures what the product DOES and this is a path nobody takes until
+// the day they stand up a new environment. Found by the dependency graph, which is the one
+// instrument that asks whether an edge lands anywhere at all.
+import { sql } from '../frontend/lib/db';
 import bcrypt from 'bcryptjs';
 
 async function main() {
