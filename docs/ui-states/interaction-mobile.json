@@ -54,7 +54,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-proposals-c3db60b1-2f0e-4bc8__vp-phone-open.jpg",
-   "bytes": 118022
+   "bytes": 118034
   },
   {
    "lane": "tenant",
@@ -78,7 +78,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-workflows__vp-phone-open.jpg",
-   "bytes": 1302292
+   "bytes": 1338855
   },
   {
    "lane": "admin",
@@ -86,7 +86,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-agents__vp-phone-open.jpg",
-   "bytes": 637543
+   "bytes": 638233
   },
   {
    "lane": "admin",
@@ -202,11 +202,11 @@
    "route": "/admin/workflows",
    "status": 200,
    "probed": true,
-   "opened": 15,
-   "candidates": 192,
+   "opened": 16,
+   "candidates": 198,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 272
+   "smallTargets": 278
   },
   {
    "lane": "admin",

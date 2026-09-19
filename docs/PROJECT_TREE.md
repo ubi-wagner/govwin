@@ -23,8 +23,8 @@
 | | |
 |---|---:|
 | files | **2363** |
-| total lines | 454,080 |
-| dependency edges (file → file) | 4,734 |
+| total lines | 454,276 |
+| dependency edges (file → file) | 4,735 |
 | distinct tables touched | 139 |
 | files with no header of their own | 555 |
 | files with no edge either way | 654 |
@@ -35,16 +35,16 @@
 
 | plane | files | lines | uses | used by |
 |---|---:|---:|---:|---:|
-| 01 UI | 362 | 78,467 | 876 | 371 |
+| 01 UI | 362 | 78,493 | 877 | 371 |
 | 02 API | 293 | 44,837 | 1449 | 45 |
 | 03 Domain | 413 | 87,557 | 1002 | 2481 |
 | 04 Data | 3 | 330 | 3 | 586 |
-| 05 Events | 4 | 1,618 | 4 | 291 |
+| 05 Events | 4 | 1,618 | 4 | 292 |
 | 06 Engine | 104 | 25,270 | 162 | 330 |
 | 07 Agents | 61 | 21,809 | 121 | 221 |
 | migration | 256 | 46,692 | 0 | 0 |
 | harness | 458 | 79,670 | 415 | 82 |
-| test | 396 | 57,301 | 696 | 0 |
+| test | 396 | 57,471 | 696 | 0 |
 | config | 12 | 746 | 6 | 327 |
 | other | 1 | 9,783 | 0 | 0 |
 
@@ -56,14 +56,14 @@
 | frontend · harnesses | 331 | 63,943 |
 | frontend · api routes | 292 | 44,488 |
 | db · migrations | 256 | 46,692 |
-| frontend · unit tests | 256 | 35,747 |
+| frontend · unit tests | 256 | 35,917 |
 | frontend · components | 188 | 47,091 |
 | pipeline | 166 | 47,246 |
 | pipeline · tests | 118 | 18,167 |
 | services · rfp-crm | 99 | 20,718 |
 | frontend · admin pages | 82 | 17,926 |
 | frontend · e2e | 81 | 9,864 |
-| frontend · portal pages | 47 | 8,557 |
+| frontend · portal pages | 47 | 8,583 |
 | repo · scripts | 46 | 5,863 |
 | frontend · marketing pages | 25 | 3,000 |
 | frontend · other pages | 16 | 1,415 |
@@ -1605,7 +1605,7 @@ which carries the per-edge reasons in full.
 | `lib/embeddings.ts` | 142 | 0 | 5 | Embeddings — the drop-in "retrieve by MEANING" engine for the atom library. |
 | `lib/errors.ts` | 170 | 0 | 39 | Canonical error class hierarchy for the RFP Pipeline frontend. |
 | `lib/event-labels.ts` | 920 | 0 | 13 | Canonical event label + deep-link map for customer-facing audit surfaces. |
-| `lib/event-namespaces.ts` | 40 | 0 | 3 | THE EVENT-NAMESPACE REGISTRY — the one TypeScript copy, in a module with NO imports. |
+| `lib/event-namespaces.ts` | 40 | 0 | 4 | THE EVENT-NAMESPACE REGISTRY — the one TypeScript copy, in a module with NO imports. |
 | `lib/events.ts` | 491 | 4 | 244 | Structured event emitter for the RFP Pipeline platform. |
 | `lib/export/artifact-export.ts` | 223 | 7 | 21 | Per-artifact / per-format export helpers. |
 | `lib/export/canvas-html.ts` | 693 | 3 | 19 | Render a CanvasDocument to styled, self-contained HTML. |
@@ -1938,7 +1938,7 @@ which carries the per-edge reasons in full.
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `app/portal/[tenantSlug]/activity/activity-stream-client.tsx` | 561 | 3 | 1 | — |
+| `app/portal/[tenantSlug]/activity/activity-stream-client.tsx` | 587 | 4 | 1 | — |
 | `app/portal/[tenantSlug]/activity/page.tsx` | 217 | 4 | 0 | — |
 | `app/portal/[tenantSlug]/agents/page.tsx` | 52 | 4 | 0 | — |
 | `app/portal/[tenantSlug]/atoms/page.tsx` | 57 | 8 | 0 | — |
@@ -2071,7 +2071,7 @@ which carries the per-edge reasons in full.
 | `__tests__/event-contract.test.ts` | 185 | 1 | 0 | EVENT-CONTRACT INVARIANT — namespace registry · type format · start/end pairing. |
 | `__tests__/event-label-jargon.test.ts` | 180 | 1 | 0 | THE CUSTOMER'S ACTIVITY FEED SHOULD NOT SPEAK THE SYSTEM'S OWN VOCABULARY. |
 | `__tests__/event-labels.test.ts` | 81 | 1 | 0 | Canonical event-label map — the single source of truth for the activity stream, notification bell, notifications API, dashboard, and proposal timeline |
-| `__tests__/event-namespace-registry.test.ts` | 245 | 1 | 0 | ONE REGISTRY, RECONCILED ACROSS EVERYTHING THAT WRITES IT DOWN. |
+| `__tests__/event-namespace-registry.test.ts` | 415 | 1 | 0 | ONE REGISTRY, RECONCILED ACROSS EVERYTHING THAT WRITES IT DOWN. |
 | `__tests__/force-advance.test.ts` | 102 | 1 | 0 | forceAdvanceProcess — the shared HITL force-advance core (admin + portal routes). Locks the guards the map found untested: RBAC (own-tenant scope), pa |
 | `__tests__/format-controls.test.ts` | 33 | 1 | 0 | — |
 | `__tests__/full-draft.test.ts` | 259 | 1 | 0 | TEST — portal/[tenantSlug]/proposals/[proposalId]/full-draft route handler |

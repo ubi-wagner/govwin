@@ -9,8 +9,8 @@
  "selfTestPassed": true,
  "summary": {
   "files": 2363,
-  "lines": 454080,
-  "edges": 4734,
+  "lines": 454276,
+  "edges": 4735,
   "tables": 139,
   "noDescription": 555,
   "orphans": 654,
@@ -8875,9 +8875,9 @@
    "name": "event-namespace-registry.test.ts",
    "area": "frontend · unit tests",
    "plane": "test",
-   "lines": 245,
-   "bytes": 12858,
-   "sha256": "1300c7897a540e91",
+   "lines": 415,
+   "bytes": 22408,
+   "sha256": "fa21724ae1938f1b",
    "description": "ONE REGISTRY, RECONCILED ACROSS EVERYTHING THAT WRITES IT DOWN.",
    "exports": [],
    "uses": [
@@ -38977,9 +38977,9 @@
    "name": "activity-stream-client.tsx",
    "area": "frontend · portal pages",
    "plane": "01 UI",
-   "lines": 561,
-   "bytes": 22263,
-   "sha256": "61edfc768438fad3",
+   "lines": 587,
+   "bytes": 24064,
+   "sha256": "fce1b29c3e488027",
    "description": null,
    "exports": [
     "ActivityStreamClient",
@@ -38998,6 +38998,12 @@
      "why": [
       "describeActor",
       "describeEvent as describeEventLabel"
+     ]
+    },
+    {
+     "path": "frontend/lib/event-namespaces.ts",
+     "why": [
+      "EVENT_NAMESPACES"
      ]
     },
     {
@@ -64606,6 +64612,12 @@
     },
     {
      "path": "frontend/app/admin/events/event-stream-client.tsx",
+     "why": [
+      "EVENT_NAMESPACES"
+     ]
+    },
+    {
+     "path": "frontend/app/portal/[tenantSlug]/activity/activity-stream-client.tsx",
      "why": [
       "EVENT_NAMESPACES"
      ]

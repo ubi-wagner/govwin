@@ -52,6 +52,12 @@ FILTER="${1:-}"
 #
 # It is NOT a second opinion on the product — a failure here means a HARNESS depends on an
 # ordering nobody declared, which is a real defect in the evidence rather than in the code.
+#
+# ── FIRST RUN, 2026-09-19: 70 passed · 0 failed · 0 could-not-run, exit 0 ────────────────────
+# So the suite does not report the order. That is a property nothing had ever measured, and it is
+# the one that makes a forward green mean what people already assumed it meant. Re-run it after
+# adding a drive that SEEDS anything: the danger is not a drive that fails backwards, it is a
+# drive that quietly relies on a fixture an earlier one happened to leave behind.
 REVERSE=0
 if [ "$FILTER" = "--reverse" ]; then REVERSE=1; FILTER=""; fi
 

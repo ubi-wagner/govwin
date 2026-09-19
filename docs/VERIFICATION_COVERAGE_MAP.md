@@ -26,10 +26,11 @@ weakest to strongest, and every claim below says which one it is standing on:
 
 Three rules govern how the rest reads. **A surface a lens has no expectation for is uncovered, not
 passing** — so every section ends by naming what it did not reach. **A drive that cannot run is a
-failure, not a skip**: this pass had 0 could-not-run in all three suite runs, which is the number
+failure, not a skip**: this pass had 0 could-not-run in all four suite runs, which is the number
 that makes the passes mean something. And **the state of the box is an input**: the suite was run
-three times, the first two failed on three different drives with none repeating, and only the
-third was clean (§1).
+four times — the first two failed on three different drives with none repeating, the third was
+clean, and the fourth ran the same 70 drives BACKWARDS to prove the green is not reporting the
+order (§1).
 
 ---
 
@@ -40,7 +41,7 @@ third was clean (§1).
 | `tsc --noEmit` | 1,526 files · 273,550 lines | **0 errors** |
 | `vitest run` | 256 files | **2,702 passed · 2 skipped** |
 | `next build` | standalone | **clean** |
-| `run-branch-drives.sh` | 70 registered drives (run THREE times — see below) | **run 1: 68/1** · **run 2: 68/2** · **run 3: 70 pass · 0 fail**, exit 0 · 0 could-not-run in any |
+| `run-branch-drives.sh` | 70 registered drives (run FOUR times — see below) | **run 1: 68/1** · **run 2: 68/2** · **run 3: 70/0** · **run 4 BACKWARDS: 70/0**, exit 0 both · 0 could-not-run in any |
 | `check-harness-syntax` | 270 harness files, parsed + bound | **clean** (makes no claim about types) |
 | `verify-surfaces` | 117 surfaces, 3 actor lanes | **117 clean · 0 broken** |
 | `verify-api-contract` | 157 GET routes on disk | **135 graded · 4 exempt · 18 unbound · 0 no-actor** |
@@ -95,6 +96,25 @@ four drives that failed across runs 1 and 2, green together on one build.
 
 **Two runs found four defects; one run would have found one.** The state of the box is an input,
 and a single green run is a sample of it.
+
+### Run 4 — the same 70 drives, BACK TO FRONT
+
+`run-branch-drives.sh --reverse`. **70 passed · 0 failed · 0 could-not-run, exit 0.**
+
+This repo's own rule is that *a suite which passes only when run in the right order is not passing
+— it is reporting the order* (B146/B147, where four drives went CANT-RUN an hour after a green run
+because a resolver picked "whatever sorted first" and an earlier drive had created it). Nothing
+had ever tested it: every run in the project's history has gone front to back, so a drive that
+works only because an EARLIER one left the box in the state it wanted was indistinguishable from
+one that stands on its own.
+
+Reversing is the cheapest experiment that separates them — same drives, same box, the only
+variable being what ran before what. A failure would have been a HARNESS depending on an ordering
+nobody declared: a defect in the evidence rather than in the code. There was none.
+
+That result is what makes a forward green mean what everyone already assumed it meant. **Re-run it
+after adding any drive that seeds**: the risk is not a drive that fails backwards, it is one that
+quietly relies on a fixture an earlier drive happened to leave behind.
 
 ---
 
