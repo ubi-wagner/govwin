@@ -176,7 +176,7 @@ Break one and the failure is quiet: lost history, a stranded workflow, an off-le
 - **Source of truth (text):** this file — `docs/DATA_FLOW.md`.
 - **Rendered cross-section:** the Claude artifact above (both themes, drawn to scale).
 - **Interactive schema explorer:** `docs/architecture/explorer.html` — every table, field, type and FK
-  from the migrated database (108 tables · 192 FKs), click-navigable down to the foreign-key
+  from the migrated database (141 tables · 314 FKs), click-navigable down to the foreign-key
   neighborhood, with these five traces and the UI→table map built in. Regenerate it as the schema
   grows: `node frontend/scripts/architecture/{extract,generate}.mjs` (see that folder's README).
 - **Live per-instance DAGs:** `/admin/workflows` Workflow Map (`docs/WORKFLOW_ADMIN_GUIDE.md`).
@@ -184,4 +184,9 @@ Break one and the failure is quiet: lost history, a stranded workflow, an off-le
   (engine), `docs/START_END_FRAMEWORK.md` (event gate), `docs/EVENT_CONTRACT.md` (event catalog),
   `CLAUDE_CLIFFNOTES.md` (schema quick-reference + bug classes).
 
-_Every identifier in this document is live in the codebase as of migration head 205._
+- **The STATIC cross-section:** `docs/PROJECT_TREE.md` — this document is the request PATH; that one
+  is the file GRAPH. 2,363 files, 4,734 edges annotated in both directions by the symbols that
+  justify them, plus the tables each file reads and writes. Explore it with
+  `node frontend/scripts/build-project-tree.mjs --file <path>` / `--table <name>`.
+
+_Every identifier in this document is live in the codebase as of migration head 254._
