@@ -41,7 +41,7 @@ order (§1).
 | `tsc --noEmit` | 1,526 files · 273,550 lines | **0 errors** |
 | `vitest run` | 256 files | **2,702 passed · 2 skipped** |
 | `next build` | standalone | **clean** |
-| `run-branch-drives.sh` | 70 registered drives (run FOUR times — see below) | **run 1: 68/1** · **run 2: 68/2** · **run 3: 70/0** · **run 4 BACKWARDS: 70/0**, exit 0 both · 0 could-not-run in any |
+| `run-branch-drives.sh` | 70 registered drives (run FIVE times — see below) | **1: 68/1** · **2: 68/2** · **3: 70/0** · **4 BACKWARDS: 70/0** · **5 on the rebuilt stack: 70/0** · exit 0 on 3·4·5 · 0 could-not-run in any |
 | `check-harness-syntax` | 270 harness files, parsed + bound | **clean** (makes no claim about types) |
 | `verify-surfaces` | 117 surfaces, 3 actor lanes | **117 clean · 0 broken** |
 | `verify-api-contract` | 157 GET routes on disk | **135 graded · 4 exempt · 18 unbound · 0 no-actor** |
@@ -115,6 +115,22 @@ nobody declared: a defect in the evidence rather than in the code. There was non
 That result is what makes a forward green mean what everyone already assumed it meant. **Re-run it
 after adding any drive that seeds**: the risk is not a drive that fails backwards, it is one that
 quietly relies on a fixture an earlier drive happened to leave behind.
+
+### Run 5 — because runs 3 and 4 tested a build that did not contain the fix
+
+**70 passed · 0 failed · 0 could-not-run, exit 0.**
+
+The B173 component change landed *after* the build the previous two runs were serving, so neither
+of them had ever executed it: `find frontend/app -newer .next/BUILD_ID` listed the changed file,
+which is exactly the "build STALE" condition `sandbox-up.sh` warns about. A green suite over a
+stale build is a measurement of the previous version.
+
+> **A suite run is only evidence about the bytes that were being served.** Check the build before
+> quoting the verdict, not after.
+
+And a passing suite only shows nothing BROKE. That the fix WORKS is a separate claim, so it was
+measured separately: `/portal/foundation/activity` as a tenant_admin now renders nine tabs — All
+plus all eight namespaces, `Project` among them.
 
 ---
 

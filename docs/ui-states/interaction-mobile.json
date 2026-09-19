@@ -14,7 +14,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__tenant-portal-foundation-buckets__vp-phone-open.jpg",
-   "bytes": 48422
+   "bytes": 48411
   },
   {
    "lane": "tenant",
@@ -78,7 +78,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-workflows__vp-phone-open.jpg",
-   "bytes": 1338855
+   "bytes": 1594147
   },
   {
    "lane": "admin",
@@ -86,7 +86,7 @@
    "viewport": "phone",
    "width": 390,
    "file": "probe__admin-admin-agents__vp-phone-open.jpg",
-   "bytes": 638233
+   "bytes": 637772
   },
   {
    "lane": "admin",
@@ -103,11 +103,11 @@
    "route": "/portal/foundation/cards",
    "status": 200,
    "probed": true,
-   "opened": 37,
-   "candidates": 230,
+   "opened": 38,
+   "candidates": 236,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 333
+   "smallTargets": 341
   },
   {
    "lane": "tenant",
@@ -202,11 +202,11 @@
    "route": "/admin/workflows",
    "status": 200,
    "probed": true,
-   "opened": 16,
-   "candidates": 198,
+   "opened": 22,
+   "candidates": 234,
    "overflow": 0,
    "clipped": 0,
-   "smallTargets": 278
+   "smallTargets": 314
   },
   {
    "lane": "admin",
