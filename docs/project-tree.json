@@ -9,7 +9,7 @@
  "selfTestPassed": true,
  "summary": {
   "files": 2363,
-  "lines": 454066,
+  "lines": 454080,
   "edges": 4734,
   "tables": 139,
   "noDescription": 555,
@@ -94737,9 +94737,9 @@
    "name": "build-project-tree.mjs",
    "area": "frontend · harnesses",
    "plane": "harness",
-   "lines": 796,
-   "bytes": 41172,
-   "sha256": "f4a0ef291e8415cb",
+   "lines": 810,
+   "bytes": 41890,
+   "sha256": "8f861c7289508d89",
    "description": "THE STATIC BASELINE — every file in the system, what it is, who uses it, and what it uses.",
    "exports": [],
    "uses": [],
@@ -107274,7 +107274,7 @@
    "lines": 148,
    "bytes": 6556,
    "sha256": "090ee6f3936e7701",
-   "description": "================================================================================ Amendment Monitor -- Solicitation change → compliance delta (PLATFORM-SCOPE) ================================================================================",
+   "description": "Amendment Monitor -- Solicitation change → compliance delta (PLATFORM-SCOPE) ================================================================================",
    "exports": [
     "AmendmentMonitorArchetype"
    ],
@@ -107598,7 +107598,7 @@
    "lines": 581,
    "bytes": 25324,
    "sha256": "f2a8c8d70519dc67",
-   "description": "================================================================================ Capture Strategist -- Go/No-Go Recommendation and Win Theme Development ================================================================================",
+   "description": "Capture Strategist -- Go/No-Go Recommendation and Win Theme Development ================================================================================",
    "exports": [
     "CaptureStrategistArchetype"
    ],
@@ -107702,7 +107702,7 @@
    "lines": 552,
    "bytes": 25434,
    "sha256": "de7c99e89cd88d9d",
-   "description": "================================================================================ Compliance Reviewer -- Proposal Compliance Verification Agent ================================================================================",
+   "description": "Compliance Reviewer -- Proposal Compliance Verification Agent ================================================================================",
    "exports": [
     "ComplianceReviewerArchetype"
    ],
@@ -107753,7 +107753,7 @@
    "lines": 141,
    "bytes": 6405,
    "sha256": "9e45cbb636ca69b5",
-   "description": "================================================================================ Content Curator -- Find social/web content to repost (PLATFORM-SCOPE / CMS scout) ================================================================================",
+   "description": "Content Curator -- Find social/web content to repost (PLATFORM-SCOPE / CMS scout) ================================================================================",
    "exports": [
     "ContentCuratorArchetype"
    ],
@@ -107801,7 +107801,7 @@
    "lines": 156,
    "bytes": 6876,
    "sha256": "07d48725120b5ca6",
-   "description": "================================================================================ Content Generator -- New web/social content (PLATFORM-SCOPE / our-org CMS) ================================================================================",
+   "description": "Content Generator -- New web/social content (PLATFORM-SCOPE / our-org CMS) ================================================================================",
    "exports": [
     "ContentGeneratorArchetype"
    ],
@@ -107909,7 +107909,7 @@
    "lines": 419,
    "bytes": 21688,
    "sha256": "4980c5e8f21f3c54",
-   "description": "================================================================================ Cost Estimator -- Cost-volume realism guidance (TENANT-SCOPE) ================================================================================",
+   "description": "Cost Estimator -- Cost-volume realism guidance (TENANT-SCOPE) ================================================================================",
    "exports": [
     "CostEstimatorArchetype"
    ],
@@ -107981,7 +107981,7 @@
    "lines": 350,
    "bytes": 18197,
    "sha256": "bd6f0d2c5d221d11",
-   "description": "================================================================================ Curation QA -- Pre-release quality gate (PLATFORM-SCOPE / our-org RFP-admin ops) ================================================================================",
+   "description": "Curation QA -- Pre-release quality gate (PLATFORM-SCOPE / our-org RFP-admin ops) ================================================================================",
    "exports": [
     "CurationQaArchetype"
    ],
@@ -108091,7 +108091,7 @@
    "lines": 171,
    "bytes": 7831,
    "sha256": "78d18a04ecae4a78",
-   "description": "================================================================================ Ingest Analyst -- Raw solicitation → structured curation draft (PLATFORM-SCOPE) ================================================================================",
+   "description": "Ingest Analyst -- Raw solicitation → structured curation draft (PLATFORM-SCOPE) ================================================================================",
    "exports": [
     "IngestAnalystArchetype"
    ],
@@ -108296,7 +108296,7 @@
    "lines": 363,
    "bytes": 18268,
    "sha256": "08e92a91bbdea854",
-   "description": "================================================================================ Market Analyst -- SOTA / market-context web scout for a proposal (TENANT-SCOPE) ================================================================================",
+   "description": "Market Analyst -- SOTA / market-context web scout for a proposal (TENANT-SCOPE) ================================================================================",
    "exports": [
     "FENCE_OPEN",
     "FENCE_CLOSE",
@@ -108368,7 +108368,7 @@
    "lines": 184,
    "bytes": 8440,
    "sha256": "7d62664dedbcb163",
-   "description": "================================================================================ Matrix Stager -- Curated solicitation → master compliance matrix (PLATFORM-SCOPE) ================================================================================",
+   "description": "Matrix Stager -- Curated solicitation → master compliance matrix (PLATFORM-SCOPE) ================================================================================",
    "exports": [
     "MatrixStagerArchetype"
    ],
@@ -108423,7 +108423,7 @@
    "lines": 287,
    "bytes": 13636,
    "sha256": "338509d40e8dfb29",
-   "description": "================================================================================ Onboarding Concierge -- New-tenant cold-start ================================================================================",
+   "description": "Onboarding Concierge -- New-tenant cold-start ================================================================================",
    "exports": [
     "OnboardingAgentArchetype"
    ],
@@ -108525,7 +108525,7 @@
    "lines": 200,
    "bytes": 9449,
    "sha256": "3fcb049864a158d4",
-   "description": "================================================================================ Opportunity Scout -- Judge & prioritize detected opportunities (PLATFORM-SCOPE) ================================================================================",
+   "description": "Opportunity Scout -- Judge & prioritize detected opportunities (PLATFORM-SCOPE) ================================================================================",
    "exports": [
     "OpportunityScoutArchetype"
    ],
@@ -108586,7 +108586,7 @@
    "lines": 451,
    "bytes": 27237,
    "sha256": "b860203bc4414f42",
-   "description": "================================================================================ Ops Companion -- the admin's second pair of eyes (PLATFORM-SCOPE / our-org) ================================================================================ ROLE: Walks the lower decks while the admin is on the bridge. Given a window of wh",
+   "description": "Ops Companion -- the admin's second pair of eyes (PLATFORM-SCOPE / our-org) ================================================================================ ROLE: Walks the lower decks while the admin is on the bridge. Given a window of what the system ACTUALLY did -- events, work items, mail, agent calls, workflows, w",
    "exports": [
     "_observation_window",
     "OpsCompanionArchetype"
@@ -108641,7 +108641,7 @@
    "lines": 184,
    "bytes": 8190,
    "sha256": "b5b261ed7f72d306",
-   "description": "================================================================================ Ops Digest -- Scheduled ops health digest (PLATFORM-SCOPE / master_admin) ================================================================================",
+   "description": "Ops Digest -- Scheduled ops health digest (PLATFORM-SCOPE / master_admin) ================================================================================",
    "exports": [
     "OpsDigestArchetype"
    ],
@@ -108689,7 +108689,7 @@
    "lines": 199,
    "bytes": 9255,
    "sha256": "d68c49c9844e700f",
-   "description": "================================================================================ Outcome Analyst -- Win/loss analysis → scoring calibration (TENANT-SCOPE) ================================================================================",
+   "description": "Outcome Analyst -- Win/loss analysis → scoring calibration (TENANT-SCOPE) ================================================================================",
    "exports": [
     "OutcomeAnalystArchetype"
    ],
@@ -108739,7 +108739,7 @@
    "lines": 677,
    "bytes": 30498,
    "sha256": "bd5a3b3eb32bcd33",
-   "description": "================================================================================ Packaging Specialist -- Final Submission Package Compilation and Validation ================================================================================",
+   "description": "Packaging Specialist -- Final Submission Package Compilation and Validation ================================================================================",
    "exports": [
     "PackagingSpecialistArchetype"
    ],
@@ -108794,7 +108794,7 @@
    "lines": 594,
    "bytes": 25686,
    "sha256": "1cfca1ab6d43925a",
-   "description": "================================================================================ Partner Coordinator -- Partner/Subcontractor Communication and Coordination ================================================================================",
+   "description": "Partner Coordinator -- Partner/Subcontractor Communication and Coordination ================================================================================",
    "exports": [
     "PartnerCoordinatorArchetype"
    ],
@@ -108847,7 +108847,7 @@
    "lines": 190,
    "bytes": 8723,
    "sha256": "71e30b9b6cc9bd56",
-   "description": "================================================================================ Past-Performance Matcher -- PP-volume grounding + teaming gaps (TENANT-SCOPE) ================================================================================",
+   "description": "Past-Performance Matcher -- PP-volume grounding + teaming gaps (TENANT-SCOPE) ================================================================================",
    "exports": [
     "PpMatcherArchetype"
    ],
@@ -108951,7 +108951,7 @@
    "lines": 658,
    "bytes": 30004,
    "sha256": "09850dab94f2869b",
-   "description": "================================================================================ Proposal Architect -- Proposal Structure Design and Requirements Mapping ================================================================================",
+   "description": "Proposal Architect -- Proposal Structure Design and Requirements Mapping ================================================================================",
    "exports": [
     "ProposalArchitectArchetype"
    ],
@@ -109124,7 +109124,7 @@
    "lines": 283,
    "bytes": 13803,
    "sha256": "9ce0adae4e6ed5f6",
-   "description": "================================================================================ Research Scout -- R&D / market-research finder for a proposal (TENANT-SCOPE) ================================================================================",
+   "description": "Research Scout -- R&D / market-research finder for a proposal (TENANT-SCOPE) ================================================================================",
    "exports": [
     "FENCE_OPEN",
     "FENCE_CLOSE",
@@ -109190,7 +109190,7 @@
    "lines": 416,
    "bytes": 20817,
    "sha256": "10656ad8a988db4c",
-   "description": "================================================================================ RFP Ingest Manager -- ingest-pipeline orchestration (PLATFORM-SCOPE / our-org) ================================================================================",
+   "description": "RFP Ingest Manager -- ingest-pipeline orchestration (PLATFORM-SCOPE / our-org) ================================================================================",
    "exports": [
     "_CONSTRAINT_FIELDS",
     "_READ_SOURCES",
@@ -109251,7 +109251,7 @@
    "lines": 427,
    "bytes": 17933,
    "sha256": "cd1d12b450f83fe0",
-   "description": "================================================================================ Scoring Strategist -- LLM-Based Opportunity Score Adjustment ================================================================================",
+   "description": "Scoring Strategist -- LLM-Based Opportunity Score Adjustment ================================================================================",
    "exports": [
     "ScoringStrategistArchetype"
    ],
@@ -109384,7 +109384,7 @@
    "lines": 177,
    "bytes": 8067,
    "sha256": "1e4f3f5358ae7aaa",
-   "description": "================================================================================ Skeleton Architect -- Matrix → master response skeleton (PLATFORM-SCOPE) ================================================================================",
+   "description": "Skeleton Architect -- Matrix → master response skeleton (PLATFORM-SCOPE) ================================================================================",
    "exports": [
     "SkeletonArchitectArchetype"
    ],
@@ -109433,7 +109433,7 @@
    "lines": 141,
    "bytes": 5866,
    "sha256": "88f894df82c286ce",
-   "description": "================================================================================ Social Scheduler -- Queue social posts from published content (PLATFORM / CMS) ================================================================================",
+   "description": "Social Scheduler -- Queue social posts from published content (PLATFORM / CMS) ================================================================================",
    "exports": [
     "SocialSchedulerArchetype"
    ],
@@ -109636,7 +109636,7 @@
    "lines": 916,
    "bytes": 36690,
    "sha256": "7f6776c077558065",
-   "description": "================================================================================ ContextAssembler — Builds Complete Prompt for Agent Invocations ================================================================================",
+   "description": "ContextAssembler — Builds Complete Prompt for Agent Invocations ================================================================================",
    "exports": [
     "_get_provider",
     "_build_task_text",
@@ -109784,7 +109784,7 @@
    "lines": 1583,
    "bytes": 70173,
    "sha256": "1a59a9ec4647dd94",
-   "description": "================================================================================ AgentFabric — Central Orchestrator for AI Agent Workforce ================================================================================",
+   "description": "AgentFabric — Central Orchestrator for AI Agent Workforce ================================================================================",
    "exports": [
     "_ARCHETYPE_CLASSES",
     "MAX_TOOL_ROUNDS",
@@ -110316,7 +110316,7 @@
    "lines": 288,
    "bytes": 12677,
    "sha256": "924ec23b1ef7148c",
-   "description": "================================================================================ Calibrator — Recalibrates Agent Performance Metrics and Confidence Scores ================================================================================",
+   "description": "Calibrator — Recalibrates Agent Performance Metrics and Confidence Scores ================================================================================",
    "exports": [
     "Calibrator"
    ],
@@ -110369,7 +110369,7 @@
    "lines": 295,
    "bytes": 11239,
    "sha256": "a8b1ac3d3ada3f75",
-   "description": "================================================================================ DiffAnalyzer — Analyzes Human Edits to Agent Output for Learning ================================================================================",
+   "description": "DiffAnalyzer — Analyzes Human Edits to Agent Output for Learning ================================================================================",
    "exports": [
     "DiffAnalyzer"
    ],
@@ -110422,7 +110422,7 @@
    "lines": 313,
    "bytes": 13094,
    "sha256": "251e2cfb758ed961",
-   "description": "================================================================================ OutcomeAttributor — Attributes Proposal Outcomes to Agent Memories and Content ================================================================================",
+   "description": "OutcomeAttributor — Attributes Proposal Outcomes to Agent Memories and Content ================================================================================",
    "exports": [
     "OutcomeAttributor"
    ],
@@ -110477,7 +110477,7 @@
    "lines": 332,
    "bytes": 13338,
    "sha256": "5f9676fb651f5f01",
-   "description": "================================================================================ PatternPromoter — Promotes Confirmed Episodic Patterns to Semantic Knowledge ================================================================================",
+   "description": "PatternPromoter — Promotes Confirmed Episodic Patterns to Semantic Knowledge ================================================================================",
    "exports": [
     "_STOP_WORDS",
     "PatternPromoter"
@@ -110530,7 +110530,7 @@
    "lines": 350,
    "bytes": 14802,
    "sha256": "e7eb99af04796f1e",
-   "description": "================================================================================ PreferenceExtractor — Extracts Tenant Preferences from Episodic Memory Patterns ================================================================================",
+   "description": "PreferenceExtractor — Extracts Tenant Preferences from Episodic Memory Patterns ================================================================================",
    "exports": [
     "_STOP_WORDS",
     "PreferenceExtractor"
@@ -110630,7 +110630,7 @@
    "lines": 333,
    "bytes": 13137,
    "sha256": "13aed0116a4c6ad8",
-   "description": "================================================================================ MemoryCompactor — Compresses Clusters of Similar Episodic Memories ================================================================================",
+   "description": "MemoryCompactor — Compresses Clusters of Similar Episodic Memories ================================================================================",
    "exports": [
     "_STOP_WORDS",
     "MemoryCompactor"
@@ -110683,7 +110683,7 @@
    "lines": 334,
    "bytes": 13699,
    "sha256": "47eea02ca42e5670",
-   "description": "================================================================================ ContradictionResolver — Detects and Resolves Contradictory Semantic Memories ================================================================================",
+   "description": "ContradictionResolver — Detects and Resolves Contradictory Semantic Memories ================================================================================",
    "exports": [
     "_OPPOSING_PAIRS",
     "_NEGATION_WORDS",
@@ -110738,7 +110738,7 @@
    "lines": 188,
    "bytes": 6841,
    "sha256": "3fe76bf1a3591fd9",
-   "description": "================================================================================ MemoryDecay — Applies Time-Based Decay to Memory Importance Scores ================================================================================",
+   "description": "MemoryDecay — Applies Time-Based Decay to Memory Importance Scores ================================================================================",
    "exports": [
     "MemoryDecay",
     "_parse_update_count"
@@ -110786,7 +110786,7 @@
    "lines": 213,
    "bytes": 7845,
    "sha256": "e5105808d96c94ec",
-   "description": "================================================================================ MemoryGC — Garbage Collects Expired and Archived Memories ================================================================================",
+   "description": "MemoryGC — Garbage Collects Expired and Archived Memories ================================================================================",
    "exports": [
     "MemoryGC",
     "_parse_update_count"
@@ -110965,7 +110965,7 @@
    "lines": 1100,
    "bytes": 41374,
    "sha256": "aaa35ab6c3794b31",
-   "description": "================================================================================ ToolRegistry — Tenant-Isolated Tool Execution Layer ================================================================================",
+   "description": "ToolRegistry — Tenant-Isolated Tool Execution Layer ================================================================================",
    "exports": [
     "_get_embedding_provider",
     "ToolDef",
@@ -112922,7 +112922,7 @@
    "lines": 735,
    "bytes": 36501,
    "sha256": "ad75231451597528",
-   "description": "================================================================================ Lifecycle Scheduler — Runs Memory Maintenance on Documented Schedules ================================================================================",
+   "description": "Lifecycle Scheduler — Runs Memory Maintenance on Documented Schedules ================================================================================",
    "exports": [
     "_seconds_until_next_hour",
     "run_lifecycle_scheduler",
@@ -113150,7 +113150,7 @@
    "lines": 527,
    "bytes": 21138,
    "sha256": "1fc06fd0b75c7681",
-   "description": "================================================================================ Budget Model — the deterministic budget / PoP-bucket cost-volume fill engine ================================================================================",
+   "description": "Budget Model — the deterministic budget / PoP-bucket cost-volume fill engine ================================================================================",
    "exports": [
     "_CENTS",
     "ODC_KINDS",
@@ -114267,7 +114267,7 @@
    "lines": 59,
    "bytes": 2500,
    "sha256": "592f80d5e7d47768",
-   "description": "================================================================================ Workflow Actions Package (__init__.py) ================================================================================",
+   "description": "Workflow Actions Package (__init__.py) ================================================================================",
    "exports": [],
    "uses": [
     {
@@ -114352,7 +114352,7 @@
    "lines": 190,
    "bytes": 8409,
    "sha256": "3e6af334c713f1cf",
-   "description": "================================================================================ Workflow Actions — Advisory / Adversarial overlay elevation + auto-land (P4-D) ================================================================================",
+   "description": "Workflow Actions — Advisory / Adversarial overlay elevation + auto-land (P4-D) ================================================================================",
    "exports": [
     "_OVERLAY_NAMESPACE",
     "_OVERLAY_TYPE",
@@ -114570,7 +114570,7 @@
    "lines": 285,
    "bytes": 12935,
    "sha256": "5d751aab6b54807a",
-   "description": "================================================================================ Workflow Actions: CMS content draft + publish (the content vertical) ================================================================================",
+   "description": "Workflow Actions: CMS content draft + publish (the content vertical) ================================================================================",
    "exports": [
     "_CONTENT_PAGES_DOC_TYPES",
     "_DEFAULT_CONTENT_TYPE",
@@ -114637,7 +114637,7 @@
    "lines": 87,
    "bytes": 4580,
    "sha256": "d2e64e44a3977227",
-   "description": "================================================================================ Did the cohort actually run? (the third signal — B17) ================================================================================ A workflow that ends in a \"reviewed\" verdict has two steps that must NOT depend on each other:",
+   "description": "Did the cohort actually run? (the third signal — B17) ================================================================================ A workflow that ends in a \"reviewed\" verdict has two steps that must NOT depend on each other:",
    "exports": [
     "_RAN",
     "REVIEWED",
@@ -114687,7 +114687,7 @@
    "lines": 296,
    "bytes": 12347,
    "sha256": "c7406511aa4907dd",
-   "description": "================================================================================ Workflow Action: create_drafts_from_scout ================================================================================",
+   "description": "Workflow Action: create_drafts_from_scout ================================================================================",
    "exports": [
     "REGION_OPPORTUNITIES_KEY",
     "create_drafts_from_scout"
@@ -114735,7 +114735,7 @@
    "lines": 482,
    "bytes": 24078,
    "sha256": "2b476140707d65a1",
-   "description": "================================================================================ Action: draft_v0 (B5 — the 3-source V0 strawman orchestration) ================================================================================",
+   "description": "Action: draft_v0 (B5 — the 3-source V0 strawman orchestration) ================================================================================",
    "exports": [
     "_DEFAULT_CANVAS",
     "_RFP_EXCERPT_CHARS",
@@ -114836,7 +114836,7 @@
    "lines": 298,
    "bytes": 11532,
    "sha256": "3c5900af7833b218",
-   "description": "================================================================================ Workflow Action: generate_preview (generate_preview.py) ================================================================================",
+   "description": "Workflow Action: generate_preview (generate_preview.py) ================================================================================",
    "exports": [
     "generate_preview",
     "_extract_readable_text"
@@ -114900,7 +114900,7 @@
    "lines": 237,
    "bytes": 11462,
    "sha256": "aa430c8c129f3172",
-   "description": "================================================================================ Ingest Studio — the phase advance ACTION (docs/INGEST_STUDIO_DESIGN.md) ================================================================================",
+   "description": "Ingest Studio — the phase advance ACTION (docs/INGEST_STUDIO_DESIGN.md) ================================================================================",
    "exports": [
     "NEXT_PHASE",
     "_PHASES",
@@ -114955,7 +114955,7 @@
    "lines": 126,
    "bytes": 5542,
    "sha256": "3b25cf540d08d76b",
-   "description": "================================================================================ Portal stage-review actions (TW-8 — the AI-manager stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ================================================================================ The landing ACTION of OnPortalStageReviewRequested: em",
+   "description": "Portal stage-review actions (TW-8 — the AI-manager stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ================================================================================ The landing ACTION of OnPortalStageReviewRequested: emit `capture:stage_review.completed` — the completion TRIGGER the FRONTEND gate-cl",
    "exports": [
     "_summarize_review",
     "record_stage_review"
@@ -114996,7 +114996,7 @@
    "lines": 187,
    "bytes": 10225,
    "sha256": "dab2dd1d8f7f28c1",
-   "description": "================================================================================ Action: publish_section_draft (E5 — the strawman/draft LANDING primitive) ================================================================================",
+   "description": "Action: publish_section_draft (E5 — the strawman/draft LANDING primitive) ================================================================================",
    "exports": [
     "_LANDABLE",
     "_counts",
@@ -115064,7 +115064,7 @@
    "lines": 402,
    "bytes": 18807,
    "sha256": "5fde6c79af2b1f59",
-   "description": "================================================================================ Workflow Action: tenant-side bucket rescore (rescore.py) ================================================================================",
+   "description": "Workflow Action: tenant-side bucket rescore (rescore.py) ================================================================================",
    "exports": [
     "_js_round",
     "_coerce",
@@ -115137,7 +115137,7 @@
    "lines": 190,
    "bytes": 8155,
    "sha256": "6581a2936a8475b1",
-   "description": "================================================================================ Workflow Action: match_tenants (score_tenants.py) ================================================================================",
+   "description": "Workflow Action: match_tenants (score_tenants.py) ================================================================================",
    "exports": [
     "NOTIFICATION_THRESHOLD",
     "match_tenants"
@@ -115194,7 +115194,7 @@
    "lines": 550,
    "bytes": 22552,
    "sha256": "bbbe22125d80aacb",
-   "description": "================================================================================ Workflow Action: shred / extract_compliance ================================================================================",
+   "description": "Workflow Action: shred / extract_compliance ================================================================================",
    "exports": [
     "shred",
     "extract_compliance"
@@ -115282,7 +115282,7 @@
    "lines": 109,
    "bytes": 4647,
    "sha256": "f33311565f0f14be",
-   "description": "================================================================================ Proposal Studio — the phase advance ACTION (docs/PROPOSAL_STUDIO_DESIGN.md) ================================================================================",
+   "description": "Proposal Studio — the phase advance ACTION (docs/PROPOSAL_STUDIO_DESIGN.md) ================================================================================",
    "exports": [
     "NEXT_PHASE",
     "_PHASES",
@@ -115326,7 +115326,7 @@
    "lines": 201,
    "bytes": 10209,
    "sha256": "4b55a9c8a9350951",
-   "description": "================================================================================ Workflow: AdvisoryOverlay (reusable sub-workflow — the Advisory / Adversarial Overlay) ================================================================================",
+   "description": "Workflow: AdvisoryOverlay (reusable sub-workflow — the Advisory / Adversarial Overlay) ================================================================================",
    "exports": [
     "OVERLAY_FANOUT_SLOTS",
     "_TARGET_ADVISOR_ACTION",
@@ -115396,7 +115396,7 @@
    "lines": 399,
    "bytes": 17491,
    "sha256": "b5fd92f839308d36",
-   "description": "================================================================================ Module: Workflow Base Classes (base.py) ================================================================================",
+   "description": "Module: Workflow Base Classes (base.py) ================================================================================",
    "exports": [
     "EventTrigger",
     "StepType",
@@ -116003,7 +116003,7 @@
    "lines": 2230,
    "bytes": 98632,
    "sha256": "2a06180bd1806eaa",
-   "description": "================================================================================ WorkflowManager — Persistent Workflow Orchestration with Crash Recovery ================================================================================",
+   "description": "WorkflowManager — Persistent Workflow Orchestration with Crash Recovery ================================================================================",
    "exports": [
     "_effective_step_status",
     "WorkflowManager"
@@ -116171,7 +116171,7 @@
    "lines": 119,
    "bytes": 5479,
    "sha256": "7b8b4aedca06e2a1",
-   "description": "================================================================================ Workflow: OnApplicationAccepted ================================================================================",
+   "description": "Workflow: OnApplicationAccepted ================================================================================",
    "exports": [
     "OnApplicationAccepted"
    ],
@@ -116210,7 +116210,7 @@
    "lines": 134,
    "bytes": 6158,
    "sha256": "c260d6a265f93277",
-   "description": "================================================================================ Workflow: OnCmsContentRequested (CMS content vertical — keystone proof) ================================================================================",
+   "description": "Workflow: OnCmsContentRequested (CMS content vertical — keystone proof) ================================================================================",
    "exports": [
     "OnCmsContentRequested"
    ],
@@ -116255,7 +116255,7 @@
    "lines": 131,
    "bytes": 5799,
    "sha256": "e580a7f151cbfcfc",
-   "description": "================================================================================ Workflow: OnCollaboratorInvited ================================================================================",
+   "description": "Workflow: OnCollaboratorInvited ================================================================================",
    "exports": [
     "OnCollaboratorInvited"
    ],
@@ -116294,7 +116294,7 @@
    "lines": 60,
    "bytes": 2375,
    "sha256": "4bfa8834be1fc478",
-   "description": "================================================================================ Workflow: OnContentResurfaceRequested (our-org CMS — scheduled content scout) ================================================================================",
+   "description": "Workflow: OnContentResurfaceRequested (our-org CMS — scheduled content scout) ================================================================================",
    "exports": [
     "OnContentResurfaceRequested"
    ],
@@ -116333,7 +116333,7 @@
    "lines": 130,
    "bytes": 5720,
    "sha256": "5d1aa5695e39f596",
-   "description": "================================================================================ Workflow: OnContractStarted ================================================================================",
+   "description": "Workflow: OnContractStarted ================================================================================",
    "exports": [
     "OnContractStarted"
    ],
@@ -116365,7 +116365,7 @@
    "lines": 374,
    "bytes": 19763,
    "sha256": "216a2cc5fa5f8146",
-   "description": "================================================================================ Workflow: OnFullDraftRequested (the Proposal Draft Manager orchestration — 3 modes) ================================================================================",
+   "description": "Workflow: OnFullDraftRequested (the Proposal Draft Manager orchestration — 3 modes) ================================================================================",
    "exports": [
     "_VOICE",
     "_plan_step",
@@ -116416,7 +116416,7 @@
    "lines": 85,
    "bytes": 3871,
    "sha256": "558b251b64f3ae71",
-   "description": "================================================================================ Workflow: OnIngestAssessmentRequested (Admin-agent Phase 1 — ingest orchestration) ================================================================================",
+   "description": "Workflow: OnIngestAssessmentRequested (Admin-agent Phase 1 — ingest orchestration) ================================================================================",
    "exports": [
     "OnIngestAssessmentRequested"
    ],
@@ -116455,7 +116455,7 @@
    "lines": 184,
    "bytes": 8091,
    "sha256": "4bf901ca14bd4bf5",
-   "description": "================================================================================ Workflow: OnIngestPhaseRequested (Ingest Studio — the gated ingest) ================================================================================",
+   "description": "Workflow: OnIngestPhaseRequested (Ingest Studio — the gated ingest) ================================================================================",
    "exports": [
     "_SOL",
     "_GUIDANCE",
@@ -116502,7 +116502,7 @@
    "lines": 175,
    "bytes": 8896,
    "sha256": "aab5469e3d9c9fdd",
-   "description": "================================================================================ Workflow: OnOpportunitiesDetected (Scouting Spine M2 — detection → alert) ================================================================================",
+   "description": "Workflow: OnOpportunitiesDetected (Scouting Spine M2 — detection → alert) ================================================================================",
    "exports": [
     "OnOpportunitiesDetected"
    ],
@@ -116547,7 +116547,7 @@
    "lines": 73,
    "bytes": 3127,
    "sha256": "bff1fc1c7770fb65",
-   "description": "================================================================================ Workflow: OnOpsDigestRequested (POD 4 — first SCHEDULED admin automation) ================================================================================",
+   "description": "Workflow: OnOpsDigestRequested (POD 4 — first SCHEDULED admin automation) ================================================================================",
    "exports": [
     "OnOpsDigestRequested"
    ],
@@ -116586,7 +116586,7 @@
    "lines": 83,
    "bytes": 4509,
    "sha256": "671d5f220bbd28d7",
-   "description": "================================================================================ Workflow: OnPortalStageReviewRequested (TW-8 — the AI-manager portal stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ================================================================================ TRIGGER: capture:stage_review.reques",
+   "description": "Workflow: OnPortalStageReviewRequested (TW-8 — the AI-manager portal stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ================================================================================ TRIGGER: capture:stage_review.requested:end Condition: payload.portalId present (emitted by the frontend phase-machin",
    "exports": [
     "OnPortalStageReviewRequested"
    ],
@@ -116637,7 +116637,7 @@
    "lines": 98,
    "bytes": 4661,
    "sha256": "aa055e559bd96aca",
-   "description": "================================================================================ Workflow: OnProjectHealthRequested (A1 — post-award milestone health) ================================================================================",
+   "description": "Workflow: OnProjectHealthRequested (A1 — post-award milestone health) ================================================================================",
    "exports": [
     "OnProjectHealthRequested"
    ],
@@ -116676,7 +116676,7 @@
    "lines": 269,
    "bytes": 12820,
    "sha256": "52c7cdb7e89c7b57",
-   "description": "================================================================================ Workflow: OnProposalAdvancedToReview / OnProposalAdvancedToFinal ================================================================================",
+   "description": "Workflow: OnProposalAdvancedToReview / OnProposalAdvancedToFinal ================================================================================",
    "exports": [
     "OnProposalAdvancedToReview",
     "OnProposalAdvancedToFinal"
@@ -116728,7 +116728,7 @@
    "lines": 218,
    "bytes": 10299,
    "sha256": "0d2a0da0df1c2305",
-   "description": "================================================================================ Workflow: OnProposalCreated ================================================================================",
+   "description": "Workflow: OnProposalCreated ================================================================================",
    "exports": [
     "OnProposalCreated"
    ],
@@ -116791,7 +116791,7 @@
    "lines": 79,
    "bytes": 3085,
    "sha256": "8333bd17a116b3a4",
-   "description": "================================================================================ Workflow: OnProposalOutcomeRecorded (PIPE-16) ================================================================================",
+   "description": "Workflow: OnProposalOutcomeRecorded (PIPE-16) ================================================================================",
    "exports": [
     "OnProposalOutcomeRecorded"
    ],
@@ -116836,7 +116836,7 @@
    "lines": 67,
    "bytes": 2608,
    "sha256": "e715b0b6d394a0ca",
-   "description": "================================================================================ Workflow: OnProposalSectionEdited (PIPE-15) ================================================================================",
+   "description": "Workflow: OnProposalSectionEdited (PIPE-15) ================================================================================",
    "exports": [
     "OnProposalSectionEdited"
    ],
@@ -116875,7 +116875,7 @@
    "lines": 173,
    "bytes": 8647,
    "sha256": "7090d1165a6ecec4",
-   "description": "================================================================================ Workflow: OnReviewPhaseRequested (Proposal Studio — 3 gated loops) ================================================================================",
+   "description": "Workflow: OnReviewPhaseRequested (Proposal Studio — 3 gated loops) ================================================================================",
    "exports": [
     "_GUIDANCE",
     "_VOICE",
@@ -116922,7 +116922,7 @@
    "lines": 169,
    "bytes": 7508,
    "sha256": "03515de06f9da41c",
-   "description": "================================================================================ Workflow: OnRfpUploaded ================================================================================",
+   "description": "Workflow: OnRfpUploaded ================================================================================",
    "exports": [
     "OnRfpUploaded"
    ],
@@ -116967,7 +116967,7 @@
    "lines": 58,
    "bytes": 2264,
    "sha256": "1f9cb68e37b51d22",
-   "description": "================================================================================ Workflow: OnSocialScheduleRequested (our-org CMS — scheduled social publisher) ================================================================================",
+   "description": "Workflow: OnSocialScheduleRequested (our-org CMS — scheduled social publisher) ================================================================================",
    "exports": [
     "OnSocialScheduleRequested"
    ],
@@ -117006,7 +117006,7 @@
    "lines": 118,
    "bytes": 5158,
    "sha256": "9a773e0742430bf1",
-   "description": "================================================================================ Workflow: OnSolicitationPushed ================================================================================",
+   "description": "Workflow: OnSolicitationPushed ================================================================================",
    "exports": [
     "OnSolicitationPushed"
    ],
@@ -117038,7 +117038,7 @@
    "lines": 89,
    "bytes": 4083,
    "sha256": "08df67ad86dfd5e0",
-   "description": "================================================================================ Workflow: OnSolicitationReviewRequested (POD 4 — admin-side automation) ================================================================================",
+   "description": "Workflow: OnSolicitationReviewRequested (POD 4 — admin-side automation) ================================================================================",
    "exports": [
     "OnSolicitationReviewRequested"
    ],
@@ -117077,7 +117077,7 @@
    "lines": 60,
    "bytes": 2533,
    "sha256": "069f0feef9b3fe6c",
-   "description": "================================================================================ Workflow: OnSolicitationUpdateScan (scout expansion — proactive update watcher) ================================================================================",
+   "description": "Workflow: OnSolicitationUpdateScan (scout expansion — proactive update watcher) ================================================================================",
    "exports": [
     "OnSolicitationUpdateScan"
    ],
@@ -117116,7 +117116,7 @@
    "lines": 174,
    "bytes": 7892,
    "sha256": "70e1907de1ef8233",
-   "description": "================================================================================ Workflow: OnSourceChangeDetected ================================================================================",
+   "description": "Workflow: OnSourceChangeDetected ================================================================================",
    "exports": [
     "OnSourceChangeDetected"
    ],
@@ -117173,7 +117173,7 @@
    "lines": 76,
    "bytes": 3532,
    "sha256": "7fc2ba18ddd8e322",
-   "description": "================================================================================ Workflow: OnStatusNarrativeRequested (A2 — the paragraph a report cannot compute) ================================================================================",
+   "description": "Workflow: OnStatusNarrativeRequested (A2 — the paragraph a report cannot compute) ================================================================================",
    "exports": [
     "OnStatusNarrativeRequested"
    ],
@@ -117212,7 +117212,7 @@
    "lines": 77,
    "bytes": 3260,
    "sha256": "b87994db0bfc813d",
-   "description": "================================================================================ Workflows: OnCardApplied / OnBucketsUpdated (tenant-side bucket scoring) ================================================================================",
+   "description": "Workflows: OnCardApplied / OnBucketsUpdated (tenant-side bucket scoring) ================================================================================",
    "exports": [
     "OnCardApplied",
     "OnBucketsUpdated"
@@ -117245,7 +117245,7 @@
    "lines": 1026,
    "bytes": 48891,
    "sha256": "380d7cabd7b0803b",
-   "description": "================================================================================ Module: Workflow Processor (processor.py) ================================================================================",
+   "description": "Module: Workflow Processor (processor.py) ================================================================================",
    "exports": [
     "_MAX_DEDUP_SET_SIZE",
     "_DEDUP_EVICT_FRACTION",
@@ -117581,7 +117581,7 @@
    "lines": 133,
    "bytes": 7557,
    "sha256": "a9375715de272be4",
-   "description": "================================================================================ Workflow: ProjectCollaboration (the generic project/opportunity HITL reaction) ================================================================================",
+   "description": "Workflow: ProjectCollaboration (the generic project/opportunity HITL reaction) ================================================================================",
    "exports": [
     "_PARK_BACKSTOP_MINUTES",
     "ProjectCollaboration"

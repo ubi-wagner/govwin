@@ -446,7 +446,12 @@ for (const [r, rec] of byRel) {
       if (!py) { rec.parseError = 'not seen by the Python pass'; unparsed.push(r); }
       else if (py.error) { rec.parseError = py.error; unparsed.push(r); }
       else {
-        rec.description = py.docstring ? py.docstring.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim().slice(0, 320) : null;
+        // Same normalisation the JS path uses — several pipeline modules open their docstring
+        // with a rule of `=` characters, and "=====... Module: Workflow Base Classes" is not a
+        // description anyone can read in a table.
+        rec.description = py.docstring
+          ? (py.docstring.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').replace(/^[-=─·_*\s]+/, '').trim().slice(0, 320) || null)
+          : null;
         parsed.exports = py.defines ?? [];
         for (const im of py.imports ?? []) {
           // A relative import (`from .x import y`) is resolved against this file's own package.
@@ -730,9 +735,18 @@ L.push('## 4 · What the graph could not answer');
 L.push('');
 L.push(`**${noDesc.length} files have no header of their own**, so this atlas has nothing to say about`);
 L.push('what they are. That is a real gap in the tree and not a limitation of the tool: an invented');
-L.push('sentence would have hidden it. The largest are worth a header first.');
+L.push('sentence would have hidden it.');
 L.push('');
-for (const r of noDesc.sort((a, b) => b.lines - a.lines).slice(0, 25)) L.push(`- \`${r.path}\` — ${r.lines} lines · used by ${r.usedBy.length}`);
+L.push('Ranked by DEPENDENTS, not by size — the cost of an unexplained file is paid by everyone who');
+L.push('has to open it, so the file 486 others import is the one worth a paragraph first. (That file');
+L.push('is `lib/db.ts`, and CLAUDE.md already carries a whole SOP section on its traps: the knowledge');
+L.push('exists, just nowhere near the code.)');
+L.push('');
+L.push('| file | used by | lines |');
+L.push('|---|---:|---:|');
+for (const r of [...noDesc].sort((a, b) => b.usedBy.length - a.usedBy.length).slice(0, 25)) {
+  L.push(`| \`${r.path}\` | ${r.usedBy.length} | ${r.lines} |`);
+}
 L.push('');
 if (unresolvedAll.length) {
   L.push(`**${unresolvedAll.length} files name an import that lands on nothing in this repo.** Reported, never dropped.`);

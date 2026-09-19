@@ -23,7 +23,7 @@
 | | |
 |---|---:|
 | files | **2363** |
-| total lines | 454,066 |
+| total lines | 454,080 |
 | dependency edges (file → file) | 4,734 |
 | distinct tables touched | 139 |
 | files with no header of their own | 555 |
@@ -43,7 +43,7 @@
 | 06 Engine | 104 | 25,270 | 162 | 330 |
 | 07 Agents | 61 | 21,809 | 121 | 221 |
 | migration | 256 | 46,692 | 0 | 0 |
-| harness | 458 | 79,656 | 415 | 82 |
+| harness | 458 | 79,670 | 415 | 82 |
 | test | 396 | 57,301 | 696 | 0 |
 | config | 12 | 746 | 6 | 327 |
 | other | 1 | 9,783 | 0 | 0 |
@@ -53,7 +53,7 @@
 | area | files | lines |
 |---|---:|---:|
 | frontend · lib | 342 | 72,007 |
-| frontend · harnesses | 331 | 63,929 |
+| frontend · harnesses | 331 | 63,943 |
 | frontend · api routes | 292 | 44,488 |
 | db · migrations | 256 | 46,692 |
 | frontend · unit tests | 256 | 35,747 |
@@ -84,15 +84,15 @@ before a refactor, and the reason each dependent is there is in the JSON.
 | `frontend/lib/events.ts` | 244 | 05 Events | Structured event emitter for the RFP Pipeline platform. |
 | `frontend/lib/types/canvas-document.ts` | 237 | 03 Domain | Canvas Document types — the unified content model for all proposal artifacts. Every document (Word, slides, PD |
 | `frontend/lib/validation.ts` | 111 | 03 Domain | Shared zod primitives. Imported by API route schemas + tool input schemas so there's one canonical definition  |
-| `pipeline/src/workflows/base.py` | 69 | 06 Engine | ================================================================================ Module: Workflow Base Classes |
+| `pipeline/src/workflows/base.py` | 69 | 06 Engine | Module: Workflow Base Classes (base.py) ====================================================================== |
 | `frontend/lib/jsonb.ts` | 50 | 04 Data | coerceJsonb — read a jsonb column safely regardless of how it was written. |
 | `frontend/lib/rls.ts` | 50 | 04 Data | — |
 | `frontend/lib/toast.tsx` | 47 | 03 Domain | — |
 | `frontend/lib/tools/base.ts` | 44 | 03 Domain | Tool interface — the canonical dual-use construct. |
-| `pipeline/src/agents/fabric.py` | 43 | 07 Agents | ================================================================================ AgentFabric — Central Orchest |
+| `pipeline/src/agents/fabric.py` | 43 | 07 Agents | AgentFabric — Central Orchestrator for AI Agent Workforce ==================================================== |
 | `frontend/lib/api-refusal.ts` | 42 | 03 Domain | THE SEAM THAT MAKES "RETURN A CODE" AND "EMIT WHEN IT DID NOT HAPPEN" INSEPARABLE. |
 | `frontend/lib/projects/project.ts` | 42 | 03 Domain | Projects and their anchor documents. |
-| `pipeline/src/workflows/processor.py` | 42 | 06 Engine | ================================================================================ Module: Workflow Processor (p |
+| `pipeline/src/workflows/processor.py` | 42 | 06 Engine | Module: Workflow Processor (processor.py) ==================================================================== |
 | `pipeline/src/agents/archetypes/base.py` | 41 | 07 Agents | Base archetype class that all agent roles inherit from. |
 | `frontend/lib/errors.ts` | 39 | 03 Domain | Canonical error class hierarchy for the RFP Pipeline frontend. |
 | `frontend/lib/fmt.ts` | 37 | 03 Domain | Deterministic formatting for anything a CLIENT component renders — a zero-import leaf. |
@@ -199,33 +199,40 @@ schema of 139, by reading every Python docstring as a SQL body.)
 
 **555 files have no header of their own**, so this atlas has nothing to say about
 what they are. That is a real gap in the tree and not a limitation of the tool: an invented
-sentence would have hidden it. The largest are worth a header first.
+sentence would have hidden it.
 
-- `frontend/components/rfp-curation/curation-workspace.tsx` — 3502 lines · used by 1
-- `frontend/scripts/drive-project-lifecycle.mts` — 2506 lines · used by 0
-- `frontend/components/canvas/canvas-renderer.tsx` — 1699 lines · used by 7
-- `frontend/app/admin/system-state/system-state-client.tsx` — 1339 lines · used by 1
-- `frontend/components/canvas/canvas-editor.tsx` — 1290 lines · used by 4
-- `frontend/components/canvas/sheet-editor.tsx` — 1243 lines · used by 1
-- `frontend/components/portal/proposal-admin-panel.tsx` — 1231 lines · used by 1
-- `frontend/components/canvas/canvas-sidebar.tsx` — 1220 lines · used by 2
-- `services/cms/frontend/src/pages/PageEditor.tsx` — 1113 lines · used by 1
-- `frontend/scripts/test-harness/emulated-claude.mjs` — 1105 lines · used by 0
-- `frontend/components/rfp-curation/topic-compliance-manager.tsx` — 862 lines · used by 1
-- `frontend/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx` — 827 lines · used by 1
-- `frontend/app/api/portal/[tenantSlug]/proposals/create/route.ts` — 811 lines · used by 1
-- `frontend/components/admin/admin-file-manager.tsx` — 779 lines · used by 1
-- `frontend/app/portal/[tenantSlug]/projects/[projectId]/page.tsx` — 742 lines · used by 0
-- `frontend/scripts/audit-automation-spine.mjs` — 742 lines · used by 0
-- `frontend/scripts/inventory-frontend.mjs` — 722 lines · used by 0
-- `frontend/app/admin/system-state/page.tsx` — 721 lines · used by 1
-- `frontend/scripts/reconcile-capability.mjs` — 717 lines · used by 0
-- `frontend/components/rfp-curation/pdf-viewer.tsx` — 714 lines · used by 1
-- `frontend/app/admin/workflows/workflow-monitor-client.tsx` — 692 lines · used by 1
-- `services/cms/frontend/src/components/MetadataEditor.tsx` — 691 lines · used by 1
-- `frontend/components/admin/application-review.tsx` — 686 lines · used by 1
-- `frontend/components/canvas/fluid-document-view.tsx` — 661 lines · used by 1
-- `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/gates/route.ts` — 655 lines · used by 0
+Ranked by DEPENDENTS, not by size — the cost of an unexplained file is paid by everyone who
+has to open it, so the file 486 others import is the one worth a paragraph first. (That file
+is `lib/db.ts`, and CLAUDE.md already carries a whole SOP section on its traps: the knowledge
+exists, just nowhere near the code.)
+
+| file | used by | lines |
+|---|---:|---:|
+| `frontend/lib/db.ts` | 486 | 281 |
+| `frontend/lib/rls.ts` | 50 | 23 |
+| `frontend/lib/toast.tsx` | 47 | 95 |
+| `frontend/components/ui/time-ago.tsx` | 26 | 155 |
+| `services/cms/frontend/src/lib/api.ts` | 13 | 38 |
+| `frontend/lib/agent-client.ts` | 10 | 62 |
+| `frontend/components/canvas/canvas-renderer.tsx` | 7 | 1699 |
+| `frontend/lib/import/types.ts` | 7 | 83 |
+| `frontend/components/admin/stat-card.tsx` | 6 | 156 |
+| `frontend/lib/compliance-resolver.ts` | 6 | 371 |
+| `frontend/components/admin/admin-nav-context.tsx` | 5 | 101 |
+| `frontend/components/auth/sign-out-button.tsx` | 5 | 27 |
+| `frontend/components/tasks/task-queue.tsx` | 5 | 577 |
+| `frontend/lib/hooks/use-tool.ts` | 5 | 60 |
+| `frontend/lib/import/pptx-reader.ts` | 5 | 401 |
+| `frontend/lib/proposal-advance.ts` | 5 | 577 |
+| `frontend/components/canvas/canvas-editor.tsx` | 4 | 1290 |
+| `frontend/components/ui/drawer.tsx` | 4 | 129 |
+| `frontend/app/admin/workflows/workflow-graph.tsx` | 3 | 319 |
+| `frontend/components/canvas/canvas-editor-page.tsx` | 3 | 311 |
+| `frontend/components/canvas/canvas-overlays.tsx` | 3 | 106 |
+| `frontend/components/marketing/safe-image.tsx` | 3 | 29 |
+| `frontend/components/portal/billing-panel.tsx` | 3 | 341 |
+| `frontend/components/portal/pipeline-cards.tsx` | 3 | 613 |
+| `frontend/components/portal/section-compliance-chip.tsx` | 3 | 113 |
 
 **654 files have no edge in either direction.** Most are configuration, migrations
 and standalone harnesses, which legitimately import nothing and are imported by nothing —
@@ -1219,7 +1226,7 @@ which carries the per-edge reasons in full.
 | `scripts/backfill-corpus-verbatim.mts` | 61 | 1 | 0 | Backfill `library_atoms.corpus_verbatim` (mig 197 / LIB-HYGIENE). |
 | `scripts/bug-log-status.mjs` | 140 | 0 | 0 | — |
 | `scripts/build-doc-guide.mjs` | 352 | 0 | 0 | Build the illustrated "Creating documents" guide: resize the session screenshots into the repo's docs/user-guides/img/ (committed) AND embed them as d |
-| `scripts/build-project-tree.mjs` | 796 | 0 | 0 | THE STATIC BASELINE — every file in the system, what it is, who uses it, and what it uses. |
+| `scripts/build-project-tree.mjs` | 810 | 0 | 0 | THE STATIC BASELINE — every file in the system, what it is, who uses it, and what it uses. |
 | `scripts/build-ui-contact-sheets.mjs` | 116 | 0 | 0 | — |
 | `scripts/calibrate-page-ruler.mts` | 386 | 2 | 0 | calibrate-page-ruler — pit `paginate()` against what Chromium actually prints. |
 | `scripts/calibrate-slide-ruler.mts` | 158 | 2 | 0 | calibrate-slide-ruler — the deck counterpart to calibrate-page-ruler. |
@@ -2261,63 +2268,63 @@ which carries the per-edge reasons in full.
 | `src/agents/__init__.py` | 15 | 4 | 2 | Agent system — fabric orchestrator, memory, context assembly, and tools. |
 | `src/agents/archetypes/__init__.py` | 86 | 40 | 1 | Agent archetypes — specialized AI roles for the proposal lifecycle. |
 | `src/agents/archetypes/advisory_manager.py` | 466 | 2 | 2 | advisory_manager — the Advisory / Adversarial Overlay's PLANNER + RECONCILER. |
-| `src/agents/archetypes/amendment_monitor.py` | 148 | 1 | 3 | ================================================================================ Amendment Monitor -- Solicitation change → compliance delta (PLATFORM |
+| `src/agents/archetypes/amendment_monitor.py` | 148 | 1 | 3 | Amendment Monitor -- Solicitation change → compliance delta (PLATFORM-SCOPE) ========================================================================= |
 | `src/agents/archetypes/base.py` | 74 | 0 | 41 | Base archetype class that all agent roles inherit from. |
-| `src/agents/archetypes/capture_strategist.py` | 581 | 1 | 2 | ================================================================================ Capture Strategist -- Go/No-Go Recommendation and Win Theme Developme |
+| `src/agents/archetypes/capture_strategist.py` | 581 | 1 | 2 | Capture Strategist -- Go/No-Go Recommendation and Win Theme Development ============================================================================== |
 | `src/agents/archetypes/color_team_reviewer.py` | 332 | 1 | 2 | color_team_reviewer agent archetype — evaluates proposals against criteria. |
-| `src/agents/archetypes/compliance_reviewer.py` | 552 | 1 | 2 | ================================================================================ Compliance Reviewer -- Proposal Compliance Verification Agent ======= |
-| `src/agents/archetypes/content_curator.py` | 141 | 1 | 2 | ================================================================================ Content Curator -- Find social/web content to repost (PLATFORM-SCOPE  |
-| `src/agents/archetypes/content_generator.py` | 156 | 1 | 2 | ================================================================================ Content Generator -- New web/social content (PLATFORM-SCOPE / our-org |
+| `src/agents/archetypes/compliance_reviewer.py` | 552 | 1 | 2 | Compliance Reviewer -- Proposal Compliance Verification Agent ================================================================================ |
+| `src/agents/archetypes/content_curator.py` | 141 | 1 | 2 | Content Curator -- Find social/web content to repost (PLATFORM-SCOPE / CMS scout) ==================================================================== |
+| `src/agents/archetypes/content_generator.py` | 156 | 1 | 2 | Content Generator -- New web/social content (PLATFORM-SCOPE / our-org CMS) =========================================================================== |
 | `src/agents/archetypes/continuity_manager.py` | 536 | 2 | 2 | continuity_manager — whole-proposal, cross-artifact QA vs the RFP (phase-gate reviewer). |
-| `src/agents/archetypes/cost_estimator.py` | 419 | 2 | 3 | ================================================================================ Cost Estimator -- Cost-volume realism guidance (TENANT-SCOPE) ======= |
-| `src/agents/archetypes/curation_qa.py` | 350 | 2 | 2 | ================================================================================ Curation QA -- Pre-release quality gate (PLATFORM-SCOPE / our-org RFP |
+| `src/agents/archetypes/cost_estimator.py` | 419 | 2 | 3 | Cost Estimator -- Cost-volume realism guidance (TENANT-SCOPE) ================================================================================ |
+| `src/agents/archetypes/curation_qa.py` | 350 | 2 | 2 | Curation QA -- Pre-release quality gate (PLATFORM-SCOPE / our-org RFP-admin ops) ===================================================================== |
 | `src/agents/archetypes/formatter.py` | 419 | 1 | 2 | formatter — CanvasDocument v2 scaffold integrity + revectoring (per-section). |
-| `src/agents/archetypes/ingest_analyst.py` | 171 | 2 | 2 | ================================================================================ Ingest Analyst -- Raw solicitation → structured curation draft (PLATF |
+| `src/agents/archetypes/ingest_analyst.py` | 171 | 2 | 2 | Ingest Analyst -- Raw solicitation → structured curation draft (PLATFORM-SCOPE) ====================================================================== |
 | `src/agents/archetypes/librarian.py` | 388 | 1 | 3 | librarian — Library cataloging, scoring, dedup, and freshness for the atom library. |
 | `src/agents/archetypes/library_seed_mapper.py` | 287 | 1 | 1 | library_seed_mapper — maps atoms from a selected source proposal onto a new build. |
 | `src/agents/archetypes/library_seed_suggester.py` | 271 | 1 | 1 | library_seed_suggester — ranks prior proposals as seed sources for a new build. |
-| `src/agents/archetypes/market_analyst.py` | 363 | 2 | 4 | ================================================================================ Market Analyst -- SOTA / market-context web scout for a proposal (TEN |
-| `src/agents/archetypes/matrix_stager.py` | 184 | 2 | 2 | ================================================================================ Matrix Stager -- Curated solicitation → master compliance matrix (PLA |
-| `src/agents/archetypes/onboarding_agent.py` | 287 | 1 | 2 | ================================================================================ Onboarding Concierge -- New-tenant cold-start ======================= |
+| `src/agents/archetypes/market_analyst.py` | 363 | 2 | 4 | Market Analyst -- SOTA / market-context web scout for a proposal (TENANT-SCOPE) ====================================================================== |
+| `src/agents/archetypes/matrix_stager.py` | 184 | 2 | 2 | Matrix Stager -- Curated solicitation → master compliance matrix (PLATFORM-SCOPE) ==================================================================== |
+| `src/agents/archetypes/onboarding_agent.py` | 287 | 1 | 2 | Onboarding Concierge -- New-tenant cold-start ================================================================================ |
 | `src/agents/archetypes/opportunity_analyst.py` | 313 | 1 | 2 | opportunity_analyst agent archetype — evaluates opportunity fit for tenants. |
-| `src/agents/archetypes/opportunity_scout.py` | 200 | 1 | 4 | ================================================================================ Opportunity Scout -- Judge & prioritize detected opportunities (PLATF |
-| `src/agents/archetypes/ops_companion.py` | 451 | 1 | 2 | ================================================================================ Ops Companion -- the admin's second pair of eyes (PLATFORM-SCOPE / ou |
-| `src/agents/archetypes/ops_digest.py` | 184 | 1 | 2 | ================================================================================ Ops Digest -- Scheduled ops health digest (PLATFORM-SCOPE / master_ad |
-| `src/agents/archetypes/outcome_analyst.py` | 199 | 1 | 2 | ================================================================================ Outcome Analyst -- Win/loss analysis → scoring calibration (TENANT-SC |
-| `src/agents/archetypes/packaging_specialist.py` | 677 | 1 | 2 | ================================================================================ Packaging Specialist -- Final Submission Package Compilation and Vali |
-| `src/agents/archetypes/partner_coordinator.py` | 594 | 1 | 2 | ================================================================================ Partner Coordinator -- Partner/Subcontractor Communication and Coordi |
-| `src/agents/archetypes/pp_matcher.py` | 190 | 1 | 2 | ================================================================================ Past-Performance Matcher -- PP-volume grounding + teaming gaps (TENAN |
+| `src/agents/archetypes/opportunity_scout.py` | 200 | 1 | 4 | Opportunity Scout -- Judge & prioritize detected opportunities (PLATFORM-SCOPE) ====================================================================== |
+| `src/agents/archetypes/ops_companion.py` | 451 | 1 | 2 | Ops Companion -- the admin's second pair of eyes (PLATFORM-SCOPE / our-org) ========================================================================== |
+| `src/agents/archetypes/ops_digest.py` | 184 | 1 | 2 | Ops Digest -- Scheduled ops health digest (PLATFORM-SCOPE / master_admin) ============================================================================ |
+| `src/agents/archetypes/outcome_analyst.py` | 199 | 1 | 2 | Outcome Analyst -- Win/loss analysis → scoring calibration (TENANT-SCOPE) ============================================================================ |
+| `src/agents/archetypes/packaging_specialist.py` | 677 | 1 | 2 | Packaging Specialist -- Final Submission Package Compilation and Validation ========================================================================== |
+| `src/agents/archetypes/partner_coordinator.py` | 594 | 1 | 2 | Partner Coordinator -- Partner/Subcontractor Communication and Coordination ========================================================================== |
+| `src/agents/archetypes/pp_matcher.py` | 190 | 1 | 2 | Past-Performance Matcher -- PP-volume grounding + teaming gaps (TENANT-SCOPE) ======================================================================== |
 | `src/agents/archetypes/project_manager.py` | 383 | 1 | 2 | project_manager — post-award milestone HEALTH, advisory (A1). |
-| `src/agents/archetypes/proposal_architect.py` | 658 | 1 | 2 | ================================================================================ Proposal Architect -- Proposal Structure Design and Requirements Mapp |
+| `src/agents/archetypes/proposal_architect.py` | 658 | 1 | 2 | Proposal Architect -- Proposal Structure Design and Requirements Mapping ============================================================================= |
 | `src/agents/archetypes/proposal_manager.py` | 540 | 2 | 2 | proposal_manager — the Proposal Draft Manager's PLANNER (skeleton + matrix + atoms → a draft PLAN). |
 | `src/agents/archetypes/redaction_guard.py` | 425 | 1 | 2 | redaction_guard — cross-boundary / OPSEC leak scanner over assembled content (reviewer). |
-| `src/agents/archetypes/research_scout.py` | 283 | 2 | 3 | ================================================================================ Research Scout -- R&D / market-research finder for a proposal (TENANT |
-| `src/agents/archetypes/rfp_ingest_manager.py` | 416 | 2 | 2 | ================================================================================ RFP Ingest Manager -- ingest-pipeline orchestration (PLATFORM-SCOPE / |
-| `src/agents/archetypes/scoring_strategist.py` | 427 | 1 | 2 | ================================================================================ Scoring Strategist -- LLM-Based Opportunity Score Adjustment ======== |
+| `src/agents/archetypes/research_scout.py` | 283 | 2 | 3 | Research Scout -- R&D / market-research finder for a proposal (TENANT-SCOPE) ========================================================================= |
+| `src/agents/archetypes/rfp_ingest_manager.py` | 416 | 2 | 2 | RFP Ingest Manager -- ingest-pipeline orchestration (PLATFORM-SCOPE / our-org) ======================================================================= |
+| `src/agents/archetypes/scoring_strategist.py` | 427 | 1 | 2 | Scoring Strategist -- LLM-Based Opportunity Score Adjustment ================================================================================ |
 | `src/agents/archetypes/section_drafter.py` | 692 | 1 | 6 | section_drafter agent archetype — drafts proposal sections using AI. |
-| `src/agents/archetypes/skeleton_architect.py` | 177 | 1 | 2 | ================================================================================ Skeleton Architect -- Matrix → master response skeleton (PLATFORM-SCO |
-| `src/agents/archetypes/social_scheduler.py` | 141 | 1 | 2 | ================================================================================ Social Scheduler -- Queue social posts from published content (PLATFO |
+| `src/agents/archetypes/skeleton_architect.py` | 177 | 1 | 2 | Skeleton Architect -- Matrix → master response skeleton (PLATFORM-SCOPE) ============================================================================= |
+| `src/agents/archetypes/social_scheduler.py` | 141 | 1 | 2 | Social Scheduler -- Queue social posts from published content (PLATFORM / CMS) ======================================================================= |
 | `src/agents/archetypes/status_narrator.py` | 249 | 1 | 2 | status_narrator — the paragraph a status report cannot compute (A2). |
 | `src/agents/archetypes/stylist.py` | 367 | 1 | 2 | stylist — CanvasDocument v2 style normalization across atom pedigrees (per-section/artifact). |
 | `src/agents/archetypes/traceability_auditor.py` | 347 | 1 | 2 | traceability_auditor — requirement→coverage mapping across the whole proposal (reviewer). |
-| `src/agents/context.py` | 916 | 1 | 4 | ================================================================================ ContextAssembler — Builds Complete Prompt for Agent Invocations ===== |
+| `src/agents/context.py` | 916 | 1 | 4 | ContextAssembler — Builds Complete Prompt for Agent Invocations ================================================================================ |
 | `src/agents/embeddings.py` | 228 | 0 | 4 | Embedding provider for agent memory and library vector search. |
-| `src/agents/fabric.py` | 1583 | 6 | 43 | ================================================================================ AgentFabric — Central Orchestrator for AI Agent Workforce =========== |
+| `src/agents/fabric.py` | 1583 | 6 | 43 | AgentFabric — Central Orchestrator for AI Agent Workforce ================================================================================ |
 | `src/agents/guardrails.py` | 165 | 0 | 5 | #120 Agent guardrails — the "guardrail" step of *advisory → guardrail → land-or-review*. |
 | `src/agents/learning/__init__.py` | 20 | 5 | 0 | Learning modules for the agent memory lifecycle. |
-| `src/agents/learning/calibrator.py` | 288 | 1 | 2 | ================================================================================ Calibrator — Recalibrates Agent Performance Metrics and Confidence Sc |
-| `src/agents/learning/diff_analyzer.py` | 295 | 1 | 2 | ================================================================================ DiffAnalyzer — Analyzes Human Edits to Agent Output for Learning ==== |
-| `src/agents/learning/outcome_attributor.py` | 313 | 1 | 2 | ================================================================================ OutcomeAttributor — Attributes Proposal Outcomes to Agent Memories an |
-| `src/agents/learning/pattern_promoter.py` | 332 | 1 | 2 | ================================================================================ PatternPromoter — Promotes Confirmed Episodic Patterns to Semantic Kn |
-| `src/agents/learning/preference_extractor.py` | 350 | 1 | 2 | ================================================================================ PreferenceExtractor — Extracts Tenant Preferences from Episodic Memor |
+| `src/agents/learning/calibrator.py` | 288 | 1 | 2 | Calibrator — Recalibrates Agent Performance Metrics and Confidence Scores ============================================================================ |
+| `src/agents/learning/diff_analyzer.py` | 295 | 1 | 2 | DiffAnalyzer — Analyzes Human Edits to Agent Output for Learning ================================================================================ |
+| `src/agents/learning/outcome_attributor.py` | 313 | 1 | 2 | OutcomeAttributor — Attributes Proposal Outcomes to Agent Memories and Content ======================================================================= |
+| `src/agents/learning/pattern_promoter.py` | 332 | 1 | 2 | PatternPromoter — Promotes Confirmed Episodic Patterns to Semantic Knowledge ========================================================================= |
+| `src/agents/learning/preference_extractor.py` | 350 | 1 | 2 | PreferenceExtractor — Extracts Tenant Preferences from Episodic Memory Patterns ====================================================================== |
 | `src/agents/lifecycle/__init__.py` | 18 | 4 | 0 | Lifecycle modules for agent memory management. |
-| `src/agents/lifecycle/compactor.py` | 333 | 1 | 2 | ================================================================================ MemoryCompactor — Compresses Clusters of Similar Episodic Memories == |
-| `src/agents/lifecycle/contradiction_resolver.py` | 334 | 1 | 2 | ================================================================================ ContradictionResolver — Detects and Resolves Contradictory Semantic M |
-| `src/agents/lifecycle/decay.py` | 188 | 1 | 2 | ================================================================================ MemoryDecay — Applies Time-Based Decay to Memory Importance Scores == |
-| `src/agents/lifecycle/gc.py` | 213 | 1 | 2 | ================================================================================ MemoryGC — Garbage Collects Expired and Archived Memories =========== |
+| `src/agents/lifecycle/compactor.py` | 333 | 1 | 2 | MemoryCompactor — Compresses Clusters of Similar Episodic Memories ================================================================================ |
+| `src/agents/lifecycle/contradiction_resolver.py` | 334 | 1 | 2 | ContradictionResolver — Detects and Resolves Contradictory Semantic Memories ========================================================================= |
+| `src/agents/lifecycle/decay.py` | 188 | 1 | 2 | MemoryDecay — Applies Time-Based Decay to Memory Importance Scores ================================================================================ |
+| `src/agents/lifecycle/gc.py` | 213 | 1 | 2 | MemoryGC — Garbage Collects Expired and Archived Memories ================================================================================ |
 | `src/agents/memory.py` | 743 | 2 | 6 | Agent memory operations — store and recall from episodic_memories table. |
 | `src/agents/platform_guard.py` | 94 | 0 | 2 | Platform AI spend guard (G1). |
-| `src/agents/tools.py` | 1100 | 1 | 5 | ================================================================================ ToolRegistry — Tenant-Isolated Tool Execution Layer ================= |
+| `src/agents/tools.py` | 1100 | 1 | 5 | ToolRegistry — Tenant-Isolated Tool Execution Layer ================================================================================ |
 | `src/agents/web.py` | 157 | 0 | 2 | Controlled web egress for the research_scout agent — the "server-side browser". |
 | `src/config.py` | 36 | 0 | 9 | Pipeline configuration from environment variables. |
 | `src/crypto.py` | 38 | 1 | 2 | AES-256-GCM encryption for API keys stored in database. |
@@ -2342,10 +2349,10 @@ which carries the per-edge reasons in full.
 | `src/ingest/sam_gov.py` | 434 | 4 | 4 | SAM.gov Opportunities API Ingester |
 | `src/ingest/sbir_gov.py` | 539 | 4 | 4 | SBIR.gov Solicitations API Ingester |
 | `src/ingest/topic_expander.py` | 859 | 2 | 3 | On-demand topic expansion for a single solicitation (Scouting Spine M3 / T3.1). |
-| `src/lifecycle_scheduler.py` | 735 | 8 | 3 | ================================================================================ Lifecycle Scheduler — Runs Memory Maintenance on Documented Schedules |
+| `src/lifecycle_scheduler.py` | 735 | 8 | 3 | Lifecycle Scheduler — Runs Memory Maintenance on Documented Schedules ================================================================================ |
 | `src/main.py` | 361 | 8 | 1 | RFP Pipeline — Main Worker Process (v2.1) |
 | `src/proposal/__init__.py` | 13 | 0 | 0 | Proposal cost/budget domain package. |
-| `src/proposal/budget_model.py` | 527 | 0 | 3 | ================================================================================ Budget Model — the deterministic budget / PoP-bucket cost-volume fill |
+| `src/proposal/budget_model.py` | 527 | 0 | 3 | Budget Model — the deterministic budget / PoP-bucket cost-volume fill engine ========================================================================= |
 | `src/safe_skip.py` | 130 | 0 | 4 | Safe-skip: what a step does when the model fails it. |
 | `src/sdk_compat.py` | 76 | 0 | 2 | What the INSTALLED anthropic SDK will actually accept. |
 | `src/seeds/__init__.py` | 0 | 0 | 0 | — |
@@ -2363,53 +2370,53 @@ which carries the per-edge reasons in full.
 | `src/workers/__init__.py` | 0 | 0 | 0 | — |
 | `src/workers/source_scout.py` | 439 | 1 | 1 | Source Scout pipeline worker. |
 | `src/workflows/__init__.py` | 13 | 0 | 6 | Workflow automation framework. |
-| `src/workflows/actions/__init__.py` | 59 | 6 | 4 | ================================================================================ Workflow Actions Package (__init__.py) ============================== |
-| `src/workflows/actions/advisory_actions.py` | 190 | 1 | 4 | ================================================================================ Workflow Actions — Advisory / Adversarial overlay elevation + auto-la |
+| `src/workflows/actions/__init__.py` | 59 | 6 | 4 | Workflow Actions Package (__init__.py) ================================================================================ |
+| `src/workflows/actions/advisory_actions.py` | 190 | 1 | 4 | Workflow Actions — Advisory / Adversarial overlay elevation + auto-land (P4-D) ======================================================================= |
 | `src/workflows/actions/analyze_section_diff.py` | 111 | 2 | 1 | Action: analyze_section_diff Workflow: OnProposalSectionEdited (PIPE-15) |
 | `src/workflows/actions/attribute_outcome.py` | 100 | 2 | 1 | Action: attribute_outcome Workflow: OnProposalOutcomeRecorded (PIPE-16) |
 | `src/workflows/actions/authorable.py` | 83 | 0 | 3 | Which proposal sections may receive an AI prose draft — the one rule, in one place. |
-| `src/workflows/actions/cms_content.py` | 285 | 3 | 1 | ================================================================================ Workflow Actions: CMS content draft + publish (the content vertical)  |
-| `src/workflows/actions/cohort_evidence.py` | 87 | 0 | 3 | ================================================================================ Did the cohort actually run? (the third signal — B17) =============== |
-| `src/workflows/actions/create_drafts_from_scout.py` | 296 | 1 | 1 | ================================================================================ Workflow Action: create_drafts_from_scout =========================== |
-| `src/workflows/actions/draft_v0.py` | 482 | 6 | 3 | ================================================================================ Action: draft_v0 (B5 — the 3-source V0 strawman orchestration) ====== |
-| `src/workflows/actions/generate_preview.py` | 298 | 3 | 1 | ================================================================================ Workflow Action: generate_preview (generate_preview.py) ============= |
-| `src/workflows/actions/ingest_actions.py` | 237 | 2 | 1 | ================================================================================ Ingest Studio — the phase advance ACTION (docs/INGEST_STUDIO_DESIGN.m |
-| `src/workflows/actions/portal_stage_actions.py` | 126 | 2 | 0 | ================================================================================ Portal stage-review actions (TW-8 — the AI-manager stage gate) docs/T |
-| `src/workflows/actions/publish_section_draft.py` | 187 | 3 | 2 | ================================================================================ Action: publish_section_draft (E5 — the strawman/draft LANDING primit |
-| `src/workflows/actions/rescore.py` | 402 | 1 | 2 | ================================================================================ Workflow Action: tenant-side bucket rescore (rescore.py) ============ |
-| `src/workflows/actions/score_tenants.py` | 190 | 1 | 2 | ================================================================================ Workflow Action: match_tenants (score_tenants.py) =================== |
-| `src/workflows/actions/shred.py` | 550 | 6 | 1 | ================================================================================ Workflow Action: shred / extract_compliance ========================= |
-| `src/workflows/actions/studio_actions.py` | 109 | 1 | 1 | ================================================================================ Proposal Studio — the phase advance ACTION (docs/PROPOSAL_STUDIO_DESI |
-| `src/workflows/advisory_overlay.py` | 201 | 1 | 4 | ================================================================================ Workflow: AdvisoryOverlay (reusable sub-workflow — the Advisory / Adv |
-| `src/workflows/base.py` | 399 | 2 | 69 | ================================================================================ Module: Workflow Base Classes (base.py) ============================= |
-| `src/workflows/manager.py` | 2230 | 3 | 16 | ================================================================================ WorkflowManager — Persistent Workflow Orchestration with Crash Recove |
-| `src/workflows/on_application_accepted.py` | 119 | 1 | 1 | ================================================================================ Workflow: OnApplicationAccepted ===================================== |
-| `src/workflows/on_cms_content_requested.py` | 134 | 1 | 2 | ================================================================================ Workflow: OnCmsContentRequested (CMS content vertical — keystone proo |
-| `src/workflows/on_collaborator_invited.py` | 131 | 1 | 1 | ================================================================================ Workflow: OnCollaboratorInvited ===================================== |
-| `src/workflows/on_content_resurface_requested.py` | 60 | 1 | 1 | ================================================================================ Workflow: OnContentResurfaceRequested (our-org CMS — scheduled conten |
-| `src/workflows/on_contract_started.py` | 130 | 1 | 0 | ================================================================================ Workflow: OnContractStarted ========================================= |
-| `src/workflows/on_full_draft_requested.py` | 374 | 1 | 2 | ================================================================================ Workflow: OnFullDraftRequested (the Proposal Draft Manager orchestrat |
-| `src/workflows/on_ingest_assessment_requested.py` | 85 | 1 | 1 | ================================================================================ Workflow: OnIngestAssessmentRequested (Admin-agent Phase 1 — ingest o |
-| `src/workflows/on_ingest_phase_requested.py` | 184 | 1 | 1 | ================================================================================ Workflow: OnIngestPhaseRequested (Ingest Studio — the gated ingest) = |
-| `src/workflows/on_opportunities_detected.py` | 175 | 1 | 2 | ================================================================================ Workflow: OnOpportunitiesDetected (Scouting Spine M2 — detection → al |
-| `src/workflows/on_ops_digest_requested.py` | 73 | 1 | 1 | ================================================================================ Workflow: OnOpsDigestRequested (POD 4 — first SCHEDULED admin automat |
-| `src/workflows/on_portal_stage_review.py` | 83 | 1 | 3 | ================================================================================ Workflow: OnPortalStageReviewRequested (TW-8 — the AI-manager portal  |
-| `src/workflows/on_project_health_requested.py` | 98 | 1 | 1 | ================================================================================ Workflow: OnProjectHealthRequested (A1 — post-award milestone health) |
-| `src/workflows/on_proposal_advanced.py` | 269 | 1 | 3 | ================================================================================ Workflow: OnProposalAdvancedToReview / OnProposalAdvancedToFinal ==== |
-| `src/workflows/on_proposal_created.py` | 218 | 1 | 5 | ================================================================================ Workflow: OnProposalCreated ========================================= |
-| `src/workflows/on_proposal_outcome_recorded.py` | 79 | 1 | 2 | ================================================================================ Workflow: OnProposalOutcomeRecorded (PIPE-16) ======================= |
-| `src/workflows/on_proposal_section_edited.py` | 67 | 1 | 1 | ================================================================================ Workflow: OnProposalSectionEdited (PIPE-15) ========================= |
-| `src/workflows/on_review_phase_requested.py` | 173 | 1 | 1 | ================================================================================ Workflow: OnReviewPhaseRequested (Proposal Studio — 3 gated loops) == |
-| `src/workflows/on_rfp_uploaded.py` | 169 | 1 | 2 | ================================================================================ Workflow: OnRfpUploaded ============================================= |
-| `src/workflows/on_social_schedule_requested.py` | 58 | 1 | 1 | ================================================================================ Workflow: OnSocialScheduleRequested (our-org CMS — scheduled social p |
-| `src/workflows/on_solicitation_pushed.py` | 118 | 1 | 0 | ================================================================================ Workflow: OnSolicitationPushed ====================================== |
-| `src/workflows/on_solicitation_review_requested.py` | 89 | 1 | 1 | ================================================================================ Workflow: OnSolicitationReviewRequested (POD 4 — admin-side automatio |
-| `src/workflows/on_solicitation_update_scan.py` | 60 | 1 | 1 | ================================================================================ Workflow: OnSolicitationUpdateScan (scout expansion — proactive updat |
-| `src/workflows/on_source_change_detected.py` | 174 | 1 | 4 | ================================================================================ Workflow: OnSourceChangeDetected ==================================== |
-| `src/workflows/on_status_narrative_requested.py` | 76 | 1 | 1 | ================================================================================ Workflow: OnStatusNarrativeRequested (A2 — the paragraph a report can |
-| `src/workflows/on_tenant_rescore.py` | 77 | 1 | 0 | ================================================================================ Workflows: OnCardApplied / OnBucketsUpdated (tenant-side bucket scori |
-| `src/workflows/processor.py` | 1026 | 3 | 42 | ================================================================================ Module: Workflow Processor (processor.py) =========================== |
-| `src/workflows/project_collaboration.py` | 133 | 1 | 1 | ================================================================================ Workflow: ProjectCollaboration (the generic project/opportunity HITL  |
+| `src/workflows/actions/cms_content.py` | 285 | 3 | 1 | Workflow Actions: CMS content draft + publish (the content vertical) ================================================================================ |
+| `src/workflows/actions/cohort_evidence.py` | 87 | 0 | 3 | Did the cohort actually run? (the third signal — B17) ================================================================================ A workflow that |
+| `src/workflows/actions/create_drafts_from_scout.py` | 296 | 1 | 1 | Workflow Action: create_drafts_from_scout ================================================================================ |
+| `src/workflows/actions/draft_v0.py` | 482 | 6 | 3 | Action: draft_v0 (B5 — the 3-source V0 strawman orchestration) ================================================================================ |
+| `src/workflows/actions/generate_preview.py` | 298 | 3 | 1 | Workflow Action: generate_preview (generate_preview.py) ================================================================================ |
+| `src/workflows/actions/ingest_actions.py` | 237 | 2 | 1 | Ingest Studio — the phase advance ACTION (docs/INGEST_STUDIO_DESIGN.md) ============================================================================== |
+| `src/workflows/actions/portal_stage_actions.py` | 126 | 2 | 0 | Portal stage-review actions (TW-8 — the AI-manager stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ============================================== |
+| `src/workflows/actions/publish_section_draft.py` | 187 | 3 | 2 | Action: publish_section_draft (E5 — the strawman/draft LANDING primitive) ============================================================================ |
+| `src/workflows/actions/rescore.py` | 402 | 1 | 2 | Workflow Action: tenant-side bucket rescore (rescore.py) ================================================================================ |
+| `src/workflows/actions/score_tenants.py` | 190 | 1 | 2 | Workflow Action: match_tenants (score_tenants.py) ================================================================================ |
+| `src/workflows/actions/shred.py` | 550 | 6 | 1 | Workflow Action: shred / extract_compliance ================================================================================ |
+| `src/workflows/actions/studio_actions.py` | 109 | 1 | 1 | Proposal Studio — the phase advance ACTION (docs/PROPOSAL_STUDIO_DESIGN.md) ========================================================================== |
+| `src/workflows/advisory_overlay.py` | 201 | 1 | 4 | Workflow: AdvisoryOverlay (reusable sub-workflow — the Advisory / Adversarial Overlay) =============================================================== |
+| `src/workflows/base.py` | 399 | 2 | 69 | Module: Workflow Base Classes (base.py) ================================================================================ |
+| `src/workflows/manager.py` | 2230 | 3 | 16 | WorkflowManager — Persistent Workflow Orchestration with Crash Recovery ============================================================================== |
+| `src/workflows/on_application_accepted.py` | 119 | 1 | 1 | Workflow: OnApplicationAccepted ================================================================================ |
+| `src/workflows/on_cms_content_requested.py` | 134 | 1 | 2 | Workflow: OnCmsContentRequested (CMS content vertical — keystone proof) ============================================================================== |
+| `src/workflows/on_collaborator_invited.py` | 131 | 1 | 1 | Workflow: OnCollaboratorInvited ================================================================================ |
+| `src/workflows/on_content_resurface_requested.py` | 60 | 1 | 1 | Workflow: OnContentResurfaceRequested (our-org CMS — scheduled content scout) ======================================================================== |
+| `src/workflows/on_contract_started.py` | 130 | 1 | 0 | Workflow: OnContractStarted ================================================================================ |
+| `src/workflows/on_full_draft_requested.py` | 374 | 1 | 2 | Workflow: OnFullDraftRequested (the Proposal Draft Manager orchestration — 3 modes) ================================================================== |
+| `src/workflows/on_ingest_assessment_requested.py` | 85 | 1 | 1 | Workflow: OnIngestAssessmentRequested (Admin-agent Phase 1 — ingest orchestration) =================================================================== |
+| `src/workflows/on_ingest_phase_requested.py` | 184 | 1 | 1 | Workflow: OnIngestPhaseRequested (Ingest Studio — the gated ingest) ================================================================================ |
+| `src/workflows/on_opportunities_detected.py` | 175 | 1 | 2 | Workflow: OnOpportunitiesDetected (Scouting Spine M2 — detection → alert) ============================================================================ |
+| `src/workflows/on_ops_digest_requested.py` | 73 | 1 | 1 | Workflow: OnOpsDigestRequested (POD 4 — first SCHEDULED admin automation) ============================================================================ |
+| `src/workflows/on_portal_stage_review.py` | 83 | 1 | 3 | Workflow: OnPortalStageReviewRequested (TW-8 — the AI-manager portal stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ============================ |
+| `src/workflows/on_project_health_requested.py` | 98 | 1 | 1 | Workflow: OnProjectHealthRequested (A1 — post-award milestone health) ================================================================================ |
+| `src/workflows/on_proposal_advanced.py` | 269 | 1 | 3 | Workflow: OnProposalAdvancedToReview / OnProposalAdvancedToFinal ================================================================================ |
+| `src/workflows/on_proposal_created.py` | 218 | 1 | 5 | Workflow: OnProposalCreated ================================================================================ |
+| `src/workflows/on_proposal_outcome_recorded.py` | 79 | 1 | 2 | Workflow: OnProposalOutcomeRecorded (PIPE-16) ================================================================================ |
+| `src/workflows/on_proposal_section_edited.py` | 67 | 1 | 1 | Workflow: OnProposalSectionEdited (PIPE-15) ================================================================================ |
+| `src/workflows/on_review_phase_requested.py` | 173 | 1 | 1 | Workflow: OnReviewPhaseRequested (Proposal Studio — 3 gated loops) ================================================================================ |
+| `src/workflows/on_rfp_uploaded.py` | 169 | 1 | 2 | Workflow: OnRfpUploaded ================================================================================ |
+| `src/workflows/on_social_schedule_requested.py` | 58 | 1 | 1 | Workflow: OnSocialScheduleRequested (our-org CMS — scheduled social publisher) ======================================================================= |
+| `src/workflows/on_solicitation_pushed.py` | 118 | 1 | 0 | Workflow: OnSolicitationPushed ================================================================================ |
+| `src/workflows/on_solicitation_review_requested.py` | 89 | 1 | 1 | Workflow: OnSolicitationReviewRequested (POD 4 — admin-side automation) ============================================================================== |
+| `src/workflows/on_solicitation_update_scan.py` | 60 | 1 | 1 | Workflow: OnSolicitationUpdateScan (scout expansion — proactive update watcher) ====================================================================== |
+| `src/workflows/on_source_change_detected.py` | 174 | 1 | 4 | Workflow: OnSourceChangeDetected ================================================================================ |
+| `src/workflows/on_status_narrative_requested.py` | 76 | 1 | 1 | Workflow: OnStatusNarrativeRequested (A2 — the paragraph a report cannot compute) ==================================================================== |
+| `src/workflows/on_tenant_rescore.py` | 77 | 1 | 0 | Workflows: OnCardApplied / OnBucketsUpdated (tenant-side bucket scoring) ============================================================================= |
+| `src/workflows/processor.py` | 1026 | 3 | 42 | Module: Workflow Processor (processor.py) ================================================================================ |
+| `src/workflows/project_collaboration.py` | 133 | 1 | 1 | Workflow: ProjectCollaboration (the generic project/opportunity HITL reaction) ======================================================================= |
 
 ### pipeline · tests · 118 file(s)
 
