@@ -40,6 +40,7 @@
  *   node frontend/scripts/build-project-tree.mjs --check    # self-test only, exit 1 on failure
  *   node frontend/scripts/build-project-tree.mjs --file lib/events.ts     # explore one file
  *   node frontend/scripts/build-project-tree.mjs --table proposals        # explore one table
+ *   node frontend/scripts/build-project-tree.mjs --trace app/api/.../route.ts   # the static trace
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -615,6 +616,69 @@ if (fileArg) {
   process.exit(0);
 }
 
+/**
+ * ── `--trace <file>` · THE STATIC VERSION OF A DATA-FLOW TRACE ────────────────────────────────
+ *
+ * `docs/DATA_FLOW.md` carries six traces — a section save, a discovery fan-out, a build→package —
+ * each written by hand and each therefore a claim about the code rather than a reading of it. This
+ * derives the same shape from the graph: start anywhere, walk what it uses transitively, and group
+ * the result BY PLANE so the descent (01 UI → 02 API → 03 Domain → 04 Data) is visible, with the
+ * tables that get touched at the bottom.
+ *
+ * It is not a replacement for the written traces and does not try to be: a hand-written trace knows
+ * the ORDER of the calls and the invariant at each hop, and no import graph can. What this knows is
+ * that the set is COMPLETE and current — which is precisely what a hand-written one cannot promise.
+ * Read them together; they fail in opposite directions.
+ */
+const traceArg = argOf('--trace');
+if (traceArg) {
+  const key = [...byRel.keys()].find((k) => k === traceArg || k.endsWith(`/${traceArg}`) || k.includes(traceArg));
+  if (!key) { console.error(`no file matching "${traceArg}"`); process.exit(1); }
+
+  const depth = new Map([[key, 0]]);
+  const order = [key];
+  for (let i = 0; i < order.length; i += 1) {
+    const cur = order[i];
+    if (depth.get(cur) >= 6) continue;              // a trace nobody can read is not a trace
+    for (const u of byRel.get(cur)?.uses ?? []) {
+      if (depth.has(u.path)) continue;
+      depth.set(u.path, depth.get(cur) + 1);
+      order.push(u.path);
+    }
+  }
+
+  const root = get(key);
+  console.log(`\n${'═'.repeat(90)}\nTRACE from ${root.path}  (${root.plane})\n${'═'.repeat(90)}`);
+  console.log(`  ${root.description ?? '⚠ no header'}\n`);
+  console.log(`  ${order.length - 1} file(s) reachable, to depth 6. Grouped by plane — the descent is the shape.\n`);
+
+  const PLANE_ORDER = ['01 UI', '02 API', '03 Domain', '05 Events', '04 Data', '06 Engine', '07 Agents',
+    'config', 'harness', 'test', 'migration', 'other'];
+  for (const plane of PLANE_ORDER) {
+    const mine = order.filter((p) => p !== key && byRel.get(p)?.plane === plane);
+    if (!mine.length) continue;
+    console.log(`  ── ${plane} · ${mine.length}`);
+    for (const p of mine.sort((a, b) => depth.get(a) - depth.get(b) || a.localeCompare(b))) {
+      const r = byRel.get(p);
+      console.log(`     ${'·'.repeat(depth.get(p))} ${p}`);
+      if (r.description) console.log(`       ${r.description.slice(0, 96)}`);
+    }
+    console.log('');
+  }
+
+  // The bottom of every trace: what actually lands in Postgres.
+  const w = new Set(); const rd = new Set();
+  for (const p of order) {
+    for (const t of byRel.get(p)?.tables.write ?? []) w.add(t);
+    for (const t of byRel.get(p)?.tables.read ?? []) rd.add(t);
+  }
+  for (const t of w) rd.delete(t);
+  console.log(`  ── 04 Data · the tables this path can reach`);
+  console.log(`     WRITES  ${[...w].sort().join(', ') || '—'}`);
+  console.log(`     reads   ${[...rd].sort().join(', ') || '—'}`);
+  process.exit(0);
+}
+
 const tableArg = argOf('--table');
 if (tableArg) {
   const t = tableIndex.get(tableArg);
@@ -657,7 +721,16 @@ L.push('> **Explore it rather than reading it:**');
 L.push('> ```');
 L.push('> node frontend/scripts/build-project-tree.mjs --file lib/events.ts      # one file, both directions');
 L.push('> node frontend/scripts/build-project-tree.mjs --table proposals         # who reads/writes a table');
+L.push('> node frontend/scripts/build-project-tree.mjs --trace  <route.ts>       # the descent, by plane');
 L.push('> ```');
+L.push('>');
+L.push('>');
+L.push('> `--trace` is the STATIC counterpart to `docs/DATA_FLOW.md`\'s six hand-written traces: start');
+L.push('> anywhere, walk what it uses transitively, grouped by plane so the descent 01 UI → 02 API →');
+L.push('> 03 Domain → 04 Data is visible, ending in the tables that path can reach. It does not replace');
+L.push('> them and does not try to — a written trace knows the ORDER of the calls and the invariant at');
+L.push('> each hop, which no import graph can. What this knows is that the set is COMPLETE and current,');
+L.push('> which is what a hand-written one cannot promise. They fail in opposite directions.');
 L.push('>');
 L.push('> Two things it will not do: it never writes a description it did not read from the file');
 L.push('> itself (no header → `—`, counted below), and it never drops an import it cannot resolve');
@@ -777,7 +850,13 @@ for (const [area, mine] of [...byArea].sort((a, b) => a[0].localeCompare(b[0])))
   L.push('|---|---:|---:|---:|---|');
   for (const r of mine.sort((a, b) => a.path.localeCompare(b.path))) {
     const what = (r.description ?? '—').replace(/\|/g, '\\|').slice(0, 150);
-    L.push(`| \`${r.path.replace(`${area.split(' · ')[0]}/`, '')}\` | ${r.lines} | ${r.uses.length} | ${r.usedBy.length} | ${what} |`);
+    // THE FULL repo-relative path, always. It was trimmed of its area prefix to save table width,
+    // which produced strings like `lib/api.ts` for a file that lives at
+    // `services/cms/frontend/src/lib/api.ts` — a "file path" column that does not resolve, in the
+    // document whose entire job is to say where things are. `audit-doc-currency` caught it as a
+    // broken reference on the first run after this file existed. Width is worth less than
+    // correctness, and the area heading above already supplies the grouping.
+    L.push(`| \`${r.path}\` | ${r.lines} | ${r.uses.length} | ${r.usedBy.length} | ${what} |`);
   }
   L.push('');
 }

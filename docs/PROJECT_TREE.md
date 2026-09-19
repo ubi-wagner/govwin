@@ -12,7 +12,16 @@
 > ```
 > node frontend/scripts/build-project-tree.mjs --file lib/events.ts      # one file, both directions
 > node frontend/scripts/build-project-tree.mjs --table proposals         # who reads/writes a table
+> node frontend/scripts/build-project-tree.mjs --trace  <route.ts>       # the descent, by plane
 > ```
+>
+>
+> `--trace` is the STATIC counterpart to `docs/DATA_FLOW.md`'s six hand-written traces: start
+> anywhere, walk what it uses transitively, grouped by plane so the descent 01 UI → 02 API →
+> 03 Domain → 04 Data is visible, ending in the tables that path can reach. It does not replace
+> them and does not try to — a written trace knows the ORDER of the calls and the invariant at
+> each hop, which no import graph can. What this knows is that the set is COMPLETE and current,
+> which is what a hand-written one cannot promise. They fail in opposite directions.
 >
 > Two things it will not do: it never writes a description it did not read from the file
 > itself (no header → `—`, counted below), and it never drops an import it cannot resolve
@@ -23,7 +32,7 @@
 | | |
 |---|---:|
 | files | **2363** |
-| total lines | 454,276 |
+| total lines | 454,361 |
 | dependency edges (file → file) | 4,735 |
 | distinct tables touched | 139 |
 | files with no header of their own | 555 |
@@ -43,7 +52,7 @@
 | 06 Engine | 104 | 25,270 | 162 | 330 |
 | 07 Agents | 61 | 21,809 | 121 | 221 |
 | migration | 256 | 46,692 | 0 | 0 |
-| harness | 458 | 79,670 | 415 | 82 |
+| harness | 458 | 79,755 | 415 | 82 |
 | test | 396 | 57,471 | 696 | 0 |
 | config | 12 | 746 | 6 | 327 |
 | other | 1 | 9,783 | 0 | 0 |
@@ -53,7 +62,7 @@
 | area | files | lines |
 |---|---:|---:|
 | frontend · lib | 342 | 72,007 |
-| frontend · harnesses | 331 | 63,943 |
+| frontend · harnesses | 331 | 64,028 |
 | frontend · api routes | 292 | 44,488 |
 | db · migrations | 256 | 46,692 |
 | frontend · unit tests | 256 | 35,917 |
@@ -247,2299 +256,2299 @@ which carries the per-edge reasons in full.
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `migrations/000_drop_all.sql` | 21 | 0 | 0 | DROP ALL — Wipes the entire public schema before baseline runs This is a clean-build migration. Runs ONLY when ALLOW_SCHEMA_RESET=true (db/migrations/ |
-| `migrations/001_baseline.sql` | 946 | 0 | 0 | RFP Pipeline SaaS — Clean Baseline Migration Creates ALL tables for the complete system ============================================================== |
-| `migrations/002_seed_system.sql` | 55 | 0 | 0 | System configuration seeds |
-| `migrations/003_seed_compliance.sql` | 29 | 0 | 0 | Compliance variable master list |
-| `migrations/004_seed_agents.sql` | 14 | 0 | 0 | Agent archetypes — base prompts will be refined during Phase 4 |
-| `migrations/005_dedupe_pipeline_schedules.sql` | 56 | 0 | 0 | 005_dedupe_pipeline_schedules.sql Cleanup migration for the pipeline_schedules table on existing deploys (Railway). Two prior bugs left this table in  |
-| `migrations/006_normalize_user_emails.sql` | 54 | 0 | 0 | 006_normalize_user_emails.sql Defense-in-depth for the case-normalization contract between frontend/auth.ts and the users.email column. auth.ts:38 low |
-| `migrations/007_system_events.sql` | 91 | 0 | 0 | 007_system_events.sql Structured event stream for the RFP Pipeline platform. Every significant action across the system writes to this table via front |
-| `migrations/008_capacity_and_system_health.sql` | 67 | 0 | 0 | 008_capacity_and_system_health.sql Adds the tables that back the /admin/system page and the tool-invocation metrics used by Phase 4 capacity planning. |
-| `migrations/009_phase1_curation_extensions.sql` | 228 | 0 | 0 | 009_phase1_curation_extensions.sql Phase 1 database additions. Purely ADDITIVE — no DROP TABLE, DROP COLUMN, or DELETE statements. Every statement use |
-| `migrations/010_phase1_shredder.sql` | 87 | 0 | 0 | 010_phase1_shredder.sql Phase 1 §D — AI Shredder and Compliance Extraction. Adds: 1. pipeline_jobs.kind — discriminator between 'ingest' and 'shred_so |
-| `migrations/011_applications.sql` | 74 | 0 | 0 | 011_applications.sql Founding-cohort application pipeline. Applications come in via the public /apply form, Eric reviews, status transitions through a |
-| `migrations/012_volumes_documents.sql` | 161 | 0 | 0 | 012_volumes_documents.sql Phase 1 extension: richer compliance model supporting DSIP-style multi-volume proposal structures where each volume can requ |
-| `migrations/013_topics_as_opportunities.sql` | 153 | 0 | 0 | 013_topics_as_opportunities.sql Solicitation (umbrella BAA/CSO) vs. Topic (discrete pursuit unit) ==================================================== |
-| `migrations/014_phase_aware_volumes.sql` | 14 | 0 | 0 | 014_phase_aware_volumes.sql Adds applies_to_phase filtering so a single solicitation can serve both Phase I and Phase II topics with different volume  |
-| `migrations/015_document_dedup_and_rounds.sql` | 72 | 0 | 0 | 015_document_dedup_and_rounds.sql Global file dedup via content_hash on solicitation_documents. Round/release tracking on curated_solicitations for mu |
-| `migrations/016_system_tenant.sql` | 19 | 0 | 0 | 016_system_tenant.sql Platform-level operations (admin curation, shredder, ingestion) write to episodic_memories with no customer tenant context. The  |
-| `migrations/017_canvas_templates.sql` | 84 | 0 | 0 | 017_canvas_templates.sql Canvas document system: templates + version history + library outcomes. See docs/CANVAS_DOCUMENT_ARCHITECTURE.md for the full |
-| `migrations/018_sbir_award_data.sql` | 121 | 0 | 0 | 018_sbir_award_data.sql SBIR/STTR award history + company directory tables. Populated from CSV uploads (sbir.gov data extracts). Used for: application |
-| `migrations/019_automation_and_content.sql` | 105 | 0 | 0 | Automation rules: when event X fires, do action Y |
-| `migrations/020_source_profiles.sql` | 126 | 0 | 0 | 020_source_profiles.sql Source profiles for opportunity monitoring sites. Each profile is a bookmarked site the admin monitors for new RFPs/topics. Tr |
-| `migrations/021_document_types_and_primary.sql` | 23 | 0 | 0 | 021_document_types_and_primary.sql Expand solicitation_documents with more document types and a primary flag. Purely additive. Idempotent. |
-| `migrations/022_stripe_columns.sql` | 7 | 0 | 0 | 022_stripe_columns.sql Add Stripe customer ID and subscription status to tenants for billing integration. |
-| `migrations/023_seed_canvas_templates.sql` | 251 | 0 | 0 | 023_seed_canvas_templates.sql Seed system-level canvas document templates for common DoD proposal types. These define the section structure, complianc |
-| `migrations/024_environment_marker.sql` | 9 | 0 | 0 | 024_environment_marker.sql Adds a deploy_environment column to system_config so we can verify which environment a database belongs to from the admin h |
-| `migrations/025_source_scout.sql` | 77 | 0 | 0 | 025_source_scout.sql Source Scout: HITL-guided web monitoring for opportunity sources. Extends source_profiles with auto-crawl settings and adds table |
-| `migrations/026_activate_ingesters.sql` | 50 | 0 | 0 | 026_activate_ingesters.sql Activate the dormant ingesters with daily schedules and add the new DSIP ingester. Also extends the pipeline_jobs.kind CHEC |
-| `migrations/027_topic_level_compliance.sql` | 107 | 0 | 0 | 027_topic_level_compliance.sql Support per-topic compliance overrides and per-topic volumes. Topics inherit from the solicitation baseline but can ove |
-| `migrations/028_automation_rules_v2.sql` | 91 | 0 | 0 | Migration 028 — Seed automation_rules for new event types Bridge: reconciles 001_baseline schema (trigger_bus, trigger_events, enabled) with 019 schem |
-| `migrations/029_proposal_portal.sql` | 36 | 0 | 0 | Migration 029: Proposal Portal — Configurable gates + lock tracking ============================================================================ |
-| `migrations/030_library_enhancements.sql` | 24 | 0 | 0 | 030: Library Enhancements — Structured atom storage, seminal tracking ============================================================================ |
-| `migrations/030a_ensure_full_schema.sql` | 1345 | 0 | 0 | 030a_ensure_full_schema.sql — Schema Bridge Migration PURPOSE: Ensure the ENTIRE schema is correct regardless of which prior migrations actually appli |
-| `migrations/031_cms_content_types.sql` | 48 | 0 | 0 | Create cms_content if it doesn't exist (019 may be in history but table was never created due to transaction rollback with history entry surviving) |
-| `migrations/032_seed_cms_content.sql` | 21 | 0 | 0 | — |
-| `migrations/033_visitor_analytics_enhancements.sql` | 18 | 0 | 0 | 033: Enhance visitor_sessions and page_views for traffic analytics |
-| `migrations/034_cms_status_and_seed_marketing.sql` | 239 | 0 | 0 | Migration 034: CMS content status expansion + seed marketing page blocks Replaces binary published boolean with multi-state status for content lifecyc |
-| `migrations/035_fix_purchases_and_cascades.sql` | 112 | 0 | 0 | 035: Fix purchases table + proposal cascade deletes + user FK delete rules Resolves: Stripe webhook crash (missing metadata column, expert_consulting  |
-| `migrations/036_reset_admin_password.sql` | 6 | 0 | 0 | Reset master admin password to known credential and force password change |
-| `migrations/037_reset_admin_password_v2.sql` | 6 | 0 | 0 | Reset master admin password (036 had wrong hash due to shell escaping) |
-| `migrations/038_fix_admin_login.sql` | 7 | 0 | 0 | Fix admin login loop: set known password AND disable temp_password flag temp_password = false so user is NOT forced to change on login |
-| `migrations/039_seed_all_marketing_pages.sql` | 549 | 0 | 0 | 039: Seed all marketing pages with CMS content Extracts hardcoded fallback content from page components into cms_content so all marketing text is edit |
-| `migrations/040_crm_phase1.sql` | 38 | 0 | 0 | Migration 040: CRM Phase 1 — lead lifecycle + automation rule seeds Depends on: 039 Adds: tenants.lifecycle_stage — track lead/customer lifecycle auto |
-| `migrations/041_seed_test_accounts.sql` | 131 | 0 | 0 | Migration 041: Seed test accounts for HITL testing Depends on: 040 Creates: 1. Admin user (eric.c.wagner@gmail.com / master_admin) 2. Test tenant: Ape |
-| `migrations/042_seed_content.sql` | 30 | 0 | 0 | Migration 042: Seed blog posts and Latest Insights page block Provides initial content for the blog listing page and the "Latest Insights" section on  |
-| `migrations/043_process_instances.sql` | 88 | 0 | 0 | Migration 043: Process Instances for Workflow State Persistence Enables crash recovery, audit trail, and admin workflow management Used by both RFP Pi |
-| `migrations/044_concurrency_and_audit.sql` | 96 | 0 | 0 | Migration 044: Optimistic Concurrency Control + Collaborative Audit Trail Supports concurrent editing, conflict detection, and complete audit trail fo |
-| `migrations/045_revision_tracking.sql` | 65 | 0 | 0 | Migration 045: Complete Revision Tracking for Collaborative Editing Tracks every version of every document across the platform: AI generations, human  |
-| `migrations/046_stage_completion.sql` | 38 | 0 | 0 | Migration 046: Stage Completion Tracking Tracks which stage each section was completed/accepted in, and records full snapshots when a stage is complet |
-| `migrations/047_supporting_documents.sql` | 43 | 0 | 0 | Migration 047: Supporting documents — required/optional files from the compliance matrix Seeded at proposal creation from solicitation_compliance.requ |
-| `migrations/048_fix_test_credentials.sql` | 43 | 0 | 0 | Migration 048: Fix test account credentials Depends on: 041 (seed test accounts) Problem: Pipeline's seed_master_admin.py may have created the admin u |
-| `migrations/049_clean_slate_hitl.sql` | 128 | 0 | 0 | Migration 049: Clean slate for HITL testing Depends on: 048 Removes all tenant-generated data while preserving: - User accounts (migration 041 test ac |
-| `migrations/050_seed_cms_publish_rule.sql` | 46 | 0 | 0 | Migration 050: Seed the automation rule that bridges CMS published content to Main DB When the CMS publishes a post (content_pipeline.post.published e |
-| `migrations/051_reset_admin_launch.sql` | 19 | 0 | 0 | Migration 051: Reset admin account for HITL launch Ensures eric.c.wagner@gmail.com exists as master_admin with known credentials. Password: GovWin2026 |
-| `migrations/052_single_owner_finder_notifications.sql` | 22 | 0 | 0 | Migration 052: Single-owner notifications for finder uploads / scout changes Kills the template-vs-rule DUPLICATE notification (EVENT_CONTRACT_V3 gap  |
-| `migrations/053_tasks_ledger.sql` | 90 | 0 | 0 | Migration 053: Unified task ledger (ToDo queues for every role) A ToDo is a parameterized TEMPLATE STEP (StepType.TODO): the static workflow code decl |
-| `migrations/054_process_template_catalog.sql` | 75 | 0 | 0 | Migration 054: Process Template Catalog (activation + audit layer) WHAT: A thin catalog row per workflow TEMPLATE. The template DEFINITION stays in co |
-| `migrations/055_content_pages.sql` | 71 | 0 | 0 | Migration 055: content_pages — single page-versioned content store (V8) -----------------------------------------------------------------------------  |
-| `migrations/056_fix_double_encoded_blocks.sql` | 17 | 0 | 0 | Migration 056: repair double-encoded content_pages.blocks ----------------------------------------------------------------------------- Before the sql |
-| `migrations/057_documents_into_content_pages.sql` | 57 | 0 | 0 | Migration 057: bring documents into content_pages (unify the content store) -------------------------------------------------------------------------- |
-| `migrations/058_visitor_connection_enrichment.sql` | 19 | 0 | 0 | Migration 058: visitor connection enrichment (ISP / org / ASN / geo) ----------------------------------------------------------------------------- Sto |
-| `migrations/059_seed_launch_resources.sql` | 119 | 0 | 0 | Migration 059: seed 3 launch resource articles into content_pages ----------------------------------------------------------------------------- The /r |
-| `migrations/060_refresh_untouched_page_seeds.sql` | 20 | 0 | 0 | Migration 060: refresh untouched auto-seeded marketing pages ----------------------------------------------------------------------------- The launch- |
-| `migrations/061_deploy_baseline.sql` | 18 | 0 | 0 | Migration 061: deploy baseline marker (main DB) — no-op, idempotent ----------------------------------------------------------------------------- Harm |
-| `migrations/062_remove_deprecated_pages.sql` | 14 | 0 | 0 | Migration 062: remove deprecated + junk marketing pages from content_pages --------------------------------------------------------------------------- |
-| `migrations/063_publish_launch_baseline.sql` | 183 | 0 | 0 | Migration 063: publish the launch baseline ----------------------------------------------------------------------------- Runs the full archive-then-pu |
-| `migrations/064_republish_launch_baseline.sql` | 180 | 0 | 0 | Migration 064: re-publish the launch baseline (now with section icons) ----------------------------------------------------------------------------- M |
-| `migrations/065_seed_detected_workflow.sql` | 51 | 0 | 0 | Migration 065: Seed the OnOpportunitiesDetected process-template catalog row (Scouting Spine M2 / T2.2 — detection -> notify + triage ToDo) WHAT: Pre- |
-| `migrations/066_seed_topic_url_patterns.sql` | 51 | 0 | 0 | Migration 066: Seed real per-topic URL patterns on source_profiles (Scouting Spine M3 / T3.4 — contract C3.a). WHAT: Populate source_profiles.topic_ur |
-| `migrations/067_allow_expand_topics_kind.sql` | 15 | 0 | 0 | Migration 067: allow pipeline_jobs.kind = 'expand_topics' ----------------------------------------------------------------------------- Milestone 3 ad |
-| `migrations/068_drop_legacy_automation_rules_cols.sql` | 24 | 0 | 0 | 068_drop_legacy_automation_rules_cols.sql DATA-01: Drop legacy trigger_bus and trigger_events columns from automation_rules. Background: automation_ru |
-| `migrations/069_system_events_namespace_check.sql` | 41 | 0 | 0 | 069_system_events_namespace_check.sql DATA-03: Add CHECK constraint on system_events.namespace enforcing the 7 canonical namespaces and excluding the  |
-| `migrations/071_revert_proposal_sections_content_to_text.sql` | 21 | 0 | 0 | Migration 071: revert proposal_sections.content JSONB -> TEXT ----------------------------------------------------------------------------- Migration  |
-| `migrations/072_agent_config_settable.sql` | 49 | 0 | 0 | 072_agent_config_settable.sql Make the agent cost-control limits admin-settable in two scopes: 1. Per-tenant — tenant_agent_config (budget already exi |
-| `migrations/073_library_atom_outcomes_unique.sql` | 28 | 0 | 0 | Migration 073: idempotent outcome recording library_atom_outcomes had no unique constraint on (unit_id, proposal_id), so the outcome route's `ON CONFL |
-| `migrations/074_section_lock_lifecycle.sql` | 30 | 0 | 0 | Migration 074: section-level accept/lock lifecycle + document (volume) grouping The customer-facing draft → regen → accept → lock loop (V1 core featur |
-| `migrations/075_section_standards.sql` | 62 | 0 | 0 | Migration 075: section-standards taxonomy + proposal_sections meta (Phase 3, C1) Discrete, hierarchical list of the standard section / sub-section hea |
-| `migrations/076_tenant_automation_preferences.sql` | 31 | 0 | 0 | Migration 076: per-tenant automation preferences (Phase 3, C3) The customer admin's automation choices, configured at portal purchase (and editable la |
-| `migrations/077_section_recommendations.sql` | 15 | 0 | 0 | Migration 077: AI-agent recommendations as section comments (Phase 3, C3 increment 2) Agent review output (grammar/flow/compliance) lands in proposal_ |
-| `migrations/078_seed_proposal_automation_rules.sql` | 42 | 0 | 0 | Migration 078: seed proposal-lifecycle automation rules + wire them to the per-tenant automation preferences (Phase 3, C3 Increment 3). The lock route |
-| `migrations/079_collaborator_get_ready_fanout.sql` | 15 | 0 | 0 | Migration 079: fan the "get ready" email out to collaborators (C3 follow-on). The Increment 3a rule "Proposal ready to advance — collaborator get-read |
-| `migrations/080_library_units_meta.sql` | 18 | 0 | 0 | Migration 080: classified-shred metadata on library atoms (C2). C2 treats harvested library atoms as classified "shreds" of proposal content: JSON now |
-| `migrations/081_spotlight_bucket_scores.sql` | 28 | 0 | 0 | Migration 081: spotlight bucket taxonomy + per-bucket scoring (C5). `spotlights` was filter-only. This adds a fixed opportunity-classification taxonom |
-| `migrations/082_opportunity_lifecycle.sql` | 38 | 0 | 0 | Migration 082: opportunity lifecycle — archive / close / reopen / close-date change (C6). All opportunities are retained (soft-state; never deleted),  |
-| `migrations/083_proposal_artifacts.sql` | 93 | 0 | 0 | Migration 083: proposal_artifacts container (E1 keystone). A proposal owns N artifacts (Tech Volume DOCX, Cost Volume XLSX, 5-page PPT…). Each artifac |
-| `migrations/084_artifact_specs.sql` | 20 | 0 | 0 | Migration 084: structured + enforceable artifact specs (E2). Adds min_font_size — the missing enforcement source (§8 prerequisite: E4 min-font enforce |
-| `migrations/085_agent_task_log_platform.sql` | 10 | 0 | 0 | Migration 085: allow platform (non-tenant) AI spend to be logged + capped (G1). agent_task_log.tenant_id was NOT NULL, so platform/system Claude calls |
-| `migrations/086_template_studio.sql` | 26 | 0 | 0 | Migration 086: Template Studio foundations (E3) — DB-backed, expert-editable templates + per-required-item template linkage + expert notes. document_t |
-| `migrations/087_automation_namespace_fixes.sql` | 39 | 0 | 0 | Migration 087: fix silent automation breaks (namespace drift) + agent_task_log hot-path indexes. (Deploy-now gap report A1-A3, I1.) Root cause (A2/A3) |
-| `migrations/088_opportunity_spine.sql` | 43 | 0 | 0 | Migration 088: the opportunity_id spine key + the cross-portal rollup (R0). Additive only. Links automation runs to the opportunity for chaining + the |
-| `migrations/089_proposal_origin_card.sql` | 17 | 0 | 0 | Migration 089: persisted forward-carried origin card (R0.3). The card's IMMUTABLE origin layer (L0 opp summary + L1 bucket), frozen at purchase so a l |
-| `migrations/090_project_collaboration_template.sql` | 25 | 0 | 0 | Migration 090: pre-seed the ProjectCollaboration template catalog row (R3.1). ProjectCollaboration is the generic, overlay-parameterized project/oppor |
-| `migrations/091_contracts_v2_scope.sql` | 61 | 0 | 0 | Migration 091: V2 contract-execution scope (R6). The spine's capstone: a WIN extends the SAME opportunity into contract execution. contracts is keyed  |
-| `migrations/092_sweep_hardening.sql` | 37 | 0 | 0 | Migration 092: hardening from the hidden-bug sweep (indexes + latent traps). All additive / idempotent; no data change. |
-| `migrations/093_collaborator_library_scope.sql` | 51 | 0 | 0 | Migration 093: Collaborator library scope (D6 — Option B) Additive + side-effect-free: existing rows default to visibility='tenant' (today's behavior  |
-| `migrations/094_oppcard_bridge_spine.sql` | 88 | 0 | 0 | Migration 094: greenfield opportunity-card spine — L0 forward-only bridge + L1 per-tenant denormalized card, RLS-native. Design: docs/OPPORTUNITY_CARD |
-| `migrations/095_oppcard_pin_docs.sql` | 8 | 0 | 0 | Migration 095: pinned opportunity-folder manifest on the tenant card (greenfield pin = full copy). When a customer pins a card, the global read-only o |
-| `migrations/096_tenant_spotlight_buckets.sql` | 60 | 0 | 0 | Migration 096: per-tenant, customer-defined spotlight buckets (greenfield). Replaces the fixed global bucket taxonomy (mig 081 spotlight_bucket_scores |
-| `migrations/097_portals_shadow_guardrails.sql` | 90 | 0 | 0 | Migration 097: L3 execute layer — proposal portals (multi-proposal per opp), scoped shadow-admin grants (replacing the unbounded god-view), and guardr |
-| `migrations/098_portal_workflow_guardrails.sql` | 32 | 0 | 0 | Migration 098: per-portal workflow — RFP-admin-settable guardrail limits + defaults, and portal stage progress. The global default guardrail template  |
-| `migrations/099_intake_meta.sql` | 12 | 0 | 0 | Migration 099: Scout-shaped intake metadata on curated_solicitations. The RFP river starts here: a found/uploaded notice is STAGED (status 'new', oppo |
-| `migrations/100_submission_stage_lifecycle.sql` | 67 | 0 | 0 | Migration 100: canonical 6-state submission lifecycle + rich release metadata (greenfield Tranche 1). The spec's card lifecycle has SIX states: NOFO,  |
-| `migrations/101_unified_library_taxonomy.sql` | 242 | 0 | 0 | Migration 101: unified library taxonomy + atoms + lineage + cocoons (greenfield). ONE tag scheme (dimension:value) for atoms/sections/volumes, a progr |
-| `migrations/102_atomizer_support.sql` | 13 | 0 | 0 | Migration 102: atomizer support — creator provenance + source anchor on atoms. Every atom is unique in the library and records HOW it was made: creato |
-| `migrations/103_event_payload_jsonb_fix.sql` | 21 | 0 | 0 | 103: repair event payloads stored as jsonb STRING scalars. Event emitters wrote payloads via `${JSON.stringify(x)}::jsonb`, which stores a jsonb strin |
-| `migrations/104_jsonb_string_scalar_backfill.sql` | 72 | 0 | 0 | 104_jsonb_string_scalar_backfill.sql Heal jsonb columns that were written via the `${JSON.stringify(x)}::jsonb` anti-pattern (postgres.js stores those |
-| `migrations/105_customer_purchase_curation_flow.sql` | 48 | 0 | 0 | 105_customer_purchase_curation_flow.sql Founding-cohort self-serve purchase → "waiting for RFP-expert curation" (72h SLA) → admin release loop. Three  |
-| `migrations/106_purchase_curation_notification.sql` | 21 | 0 | 0 | 106_purchase_curation_notification.sql Close the "silent purchase" gap: capture:purchase.completed had NO automation_rule, so a customer buying a work |
-| `migrations/107_spotlight_summary.sql` | 13 | 0 | 0 | 107_spotlight_summary.sql The RFP admin's manual FIRST-PASS "summary for spotlight matches": a short, curated context blurb (built from the shred's re |
-| `migrations/108_patch_live_marketing_content.sql` | 56 | 0 | 0 | 108_patch_live_marketing_content.sql The public marketing pages render from the CMS store (content_pages.blocks, with cms_content as the legacy fallba |
-| `migrations/109_patch_dynamic_content.sql` | 60 | 0 | 0 | Migration 109: patch dynamic CMS content (the /resources + /team docs) ----------------------------------------------------------------------------- A |
-| `migrations/110_tenant_documents.sql` | 43 | 0 | 0 | Migration 110: tenant_documents — standalone canvas documents (Tier 2, #3/#4). The portal could only enter the canvas via a provisioned proposal SECTI |
-| `migrations/111_user_memberships.sql` | 56 | 0 | 0 | Migration 111: user_memberships — multi-membership identity (P1 foundation). Identity (users.email) is the global person; a person may act as MANY (co |
-| `migrations/112_collaborator_soft_delete.sql` | 16 | 0 | 0 | 112_collaborator_soft_delete.sql Collaborators are NEVER hard-deleted. "Removing" a collaborator marks revoked_at so the full history is preserved (th |
-| `migrations/113_tenant_archive.sql` | 15 | 0 | 0 | 113_tenant_archive.sql Company-level "slumber" (license expired). When a company loses its license the whole tenant is ARCHIVED — every user loses acc |
-| `migrations/114_rfp_pipeline_tenant.sql` | 20 | 0 | 0 | 114_rfp_pipeline_tenant.sql "Everyone is email + a real company — including us." Make our own organization a first-class tenant so staff have a real w |
-| `migrations/115_document_cocoon_origin_document.sql` | 18 | 0 | 0 | 115_document_cocoon_origin_document.sql #18 branch-and-promote reuse loop. When a customer REGENs from a templified past proposal, the seminal atoms a |
-| `migrations/116_agent_memory_rls.sql` | 23 | 0 | 0 | 116_agent_memory_rls.sql #117 agent security foundation (§7b). The agent memory table `episodic_memories` had RLS ENABLED but NOT FORCED and no tenant |
-| `migrations/117_agent_rls_role.sql` | 99 | 0 | 0 | 117_agent_rls_role.sql #120 agent security foundation. Two parts, BOTH INERT under today's bypass app role (`rolbypassrls = true`), so admin/frontend  |
-| `migrations/118_scout_crawl_and_schedules.sql` | 123 | 0 | 0 | 118_scout_crawl_and_schedules.sql Our-org scout/CMS expansion. Three parts ((C) is inline right after (A)): (A) Seed the SHARED cron manager (pipeline |
-| `migrations/119_agent_memory_rls_reconcile.sql` | 47 | 0 | 0 | 119_agent_memory_rls_reconcile.sql #120 / launch-readiness P1-1. `semantic_memories`, `procedural_memories`, and `agent_task_log` have RLS ENABLED but |
-| `migrations/120_observability_lifecycle.sql` | 42 | 0 | 0 | 120_observability_lifecycle.sql Cross-board "stateless-but-observable" contract (One Brain, two spines, a bridge): give the audit tables a real START→ |
-| `migrations/121_drop_library_units.sql` | 27 | 0 | 0 | 121_drop_library_units.sql P0-1 library cutover — final drop. The legacy library_units spine is fully retired: every live read/write across frontend + |
-| `migrations/122_topic_origin_document.sql` | 29 | 0 | 0 | 122_topic_origin_document.sql The missing file↔opportunity link for the per-topic-file ingest path. "Topics ARE opportunities" (013): a topic is an `o |
-| `migrations/123_portal_guardrail_managers_delegated.sql` | 17 | 0 | 0 | 123_portal_guardrail_managers_delegated.sql Managers on a proposal portal are a DELEGATED, PER-PORTAL role now: an admin can assign as many as they wa |
-| `migrations/124_launch_security_rotate_seed_credentials.sql` | 39 | 0 | 0 | 124_launch_security_rotate_seed_credentials.sql SECURITY BLOCKER FIX. Prior seed/reset migrations committed KNOWN plaintext passwords into git for the |
-| `migrations/125_drop_dead_tables.sql` | 79 | 0 | 0 | 125_drop_dead_tables.sql SCHEMA CLEANUP. Drops 12 tables that were superseded by the current spine and have ZERO live code references anywhere (fronte |
-| `migrations/126_automation_framework.sql` | 53 | 0 | 0 | Migration 126: automation_framework — the PLATFORM level of the three-level automation-policy model (docs/AUTOMATION_POLICY_DESIGN.md §12, decision ⑦) |
-| `migrations/127_tenant_automation_policies.sql` | 65 | 0 | 0 | Migration 127: tenant_automation_policies — the TENANT level of the three-level automation-policy model (docs/AUTOMATION_POLICY_DESIGN.md §3 + §12). O |
-| `migrations/128_opportunity_date_guard.sql` | 19 | 0 | 0 | Migration 128: OPP open/close date guard (docs/AUTOMATION_POLICY_DESIGN.md decision ⑤). An OPP card must never exist without an open AND close date. I |
-| `migrations/129_backfill_automation_policies.sql` | 46 | 0 | 0 | Migration 129: backfill tenant_automation_policies from the legacy 6-boolean tenant_automation_preferences (docs/AUTOMATION_POLICY_DESIGN.md §8, decis |
-| `migrations/130_curation_sla_todo.sql` | 24 | 0 | 0 | 130_curation_sla_todo.sql Put a hard SLA on the "Purchase needs curation" admin ToDo. A comp-code purchase fans capture:purchase.completed → the 'Purc |
-| `migrations/131_expert_time_calendar.sql` | 71 | 0 | 0 | 131_expert_time_calendar.sql Expert-time scheduling (the "super simple" calendar behind Terms §7): • RFP-Pipeline admins post blocks of availability ( |
-| `migrations/132_foundation_artifact_grains.sql` | 19 | 0 | 0 | 132_foundation_artifact_grains.sql The foundation-artifact containment model (docs/LIBRARY_AND_VAULTS_DESIGN.md §1): a created canvas is a FOUNDATION  |
-| `migrations/133_library_seed_jobs.sql` | 42 | 0 | 0 | Migration 133: library_seed_jobs (was authored as 128 on a parallel branch; renumbered) Tracks the two-phase AI-assisted "seed from prior proposal" fl |
-| `migrations/134_collaboration_vaults.sql` | 70 | 0 | 0 | 134_collaboration_vaults.sql Collaboration vaults ("nooks") — the segregated external-partner bridge (docs/LIBRARY_AND_VAULTS_DESIGN.md §5). A nook is |
-| `migrations/135_starter_offer_unique.sql` | 12 | 0 | 0 | 135_starter_offer_unique.sql Backstop the one-time starter-set onboarding OFFER against a check-then-insert race (two concurrent provisions of the sam |
-| `migrations/136_rls_cutover.sql` | 59 | 0 | 0 | 136_rls_cutover.sql — make RLS a real second layer (docs/RLS_CUTOVER.md). Adds tenant-isolation policies to the 16 tenant-scoped tables that were unpr |
-| `migrations/137_validate_namespace_check.sql` | 17 | 0 | 0 | 137_validate_namespace_check.sql Rebaseline cutover-readiness: promote the system_events namespace CHECK from NOT VALID to VALIDATED. mig 069 added sy |
-| `migrations/138_drop_retired_tables.sql` | 24 | 0 | 0 | 138_drop_retired_tables.sql Rebaseline cleanup (task #143): drop 3 retired tables that each have a LIVE SUCCESSOR and ZERO live code references. Drop- |
-| `migrations/139_proposal_voice.sql` | 19 | 0 | 0 | 139_proposal_voice.sql Voice of Proposal (Proposal Draft Manager, P1) — additive, DORMANT, no-op when unset. Adds a nullable `voice` parameter to prop |
-| `migrations/140_seed_foundation_tvsf_demo.sql` | 240 | 0 | 0 | 140_seed_foundation_tvsf_demo.sql Idempotent DEMO seed: the full Foundation TVSF workspace (opportunity ingest, tenant + founder accounts + Paul the E |
-| `migrations/141_fix_paul_shadow_admin_role.sql` | 13 | 0 | 0 | 141_fix_paul_shadow_admin_role.sql Paul Jackson (Entrepreneurs' Center) is the company-appointed SHADOW ADMIN of Foundation, but migration 140 seeded  |
-| `migrations/142_drop_superseded_tables.sql` | 31 | 0 | 0 | 142_drop_superseded_tables.sql Post-audit cleanup: drop the dead tables that satisfy BOTH halves of the CLAUDE.md drop-SOP ("drop ONLY when superseded |
-| `migrations/143_proposal_sort_index.sql` | 31 | 0 | 0 | 143_proposal_sort_index.sql Numbering root fix, made durable. Section order was string-sorted by section_number ("10".."14" landing before "2", unnumb |
-| `migrations/144_proposal_studio_phase.sql` | 28 | 0 | 0 | 144_proposal_studio_phase.sql Proposal Studio — the 3-phase (Draft → Refine → Compliance) gated draft workflow (docs/PROPOSAL_STUDIO_DESIGN.md). Adds  |
-| `migrations/145_notification_read_state.sql` | 16 | 0 | 0 | 145_notification_read_state.sql Per-user notification read watermark. Notifications are DERIVED from system_events (there is no per-row read flag), so |
-| `migrations/146_solicitation_amendments.sql` | 42 | 0 | 0 | 146_solicitation_amendments.sql Amendment fan-out engine (M3). A detected amendment to a MASTER solicitation carries a compliance delta. Detection is  |
-| `migrations/147_proposals_archived_at.sql` | 13 | 0 | 0 | 147_proposals_archived_at.sql Archive retention: stamp WHEN a proposal was archived so the retention window (purge-eligibility) and the "archived N da |
-| `migrations/148_archivable_artifacts.sql` | 21 | 0 | 0 | 148_archivable_artifacts.sql Universal archive (soft, for sorting/visibility). Every user-sortable artifact gets a nullable `archived_at`: archived ro |
-| `migrations/149_seed_sales_overview_doc.sql` | 30 | 0 | 0 | 149_seed_sales_overview_doc.sql Idempotent seed: the branded "RFP Pipeline — Platform Overview & Capabilities" sales document, as a CANVAS DOCUMENT in |
-| `migrations/150_seed_system_templates.sql` | 26 | 0 | 0 | 150_seed_system_templates.sql Idempotent seed: SYSTEM document_templates (tenant_id NULL, is_system = true), available to every tenant in the "New doc |
-| `migrations/151_seed_system_templates_more.sql` | 41 | 0 | 0 | 151_seed_system_templates_more.sql Idempotent seed: four more SYSTEM document_templates (tenant_id NULL, is_system = true), joining the two from mig 1 |
-| `migrations/152_seed_system_starter_library.sql` | 2624 | 0 | 0 | 152_seed_system_starter_library.sql Idempotent seed: the SHARED system-starter MASTER LIBRARY — the dogfooded STARTER_SET (lib/library/starter-set.ts) |
-| `migrations/153_seed_scout_opportunities.sql` | 65 | 0 | 0 | 153_seed_scout_opportunities.sql Durable seed for the Scout-ingested representative OPP set (DSIP + NSF + DOE), captured after the SBIR BAA multi-topi |
-| `migrations/154_fix_process_instances_dedup_index.sql` | 35 | 0 | 0 | 154_fix_process_instances_dedup_index.sql Recreate the process_instances dedup arbiter index that mig 043 defines but that is MISSING in any database  |
-| `migrations/155_deploy_baseline_checkpoint.sql` | 42 | 0 | 0 | Migration 155: full redeploy checkpoint (main DB) — schema check + baseline marker ------------------------------------------------------------------- |
-| `migrations/156_seed_tvsf_compliance_preset.sql` | 64 | 0 | 0 | 156_seed_tvsf_compliance_preset.sql Systemic fix for TVSF compliance: a reusable compliance_presets row encoding the EC/DMVEC Round-45 rules section-b |
-| `migrations/157_econdev_partner_admin.sql` | 49 | 0 | 0 | 157_econdev_partner_admin.sql EconDev partner-admin: an owner-scoped platform role for Economic-Development groups (e.g. the Entrepreneurs' Center) th |
-| `migrations/158_partner_manager_foundations.sql` | 51 | 0 | 0 | 158_partner_manager_foundations.sql Partner-Manager actor — Phase 0 foundations (docs/PARTNER_MANAGER_DESIGN.md §2). Additive + idempotent. Every exis |
-| `migrations/159_seed_entrepreneurs_center_org.sql` | 35 | 0 | 0 | 159_seed_entrepreneurs_center_org.sql Seed the Entrepreneurs' Center as Paul Jackson's partner-manager OWN organization (docs/PARTNER_MANAGER_DESIGN.m |
-| `migrations/160_backfill_partner_owner_memberships.sql` | 19 | 0 | 0 | 160_backfill_partner_owner_memberships.sql A partner can only DESCEND into a company where they hold the tenant_admin membership verifyTenantAccess re |
-| `migrations/161_normalize_partner_membership_source.sql` | 15 | 0 | 0 | 161_normalize_partner_membership_source.sql The old instant-create partner route granted the partner's membership on their owned company with source=' |
-| `migrations/162_seed_ybi_partner.sql` | 43 | 0 | 0 | 162_seed_ybi_partner.sql Durable seed of a SECOND partner-manager (docs/PARTNER_MANAGER_DESIGN.md D4) so any replica of the Claude VM lands with the f |
-| `migrations/163_add_content_source_to_proposal_sections.sql` | 13 | 0 | 0 | 163_add_content_source_to_proposal_sections.sql Track the provenance of a section's CURRENT live content so the version archive can label history hone |
-| `migrations/164_heal_illegal_content_source.sql` | 23 | 0 | 0 | 164_heal_illegal_content_source.sql Data remediation for the reuse-past content_source bug (found by the Canvas zero-trust sweep). `reuse-past` wrote  |
-| `migrations/166_fix_dod_sbir_sttr_presets.sql` | 50 | 0 | 0 | 166_fix_dod_sbir_sttr_presets.sql Correct the DoD compliance presets to the REAL DSIP program requirements (the seeded ones had a simplified 3-volume  |
-| `migrations/167_seed_dow_2026_dod_solicitations.sql` | 185 | 0 | 0 | 167_seed_dow_2026_dod_solicitations.sql Idempotent seed of the two REAL DoW 2026 solicitations, ingested from the uploaded BAAs (docs/DoW 2026 SBIR BA |
-| `migrations/168_seed_tvsf_r45_opp.sql` | 56 | 0 | 0 | 168_seed_tvsf_r45_opp.sql Idempotent seed of the Ohio TVSF Round-45 OPPORTUNITY CARD, built end-to-end via the real admin process (opp + curated_solic |
-| `migrations/169_seed_tvsf_foundation_proposal.sql` | 67 | 0 | 0 | 169_seed_tvsf_foundation_proposal.sql The tenant-side Foundation 3DCP TVSF Round-45 PROPOSAL, captured live for deployment verification: the built app |
-| `migrations/170_seed_foundation_deck_ingest.sql` | 365 | 0 | 0 | 170_seed_foundation_deck_ingest.sql The Foundation deck atomized through the REAL ingest procedure (upload → document_cocoon → atomizeDocumentIntoLibr |
-| `migrations/171_atom_embeddings.sql` | 44 | 0 | 0 | 171_atom_embeddings.sql — semantic-retrieval spine for the atom library. One embedding per atom, TENANT-SCOPED and MODEL-TAGGED so embedding spaces ne |
-| `migrations/172_seed_scout_schedule.sql` | 12 | 0 | 0 | 172_seed_scout_schedule.sql — put web Source Scout auto-discovery on the shared cron. The scout worker (source_scout.scout_all_due) + OnSourceChangeDe |
-| `migrations/173_rls_close_amendment_notification_gap.sql` | 43 | 0 | 0 | 173_rls_close_amendment_notification_gap.sql Close the RLS coverage gap for two tenant-scoped tables added AFTER the mig-136 NOBYPASSRLS cutover (docs |
-| `migrations/174_tasks_broadcast_assignee.sql` | 24 | 0 | 0 | 174_tasks_broadcast_assignee.sql Allow a TENANT BROADCAST ToDo: a task with NO named assignee (assignee_role AND assignee_user_id both NULL) that targ |
-| `migrations/175_scout_candidate_classification.sql` | 37 | 0 | 0 | 175_scout_candidate_classification.sql Completes the "potential NEW or UPDATED OPP" review→release queue on `scout_findings` (SCOUT-INTAKE, task #176) |
-| `migrations/176_seed_program_guide_drafts.sql` | 45 | 0 | 0 | 176_seed_program_guide_drafts.sql #168 CONTENT-QUEUE — durable seed for the four program-primer guide DRAFTS (BAA · OTA · CSO · Grants/NOFO) plus thei |
-| `migrations/177_template_bridge_spine.sql` | 94 | 0 | 0 | Migration 177: template stable + template bridge — mirror of the opportunity-card spine (mig 094) for pristine templates. Design: docs/TEMPLATE_BRIDGE |
-| `migrations/178_tenant_document_template_provenance.sql` | 28 | 0 | 0 | Migration 178: standalone-document provenance + atomize-on-download idempotency. Phase 2 of the template bridge (docs/TEMPLATE_BRIDGE_DESIGN.md): a te |
-| `migrations/179_command_seen_state.sql` | 32 | 0 | 0 | 179_command_seen_state.sql Per-(user, scope, tab) "last looked at" watermark for the Command Center. The CC tab badges show the OPEN count (how many i |
-| `migrations/180_bucket_score_integrity.sql` | 42 | 0 | 0 | 180_bucket_score_integrity.sql Spotlight-bucket lock-down, Tier 1 — restore the integrity guards tenant_bucket_scores lost when the legacy spotlight_b |
-| `migrations/181_ranking_spine.sql` | 49 | 0 | 0 | Migration 181: Ranking-spine hardening. Canonical: docs/RANKING_SPINE.md. Realizes the customer-admin/designee → cap → rescore/reshuffle → single-list |
-| `migrations/182_master_build_complete.sql` | 18 | 0 | 0 | Migration 182: master OPP build-out completion flag. Canonical: docs/PROVISIONING_WORKSPACE_DESIGN.md. The explicit "this master OPP is fully built ou |
-| `migrations/183_comment_anchor.sql` | 17 | 0 | 0 | 183 · Span/node-anchored comments (SPINE-T7) A comment already belongs to a SECTION (proposal_comments.section_id). This adds an optional block anchor |
-| `migrations/184_restrict_shared_template_catalog_writes.sql` | 81 | 0 | 0 | 184_restrict_shared_template_catalog_writes.sql Hardening (defense-in-depth) for the "no cross-tenant shared objects" invariant. BACKGROUND. mig 136_r |
-| `migrations/185_restrict_shared_task_workflow_writes.sql` | 96 | 0 | 0 | 185_restrict_shared_task_workflow_writes.sql Hardening (defense-in-depth) for the "no cross-tenant shared objects" invariant — the follow-up to mig 18 |
-| `migrations/186_platform_scope_episodic_memories.sql` | 60 | 0 | 0 | 186_platform_scope_episodic_memories.sql PLATFORM-SCOPE MEMORY = NULL tenant_id, mirroring the descent model. Why: an rfp_admin has no ambient cross-t |
-| `migrations/187_compliance_field_provenance.sql` | 72 | 0 | 0 | 187_compliance_field_provenance.sql PER-FIELD PROVENANCE on the compliance matrix — never present a default as a rule. Why: driving the real DoW 2026  |
-| `migrations/188_compliance_provenance_pattern_match.sql` | 57 | 0 | 0 | 188_compliance_provenance_pattern_match.sql Correct the `solicitation_compliance.field_provenance` column comment for the two things migration 187 cou |
-| `migrations/189_ingest_studio.sql` | 103 | 0 | 0 | 189_ingest_studio.sql THE INGEST STUDIO — a staged compliance matrix and a phase state machine. Canonical design: docs/INGEST_STUDIO_DESIGN.md. WHY. ` |
-| `migrations/190_curation_notes_amendment_doc.sql` | 50 | 0 | 0 | 190: Mid-window master-OPP flexibility — curation notes + amendment↔document (docs/MASTER_MIRROR_OPP_DESIGN.md §1-2; the post-push, pre-portal window) |
-| `migrations/191_seed_immobileyes_proposals.sql` | 24620 | 0 | 0 | 191_seed_immobileyes_proposals.sql Deploy seed: the Immobileyes tenant + admin + company profile + the FOUR real DSIP past proposals ingested live thr |
-| `migrations/192_sol_doc_hash_unique_per_solicitation.sql` | 24 | 0 | 0 | 192 · Document-dedupe uniqueness is PER SOLICITATION, not global. `idx_sol_docs_content_hash_unique` was UNIQUE on content_hash across the whole table |
-| `migrations/193_character_limits.sql` | 46 | 0 | 0 | 193 · Character limits are a first-class compliance dimension. The compliance floor could measure PAGES, SLIDES and FONT SIZE — but a large family of  |
-| `migrations/194_rls_tenant_id_indexes.sql` | 56 | 0 | 0 | 194 — Index the column every RLS policy filters on. Six RLS-enabled tables carry `tenant_id`, have a `tenant_isolation` policy whose USING and WITH CH |
-| `migrations/195_atom_fulltext_index.sql` | 35 | 0 | 0 | 195 · Lexical relevance for library retrieval WHY. `selectForSection` ranked atoms by: scope tag filter → context-tag count → (gated) vector cosine →  |
-| `migrations/196_agent_rate_limit_default.sql` | 25 | 0 | 0 | 196 · Raise the default agent rate limit above one user action WHY. `platform_agent_config.default_rate_limit_per_hour` was 50, and the fabric refuses |
-| `migrations/197_atom_corpus_verbatim.sql` | 36 | 0 | 0 | Migration 197: mark library atoms that are the AGENCY's words, not the tenant's. WHY. Atomizing an uploaded solicitation package puts the whole packag |
-| `migrations/198_rotate_remaining_committed_admin.sql` | 49 | 0 | 0 | Migration 198: finish what 124 started — rotate the LAST master_admin off a committed credential. WHAT 124 DID. `124_rotate_committed_credentials.sql` |
-| `migrations/199_agent_task_log_fk_set_null.sql` | 40 | 0 | 0 | 199_agent_task_log_fk_set_null.sql An audit row must never keep its subject alive. agent_task_log.proposal_id and .section_id reference proposals/prop |
-| `migrations/200_promo_code_issuance.sql` | 42 | 0 | 0 | 200_promo_code_issuance.sql Make comp codes ISSUABLE, so we can hand a buyer a one-time code that opens a proposal portal without a card. The redempti |
-| `migrations/201_decode_pptx_entities_in_atoms.sql` | 63 | 0 | 0 | 201 · Decode the XML entities a pptx upload left in the library. PPTX text lives in XML, so a slide reading "Core Technology & IP" is stored as "Core  |
-| `migrations/202_card_dates_to_iso.sql` | 88 | 0 | 0 | 202 · Card dates stored as Date.prototype.toString() → ISO. buildCardSnapshot stringified date columns with a bare String(v). postgres.js returns thos |
-| `migrations/203_bucket_authoring_headroom.sql` | 27 | 0 | 0 | 203 · Spotlight bucket cap must leave authoring headroom (bug log B62) Mig 181 moved max_buckets_per_tenant 12 → 6. Every tenant-creation path (applic |
-| `migrations/204_retire_application_todo_rule.sql` | 59 | 0 | 0 | Migration 204: retire the mig-040 'Auto-todo on application' automation rule Depends on: 203 Bug log B51, half (a). One application raised TWO ToDos:  |
-| `migrations/205_backfill_opportunity_solicitation_backlink.sql` | 68 | 0 | 0 | Migration 205: backfill opportunities.solicitation_id from the forward link Depends on: 204 Bug log B46. An opportunity and its curated solicitation p |
-| `migrations/206_bucket_authoring_budget.sql` | 33 | 0 | 0 | 206 · The bucket cap becomes an authoring BUDGET, not `seeded + headroom`. History of this number, because it explains why it was wrong rather than ju |
-| `migrations/207_agent_task_scope.sql` | 65 | 0 | 0 | 207 · The review queue learns SCOPE. Comments went sub-section. Reviews never followed. proposal_comments proposal_id · section_id · anchor jsonb (mig |
-| `migrations/208_no_cross_tenant_atom_lineage.sql` | 85 | 0 | 0 | 208 · NOTHING READS OR WRITES CROSS-TENANT. EVER. The rule, stated by the owner: tenants never read or write each other's data. Bridges carry messages |
-| `migrations/209_rls_atom_link_tables.sql` | 86 | 0 | 0 | 209 · The READ half of "nothing reads or writes cross-tenant" Mig 208 closed the WRITE half for `atom_lineage`: a trigger refuses any edge whose two e |
-| `migrations/210_close_published_content_todos.sql` | 44 | 0 | 0 | 210_close_published_content_todos.sql BACKFILL for the fix in lib/content-admin.ts: publishing a page now closes the content_publish ToDo that asked f |
-| `migrations/211_seed_queued_guide_drafts.sql` | 65 | 0 | 0 | 211_seed_queued_guide_drafts.sql #168 CONTENT-QUEUE — durable capture of the guide drafts still awaiting review, plus the content_publish ToDo that pu |
-| `migrations/212_rls_proposal_spine.sql` | 141 | 0 | 0 | 212_rls_proposal_spine.sql Close a REAL cross-tenant read leak in the proposal spine. THE INVARIANT THIS RESTORES: nothing reads or writes cross-tenan |
-| `migrations/213_rls_child_tables_inherit_parent.sql` | 132 | 0 | 0 | 213_rls_child_tables_inherit_parent.sql Two more tables of the shape mig 212 closed, found by the instrument that mig 212 widened. `process_instance_t |
-| `migrations/214_close_committed_demo_credential.sql` | 53 | 0 | 0 | 214_close_committed_demo_credential.sql One seeded account is a usable production login with a password published in this repository. `191_seed_immobi |
-| `migrations/215_email_send_ledger.sql` | 191 | 0 | 0 | 215_email_send_ledger.sql The outbound-mail ledger and the suppression list. Both must exist BEFORE the first message is sent through the new seam, be |
-| `migrations/216_project_spine.sql` | 352 | 0 | 0 | 216_project_spine.sql Post-award project management (delivery): CLIN · WBS · milestones · deliverables. A SEGREGATED capability for tenants who have w |
-| `migrations/217_project_event_namespace.sql` | 42 | 0 | 0 | 217_project_event_namespace.sql Add `project` to the event-namespace registry. Post-award delivery is a new domain with its own lifecycle — baselines, |
-| `migrations/218_project_milestone_tasks.sql` | 163 | 0 | 0 | 218_project_milestone_tasks.sql The milestone becomes the unit of project management: a dated segment of work with a checklist, an owner, and a comple |
-| `migrations/219_project_closeout.sql` | 57 | 0 | 0 | 219_project_closeout.sql Close-out: the end of the project's life, recorded the same way its milestones are. ── WHY A STATUS FLIP IS NOT ENOUGH ────── |
-| `migrations/220_project_deliverable_documents.sql` | 38 | 0 | 0 | 220_project_deliverable_documents.sql A deliverable can be AUTHORED, not only uploaded. ── WHY THIS IS A LINK AND NOT A NEW SUBSYSTEM ──────────────── |
-| `migrations/221_project_task_spine.sql` | 268 | 0 | 0 | 221_project_task_spine.sql The task spine grows up: project-scope tasks, milestone-only dependencies, an assignee-owned estimate, attached references, |
-| `migrations/222_project_comments.sql` | 126 | 0 | 0 | 222_project_comments.sql The conversation a project did not have. ── WHAT WAS MISSING ──────────────────────────────────────────────────────────────── |
-| `migrations/223_project_reviews.sql` | 126 | 0 | 0 | 223_project_reviews.sql Somebody looked at this and said no, because X. ── WHAT WAS MISSING ────────────────────────────────────────────────────────── |
-| `migrations/224_project_acceptance_evidence.sql` | 103 | 0 | 0 | 224_project_acceptance_evidence.sql The BACKING for an acceptance — a signed DD-250, the COR's email, a transmittal receipt. ── WHAT THIS REPLACES, AN |
-| `migrations/225_project_risks.sql` | 121 | 0 | 0 | 225_project_risks.sql The register every program review asks for and nothing here could answer. ── A RISK AND AN ISSUE ARE ONE TABLE, DELIBERATELY ─── |
-| `migrations/226_project_meetings.sql` | 99 | 0 | 0 | 226_project_meetings.sql Where action items come from. ── THE ONE THING THIS ADDS THAT A DOCUMENT CANNOT ─────────────────────────────────────────── M |
-| `migrations/227_project_labor_and_wbs_spine.sql` | 170 | 0 | 0 | 227_project_labor_and_wbs_spine.sql Two things that belong together: the cost measure gets a source, and the WBS starts driving. ══ PART 1 · THE WBS I |
-| `migrations/228_milestones_are_the_wbs.sql` | 134 | 0 | 0 | 228_milestones_are_the_wbs.sql The WBS **is** the milestone list. Stated plainly by the product owner: "1 project is the portal. It has high level inf |
-| `migrations/229_drop_wbs_nodes.sql` | 75 | 0 | 0 | 229_drop_wbs_nodes.sql The second half of migration 228: remove the superseded table, and close the one thing collapsing the two spines quietly LOST.  |
-| `migrations/230_project_modifications.sql` | 240 | 0 | 0 | 230_project_modifications.sql Contract modifications — the only way a CLIN is allowed to change. ── WHY CLINs ARE WRITE-ONCE, AND STAY THAT WAY ────── |
-| `migrations/231_project_invoices.sql` | 244 | 0 | 0 | 231_project_invoices.sql Invoicing — the point where everything else in this capability becomes money. ── IT IS DELIBERATELY BUILT ON WHAT IS ALREADY  |
-| `migrations/232_project_cdrl_register.sql` | 192 | 0 | 0 | 232_project_cdrl_register.sql The CDRL register — DD Form 1423 data items, and the third state a deliverable never had. ── A CDRL IS AN OBLIGATION; A  |
-| `migrations/233_modification_change_clin_restrict.sql` | 49 | 0 | 0 | 233_modification_change_clin_restrict.sql A defect in migration 230, found by a probe that was doing something else entirely. ── WHAT WAS WRONG ────── |
-| `migrations/234_clin_child_cascade.sql` | 66 | 0 | 0 | 234_clin_child_cascade.sql Correcting migration 233, which was wrong for a reason worth writing down. ── THE CHAIN OF THREE ────────────────────────── |
-| `migrations/235_project_notification_policy.sql` | 59 | 0 | 0 | 235_project_notification_policy.sql Bringing Projects into the automation-policy layer, instead of beside it. ── WHAT WAS HARD-CODED ───────────────── |
-| `migrations/236_milestone_gate_closer.sql` | 44 | 0 | 0 | 236_milestone_gate_closer.sql Who closes a milestone's gate: a person, or the AI manager (A4). ── THE RULE THE PROPOSAL SIDE ALREADY LOCKED ────────── |
-| `migrations/237_freeze_trigger_returns_old.sql` | 110 | 0 | 0 | 237 · A BEFORE DELETE trigger that returns NEW returns NULL, and NULL cancels the delete. ── THE DEFECT ────────────────────────────────────────────── |
-| `migrations/238_tenant_opportunity_corpus.sql` | 177 | 0 | 0 | 238_tenant_opportunity_corpus.sql Copy the solicitation INWARD. All of it. The mirror becomes self-sufficient. ── WHAT THE MIRROR CARRIED, AND WHAT IT |
-| `migrations/239_curated_ranking_corpus.sql` | 114 | 0 | 0 | 239_curated_ranking_corpus.sql The ranking corpus is the CURATED RECORD, not the solicitation. ── WHAT MIGRATION 238 GOT WRONG ─────────────────────── |
-| `migrations/240_verdict_and_copy_split.sql` | 122 | 0 | 0 | 240_verdict_and_copy_split.sql A VERDICT and a TRANSFER are two different facts. Split them. ── WHAT ONE COLUMN WAS BEING ASKED TO MEAN ────────────── |
-| `migrations/241_release_field_basis.sql` | 75 | 0 | 0 | 241_release_field_basis.sql A value the product did not read must never look like one it did — and NEITHER MUST A BLANK. ── THE GAP THIS CLOSES ────── |
-| `migrations/242_funnel_attribution.sql` | 81 | 0 | 0 | 242 · Join the funnel across the sever. ── THE PROBLEM THIS SOLVES ────────────────────────────────────────────────────────────────── The funnel is co |
-| `migrations/243_contacts.sql` | 121 | 0 | 0 | 243 · `contacts` — the subject the CRM never had. ── WHY THIS TABLE EXISTS ──────────────────────────────────────────────────────────────────── docs/C |
-| `migrations/244_working_notes.sql` | 116 | 0 | 0 | 244 · `working_notes` — the shared board between the human, this session, and the companion. ── WHY THIS TABLE EXISTS ──────────────────────────────── |
-| `migrations/245_atom_titles_from_content.sql` | 58 | 0 | 0 | 245 · Repair atoms that were named after their node type. ── THE DEFECT ────────────────────────────────────────────────────────────────────────────── |
-| `migrations/246_space_presence.sql` | 96 | 0 | 0 | 246 · `space_presence` — the OPEN half of "somebody from outside is in your workspace". ── THE DEFECT THIS CLOSES ──────────────────────────────────── |
-| `migrations/247_space_presence_signed_out.sql` | 27 | 0 | 0 | 247 · `signed_out` — the fifth way a space-presence bracket closes. Mig 246 named four: `explicit` (they pressed exit), `left_space` (they turned up o |
-| `migrations/248_space_presence_interaction.sql` | 63 | 0 | 0 | 248 · space_presence.last_interaction_at — separating "the tab is open" from "a person is working" ── WHAT THIS FIXES ──────────────────────────────── |
-| `migrations/249_task_claims.sql` | 74 | 0 | 0 | 249 · A ToDo can be CLAIMED, and a claim can expire ── WHAT WAS MISSING ─────────────────────────────────────────────────────────────────────────── `t |
-| `migrations/250_forced_ascent.sql` | 48 | 0 | 0 | 250 · `forced` — an operator can end somebody's presence in a customer's workspace ── WHY A SIXTH CLOSE REASON ─────────────────────────────────────── |
-| `migrations/251_agent_task_attribution.sql` | 46 | 0 | 0 | 251 · Who asked for this agent work? ── THE QUESTION THAT COULD NOT BE ANSWERED ──────────────────────────────────────────────────── `agent_task_queue |
-| `migrations/252_atom_titles_repair_redo.sql` | 59 | 0 | 0 | 252 · Redo 245's repair, which was applied as a role that could not see the rows ── WHAT HAPPENED ──────────────────────────────────────────────────── |
-| `migrations/253_doc_tag_slugs.sql` | 56 | 0 | 0 | 253 · A `doc` tag a person can read ── WHAT A CUSTOMER SAW ──────────────────────────────────────────────────────────────────────── The library shelf  |
-| `migrations/254_govtech_app_can_login.sql` | 73 | 0 | 0 | 254 · `govtech_app` can LOGIN — the half of the RLS cutover that lived only in a runbook ── WHAT THIS FIXES ────────────────────────────────────────── |
-| `migrations/migrate.mjs` | 280 | 0 | 0 | Lightweight migration runner for production startup. Uses the postgres.js driver already bundled in the Next.js standalone image. No psql or shell dep |
-| `migrations/run.sh` | 248 | 0 | 0 | GovWin — Database Migration & Seed Runner --------------------------------------------------------------------------- Runs all SQL migrations in order |
+| `db/migrations/000_drop_all.sql` | 21 | 0 | 0 | DROP ALL — Wipes the entire public schema before baseline runs This is a clean-build migration. Runs ONLY when ALLOW_SCHEMA_RESET=true (db/migrations/ |
+| `db/migrations/001_baseline.sql` | 946 | 0 | 0 | RFP Pipeline SaaS — Clean Baseline Migration Creates ALL tables for the complete system ============================================================== |
+| `db/migrations/002_seed_system.sql` | 55 | 0 | 0 | System configuration seeds |
+| `db/migrations/003_seed_compliance.sql` | 29 | 0 | 0 | Compliance variable master list |
+| `db/migrations/004_seed_agents.sql` | 14 | 0 | 0 | Agent archetypes — base prompts will be refined during Phase 4 |
+| `db/migrations/005_dedupe_pipeline_schedules.sql` | 56 | 0 | 0 | 005_dedupe_pipeline_schedules.sql Cleanup migration for the pipeline_schedules table on existing deploys (Railway). Two prior bugs left this table in  |
+| `db/migrations/006_normalize_user_emails.sql` | 54 | 0 | 0 | 006_normalize_user_emails.sql Defense-in-depth for the case-normalization contract between frontend/auth.ts and the users.email column. auth.ts:38 low |
+| `db/migrations/007_system_events.sql` | 91 | 0 | 0 | 007_system_events.sql Structured event stream for the RFP Pipeline platform. Every significant action across the system writes to this table via front |
+| `db/migrations/008_capacity_and_system_health.sql` | 67 | 0 | 0 | 008_capacity_and_system_health.sql Adds the tables that back the /admin/system page and the tool-invocation metrics used by Phase 4 capacity planning. |
+| `db/migrations/009_phase1_curation_extensions.sql` | 228 | 0 | 0 | 009_phase1_curation_extensions.sql Phase 1 database additions. Purely ADDITIVE — no DROP TABLE, DROP COLUMN, or DELETE statements. Every statement use |
+| `db/migrations/010_phase1_shredder.sql` | 87 | 0 | 0 | 010_phase1_shredder.sql Phase 1 §D — AI Shredder and Compliance Extraction. Adds: 1. pipeline_jobs.kind — discriminator between 'ingest' and 'shred_so |
+| `db/migrations/011_applications.sql` | 74 | 0 | 0 | 011_applications.sql Founding-cohort application pipeline. Applications come in via the public /apply form, Eric reviews, status transitions through a |
+| `db/migrations/012_volumes_documents.sql` | 161 | 0 | 0 | 012_volumes_documents.sql Phase 1 extension: richer compliance model supporting DSIP-style multi-volume proposal structures where each volume can requ |
+| `db/migrations/013_topics_as_opportunities.sql` | 153 | 0 | 0 | 013_topics_as_opportunities.sql Solicitation (umbrella BAA/CSO) vs. Topic (discrete pursuit unit) ==================================================== |
+| `db/migrations/014_phase_aware_volumes.sql` | 14 | 0 | 0 | 014_phase_aware_volumes.sql Adds applies_to_phase filtering so a single solicitation can serve both Phase I and Phase II topics with different volume  |
+| `db/migrations/015_document_dedup_and_rounds.sql` | 72 | 0 | 0 | 015_document_dedup_and_rounds.sql Global file dedup via content_hash on solicitation_documents. Round/release tracking on curated_solicitations for mu |
+| `db/migrations/016_system_tenant.sql` | 19 | 0 | 0 | 016_system_tenant.sql Platform-level operations (admin curation, shredder, ingestion) write to episodic_memories with no customer tenant context. The  |
+| `db/migrations/017_canvas_templates.sql` | 84 | 0 | 0 | 017_canvas_templates.sql Canvas document system: templates + version history + library outcomes. See docs/CANVAS_DOCUMENT_ARCHITECTURE.md for the full |
+| `db/migrations/018_sbir_award_data.sql` | 121 | 0 | 0 | 018_sbir_award_data.sql SBIR/STTR award history + company directory tables. Populated from CSV uploads (sbir.gov data extracts). Used for: application |
+| `db/migrations/019_automation_and_content.sql` | 105 | 0 | 0 | Automation rules: when event X fires, do action Y |
+| `db/migrations/020_source_profiles.sql` | 126 | 0 | 0 | 020_source_profiles.sql Source profiles for opportunity monitoring sites. Each profile is a bookmarked site the admin monitors for new RFPs/topics. Tr |
+| `db/migrations/021_document_types_and_primary.sql` | 23 | 0 | 0 | 021_document_types_and_primary.sql Expand solicitation_documents with more document types and a primary flag. Purely additive. Idempotent. |
+| `db/migrations/022_stripe_columns.sql` | 7 | 0 | 0 | 022_stripe_columns.sql Add Stripe customer ID and subscription status to tenants for billing integration. |
+| `db/migrations/023_seed_canvas_templates.sql` | 251 | 0 | 0 | 023_seed_canvas_templates.sql Seed system-level canvas document templates for common DoD proposal types. These define the section structure, complianc |
+| `db/migrations/024_environment_marker.sql` | 9 | 0 | 0 | 024_environment_marker.sql Adds a deploy_environment column to system_config so we can verify which environment a database belongs to from the admin h |
+| `db/migrations/025_source_scout.sql` | 77 | 0 | 0 | 025_source_scout.sql Source Scout: HITL-guided web monitoring for opportunity sources. Extends source_profiles with auto-crawl settings and adds table |
+| `db/migrations/026_activate_ingesters.sql` | 50 | 0 | 0 | 026_activate_ingesters.sql Activate the dormant ingesters with daily schedules and add the new DSIP ingester. Also extends the pipeline_jobs.kind CHEC |
+| `db/migrations/027_topic_level_compliance.sql` | 107 | 0 | 0 | 027_topic_level_compliance.sql Support per-topic compliance overrides and per-topic volumes. Topics inherit from the solicitation baseline but can ove |
+| `db/migrations/028_automation_rules_v2.sql` | 91 | 0 | 0 | Migration 028 — Seed automation_rules for new event types Bridge: reconciles 001_baseline schema (trigger_bus, trigger_events, enabled) with 019 schem |
+| `db/migrations/029_proposal_portal.sql` | 36 | 0 | 0 | Migration 029: Proposal Portal — Configurable gates + lock tracking ============================================================================ |
+| `db/migrations/030_library_enhancements.sql` | 24 | 0 | 0 | 030: Library Enhancements — Structured atom storage, seminal tracking ============================================================================ |
+| `db/migrations/030a_ensure_full_schema.sql` | 1345 | 0 | 0 | 030a_ensure_full_schema.sql — Schema Bridge Migration PURPOSE: Ensure the ENTIRE schema is correct regardless of which prior migrations actually appli |
+| `db/migrations/031_cms_content_types.sql` | 48 | 0 | 0 | Create cms_content if it doesn't exist (019 may be in history but table was never created due to transaction rollback with history entry surviving) |
+| `db/migrations/032_seed_cms_content.sql` | 21 | 0 | 0 | — |
+| `db/migrations/033_visitor_analytics_enhancements.sql` | 18 | 0 | 0 | 033: Enhance visitor_sessions and page_views for traffic analytics |
+| `db/migrations/034_cms_status_and_seed_marketing.sql` | 239 | 0 | 0 | Migration 034: CMS content status expansion + seed marketing page blocks Replaces binary published boolean with multi-state status for content lifecyc |
+| `db/migrations/035_fix_purchases_and_cascades.sql` | 112 | 0 | 0 | 035: Fix purchases table + proposal cascade deletes + user FK delete rules Resolves: Stripe webhook crash (missing metadata column, expert_consulting  |
+| `db/migrations/036_reset_admin_password.sql` | 6 | 0 | 0 | Reset master admin password to known credential and force password change |
+| `db/migrations/037_reset_admin_password_v2.sql` | 6 | 0 | 0 | Reset master admin password (036 had wrong hash due to shell escaping) |
+| `db/migrations/038_fix_admin_login.sql` | 7 | 0 | 0 | Fix admin login loop: set known password AND disable temp_password flag temp_password = false so user is NOT forced to change on login |
+| `db/migrations/039_seed_all_marketing_pages.sql` | 549 | 0 | 0 | 039: Seed all marketing pages with CMS content Extracts hardcoded fallback content from page components into cms_content so all marketing text is edit |
+| `db/migrations/040_crm_phase1.sql` | 38 | 0 | 0 | Migration 040: CRM Phase 1 — lead lifecycle + automation rule seeds Depends on: 039 Adds: tenants.lifecycle_stage — track lead/customer lifecycle auto |
+| `db/migrations/041_seed_test_accounts.sql` | 131 | 0 | 0 | Migration 041: Seed test accounts for HITL testing Depends on: 040 Creates: 1. Admin user (eric.c.wagner@gmail.com / master_admin) 2. Test tenant: Ape |
+| `db/migrations/042_seed_content.sql` | 30 | 0 | 0 | Migration 042: Seed blog posts and Latest Insights page block Provides initial content for the blog listing page and the "Latest Insights" section on  |
+| `db/migrations/043_process_instances.sql` | 88 | 0 | 0 | Migration 043: Process Instances for Workflow State Persistence Enables crash recovery, audit trail, and admin workflow management Used by both RFP Pi |
+| `db/migrations/044_concurrency_and_audit.sql` | 96 | 0 | 0 | Migration 044: Optimistic Concurrency Control + Collaborative Audit Trail Supports concurrent editing, conflict detection, and complete audit trail fo |
+| `db/migrations/045_revision_tracking.sql` | 65 | 0 | 0 | Migration 045: Complete Revision Tracking for Collaborative Editing Tracks every version of every document across the platform: AI generations, human  |
+| `db/migrations/046_stage_completion.sql` | 38 | 0 | 0 | Migration 046: Stage Completion Tracking Tracks which stage each section was completed/accepted in, and records full snapshots when a stage is complet |
+| `db/migrations/047_supporting_documents.sql` | 43 | 0 | 0 | Migration 047: Supporting documents — required/optional files from the compliance matrix Seeded at proposal creation from solicitation_compliance.requ |
+| `db/migrations/048_fix_test_credentials.sql` | 43 | 0 | 0 | Migration 048: Fix test account credentials Depends on: 041 (seed test accounts) Problem: Pipeline's seed_master_admin.py may have created the admin u |
+| `db/migrations/049_clean_slate_hitl.sql` | 128 | 0 | 0 | Migration 049: Clean slate for HITL testing Depends on: 048 Removes all tenant-generated data while preserving: - User accounts (migration 041 test ac |
+| `db/migrations/050_seed_cms_publish_rule.sql` | 46 | 0 | 0 | Migration 050: Seed the automation rule that bridges CMS published content to Main DB When the CMS publishes a post (content_pipeline.post.published e |
+| `db/migrations/051_reset_admin_launch.sql` | 19 | 0 | 0 | Migration 051: Reset admin account for HITL launch Ensures eric.c.wagner@gmail.com exists as master_admin with known credentials. Password: GovWin2026 |
+| `db/migrations/052_single_owner_finder_notifications.sql` | 22 | 0 | 0 | Migration 052: Single-owner notifications for finder uploads / scout changes Kills the template-vs-rule DUPLICATE notification (EVENT_CONTRACT_V3 gap  |
+| `db/migrations/053_tasks_ledger.sql` | 90 | 0 | 0 | Migration 053: Unified task ledger (ToDo queues for every role) A ToDo is a parameterized TEMPLATE STEP (StepType.TODO): the static workflow code decl |
+| `db/migrations/054_process_template_catalog.sql` | 75 | 0 | 0 | Migration 054: Process Template Catalog (activation + audit layer) WHAT: A thin catalog row per workflow TEMPLATE. The template DEFINITION stays in co |
+| `db/migrations/055_content_pages.sql` | 71 | 0 | 0 | Migration 055: content_pages — single page-versioned content store (V8) -----------------------------------------------------------------------------  |
+| `db/migrations/056_fix_double_encoded_blocks.sql` | 17 | 0 | 0 | Migration 056: repair double-encoded content_pages.blocks ----------------------------------------------------------------------------- Before the sql |
+| `db/migrations/057_documents_into_content_pages.sql` | 57 | 0 | 0 | Migration 057: bring documents into content_pages (unify the content store) -------------------------------------------------------------------------- |
+| `db/migrations/058_visitor_connection_enrichment.sql` | 19 | 0 | 0 | Migration 058: visitor connection enrichment (ISP / org / ASN / geo) ----------------------------------------------------------------------------- Sto |
+| `db/migrations/059_seed_launch_resources.sql` | 119 | 0 | 0 | Migration 059: seed 3 launch resource articles into content_pages ----------------------------------------------------------------------------- The /r |
+| `db/migrations/060_refresh_untouched_page_seeds.sql` | 20 | 0 | 0 | Migration 060: refresh untouched auto-seeded marketing pages ----------------------------------------------------------------------------- The launch- |
+| `db/migrations/061_deploy_baseline.sql` | 18 | 0 | 0 | Migration 061: deploy baseline marker (main DB) — no-op, idempotent ----------------------------------------------------------------------------- Harm |
+| `db/migrations/062_remove_deprecated_pages.sql` | 14 | 0 | 0 | Migration 062: remove deprecated + junk marketing pages from content_pages --------------------------------------------------------------------------- |
+| `db/migrations/063_publish_launch_baseline.sql` | 183 | 0 | 0 | Migration 063: publish the launch baseline ----------------------------------------------------------------------------- Runs the full archive-then-pu |
+| `db/migrations/064_republish_launch_baseline.sql` | 180 | 0 | 0 | Migration 064: re-publish the launch baseline (now with section icons) ----------------------------------------------------------------------------- M |
+| `db/migrations/065_seed_detected_workflow.sql` | 51 | 0 | 0 | Migration 065: Seed the OnOpportunitiesDetected process-template catalog row (Scouting Spine M2 / T2.2 — detection -> notify + triage ToDo) WHAT: Pre- |
+| `db/migrations/066_seed_topic_url_patterns.sql` | 51 | 0 | 0 | Migration 066: Seed real per-topic URL patterns on source_profiles (Scouting Spine M3 / T3.4 — contract C3.a). WHAT: Populate source_profiles.topic_ur |
+| `db/migrations/067_allow_expand_topics_kind.sql` | 15 | 0 | 0 | Migration 067: allow pipeline_jobs.kind = 'expand_topics' ----------------------------------------------------------------------------- Milestone 3 ad |
+| `db/migrations/068_drop_legacy_automation_rules_cols.sql` | 24 | 0 | 0 | 068_drop_legacy_automation_rules_cols.sql DATA-01: Drop legacy trigger_bus and trigger_events columns from automation_rules. Background: automation_ru |
+| `db/migrations/069_system_events_namespace_check.sql` | 41 | 0 | 0 | 069_system_events_namespace_check.sql DATA-03: Add CHECK constraint on system_events.namespace enforcing the 7 canonical namespaces and excluding the  |
+| `db/migrations/071_revert_proposal_sections_content_to_text.sql` | 21 | 0 | 0 | Migration 071: revert proposal_sections.content JSONB -> TEXT ----------------------------------------------------------------------------- Migration  |
+| `db/migrations/072_agent_config_settable.sql` | 49 | 0 | 0 | 072_agent_config_settable.sql Make the agent cost-control limits admin-settable in two scopes: 1. Per-tenant — tenant_agent_config (budget already exi |
+| `db/migrations/073_library_atom_outcomes_unique.sql` | 28 | 0 | 0 | Migration 073: idempotent outcome recording library_atom_outcomes had no unique constraint on (unit_id, proposal_id), so the outcome route's `ON CONFL |
+| `db/migrations/074_section_lock_lifecycle.sql` | 30 | 0 | 0 | Migration 074: section-level accept/lock lifecycle + document (volume) grouping The customer-facing draft → regen → accept → lock loop (V1 core featur |
+| `db/migrations/075_section_standards.sql` | 62 | 0 | 0 | Migration 075: section-standards taxonomy + proposal_sections meta (Phase 3, C1) Discrete, hierarchical list of the standard section / sub-section hea |
+| `db/migrations/076_tenant_automation_preferences.sql` | 31 | 0 | 0 | Migration 076: per-tenant automation preferences (Phase 3, C3) The customer admin's automation choices, configured at portal purchase (and editable la |
+| `db/migrations/077_section_recommendations.sql` | 15 | 0 | 0 | Migration 077: AI-agent recommendations as section comments (Phase 3, C3 increment 2) Agent review output (grammar/flow/compliance) lands in proposal_ |
+| `db/migrations/078_seed_proposal_automation_rules.sql` | 42 | 0 | 0 | Migration 078: seed proposal-lifecycle automation rules + wire them to the per-tenant automation preferences (Phase 3, C3 Increment 3). The lock route |
+| `db/migrations/079_collaborator_get_ready_fanout.sql` | 15 | 0 | 0 | Migration 079: fan the "get ready" email out to collaborators (C3 follow-on). The Increment 3a rule "Proposal ready to advance — collaborator get-read |
+| `db/migrations/080_library_units_meta.sql` | 18 | 0 | 0 | Migration 080: classified-shred metadata on library atoms (C2). C2 treats harvested library atoms as classified "shreds" of proposal content: JSON now |
+| `db/migrations/081_spotlight_bucket_scores.sql` | 28 | 0 | 0 | Migration 081: spotlight bucket taxonomy + per-bucket scoring (C5). `spotlights` was filter-only. This adds a fixed opportunity-classification taxonom |
+| `db/migrations/082_opportunity_lifecycle.sql` | 38 | 0 | 0 | Migration 082: opportunity lifecycle — archive / close / reopen / close-date change (C6). All opportunities are retained (soft-state; never deleted),  |
+| `db/migrations/083_proposal_artifacts.sql` | 93 | 0 | 0 | Migration 083: proposal_artifacts container (E1 keystone). A proposal owns N artifacts (Tech Volume DOCX, Cost Volume XLSX, 5-page PPT…). Each artifac |
+| `db/migrations/084_artifact_specs.sql` | 20 | 0 | 0 | Migration 084: structured + enforceable artifact specs (E2). Adds min_font_size — the missing enforcement source (§8 prerequisite: E4 min-font enforce |
+| `db/migrations/085_agent_task_log_platform.sql` | 10 | 0 | 0 | Migration 085: allow platform (non-tenant) AI spend to be logged + capped (G1). agent_task_log.tenant_id was NOT NULL, so platform/system Claude calls |
+| `db/migrations/086_template_studio.sql` | 26 | 0 | 0 | Migration 086: Template Studio foundations (E3) — DB-backed, expert-editable templates + per-required-item template linkage + expert notes. document_t |
+| `db/migrations/087_automation_namespace_fixes.sql` | 39 | 0 | 0 | Migration 087: fix silent automation breaks (namespace drift) + agent_task_log hot-path indexes. (Deploy-now gap report A1-A3, I1.) Root cause (A2/A3) |
+| `db/migrations/088_opportunity_spine.sql` | 43 | 0 | 0 | Migration 088: the opportunity_id spine key + the cross-portal rollup (R0). Additive only. Links automation runs to the opportunity for chaining + the |
+| `db/migrations/089_proposal_origin_card.sql` | 17 | 0 | 0 | Migration 089: persisted forward-carried origin card (R0.3). The card's IMMUTABLE origin layer (L0 opp summary + L1 bucket), frozen at purchase so a l |
+| `db/migrations/090_project_collaboration_template.sql` | 25 | 0 | 0 | Migration 090: pre-seed the ProjectCollaboration template catalog row (R3.1). ProjectCollaboration is the generic, overlay-parameterized project/oppor |
+| `db/migrations/091_contracts_v2_scope.sql` | 61 | 0 | 0 | Migration 091: V2 contract-execution scope (R6). The spine's capstone: a WIN extends the SAME opportunity into contract execution. contracts is keyed  |
+| `db/migrations/092_sweep_hardening.sql` | 37 | 0 | 0 | Migration 092: hardening from the hidden-bug sweep (indexes + latent traps). All additive / idempotent; no data change. |
+| `db/migrations/093_collaborator_library_scope.sql` | 51 | 0 | 0 | Migration 093: Collaborator library scope (D6 — Option B) Additive + side-effect-free: existing rows default to visibility='tenant' (today's behavior  |
+| `db/migrations/094_oppcard_bridge_spine.sql` | 88 | 0 | 0 | Migration 094: greenfield opportunity-card spine — L0 forward-only bridge + L1 per-tenant denormalized card, RLS-native. Design: docs/OPPORTUNITY_CARD |
+| `db/migrations/095_oppcard_pin_docs.sql` | 8 | 0 | 0 | Migration 095: pinned opportunity-folder manifest on the tenant card (greenfield pin = full copy). When a customer pins a card, the global read-only o |
+| `db/migrations/096_tenant_spotlight_buckets.sql` | 60 | 0 | 0 | Migration 096: per-tenant, customer-defined spotlight buckets (greenfield). Replaces the fixed global bucket taxonomy (mig 081 spotlight_bucket_scores |
+| `db/migrations/097_portals_shadow_guardrails.sql` | 90 | 0 | 0 | Migration 097: L3 execute layer — proposal portals (multi-proposal per opp), scoped shadow-admin grants (replacing the unbounded god-view), and guardr |
+| `db/migrations/098_portal_workflow_guardrails.sql` | 32 | 0 | 0 | Migration 098: per-portal workflow — RFP-admin-settable guardrail limits + defaults, and portal stage progress. The global default guardrail template  |
+| `db/migrations/099_intake_meta.sql` | 12 | 0 | 0 | Migration 099: Scout-shaped intake metadata on curated_solicitations. The RFP river starts here: a found/uploaded notice is STAGED (status 'new', oppo |
+| `db/migrations/100_submission_stage_lifecycle.sql` | 67 | 0 | 0 | Migration 100: canonical 6-state submission lifecycle + rich release metadata (greenfield Tranche 1). The spec's card lifecycle has SIX states: NOFO,  |
+| `db/migrations/101_unified_library_taxonomy.sql` | 242 | 0 | 0 | Migration 101: unified library taxonomy + atoms + lineage + cocoons (greenfield). ONE tag scheme (dimension:value) for atoms/sections/volumes, a progr |
+| `db/migrations/102_atomizer_support.sql` | 13 | 0 | 0 | Migration 102: atomizer support — creator provenance + source anchor on atoms. Every atom is unique in the library and records HOW it was made: creato |
+| `db/migrations/103_event_payload_jsonb_fix.sql` | 21 | 0 | 0 | 103: repair event payloads stored as jsonb STRING scalars. Event emitters wrote payloads via `${JSON.stringify(x)}::jsonb`, which stores a jsonb strin |
+| `db/migrations/104_jsonb_string_scalar_backfill.sql` | 72 | 0 | 0 | 104_jsonb_string_scalar_backfill.sql Heal jsonb columns that were written via the `${JSON.stringify(x)}::jsonb` anti-pattern (postgres.js stores those |
+| `db/migrations/105_customer_purchase_curation_flow.sql` | 48 | 0 | 0 | 105_customer_purchase_curation_flow.sql Founding-cohort self-serve purchase → "waiting for RFP-expert curation" (72h SLA) → admin release loop. Three  |
+| `db/migrations/106_purchase_curation_notification.sql` | 21 | 0 | 0 | 106_purchase_curation_notification.sql Close the "silent purchase" gap: capture:purchase.completed had NO automation_rule, so a customer buying a work |
+| `db/migrations/107_spotlight_summary.sql` | 13 | 0 | 0 | 107_spotlight_summary.sql The RFP admin's manual FIRST-PASS "summary for spotlight matches": a short, curated context blurb (built from the shred's re |
+| `db/migrations/108_patch_live_marketing_content.sql` | 56 | 0 | 0 | 108_patch_live_marketing_content.sql The public marketing pages render from the CMS store (content_pages.blocks, with cms_content as the legacy fallba |
+| `db/migrations/109_patch_dynamic_content.sql` | 60 | 0 | 0 | Migration 109: patch dynamic CMS content (the /resources + /team docs) ----------------------------------------------------------------------------- A |
+| `db/migrations/110_tenant_documents.sql` | 43 | 0 | 0 | Migration 110: tenant_documents — standalone canvas documents (Tier 2, #3/#4). The portal could only enter the canvas via a provisioned proposal SECTI |
+| `db/migrations/111_user_memberships.sql` | 56 | 0 | 0 | Migration 111: user_memberships — multi-membership identity (P1 foundation). Identity (users.email) is the global person; a person may act as MANY (co |
+| `db/migrations/112_collaborator_soft_delete.sql` | 16 | 0 | 0 | 112_collaborator_soft_delete.sql Collaborators are NEVER hard-deleted. "Removing" a collaborator marks revoked_at so the full history is preserved (th |
+| `db/migrations/113_tenant_archive.sql` | 15 | 0 | 0 | 113_tenant_archive.sql Company-level "slumber" (license expired). When a company loses its license the whole tenant is ARCHIVED — every user loses acc |
+| `db/migrations/114_rfp_pipeline_tenant.sql` | 20 | 0 | 0 | 114_rfp_pipeline_tenant.sql "Everyone is email + a real company — including us." Make our own organization a first-class tenant so staff have a real w |
+| `db/migrations/115_document_cocoon_origin_document.sql` | 18 | 0 | 0 | 115_document_cocoon_origin_document.sql #18 branch-and-promote reuse loop. When a customer REGENs from a templified past proposal, the seminal atoms a |
+| `db/migrations/116_agent_memory_rls.sql` | 23 | 0 | 0 | 116_agent_memory_rls.sql #117 agent security foundation (§7b). The agent memory table `episodic_memories` had RLS ENABLED but NOT FORCED and no tenant |
+| `db/migrations/117_agent_rls_role.sql` | 99 | 0 | 0 | 117_agent_rls_role.sql #120 agent security foundation. Two parts, BOTH INERT under today's bypass app role (`rolbypassrls = true`), so admin/frontend  |
+| `db/migrations/118_scout_crawl_and_schedules.sql` | 123 | 0 | 0 | 118_scout_crawl_and_schedules.sql Our-org scout/CMS expansion. Three parts ((C) is inline right after (A)): (A) Seed the SHARED cron manager (pipeline |
+| `db/migrations/119_agent_memory_rls_reconcile.sql` | 47 | 0 | 0 | 119_agent_memory_rls_reconcile.sql #120 / launch-readiness P1-1. `semantic_memories`, `procedural_memories`, and `agent_task_log` have RLS ENABLED but |
+| `db/migrations/120_observability_lifecycle.sql` | 42 | 0 | 0 | 120_observability_lifecycle.sql Cross-board "stateless-but-observable" contract (One Brain, two spines, a bridge): give the audit tables a real START→ |
+| `db/migrations/121_drop_library_units.sql` | 27 | 0 | 0 | 121_drop_library_units.sql P0-1 library cutover — final drop. The legacy library_units spine is fully retired: every live read/write across frontend + |
+| `db/migrations/122_topic_origin_document.sql` | 29 | 0 | 0 | 122_topic_origin_document.sql The missing file↔opportunity link for the per-topic-file ingest path. "Topics ARE opportunities" (013): a topic is an `o |
+| `db/migrations/123_portal_guardrail_managers_delegated.sql` | 17 | 0 | 0 | 123_portal_guardrail_managers_delegated.sql Managers on a proposal portal are a DELEGATED, PER-PORTAL role now: an admin can assign as many as they wa |
+| `db/migrations/124_launch_security_rotate_seed_credentials.sql` | 39 | 0 | 0 | 124_launch_security_rotate_seed_credentials.sql SECURITY BLOCKER FIX. Prior seed/reset migrations committed KNOWN plaintext passwords into git for the |
+| `db/migrations/125_drop_dead_tables.sql` | 79 | 0 | 0 | 125_drop_dead_tables.sql SCHEMA CLEANUP. Drops 12 tables that were superseded by the current spine and have ZERO live code references anywhere (fronte |
+| `db/migrations/126_automation_framework.sql` | 53 | 0 | 0 | Migration 126: automation_framework — the PLATFORM level of the three-level automation-policy model (docs/AUTOMATION_POLICY_DESIGN.md §12, decision ⑦) |
+| `db/migrations/127_tenant_automation_policies.sql` | 65 | 0 | 0 | Migration 127: tenant_automation_policies — the TENANT level of the three-level automation-policy model (docs/AUTOMATION_POLICY_DESIGN.md §3 + §12). O |
+| `db/migrations/128_opportunity_date_guard.sql` | 19 | 0 | 0 | Migration 128: OPP open/close date guard (docs/AUTOMATION_POLICY_DESIGN.md decision ⑤). An OPP card must never exist without an open AND close date. I |
+| `db/migrations/129_backfill_automation_policies.sql` | 46 | 0 | 0 | Migration 129: backfill tenant_automation_policies from the legacy 6-boolean tenant_automation_preferences (docs/AUTOMATION_POLICY_DESIGN.md §8, decis |
+| `db/migrations/130_curation_sla_todo.sql` | 24 | 0 | 0 | 130_curation_sla_todo.sql Put a hard SLA on the "Purchase needs curation" admin ToDo. A comp-code purchase fans capture:purchase.completed → the 'Purc |
+| `db/migrations/131_expert_time_calendar.sql` | 71 | 0 | 0 | 131_expert_time_calendar.sql Expert-time scheduling (the "super simple" calendar behind Terms §7): • RFP-Pipeline admins post blocks of availability ( |
+| `db/migrations/132_foundation_artifact_grains.sql` | 19 | 0 | 0 | 132_foundation_artifact_grains.sql The foundation-artifact containment model (docs/LIBRARY_AND_VAULTS_DESIGN.md §1): a created canvas is a FOUNDATION  |
+| `db/migrations/133_library_seed_jobs.sql` | 42 | 0 | 0 | Migration 133: library_seed_jobs (was authored as 128 on a parallel branch; renumbered) Tracks the two-phase AI-assisted "seed from prior proposal" fl |
+| `db/migrations/134_collaboration_vaults.sql` | 70 | 0 | 0 | 134_collaboration_vaults.sql Collaboration vaults ("nooks") — the segregated external-partner bridge (docs/LIBRARY_AND_VAULTS_DESIGN.md §5). A nook is |
+| `db/migrations/135_starter_offer_unique.sql` | 12 | 0 | 0 | 135_starter_offer_unique.sql Backstop the one-time starter-set onboarding OFFER against a check-then-insert race (two concurrent provisions of the sam |
+| `db/migrations/136_rls_cutover.sql` | 59 | 0 | 0 | 136_rls_cutover.sql — make RLS a real second layer (docs/RLS_CUTOVER.md). Adds tenant-isolation policies to the 16 tenant-scoped tables that were unpr |
+| `db/migrations/137_validate_namespace_check.sql` | 17 | 0 | 0 | 137_validate_namespace_check.sql Rebaseline cutover-readiness: promote the system_events namespace CHECK from NOT VALID to VALIDATED. mig 069 added sy |
+| `db/migrations/138_drop_retired_tables.sql` | 24 | 0 | 0 | 138_drop_retired_tables.sql Rebaseline cleanup (task #143): drop 3 retired tables that each have a LIVE SUCCESSOR and ZERO live code references. Drop- |
+| `db/migrations/139_proposal_voice.sql` | 19 | 0 | 0 | 139_proposal_voice.sql Voice of Proposal (Proposal Draft Manager, P1) — additive, DORMANT, no-op when unset. Adds a nullable `voice` parameter to prop |
+| `db/migrations/140_seed_foundation_tvsf_demo.sql` | 240 | 0 | 0 | 140_seed_foundation_tvsf_demo.sql Idempotent DEMO seed: the full Foundation TVSF workspace (opportunity ingest, tenant + founder accounts + Paul the E |
+| `db/migrations/141_fix_paul_shadow_admin_role.sql` | 13 | 0 | 0 | 141_fix_paul_shadow_admin_role.sql Paul Jackson (Entrepreneurs' Center) is the company-appointed SHADOW ADMIN of Foundation, but migration 140 seeded  |
+| `db/migrations/142_drop_superseded_tables.sql` | 31 | 0 | 0 | 142_drop_superseded_tables.sql Post-audit cleanup: drop the dead tables that satisfy BOTH halves of the CLAUDE.md drop-SOP ("drop ONLY when superseded |
+| `db/migrations/143_proposal_sort_index.sql` | 31 | 0 | 0 | 143_proposal_sort_index.sql Numbering root fix, made durable. Section order was string-sorted by section_number ("10".."14" landing before "2", unnumb |
+| `db/migrations/144_proposal_studio_phase.sql` | 28 | 0 | 0 | 144_proposal_studio_phase.sql Proposal Studio — the 3-phase (Draft → Refine → Compliance) gated draft workflow (docs/PROPOSAL_STUDIO_DESIGN.md). Adds  |
+| `db/migrations/145_notification_read_state.sql` | 16 | 0 | 0 | 145_notification_read_state.sql Per-user notification read watermark. Notifications are DERIVED from system_events (there is no per-row read flag), so |
+| `db/migrations/146_solicitation_amendments.sql` | 42 | 0 | 0 | 146_solicitation_amendments.sql Amendment fan-out engine (M3). A detected amendment to a MASTER solicitation carries a compliance delta. Detection is  |
+| `db/migrations/147_proposals_archived_at.sql` | 13 | 0 | 0 | 147_proposals_archived_at.sql Archive retention: stamp WHEN a proposal was archived so the retention window (purge-eligibility) and the "archived N da |
+| `db/migrations/148_archivable_artifacts.sql` | 21 | 0 | 0 | 148_archivable_artifacts.sql Universal archive (soft, for sorting/visibility). Every user-sortable artifact gets a nullable `archived_at`: archived ro |
+| `db/migrations/149_seed_sales_overview_doc.sql` | 30 | 0 | 0 | 149_seed_sales_overview_doc.sql Idempotent seed: the branded "RFP Pipeline — Platform Overview & Capabilities" sales document, as a CANVAS DOCUMENT in |
+| `db/migrations/150_seed_system_templates.sql` | 26 | 0 | 0 | 150_seed_system_templates.sql Idempotent seed: SYSTEM document_templates (tenant_id NULL, is_system = true), available to every tenant in the "New doc |
+| `db/migrations/151_seed_system_templates_more.sql` | 41 | 0 | 0 | 151_seed_system_templates_more.sql Idempotent seed: four more SYSTEM document_templates (tenant_id NULL, is_system = true), joining the two from mig 1 |
+| `db/migrations/152_seed_system_starter_library.sql` | 2624 | 0 | 0 | 152_seed_system_starter_library.sql Idempotent seed: the SHARED system-starter MASTER LIBRARY — the dogfooded STARTER_SET (lib/library/starter-set.ts) |
+| `db/migrations/153_seed_scout_opportunities.sql` | 65 | 0 | 0 | 153_seed_scout_opportunities.sql Durable seed for the Scout-ingested representative OPP set (DSIP + NSF + DOE), captured after the SBIR BAA multi-topi |
+| `db/migrations/154_fix_process_instances_dedup_index.sql` | 35 | 0 | 0 | 154_fix_process_instances_dedup_index.sql Recreate the process_instances dedup arbiter index that mig 043 defines but that is MISSING in any database  |
+| `db/migrations/155_deploy_baseline_checkpoint.sql` | 42 | 0 | 0 | Migration 155: full redeploy checkpoint (main DB) — schema check + baseline marker ------------------------------------------------------------------- |
+| `db/migrations/156_seed_tvsf_compliance_preset.sql` | 64 | 0 | 0 | 156_seed_tvsf_compliance_preset.sql Systemic fix for TVSF compliance: a reusable compliance_presets row encoding the EC/DMVEC Round-45 rules section-b |
+| `db/migrations/157_econdev_partner_admin.sql` | 49 | 0 | 0 | 157_econdev_partner_admin.sql EconDev partner-admin: an owner-scoped platform role for Economic-Development groups (e.g. the Entrepreneurs' Center) th |
+| `db/migrations/158_partner_manager_foundations.sql` | 51 | 0 | 0 | 158_partner_manager_foundations.sql Partner-Manager actor — Phase 0 foundations (docs/PARTNER_MANAGER_DESIGN.md §2). Additive + idempotent. Every exis |
+| `db/migrations/159_seed_entrepreneurs_center_org.sql` | 35 | 0 | 0 | 159_seed_entrepreneurs_center_org.sql Seed the Entrepreneurs' Center as Paul Jackson's partner-manager OWN organization (docs/PARTNER_MANAGER_DESIGN.m |
+| `db/migrations/160_backfill_partner_owner_memberships.sql` | 19 | 0 | 0 | 160_backfill_partner_owner_memberships.sql A partner can only DESCEND into a company where they hold the tenant_admin membership verifyTenantAccess re |
+| `db/migrations/161_normalize_partner_membership_source.sql` | 15 | 0 | 0 | 161_normalize_partner_membership_source.sql The old instant-create partner route granted the partner's membership on their owned company with source=' |
+| `db/migrations/162_seed_ybi_partner.sql` | 43 | 0 | 0 | 162_seed_ybi_partner.sql Durable seed of a SECOND partner-manager (docs/PARTNER_MANAGER_DESIGN.md D4) so any replica of the Claude VM lands with the f |
+| `db/migrations/163_add_content_source_to_proposal_sections.sql` | 13 | 0 | 0 | 163_add_content_source_to_proposal_sections.sql Track the provenance of a section's CURRENT live content so the version archive can label history hone |
+| `db/migrations/164_heal_illegal_content_source.sql` | 23 | 0 | 0 | 164_heal_illegal_content_source.sql Data remediation for the reuse-past content_source bug (found by the Canvas zero-trust sweep). `reuse-past` wrote  |
+| `db/migrations/166_fix_dod_sbir_sttr_presets.sql` | 50 | 0 | 0 | 166_fix_dod_sbir_sttr_presets.sql Correct the DoD compliance presets to the REAL DSIP program requirements (the seeded ones had a simplified 3-volume  |
+| `db/migrations/167_seed_dow_2026_dod_solicitations.sql` | 185 | 0 | 0 | 167_seed_dow_2026_dod_solicitations.sql Idempotent seed of the two REAL DoW 2026 solicitations, ingested from the uploaded BAAs (docs/DoW 2026 SBIR BA |
+| `db/migrations/168_seed_tvsf_r45_opp.sql` | 56 | 0 | 0 | 168_seed_tvsf_r45_opp.sql Idempotent seed of the Ohio TVSF Round-45 OPPORTUNITY CARD, built end-to-end via the real admin process (opp + curated_solic |
+| `db/migrations/169_seed_tvsf_foundation_proposal.sql` | 67 | 0 | 0 | 169_seed_tvsf_foundation_proposal.sql The tenant-side Foundation 3DCP TVSF Round-45 PROPOSAL, captured live for deployment verification: the built app |
+| `db/migrations/170_seed_foundation_deck_ingest.sql` | 365 | 0 | 0 | 170_seed_foundation_deck_ingest.sql The Foundation deck atomized through the REAL ingest procedure (upload → document_cocoon → atomizeDocumentIntoLibr |
+| `db/migrations/171_atom_embeddings.sql` | 44 | 0 | 0 | 171_atom_embeddings.sql — semantic-retrieval spine for the atom library. One embedding per atom, TENANT-SCOPED and MODEL-TAGGED so embedding spaces ne |
+| `db/migrations/172_seed_scout_schedule.sql` | 12 | 0 | 0 | 172_seed_scout_schedule.sql — put web Source Scout auto-discovery on the shared cron. The scout worker (source_scout.scout_all_due) + OnSourceChangeDe |
+| `db/migrations/173_rls_close_amendment_notification_gap.sql` | 43 | 0 | 0 | 173_rls_close_amendment_notification_gap.sql Close the RLS coverage gap for two tenant-scoped tables added AFTER the mig-136 NOBYPASSRLS cutover (docs |
+| `db/migrations/174_tasks_broadcast_assignee.sql` | 24 | 0 | 0 | 174_tasks_broadcast_assignee.sql Allow a TENANT BROADCAST ToDo: a task with NO named assignee (assignee_role AND assignee_user_id both NULL) that targ |
+| `db/migrations/175_scout_candidate_classification.sql` | 37 | 0 | 0 | 175_scout_candidate_classification.sql Completes the "potential NEW or UPDATED OPP" review→release queue on `scout_findings` (SCOUT-INTAKE, task #176) |
+| `db/migrations/176_seed_program_guide_drafts.sql` | 45 | 0 | 0 | 176_seed_program_guide_drafts.sql #168 CONTENT-QUEUE — durable seed for the four program-primer guide DRAFTS (BAA · OTA · CSO · Grants/NOFO) plus thei |
+| `db/migrations/177_template_bridge_spine.sql` | 94 | 0 | 0 | Migration 177: template stable + template bridge — mirror of the opportunity-card spine (mig 094) for pristine templates. Design: docs/TEMPLATE_BRIDGE |
+| `db/migrations/178_tenant_document_template_provenance.sql` | 28 | 0 | 0 | Migration 178: standalone-document provenance + atomize-on-download idempotency. Phase 2 of the template bridge (docs/TEMPLATE_BRIDGE_DESIGN.md): a te |
+| `db/migrations/179_command_seen_state.sql` | 32 | 0 | 0 | 179_command_seen_state.sql Per-(user, scope, tab) "last looked at" watermark for the Command Center. The CC tab badges show the OPEN count (how many i |
+| `db/migrations/180_bucket_score_integrity.sql` | 42 | 0 | 0 | 180_bucket_score_integrity.sql Spotlight-bucket lock-down, Tier 1 — restore the integrity guards tenant_bucket_scores lost when the legacy spotlight_b |
+| `db/migrations/181_ranking_spine.sql` | 49 | 0 | 0 | Migration 181: Ranking-spine hardening. Canonical: docs/RANKING_SPINE.md. Realizes the customer-admin/designee → cap → rescore/reshuffle → single-list |
+| `db/migrations/182_master_build_complete.sql` | 18 | 0 | 0 | Migration 182: master OPP build-out completion flag. Canonical: docs/PROVISIONING_WORKSPACE_DESIGN.md. The explicit "this master OPP is fully built ou |
+| `db/migrations/183_comment_anchor.sql` | 17 | 0 | 0 | 183 · Span/node-anchored comments (SPINE-T7) A comment already belongs to a SECTION (proposal_comments.section_id). This adds an optional block anchor |
+| `db/migrations/184_restrict_shared_template_catalog_writes.sql` | 81 | 0 | 0 | 184_restrict_shared_template_catalog_writes.sql Hardening (defense-in-depth) for the "no cross-tenant shared objects" invariant. BACKGROUND. mig 136_r |
+| `db/migrations/185_restrict_shared_task_workflow_writes.sql` | 96 | 0 | 0 | 185_restrict_shared_task_workflow_writes.sql Hardening (defense-in-depth) for the "no cross-tenant shared objects" invariant — the follow-up to mig 18 |
+| `db/migrations/186_platform_scope_episodic_memories.sql` | 60 | 0 | 0 | 186_platform_scope_episodic_memories.sql PLATFORM-SCOPE MEMORY = NULL tenant_id, mirroring the descent model. Why: an rfp_admin has no ambient cross-t |
+| `db/migrations/187_compliance_field_provenance.sql` | 72 | 0 | 0 | 187_compliance_field_provenance.sql PER-FIELD PROVENANCE on the compliance matrix — never present a default as a rule. Why: driving the real DoW 2026  |
+| `db/migrations/188_compliance_provenance_pattern_match.sql` | 57 | 0 | 0 | 188_compliance_provenance_pattern_match.sql Correct the `solicitation_compliance.field_provenance` column comment for the two things migration 187 cou |
+| `db/migrations/189_ingest_studio.sql` | 103 | 0 | 0 | 189_ingest_studio.sql THE INGEST STUDIO — a staged compliance matrix and a phase state machine. Canonical design: docs/INGEST_STUDIO_DESIGN.md. WHY. ` |
+| `db/migrations/190_curation_notes_amendment_doc.sql` | 50 | 0 | 0 | 190: Mid-window master-OPP flexibility — curation notes + amendment↔document (docs/MASTER_MIRROR_OPP_DESIGN.md §1-2; the post-push, pre-portal window) |
+| `db/migrations/191_seed_immobileyes_proposals.sql` | 24620 | 0 | 0 | 191_seed_immobileyes_proposals.sql Deploy seed: the Immobileyes tenant + admin + company profile + the FOUR real DSIP past proposals ingested live thr |
+| `db/migrations/192_sol_doc_hash_unique_per_solicitation.sql` | 24 | 0 | 0 | 192 · Document-dedupe uniqueness is PER SOLICITATION, not global. `idx_sol_docs_content_hash_unique` was UNIQUE on content_hash across the whole table |
+| `db/migrations/193_character_limits.sql` | 46 | 0 | 0 | 193 · Character limits are a first-class compliance dimension. The compliance floor could measure PAGES, SLIDES and FONT SIZE — but a large family of  |
+| `db/migrations/194_rls_tenant_id_indexes.sql` | 56 | 0 | 0 | 194 — Index the column every RLS policy filters on. Six RLS-enabled tables carry `tenant_id`, have a `tenant_isolation` policy whose USING and WITH CH |
+| `db/migrations/195_atom_fulltext_index.sql` | 35 | 0 | 0 | 195 · Lexical relevance for library retrieval WHY. `selectForSection` ranked atoms by: scope tag filter → context-tag count → (gated) vector cosine →  |
+| `db/migrations/196_agent_rate_limit_default.sql` | 25 | 0 | 0 | 196 · Raise the default agent rate limit above one user action WHY. `platform_agent_config.default_rate_limit_per_hour` was 50, and the fabric refuses |
+| `db/migrations/197_atom_corpus_verbatim.sql` | 36 | 0 | 0 | Migration 197: mark library atoms that are the AGENCY's words, not the tenant's. WHY. Atomizing an uploaded solicitation package puts the whole packag |
+| `db/migrations/198_rotate_remaining_committed_admin.sql` | 49 | 0 | 0 | Migration 198: finish what 124 started — rotate the LAST master_admin off a committed credential. WHAT 124 DID. `124_rotate_committed_credentials.sql` |
+| `db/migrations/199_agent_task_log_fk_set_null.sql` | 40 | 0 | 0 | 199_agent_task_log_fk_set_null.sql An audit row must never keep its subject alive. agent_task_log.proposal_id and .section_id reference proposals/prop |
+| `db/migrations/200_promo_code_issuance.sql` | 42 | 0 | 0 | 200_promo_code_issuance.sql Make comp codes ISSUABLE, so we can hand a buyer a one-time code that opens a proposal portal without a card. The redempti |
+| `db/migrations/201_decode_pptx_entities_in_atoms.sql` | 63 | 0 | 0 | 201 · Decode the XML entities a pptx upload left in the library. PPTX text lives in XML, so a slide reading "Core Technology & IP" is stored as "Core  |
+| `db/migrations/202_card_dates_to_iso.sql` | 88 | 0 | 0 | 202 · Card dates stored as Date.prototype.toString() → ISO. buildCardSnapshot stringified date columns with a bare String(v). postgres.js returns thos |
+| `db/migrations/203_bucket_authoring_headroom.sql` | 27 | 0 | 0 | 203 · Spotlight bucket cap must leave authoring headroom (bug log B62) Mig 181 moved max_buckets_per_tenant 12 → 6. Every tenant-creation path (applic |
+| `db/migrations/204_retire_application_todo_rule.sql` | 59 | 0 | 0 | Migration 204: retire the mig-040 'Auto-todo on application' automation rule Depends on: 203 Bug log B51, half (a). One application raised TWO ToDos:  |
+| `db/migrations/205_backfill_opportunity_solicitation_backlink.sql` | 68 | 0 | 0 | Migration 205: backfill opportunities.solicitation_id from the forward link Depends on: 204 Bug log B46. An opportunity and its curated solicitation p |
+| `db/migrations/206_bucket_authoring_budget.sql` | 33 | 0 | 0 | 206 · The bucket cap becomes an authoring BUDGET, not `seeded + headroom`. History of this number, because it explains why it was wrong rather than ju |
+| `db/migrations/207_agent_task_scope.sql` | 65 | 0 | 0 | 207 · The review queue learns SCOPE. Comments went sub-section. Reviews never followed. proposal_comments proposal_id · section_id · anchor jsonb (mig |
+| `db/migrations/208_no_cross_tenant_atom_lineage.sql` | 85 | 0 | 0 | 208 · NOTHING READS OR WRITES CROSS-TENANT. EVER. The rule, stated by the owner: tenants never read or write each other's data. Bridges carry messages |
+| `db/migrations/209_rls_atom_link_tables.sql` | 86 | 0 | 0 | 209 · The READ half of "nothing reads or writes cross-tenant" Mig 208 closed the WRITE half for `atom_lineage`: a trigger refuses any edge whose two e |
+| `db/migrations/210_close_published_content_todos.sql` | 44 | 0 | 0 | 210_close_published_content_todos.sql BACKFILL for the fix in lib/content-admin.ts: publishing a page now closes the content_publish ToDo that asked f |
+| `db/migrations/211_seed_queued_guide_drafts.sql` | 65 | 0 | 0 | 211_seed_queued_guide_drafts.sql #168 CONTENT-QUEUE — durable capture of the guide drafts still awaiting review, plus the content_publish ToDo that pu |
+| `db/migrations/212_rls_proposal_spine.sql` | 141 | 0 | 0 | 212_rls_proposal_spine.sql Close a REAL cross-tenant read leak in the proposal spine. THE INVARIANT THIS RESTORES: nothing reads or writes cross-tenan |
+| `db/migrations/213_rls_child_tables_inherit_parent.sql` | 132 | 0 | 0 | 213_rls_child_tables_inherit_parent.sql Two more tables of the shape mig 212 closed, found by the instrument that mig 212 widened. `process_instance_t |
+| `db/migrations/214_close_committed_demo_credential.sql` | 53 | 0 | 0 | 214_close_committed_demo_credential.sql One seeded account is a usable production login with a password published in this repository. `191_seed_immobi |
+| `db/migrations/215_email_send_ledger.sql` | 191 | 0 | 0 | 215_email_send_ledger.sql The outbound-mail ledger and the suppression list. Both must exist BEFORE the first message is sent through the new seam, be |
+| `db/migrations/216_project_spine.sql` | 352 | 0 | 0 | 216_project_spine.sql Post-award project management (delivery): CLIN · WBS · milestones · deliverables. A SEGREGATED capability for tenants who have w |
+| `db/migrations/217_project_event_namespace.sql` | 42 | 0 | 0 | 217_project_event_namespace.sql Add `project` to the event-namespace registry. Post-award delivery is a new domain with its own lifecycle — baselines, |
+| `db/migrations/218_project_milestone_tasks.sql` | 163 | 0 | 0 | 218_project_milestone_tasks.sql The milestone becomes the unit of project management: a dated segment of work with a checklist, an owner, and a comple |
+| `db/migrations/219_project_closeout.sql` | 57 | 0 | 0 | 219_project_closeout.sql Close-out: the end of the project's life, recorded the same way its milestones are. ── WHY A STATUS FLIP IS NOT ENOUGH ────── |
+| `db/migrations/220_project_deliverable_documents.sql` | 38 | 0 | 0 | 220_project_deliverable_documents.sql A deliverable can be AUTHORED, not only uploaded. ── WHY THIS IS A LINK AND NOT A NEW SUBSYSTEM ──────────────── |
+| `db/migrations/221_project_task_spine.sql` | 268 | 0 | 0 | 221_project_task_spine.sql The task spine grows up: project-scope tasks, milestone-only dependencies, an assignee-owned estimate, attached references, |
+| `db/migrations/222_project_comments.sql` | 126 | 0 | 0 | 222_project_comments.sql The conversation a project did not have. ── WHAT WAS MISSING ──────────────────────────────────────────────────────────────── |
+| `db/migrations/223_project_reviews.sql` | 126 | 0 | 0 | 223_project_reviews.sql Somebody looked at this and said no, because X. ── WHAT WAS MISSING ────────────────────────────────────────────────────────── |
+| `db/migrations/224_project_acceptance_evidence.sql` | 103 | 0 | 0 | 224_project_acceptance_evidence.sql The BACKING for an acceptance — a signed DD-250, the COR's email, a transmittal receipt. ── WHAT THIS REPLACES, AN |
+| `db/migrations/225_project_risks.sql` | 121 | 0 | 0 | 225_project_risks.sql The register every program review asks for and nothing here could answer. ── A RISK AND AN ISSUE ARE ONE TABLE, DELIBERATELY ─── |
+| `db/migrations/226_project_meetings.sql` | 99 | 0 | 0 | 226_project_meetings.sql Where action items come from. ── THE ONE THING THIS ADDS THAT A DOCUMENT CANNOT ─────────────────────────────────────────── M |
+| `db/migrations/227_project_labor_and_wbs_spine.sql` | 170 | 0 | 0 | 227_project_labor_and_wbs_spine.sql Two things that belong together: the cost measure gets a source, and the WBS starts driving. ══ PART 1 · THE WBS I |
+| `db/migrations/228_milestones_are_the_wbs.sql` | 134 | 0 | 0 | 228_milestones_are_the_wbs.sql The WBS **is** the milestone list. Stated plainly by the product owner: "1 project is the portal. It has high level inf |
+| `db/migrations/229_drop_wbs_nodes.sql` | 75 | 0 | 0 | 229_drop_wbs_nodes.sql The second half of migration 228: remove the superseded table, and close the one thing collapsing the two spines quietly LOST.  |
+| `db/migrations/230_project_modifications.sql` | 240 | 0 | 0 | 230_project_modifications.sql Contract modifications — the only way a CLIN is allowed to change. ── WHY CLINs ARE WRITE-ONCE, AND STAY THAT WAY ────── |
+| `db/migrations/231_project_invoices.sql` | 244 | 0 | 0 | 231_project_invoices.sql Invoicing — the point where everything else in this capability becomes money. ── IT IS DELIBERATELY BUILT ON WHAT IS ALREADY  |
+| `db/migrations/232_project_cdrl_register.sql` | 192 | 0 | 0 | 232_project_cdrl_register.sql The CDRL register — DD Form 1423 data items, and the third state a deliverable never had. ── A CDRL IS AN OBLIGATION; A  |
+| `db/migrations/233_modification_change_clin_restrict.sql` | 49 | 0 | 0 | 233_modification_change_clin_restrict.sql A defect in migration 230, found by a probe that was doing something else entirely. ── WHAT WAS WRONG ────── |
+| `db/migrations/234_clin_child_cascade.sql` | 66 | 0 | 0 | 234_clin_child_cascade.sql Correcting migration 233, which was wrong for a reason worth writing down. ── THE CHAIN OF THREE ────────────────────────── |
+| `db/migrations/235_project_notification_policy.sql` | 59 | 0 | 0 | 235_project_notification_policy.sql Bringing Projects into the automation-policy layer, instead of beside it. ── WHAT WAS HARD-CODED ───────────────── |
+| `db/migrations/236_milestone_gate_closer.sql` | 44 | 0 | 0 | 236_milestone_gate_closer.sql Who closes a milestone's gate: a person, or the AI manager (A4). ── THE RULE THE PROPOSAL SIDE ALREADY LOCKED ────────── |
+| `db/migrations/237_freeze_trigger_returns_old.sql` | 110 | 0 | 0 | 237 · A BEFORE DELETE trigger that returns NEW returns NULL, and NULL cancels the delete. ── THE DEFECT ────────────────────────────────────────────── |
+| `db/migrations/238_tenant_opportunity_corpus.sql` | 177 | 0 | 0 | 238_tenant_opportunity_corpus.sql Copy the solicitation INWARD. All of it. The mirror becomes self-sufficient. ── WHAT THE MIRROR CARRIED, AND WHAT IT |
+| `db/migrations/239_curated_ranking_corpus.sql` | 114 | 0 | 0 | 239_curated_ranking_corpus.sql The ranking corpus is the CURATED RECORD, not the solicitation. ── WHAT MIGRATION 238 GOT WRONG ─────────────────────── |
+| `db/migrations/240_verdict_and_copy_split.sql` | 122 | 0 | 0 | 240_verdict_and_copy_split.sql A VERDICT and a TRANSFER are two different facts. Split them. ── WHAT ONE COLUMN WAS BEING ASKED TO MEAN ────────────── |
+| `db/migrations/241_release_field_basis.sql` | 75 | 0 | 0 | 241_release_field_basis.sql A value the product did not read must never look like one it did — and NEITHER MUST A BLANK. ── THE GAP THIS CLOSES ────── |
+| `db/migrations/242_funnel_attribution.sql` | 81 | 0 | 0 | 242 · Join the funnel across the sever. ── THE PROBLEM THIS SOLVES ────────────────────────────────────────────────────────────────── The funnel is co |
+| `db/migrations/243_contacts.sql` | 121 | 0 | 0 | 243 · `contacts` — the subject the CRM never had. ── WHY THIS TABLE EXISTS ──────────────────────────────────────────────────────────────────── docs/C |
+| `db/migrations/244_working_notes.sql` | 116 | 0 | 0 | 244 · `working_notes` — the shared board between the human, this session, and the companion. ── WHY THIS TABLE EXISTS ──────────────────────────────── |
+| `db/migrations/245_atom_titles_from_content.sql` | 58 | 0 | 0 | 245 · Repair atoms that were named after their node type. ── THE DEFECT ────────────────────────────────────────────────────────────────────────────── |
+| `db/migrations/246_space_presence.sql` | 96 | 0 | 0 | 246 · `space_presence` — the OPEN half of "somebody from outside is in your workspace". ── THE DEFECT THIS CLOSES ──────────────────────────────────── |
+| `db/migrations/247_space_presence_signed_out.sql` | 27 | 0 | 0 | 247 · `signed_out` — the fifth way a space-presence bracket closes. Mig 246 named four: `explicit` (they pressed exit), `left_space` (they turned up o |
+| `db/migrations/248_space_presence_interaction.sql` | 63 | 0 | 0 | 248 · space_presence.last_interaction_at — separating "the tab is open" from "a person is working" ── WHAT THIS FIXES ──────────────────────────────── |
+| `db/migrations/249_task_claims.sql` | 74 | 0 | 0 | 249 · A ToDo can be CLAIMED, and a claim can expire ── WHAT WAS MISSING ─────────────────────────────────────────────────────────────────────────── `t |
+| `db/migrations/250_forced_ascent.sql` | 48 | 0 | 0 | 250 · `forced` — an operator can end somebody's presence in a customer's workspace ── WHY A SIXTH CLOSE REASON ─────────────────────────────────────── |
+| `db/migrations/251_agent_task_attribution.sql` | 46 | 0 | 0 | 251 · Who asked for this agent work? ── THE QUESTION THAT COULD NOT BE ANSWERED ──────────────────────────────────────────────────── `agent_task_queue |
+| `db/migrations/252_atom_titles_repair_redo.sql` | 59 | 0 | 0 | 252 · Redo 245's repair, which was applied as a role that could not see the rows ── WHAT HAPPENED ──────────────────────────────────────────────────── |
+| `db/migrations/253_doc_tag_slugs.sql` | 56 | 0 | 0 | 253 · A `doc` tag a person can read ── WHAT A CUSTOMER SAW ──────────────────────────────────────────────────────────────────────── The library shelf  |
+| `db/migrations/254_govtech_app_can_login.sql` | 73 | 0 | 0 | 254 · `govtech_app` can LOGIN — the half of the RLS cutover that lived only in a runbook ── WHAT THIS FIXES ────────────────────────────────────────── |
+| `db/migrations/migrate.mjs` | 280 | 0 | 0 | Lightweight migration runner for production startup. Uses the postgres.js driver already bundled in the Next.js standalone image. No psql or shell dep |
+| `db/migrations/run.sh` | 248 | 0 | 0 | GovWin — Database Migration & Seed Runner --------------------------------------------------------------------------- Runs all SQL migrations in order |
 
 ### db · other · 1 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `seeds/golden_fixtures.sql` | 9783 | 0 | 0 | seed_golden_fixtures.sql Idempotent seed of 5 real DoD solicitation fixtures. Paste this entire file into Railway's Postgres Query tab. Safe to re-run |
+| `db/seeds/golden_fixtures.sql` | 9783 | 0 | 0 | seed_golden_fixtures.sql Idempotent seed of 5 real DoD solicitation fixtures. Paste this entire file into Railway's Postgres Query tab. Safe to re-run |
 
 ### frontend · admin pages · 82 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `app/admin/agents/page.tsx` | 228 | 7 | 0 | — |
-| `app/admin/analytics/page.tsx` | 467 | 5 | 0 | — |
-| `app/admin/applications/page.tsx` | 114 | 3 | 0 | — |
-| `app/admin/architecture/page.tsx` | 66 | 1 | 0 | — |
-| `app/admin/automation-framework/page.tsx` | 126 | 0 | 0 | — |
-| `app/admin/automation/automation-client.tsx` | 190 | 1 | 1 | — |
-| `app/admin/automation/page.tsx` | 190 | 5 | 0 | — |
-| `app/admin/billing/page.tsx` | 314 | 3 | 0 | — |
-| `app/admin/cards/page.tsx` | 190 | 5 | 0 | Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md) |
-| `app/admin/command/page.tsx` | 238 | 6 | 0 | — |
-| `app/admin/contacts/page.tsx` | 166 | 3 | 0 | — |
-| `app/admin/crm/page.tsx` | 211 | 5 | 0 | — |
-| `app/admin/dashboard/page.tsx` | 281 | 5 | 0 | — |
-| `app/admin/documents/[documentId]/page.tsx` | 189 | 3 | 0 | — |
-| `app/admin/documents/document-list-client.tsx` | 309 | 2 | 1 | — |
-| `app/admin/documents/page.tsx` | 19 | 2 | 0 | — |
-| `app/admin/events/event-stream-client.tsx` | 324 | 2 | 1 | — |
-| `app/admin/events/page.tsx` | 118 | 3 | 0 | — |
-| `app/admin/expert-time/page.tsx` | 151 | 1 | 0 | — |
-| `app/admin/funnel/page.tsx` | 294 | 3 | 0 | — |
-| `app/admin/guardrail-defaults/page.tsx` | 23 | 3 | 0 | — |
-| `app/admin/guides/page.tsx` | 154 | 3 | 0 | — |
-| `app/admin/intake/intake-guide.tsx` | 105 | 1 | 1 | The in-page guide for hand-staging an opportunity. |
-| `app/admin/intake/page.tsx` | 35 | 6 | 0 | — |
-| `app/admin/layout.tsx` | 88 | 8 | 0 | — |
-| `app/admin/notes/page.tsx` | 226 | 5 | 0 | — |
-| `app/admin/observe/companion-guide.tsx` | 112 | 0 | 1 | The companion's guide, ON the page where you ask it. Static server component, collapsible via native <details> — no client JS, no clock read during re |
-| `app/admin/observe/page.tsx` | 226 | 5 | 0 | — |
-| `app/admin/opportunities/page.tsx` | 160 | 3 | 0 | Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md) |
-| `app/admin/page.tsx` | 16 | 0 | 0 | — |
-| `app/admin/pipeline/page.tsx` | 275 | 2 | 0 | — |
-| `app/admin/process/page.tsx` | 286 | 3 | 1 | — |
-| `app/admin/process/process-monitor-client.tsx` | 490 | 2 | 1 | — |
-| `app/admin/processes/admin-processes-client.tsx` | 213 | 2 | 1 | — |
-| `app/admin/processes/page.tsx` | 62 | 4 | 0 | Admin cross-tenant process ledger — /admin/processes |
-| `app/admin/projects/page.tsx` | 249 | 5 | 0 | — |
-| `app/admin/proposals/page.tsx` | 121 | 2 | 0 | Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md) |
-| `app/admin/provisioning/[portalId]/page.tsx` | 270 | 6 | 0 | Provisioning cockpit — /admin/provisioning/[portalId] (docs/PROVISIONING_WORKSPACE_DESIGN.md, PV-3). |
-| `app/admin/provisioning/[portalId]/provisioning-guide.tsx` | 98 | 1 | 1 | The in-page guide for the provisioning cockpit — the skeleton, and release two. |
-| `app/admin/provisioning/[portalId]/release-panel.tsx` | 134 | 2 | 2 | — |
-| `app/admin/provisioning/instant-release-button.tsx` | 65 | 1 | 1 | — |
-| `app/admin/provisioning/page.tsx` | 144 | 5 | 0 | Release & SLA board — /admin/provisioning |
-| `app/admin/purchases/page.tsx` | 136 | 3 | 0 | — |
-| `app/admin/rfp-curation/[solId]/curation-guide.tsx` | 137 | 1 | 1 | The in-page guide for the curation workspace — the longest step in the arc, and the one that ends with a customer seeing something. |
-| `app/admin/rfp-curation/[solId]/page.tsx` | 426 | 5 | 0 | — |
-| `app/admin/rfp-curation/[solId]/spotlight-summary-editor.tsx` | 294 | 0 | 1 | — |
-| `app/admin/rfp-curation/[solId]/topic/[topicId]/page.tsx` | 74 | 3 | 0 | — |
-| `app/admin/rfp-curation/curation-queue-guide.tsx` | 60 | 1 | 1 | The in-page guide for the RFP triage queue — the front door of curation. |
-| `app/admin/rfp-curation/page.tsx` | 115 | 7 | 0 | — |
-| `app/admin/rfp-curation/triage-todos.tsx` | 19 | 1 | 1 | Admin triage ToDos panel (Scouting Spine M2 / C2.b) — the SINGLE completable admin inbox. |
-| `app/admin/rfp-curation/upload/page.tsx` | 38 | 2 | 0 | — |
-| `app/admin/scouts/page.tsx` | 296 | 6 | 0 | /admin/scouts — Scout worker-pool monitor (#103). |
-| `app/admin/scouts/scouts-guide.tsx` | 107 | 1 | 1 | The in-page guide for the scout candidate queue. |
-| `app/admin/site/[pageKey]/editor-client.tsx` | 424 | 5 | 1 | — |
-| `app/admin/site/[pageKey]/page.tsx` | 33 | 3 | 0 | — |
-| `app/admin/site/content/[id]/route.ts` | 31 | 2 | 0 | GET /admin/site/content/[id] — resolve a content_pages row id to its Content Studio editor URL and redirect. This is the deep-link target for the `con |
-| `app/admin/site/docs/[type]/[slug]/doc-canvas-editor.tsx` | 248 | 6 | 1 | — |
-| `app/admin/site/docs/[type]/[slug]/page.tsx` | 78 | 5 | 0 | Site content document editor — canvas-native authoring for front-facing documents (blog_post / resource / guide / testimonial / team_member). The Canv |
-| `app/admin/site/page.tsx` | 156 | 3 | 0 | — |
-| `app/admin/sources/[profileId]/page.tsx` | 245 | 3 | 0 | — |
-| `app/admin/sources/[profileId]/source-detail-client.tsx` | 267 | 4 | 1 | — |
-| `app/admin/sources/page.tsx` | 203 | 6 | 0 | — |
-| `app/admin/sources/sources-guide.tsx` | 80 | 1 | 1 | The in-page guide for source profiles — where findings come from in the first place. |
-| `app/admin/storage/page.tsx` | 28 | 2 | 0 | — |
-| `app/admin/system-state/page.tsx` | 721 | 3 | 1 | — |
-| `app/admin/system-state/system-state-client.tsx` | 1339 | 3 | 1 | — |
-| `app/admin/system/page.tsx` | 211 | 5 | 0 | /admin/system — master_admin dashboard showing: - queue depth (agent_task_queue pending count) - event rates (events + errors in the last hour) - tool |
-| `app/admin/template-stable/page.tsx` | 187 | 0 | 0 | — |
-| `app/admin/templates/[templateId]/edit/page.tsx` | 56 | 4 | 0 | Template editor route — author a document template's canvas in the full WYSIWYG editor. New templates open with an empty canvas seeded from their pres |
-| `app/admin/templates/page.tsx` | 451 | 3 | 0 | — |
-| `app/admin/tenants/[tenantId]/page.tsx` | 393 | 6 | 0 | — |
-| `app/admin/tenants/page.tsx` | 140 | 4 | 0 | — |
-| `app/admin/waitlist/page.tsx` | 99 | 2 | 0 | — |
-| `app/admin/workflows/launch-collaboration-client.tsx` | 265 | 0 | 1 | — |
-| `app/admin/workflows/launch-content-client.tsx` | 185 | 0 | 1 | — |
-| `app/admin/workflows/page.tsx` | 402 | 5 | 1 | — |
-| `app/admin/workflows/workflow-graph.tsx` | 319 | 0 | 3 | — |
-| `app/admin/workflows/workflow-map.tsx` | 306 | 2 | 1 | — |
-| `app/admin/workflows/workflow-monitor-client.tsx` | 692 | 5 | 1 | — |
-| `app/admin/workflows/workflow-shapes.ts` | 673 | 1 | 2 | Workflow shape catalog — the DESIGNED step-DAG of every workflow the pipeline registers, mirrored here so the admin console can VISUALISE each templat |
-| `app/admin/workspace-access/end-access-button.tsx` | 73 | 1 | 1 | — |
-| `app/admin/workspace-access/page.tsx` | 182 | 4 | 0 | /admin/workspace-access — who is inside a customer's workspace, and who has been. |
+| `frontend/app/admin/agents/page.tsx` | 228 | 7 | 0 | — |
+| `frontend/app/admin/analytics/page.tsx` | 467 | 5 | 0 | — |
+| `frontend/app/admin/applications/page.tsx` | 114 | 3 | 0 | — |
+| `frontend/app/admin/architecture/page.tsx` | 66 | 1 | 0 | — |
+| `frontend/app/admin/automation-framework/page.tsx` | 126 | 0 | 0 | — |
+| `frontend/app/admin/automation/automation-client.tsx` | 190 | 1 | 1 | — |
+| `frontend/app/admin/automation/page.tsx` | 190 | 5 | 0 | — |
+| `frontend/app/admin/billing/page.tsx` | 314 | 3 | 0 | — |
+| `frontend/app/admin/cards/page.tsx` | 190 | 5 | 0 | Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md) |
+| `frontend/app/admin/command/page.tsx` | 238 | 6 | 0 | — |
+| `frontend/app/admin/contacts/page.tsx` | 166 | 3 | 0 | — |
+| `frontend/app/admin/crm/page.tsx` | 211 | 5 | 0 | — |
+| `frontend/app/admin/dashboard/page.tsx` | 281 | 5 | 0 | — |
+| `frontend/app/admin/documents/[documentId]/page.tsx` | 189 | 3 | 0 | — |
+| `frontend/app/admin/documents/document-list-client.tsx` | 309 | 2 | 1 | — |
+| `frontend/app/admin/documents/page.tsx` | 19 | 2 | 0 | — |
+| `frontend/app/admin/events/event-stream-client.tsx` | 324 | 2 | 1 | — |
+| `frontend/app/admin/events/page.tsx` | 118 | 3 | 0 | — |
+| `frontend/app/admin/expert-time/page.tsx` | 151 | 1 | 0 | — |
+| `frontend/app/admin/funnel/page.tsx` | 294 | 3 | 0 | — |
+| `frontend/app/admin/guardrail-defaults/page.tsx` | 23 | 3 | 0 | — |
+| `frontend/app/admin/guides/page.tsx` | 154 | 3 | 0 | — |
+| `frontend/app/admin/intake/intake-guide.tsx` | 105 | 1 | 1 | The in-page guide for hand-staging an opportunity. |
+| `frontend/app/admin/intake/page.tsx` | 35 | 6 | 0 | — |
+| `frontend/app/admin/layout.tsx` | 88 | 8 | 0 | — |
+| `frontend/app/admin/notes/page.tsx` | 226 | 5 | 0 | — |
+| `frontend/app/admin/observe/companion-guide.tsx` | 112 | 0 | 1 | The companion's guide, ON the page where you ask it. Static server component, collapsible via native <details> — no client JS, no clock read during re |
+| `frontend/app/admin/observe/page.tsx` | 226 | 5 | 0 | — |
+| `frontend/app/admin/opportunities/page.tsx` | 160 | 3 | 0 | Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md) |
+| `frontend/app/admin/page.tsx` | 16 | 0 | 0 | — |
+| `frontend/app/admin/pipeline/page.tsx` | 275 | 2 | 0 | — |
+| `frontend/app/admin/process/page.tsx` | 286 | 3 | 1 | — |
+| `frontend/app/admin/process/process-monitor-client.tsx` | 490 | 2 | 1 | — |
+| `frontend/app/admin/processes/admin-processes-client.tsx` | 213 | 2 | 1 | — |
+| `frontend/app/admin/processes/page.tsx` | 62 | 4 | 0 | Admin cross-tenant process ledger — /admin/processes |
+| `frontend/app/admin/projects/page.tsx` | 249 | 5 | 0 | — |
+| `frontend/app/admin/proposals/page.tsx` | 121 | 2 | 0 | Admin cross-tenant console page — reads span tenants, so use the owner (BYPASSRLS) pool. (docs/RLS_CUTOVER.md) |
+| `frontend/app/admin/provisioning/[portalId]/page.tsx` | 270 | 6 | 0 | Provisioning cockpit — /admin/provisioning/[portalId] (docs/PROVISIONING_WORKSPACE_DESIGN.md, PV-3). |
+| `frontend/app/admin/provisioning/[portalId]/provisioning-guide.tsx` | 98 | 1 | 1 | The in-page guide for the provisioning cockpit — the skeleton, and release two. |
+| `frontend/app/admin/provisioning/[portalId]/release-panel.tsx` | 134 | 2 | 2 | — |
+| `frontend/app/admin/provisioning/instant-release-button.tsx` | 65 | 1 | 1 | — |
+| `frontend/app/admin/provisioning/page.tsx` | 144 | 5 | 0 | Release & SLA board — /admin/provisioning |
+| `frontend/app/admin/purchases/page.tsx` | 136 | 3 | 0 | — |
+| `frontend/app/admin/rfp-curation/[solId]/curation-guide.tsx` | 137 | 1 | 1 | The in-page guide for the curation workspace — the longest step in the arc, and the one that ends with a customer seeing something. |
+| `frontend/app/admin/rfp-curation/[solId]/page.tsx` | 426 | 5 | 0 | — |
+| `frontend/app/admin/rfp-curation/[solId]/spotlight-summary-editor.tsx` | 294 | 0 | 1 | — |
+| `frontend/app/admin/rfp-curation/[solId]/topic/[topicId]/page.tsx` | 74 | 3 | 0 | — |
+| `frontend/app/admin/rfp-curation/curation-queue-guide.tsx` | 60 | 1 | 1 | The in-page guide for the RFP triage queue — the front door of curation. |
+| `frontend/app/admin/rfp-curation/page.tsx` | 115 | 7 | 0 | — |
+| `frontend/app/admin/rfp-curation/triage-todos.tsx` | 19 | 1 | 1 | Admin triage ToDos panel (Scouting Spine M2 / C2.b) — the SINGLE completable admin inbox. |
+| `frontend/app/admin/rfp-curation/upload/page.tsx` | 38 | 2 | 0 | — |
+| `frontend/app/admin/scouts/page.tsx` | 296 | 6 | 0 | /admin/scouts — Scout worker-pool monitor (#103). |
+| `frontend/app/admin/scouts/scouts-guide.tsx` | 107 | 1 | 1 | The in-page guide for the scout candidate queue. |
+| `frontend/app/admin/site/[pageKey]/editor-client.tsx` | 424 | 5 | 1 | — |
+| `frontend/app/admin/site/[pageKey]/page.tsx` | 33 | 3 | 0 | — |
+| `frontend/app/admin/site/content/[id]/route.ts` | 31 | 2 | 0 | GET /admin/site/content/[id] — resolve a content_pages row id to its Content Studio editor URL and redirect. This is the deep-link target for the `con |
+| `frontend/app/admin/site/docs/[type]/[slug]/doc-canvas-editor.tsx` | 248 | 6 | 1 | — |
+| `frontend/app/admin/site/docs/[type]/[slug]/page.tsx` | 78 | 5 | 0 | Site content document editor — canvas-native authoring for front-facing documents (blog_post / resource / guide / testimonial / team_member). The Canv |
+| `frontend/app/admin/site/page.tsx` | 156 | 3 | 0 | — |
+| `frontend/app/admin/sources/[profileId]/page.tsx` | 245 | 3 | 0 | — |
+| `frontend/app/admin/sources/[profileId]/source-detail-client.tsx` | 267 | 4 | 1 | — |
+| `frontend/app/admin/sources/page.tsx` | 203 | 6 | 0 | — |
+| `frontend/app/admin/sources/sources-guide.tsx` | 80 | 1 | 1 | The in-page guide for source profiles — where findings come from in the first place. |
+| `frontend/app/admin/storage/page.tsx` | 28 | 2 | 0 | — |
+| `frontend/app/admin/system-state/page.tsx` | 721 | 3 | 1 | — |
+| `frontend/app/admin/system-state/system-state-client.tsx` | 1339 | 3 | 1 | — |
+| `frontend/app/admin/system/page.tsx` | 211 | 5 | 0 | /admin/system — master_admin dashboard showing: - queue depth (agent_task_queue pending count) - event rates (events + errors in the last hour) - tool |
+| `frontend/app/admin/template-stable/page.tsx` | 187 | 0 | 0 | — |
+| `frontend/app/admin/templates/[templateId]/edit/page.tsx` | 56 | 4 | 0 | Template editor route — author a document template's canvas in the full WYSIWYG editor. New templates open with an empty canvas seeded from their pres |
+| `frontend/app/admin/templates/page.tsx` | 451 | 3 | 0 | — |
+| `frontend/app/admin/tenants/[tenantId]/page.tsx` | 393 | 6 | 0 | — |
+| `frontend/app/admin/tenants/page.tsx` | 140 | 4 | 0 | — |
+| `frontend/app/admin/waitlist/page.tsx` | 99 | 2 | 0 | — |
+| `frontend/app/admin/workflows/launch-collaboration-client.tsx` | 265 | 0 | 1 | — |
+| `frontend/app/admin/workflows/launch-content-client.tsx` | 185 | 0 | 1 | — |
+| `frontend/app/admin/workflows/page.tsx` | 402 | 5 | 1 | — |
+| `frontend/app/admin/workflows/workflow-graph.tsx` | 319 | 0 | 3 | — |
+| `frontend/app/admin/workflows/workflow-map.tsx` | 306 | 2 | 1 | — |
+| `frontend/app/admin/workflows/workflow-monitor-client.tsx` | 692 | 5 | 1 | — |
+| `frontend/app/admin/workflows/workflow-shapes.ts` | 673 | 1 | 2 | Workflow shape catalog — the DESIGNED step-DAG of every workflow the pipeline registers, mirrored here so the admin console can VISUALISE each templat |
+| `frontend/app/admin/workspace-access/end-access-button.tsx` | 73 | 1 | 1 | — |
+| `frontend/app/admin/workspace-access/page.tsx` | 182 | 4 | 0 | /admin/workspace-access — who is inside a customer's workspace, and who has been. |
 
 ### frontend · api routes · 292 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `app/api/admin/agent-gates/sweep/route.ts` | 44 | 3 | 0 | POST /api/admin/agent-gates/sweep |
-| `app/api/admin/agents/platform-config/route.ts` | 228 | 4 | 1 | GET /api/admin/agents/platform-config — pipeline-wide AI defaults + cap PATCH /api/admin/agents/platform-config — set defaults / cap / master switch |
-| `app/api/admin/agents/route.ts` | 106 | 3 | 0 | GET /api/admin/agents — Agent monitoring dashboard |
-| `app/api/admin/agents/usage/route.ts` | 245 | 3 | 0 | GET /api/admin/agents/usage — Admin agent usage dashboard |
-| `app/api/admin/agents/workforce/route.ts` | 83 | 3 | 0 | GET /api/admin/agents/workforce (#117) — RFP-admin oversight of the agent workforce. |
-| `app/api/admin/applications/[id]/accept/route.ts` | 400 | 14 | 0 | — |
-| `app/api/admin/applications/[id]/reject/route.ts` | 161 | 8 | 0 | — |
-| `app/api/admin/applications/[id]/status/route.ts` | 114 | 4 | 0 | — |
-| `app/api/admin/architecture/live/route.ts` | 44 | 2 | 0 | — |
-| `app/api/admin/architecture/schema/route.ts` | 80 | 2 | 0 | — |
-| `app/api/admin/architecture/stats/route.ts` | 49 | 2 | 0 | — |
-| `app/api/admin/automation-framework/route.ts` | 141 | 4 | 1 | GET /api/admin/automation-framework — the platform automation framework (mig 126). PATCH /api/admin/automation-framework — tune it (RFP-Pipeline admin |
-| `app/api/admin/automation/[ruleId]/route.ts` | 279 | 3 | 0 | PATCH /api/admin/automation/[ruleId] — Toggle active, update config |
-| `app/api/admin/automation/route.ts` | 196 | 3 | 0 | GET /api/admin/automation — List automation rules POST /api/admin/automation — Create a new automation rule |
-| `app/api/admin/compliance-presets/route.ts` | 237 | 4 | 0 | GET + POST /api/admin/compliance-presets |
-| `app/api/admin/compliance-suggest/route.ts` | 109 | 3 | 0 | GET /api/admin/compliance-suggest?namespace=...&variableName=... |
-| `app/api/admin/documents/[documentId]/export/route.ts` | 129 | 6 | 0 | /api/admin/documents/[documentId]/export — export a document to file format. |
-| `app/api/admin/documents/[documentId]/route.ts` | 320 | 4 | 0 | /api/admin/documents/[documentId] — single document operations. |
-| `app/api/admin/documents/route.ts` | 209 | 4 | 0 | /api/admin/documents — Admin Document Builder CRUD. |
-| `app/api/admin/documents/upload-image/route.ts` | 68 | 2 | 0 | — |
-| `app/api/admin/email/suppressions/route.ts` | 89 | 4 | 0 | — |
-| `app/api/admin/event-brackets/sweep/route.ts` | 66 | 3 | 0 | Close the event brackets a crashed process left open. |
-| `app/api/admin/expert-time/availability/route.ts` | 98 | 3 | 0 | RFP-Pipeline admin expert-time availability (Terms §7 calendar). GET — list non-cancelled upcoming slots (+ who booked each) POST { startAt, endAt } — |
-| `app/api/admin/extract-topics/route.ts` | 48 | 3 | 0 | POST /api/admin/extract-topics |
-| `app/api/admin/guardrail-defaults/route.ts` | 79 | 4 | 0 | GET /api/admin/guardrail-defaults — the RFP-admin default guardrails + hard limits PATCH /api/admin/guardrail-defaults — update them { limits?, defaul |
-| `app/api/admin/intake/route.ts` | 38 | 3 | 0 | POST /api/admin/intake — stage a found/uploaded opportunity NOTICE into the RFP review queue (the head of the RFP river; Scout-shaped). Creates a stag |
-| `app/api/admin/notes/[noteId]/route.ts` | 51 | 3 | 0 | PATCH /api/admin/notes/[noteId] — move a note along `watching → seen → resolved`. |
-| `app/api/admin/notes/route.ts` | 83 | 3 | 0 | POST /api/admin/notes — add a note to the shared board. |
-| `app/api/admin/observe/route.ts` | 85 | 4 | 0 | POST /api/admin/observe — ask the ops companion to read the window. |
-| `app/api/admin/opportunities/[oppId]/lifecycle/route.ts` | 236 | 8 | 1 | — |
-| `app/api/admin/opportunities/[oppId]/publish/route.ts` | 66 | 5 | 0 | POST /api/admin/opportunities/[oppId]/publish |
-| `app/api/admin/opportunities/[oppId]/watch/route.ts` | 71 | 5 | 0 | POST /api/admin/opportunities/[oppId]/watch → arm update-monitoring on a master opportunity DELETE /api/admin/opportunities/[oppId]/watch → disarm it |
-| `app/api/admin/partners/route.ts` | 49 | 4 | 0 | POST /api/admin/partners — an RFP admin creates a new partner-manager (EconDev org) (docs/PARTNER_MANAGER_DESIGN.md D4). Creates the partner_admin use |
-| `app/api/admin/promo-codes/route.ts` | 146 | 4 | 0 | Comp-code issuance — the admin side of the free-purchase path. |
-| `app/api/admin/proposals/[proposalId]/full-draft/route.ts` | 177 | 4 | 1 | POST /api/admin/proposals/[proposalId]/full-draft — the Proposal Auto-Drive "Doorbell". |
-| `app/api/admin/proposals/[proposalId]/studio/route.ts` | 71 | 4 | 0 | POST /api/admin/proposals/[proposalId]/studio — the Proposal Studio doorbell (full automation). |
-| `app/api/admin/proposals/route.ts` | 62 | 3 | 0 | GET /api/admin/proposals — recent proposals across ALL tenants, for the admin doorbell picker. |
-| `app/api/admin/provisioning/[portalId]/release/route.ts` | 151 | 7 | 0 | POST /api/admin/provisioning/[portalId]/release |
-| `app/api/admin/reconcile-cards/route.ts` | 65 | 5 | 0 | POST /api/admin/reconcile-cards |
-| `app/api/admin/rfp-curation/[solId]/amendments/[amendmentId]/route.ts` | 73 | 4 | 1 | Confirm or dismiss a detected amendment — POST { action: 'confirm' \| 'dismiss' }. |
-| `app/api/admin/rfp-curation/[solId]/amendments/route.ts` | 169 | 4 | 1 | Amendments for a solicitation — GET (list) + POST (log a detected amendment). |
-| `app/api/admin/rfp-curation/[solId]/annotations/[annotationId]/route.ts` | 118 | 5 | 0 | PATCH /api/admin/rfp-curation/[solId]/annotations/[annotationId] |
-| `app/api/admin/rfp-curation/[solId]/annotations/route.ts` | 215 | 4 | 0 | GET + POST /api/admin/rfp-curation/[solId]/annotations |
-| `app/api/admin/rfp-curation/[solId]/apply-preset/route.ts` | 392 | 6 | 0 | POST /api/admin/rfp-curation/[solId]/apply-preset |
-| `app/api/admin/rfp-curation/[solId]/assess-ingest/route.ts` | 198 | 7 | 1 | POST /api/admin/rfp-curation/[solId]/assess-ingest |
-| `app/api/admin/rfp-curation/[solId]/assessment/route.ts` | 73 | 5 | 0 | GET /api/admin/rfp-curation/[solId]/assessment |
-| `app/api/admin/rfp-curation/[solId]/broadcast/route.ts` | 62 | 6 | 0 | POST /api/admin/rfp-curation/[solId]/broadcast |
-| `app/api/admin/rfp-curation/[solId]/complete-buildout/route.ts` | 50 | 4 | 0 | POST /api/admin/rfp-curation/[solId]/complete-buildout |
-| `app/api/admin/rfp-curation/[solId]/compliance/route.ts` | 205 | 7 | 0 | GET + POST /api/admin/rfp-curation/[solId]/compliance |
-| `app/api/admin/rfp-curation/[solId]/force-release/route.ts` | 139 | 5 | 0 | POST /api/admin/rfp-curation/[solId]/force-release |
-| `app/api/admin/rfp-curation/[solId]/ingest-assist/route.ts` | 255 | 9 | 0 | POST /api/admin/rfp-curation/[solId]/ingest-assist |
-| `app/api/admin/rfp-curation/[solId]/ingest-phase/route.ts` | 324 | 9 | 0 | Ingest Studio — the phase gate. /api/admin/rfp-curation/[solId]/ingest-phase |
-| `app/api/admin/rfp-curation/[solId]/items/[itemId]/route.ts` | 109 | 4 | 0 | PATCH /api/admin/rfp-curation/[solId]/items/[itemId] — decide a required item's disposition. |
-| `app/api/admin/rfp-curation/[solId]/notes/route.ts` | 93 | 5 | 0 | GET + POST /api/admin/rfp-curation/[solId]/notes — the curation note thread (mig 190). |
-| `app/api/admin/rfp-curation/[solId]/route.ts` | 357 | 5 | 0 | GET /api/admin/rfp-curation/[solId] |
-| `app/api/admin/rfp-curation/[solId]/shred-audit/route.ts` | 75 | 4 | 0 | POST /api/admin/rfp-curation/[solId]/shred-audit |
-| `app/api/admin/rfp-curation/[solId]/topics/[topicId]/compliance/route.ts` | 366 | 5 | 0 | GET + PUT + DELETE /api/admin/rfp-curation/[solId]/topics/[topicId]/compliance |
-| `app/api/admin/rfp-curation/[solId]/triage/route.ts` | 255 | 4 | 0 | POST /api/admin/rfp-curation/[solId]/triage |
-| `app/api/admin/rfp-curation/[solId]/volumes/[volumeId]/route.ts` | 100 | 4 | 0 | PATCH /api/admin/rfp-curation/[solId]/volumes/[volumeId] — decide a whole volume's disposition. |
-| `app/api/admin/rfp-curation/route.ts` | 80 | 3 | 0 | GET /api/admin/rfp-curation |
-| `app/api/admin/rfp-document/[id]/set-primary/route.ts` | 89 | 4 | 0 | POST /api/admin/rfp-document/[id]/set-primary |
-| `app/api/admin/rfp-document/[id]/signed-url/route.ts` | 66 | 4 | 0 | GET /api/admin/rfp-document/[id]/signed-url |
-| `app/api/admin/rfp-upload/route.ts` | 675 | 11 | 0 | POST /api/admin/rfp-upload |
-| `app/api/admin/sbir-data/ingest/route.ts` | 613 | 4 | 0 | — |
-| `app/api/admin/sbir-data/lookup/route.ts` | 182 | 2 | 0 | GET /api/admin/sbir-data/lookup |
-| `app/api/admin/scout-review/[findingId]/route.ts` | 105 | 4 | 0 | POST /api/admin/scout-review/[findingId] — act on a scout candidate (#176). rfp_admin \| master_admin. |
-| `app/api/admin/scout-review/route.ts` | 40 | 3 | 0 | GET /api/admin/scout-review — the "potential NEW or UPDATED OPP" candidate queue (#176). |
-| `app/api/admin/section-standards/route.ts` | 110 | 4 | 1 | GET /api/admin/section-standards — list the section-standards taxonomy POST /api/admin/section-standards — add a standard (RFP admin) |
-| `app/api/admin/shadow-transition/route.ts` | 68 | 4 | 0 | POST /api/admin/shadow-transition — audit an RFP-admin's move between spaces. |
-| `app/api/admin/site/docs/[type]/[slug]/publish/route.ts` | 52 | 3 | 0 | POST /api/admin/site/docs/[type]/[slug]/publish — promote latest draft + revalidate. |
-| `app/api/admin/site/docs/[type]/[slug]/route.ts` | 17 | 2 | 0 | GET /api/admin/site/docs/[type]/[slug] — active + latest draft of a document. |
-| `app/api/admin/site/docs/[type]/[slug]/save/route.ts` | 64 | 3 | 0 | POST /api/admin/site/docs/[type]/[slug]/save — save a document draft. |
-| `app/api/admin/site/docs/[type]/[slug]/status/route.ts` | 71 | 3 | 0 | POST /api/admin/site/docs/[type]/[slug]/status — archive (retire) or restore a posting. |
-| `app/api/admin/site/docs/route.ts` | 16 | 2 | 0 | GET /api/admin/site/docs — list all documents (blog_post/resource/guide/testimonial/team_member). |
-| `app/api/admin/site/pages/[pageKey]/publish/route.ts` | 71 | 4 | 0 | POST /api/admin/site/pages/[pageKey]/publish — promote latest draft to active + revalidate. |
-| `app/api/admin/site/pages/[pageKey]/route.ts` | 18 | 2 | 0 | GET /api/admin/site/pages/[pageKey] — the active + latest draft version of a page. |
-| `app/api/admin/site/pages/[pageKey]/save/route.ts` | 53 | 4 | 0 | POST /api/admin/site/pages/[pageKey]/save — save a whole-page draft snapshot. |
-| `app/api/admin/site/pages/[pageKey]/versions/route.ts` | 18 | 2 | 0 | GET /api/admin/site/pages/[pageKey]/versions — full version history, newest first. |
-| `app/api/admin/site/pages/route.ts` | 17 | 2 | 0 | GET /api/admin/site/pages — list all content pages (active version + draft flag). |
-| `app/api/admin/site/upload-image/route.ts` | 55 | 2 | 0 | POST /api/admin/site/upload-image — upload a CMS image, return a stable public URL. |
-| `app/api/admin/sources/[profileId]/diffs/route.ts` | 188 | 3 | 0 | GET /api/admin/sources/[profileId]/diffs — List diffs for a source profile |
-| `app/api/admin/sources/[profileId]/expand-topics/route.ts` | 241 | 3 | 0 | POST /api/admin/sources/[profileId]/expand-topics — Enqueue topic expansion |
-| `app/api/admin/sources/[profileId]/regions/[regionId]/route.ts` | 94 | 3 | 0 | DELETE /api/admin/sources/[profileId]/regions/[regionId] — Soft-delete a region |
-| `app/api/admin/sources/[profileId]/regions/route.ts` | 208 | 3 | 0 | GET /api/admin/sources/[profileId]/regions — List regions for a source profile POST /api/admin/sources/[profileId]/regions — Create a new region annot |
-| `app/api/admin/sources/[profileId]/route.ts` | 169 | 3 | 0 | PATCH /api/admin/sources/[profileId] — Update source profile settings |
-| `app/api/admin/sources/[profileId]/scout/route.ts` | 112 | 3 | 0 | POST /api/admin/sources/[profileId]/scout — Trigger a manual scout run |
-| `app/api/admin/sources/[profileId]/visit/route.ts` | 155 | 3 | 0 | POST /api/admin/sources/[profileId]/visit — Log a source visit/action |
-| `app/api/admin/sources/route.ts` | 164 | 3 | 0 | GET /api/admin/sources — List all active source profiles with visit counts POST /api/admin/sources — Create a new source profile |
-| `app/api/admin/space-presence/sweep/route.ts` | 67 | 3 | 0 | POST /api/admin/space-presence/sweep |
-| `app/api/admin/storage/route.ts` | 510 | 5 | 0 | /api/admin/storage — S3 file manager for multiple prefixes. |
-| `app/api/admin/system/route.ts` | 80 | 3 | 0 | GET /api/admin/system |
-| `app/api/admin/tasks/route.ts` | 84 | 5 | 0 | GET /api/admin/tasks — the admin task queue (admin-scoped + all tenants) POST /api/admin/tasks — complete a task { taskId, result? } |
-| `app/api/admin/tasks/sweep-claims/route.ts` | 59 | 3 | 0 | POST /api/admin/tasks/sweep-claims — return abandoned ToDo claims to the queue. |
-| `app/api/admin/template-stable/[id]/publish/route.ts` | 86 | 6 | 0 | POST /api/admin/template-stable/[id]/publish |
-| `app/api/admin/template-stable/route.ts` | 58 | 3 | 0 | GET /api/admin/template-stable |
-| `app/api/admin/template-stable/sync/route.ts` | 63 | 4 | 0 | POST /api/admin/template-stable/sync |
-| `app/api/admin/templates/[templateId]/route.ts` | 230 | 5 | 1 | Template Studio — single template (E3b). |
-| `app/api/admin/templates/route.ts` | 177 | 5 | 1 | Template Studio — document_templates library (E3b). |
-| `app/api/admin/tenants/[tenantId]/agent-config/route.ts` | 221 | 5 | 1 | GET /api/admin/tenants/[tenantId]/agent-config — per-tenant AI limits PATCH /api/admin/tenants/[tenantId]/agent-config — set monthly budget + rate lim |
-| `app/api/admin/tenants/[tenantId]/archive/route.ts` | 120 | 5 | 0 | Company-level ARCHIVE (license slumber) — RFP-admin only. |
-| `app/api/admin/tenants/[tenantId]/backfill-cards/route.ts` | 49 | 5 | 0 | POST /api/admin/tenants/[tenantId]/backfill-cards |
-| `app/api/admin/tenants/[tenantId]/route.ts` | 280 | 5 | 0 | GET /api/admin/tenants/[tenantId] — Full tenant details PATCH /api/admin/tenants/[tenantId] — Update tenant fields |
-| `app/api/admin/tenants/route.ts` | 259 | 6 | 0 | GET /api/admin/tenants — List all tenants with stats POST /api/admin/tenants — Create tenant manually (bypass application flow) |
-| `app/api/admin/topics/[id]/route.ts` | 101 | 4 | 0 | PATCH /api/admin/topics/[id] |
-| `app/api/admin/upload-topic-files/route.ts` | 73 | 3 | 0 | POST /api/admin/upload-topic-files |
-| `app/api/admin/workflows/[instanceId]/advance/route.ts` | 111 | 5 | 0 | POST /api/admin/workflows/[instanceId]/advance |
-| `app/api/admin/workflows/[instanceId]/cancel/route.ts` | 122 | 4 | 0 | POST /api/admin/workflows/[instanceId]/cancel — Cancel a running/paused instance |
-| `app/api/admin/workflows/[instanceId]/retry/route.ts` | 187 | 5 | 0 | POST /api/admin/workflows/[instanceId]/retry — Retry a failed instance |
-| `app/api/admin/workflows/[instanceId]/route.ts` | 136 | 3 | 0 | GET /api/admin/workflows/[instanceId] — Get instance detail with transitions |
-| `app/api/admin/workflows/launch-collaboration/route.ts` | 127 | 5 | 0 | POST /api/admin/workflows/launch-collaboration — start a ProjectCollaboration HITL gate BY HAND (M3). The generic POST /api/admin/workflows can launch |
-| `app/api/admin/workflows/route.ts` | 276 | 5 | 0 | GET /api/admin/workflows — List workflow instances (active + recent) |
-| `app/api/admin/workflows/templates/route.ts` | 201 | 4 | 0 | GET /api/admin/workflows/templates — the workflow TEMPLATE CATALOG. PATCH /api/admin/workflows/templates — toggle a template active/inactive (audited) |
-| `app/api/admin/workspace-access/force-ascend/route.ts` | 97 | 5 | 0 | POST /api/admin/workspace-access/force-ascend — end somebody else's presence in a customer's workspace, now. |
-| `app/api/analytics/pageview/route.ts` | 167 | 2 | 0 | POST /api/analytics/pageview |
-| `app/api/applications/route.ts` | 270 | 6 | 0 | POST /api/applications |
-| `app/api/auth/[...nextauth]/route.ts` | 4 | 1 | 0 | — |
-| `app/api/auth/change-password/route.ts` | 127 | 5 | 0 | POST /api/auth/change-password |
-| `app/api/auth/forgot-password/route.ts` | 114 | 3 | 0 | — |
-| `app/api/auth/reset-password/route.ts` | 167 | 2 | 0 | — |
-| `app/api/cms/revalidate/route.ts` | 103 | 2 | 0 | CMS content revalidation webhook. |
-| `app/api/command/seen/route.ts` | 61 | 3 | 0 | POST /api/command/seen — stamp "I just looked at this Command Center tab". |
-| `app/api/consent/route.ts` | 143 | 4 | 0 | POST /api/consent — Record user consent acceptance |
-| `app/api/content/[slug]/route.ts` | 44 | 1 | 0 | GET /api/content/[slug] |
-| `app/api/enter/route.ts` | 65 | 3 | 0 | GET /api/enter?slug=<company>&next=<path> — company-specific deep-link landing. |
-| `app/api/events/route.ts` | 220 | 4 | 0 | GET /api/events — Recent events for the authenticated user (polling-based V1) POST /api/events — Emit a system event (admin only) |
-| `app/api/health/route.ts` | 296 | 4 | 0 | GET /api/health |
-| `app/api/invite/route.ts` | 253 | 2 | 1 | — |
-| `app/api/partner/enter/route.ts` | 84 | 5 | 0 | GET /api/partner/enter?slug=X — a partner-manager DESCENDS into one of their companies (docs/PARTNER_MANAGER_DESIGN.md §3b, D2). Pins the session as t |
-| `app/api/partner/exit/route.ts` | 60 | 5 | 0 | GET /api/partner/exit — a partner-manager ASCENDS back to their console (docs/PARTNER_MANAGER_DESIGN.md §3b, D2). Restores their real base role + thei |
-| `app/api/partner/manager-requests/route.ts` | 51 | 6 | 0 | POST /api/partner/manager-requests — a partner requests manager access to an EXISTING company (docs/PARTNER_MANAGER_DESIGN.md §4 Branch B). Raises a T |
-| `app/api/partner/registrations/route.ts` | 57 | 4 | 0 | POST /api/partner/registrations — submit a new client company for RFP-admin approval (docs/PARTNER_MANAGER_DESIGN.md §4 Branch A). Creates an applicat |
-| `app/api/partner/tenants/precheck/route.ts` | 46 | 3 | 0 | POST /api/partner/tenants/precheck — the add-company dedup check (docs/PARTNER_MANAGER_DESIGN.md §4). |
-| `app/api/partner/tenants/route.ts` | 65 | 5 | 0 | GET /api/partner/tenants — the partner console model: the partner's OWN org + their STABLE (owned/managed client companies) with rollup stats. Owner-s |
-| `app/api/portal/[tenantSlug]/agents/usage/route.ts` | 257 | 4 | 1 | GET /api/portal/[tenantSlug]/agents/usage — Tenant agent usage |
-| `app/api/portal/[tenantSlug]/atoms/[atomId]/archive/route.ts` | 100 | 6 | 0 | Soft-archive lifecycle — POST /api/portal/[tenantSlug]/atoms/[atomId]/archive { action: 'archive' } → soft-archive (archived_at = now()): the atom dro |
-| `app/api/portal/[tenantSlug]/atoms/[atomId]/route.ts` | 85 | 7 | 0 | GET /api/portal/[tenantSlug]/atoms/[atomId] — the atom + tags + members + lineage PATCH /api/portal/[tenantSlug]/atoms/[atomId] — confirm / add tags,  |
-| `app/api/portal/[tenantSlug]/atoms/apply-librarian-tags/route.ts` | 143 | 7 | 0 | POST /api/portal/[tenantSlug]/atoms/apply-librarian-tags |
-| `app/api/portal/[tenantSlug]/atoms/atomize-package/route.ts` | 193 | 8 | 0 | POST /api/portal/[tenantSlug]/atoms/atomize-package (multipart: files[], context?, packageName?) |
-| `app/api/portal/[tenantSlug]/atoms/bulk/route.ts` | 110 | 6 | 0 | POST /api/portal/[tenantSlug]/atoms/bulk — bulk-curate atoms in one transaction. |
-| `app/api/portal/[tenantSlug]/atoms/capture/route.ts` | 109 | 7 | 0 | POST /api/portal/[tenantSlug]/atoms/capture (multipart) |
-| `app/api/portal/[tenantSlug]/atoms/propose-regions/route.ts` | 57 | 4 | 0 | POST /api/portal/[tenantSlug]/atoms/propose-regions (JSON: { width, height }) |
-| `app/api/portal/[tenantSlug]/atoms/review/route.ts` | 115 | 4 | 0 | GET /api/portal/[tenantSlug]/atoms/review |
-| `app/api/portal/[tenantSlug]/atoms/route.ts` | 96 | 5 | 0 | GET /api/portal/[tenantSlug]/atoms — list/facet the tenant's atoms ?dimension=&value=&grain=&status=&q=&limit= POST /api/portal/[tenantSlug]/atoms — c |
-| `app/api/portal/[tenantSlug]/atoms/select/route.ts` | 145 | 7 | 0 | GET /api/portal/[tenantSlug]/atoms/select — the scored selector for a section mold. ?vol=key_personnel&kinds=bio,narrative&context=army,sbir,autonomy& |
-| `app/api/portal/[tenantSlug]/atoms/upload/route.ts` | 166 | 9 | 1 | POST /api/portal/[tenantSlug]/atoms/upload (multipart: file) |
-| `app/api/portal/[tenantSlug]/automation-overview/route.ts` | 155 | 6 | 1 | GET /api/portal/[tenantSlug]/automation-overview — the tenant's "Your automation" roll-up. |
-| `app/api/portal/[tenantSlug]/automation-policies/route.ts` | 173 | 7 | 1 | GET /api/portal/[tenantSlug]/automation-policies — the tenant's automation grammar. PATCH /api/portal/[tenantSlug]/automation-policies — upsert one po |
-| `app/api/portal/[tenantSlug]/buckets/[bucketId]/route.ts` | 159 | 8 | 0 | GET /api/portal/[tenantSlug]/buckets/[bucketId] — ranked cards for this bucket POST /api/portal/[tenantSlug]/buckets/[bucketId]?action=rank — (re)rank |
-| `app/api/portal/[tenantSlug]/buckets/route.ts` | 130 | 8 | 0 | GET /api/portal/[tenantSlug]/buckets — list the tenant's spotlight buckets POST /api/portal/[tenantSlug]/buckets — create one { name, description?, cr |
-| `app/api/portal/[tenantSlug]/cards/[opportunityId]/documents/route.ts` | 145 | 7 | 0 | POST …/cards/[opportunityId]/documents — "View Solicitation": copy them here POST …/cards/[opportunityId]/documents?action=resync — re-copy after the  |
-| `app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts` | 100 | 6 | 0 | POST /api/portal/[tenantSlug]/cards/[opportunityId]/pursuit { status } |
-| `app/api/portal/[tenantSlug]/cards/route.ts` | 150 | 5 | 0 | GET /api/portal/[tenantSlug]/cards |
-| `app/api/portal/[tenantSlug]/dashboard/route.ts` | 186 | 3 | 0 | GET /api/portal/[tenantSlug]/dashboard |
-| `app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts` | 163 | 11 | 0 | POST /api/portal/[tenantSlug]/documents/[documentId]/export |
-| `app/api/portal/[tenantSlug]/documents/[documentId]/lock/route.ts` | 92 | 6 | 0 | POST /api/portal/[tenantSlug]/documents/[documentId]/lock |
-| `app/api/portal/[tenantSlug]/documents/[documentId]/save/route.ts` | 157 | 7 | 0 | PUT /api/portal/[tenantSlug]/documents/[documentId]/save |
-| `app/api/portal/[tenantSlug]/documents/route.ts` | 171 | 7 | 0 | POST /api/portal/[tenantSlug]/documents |
-| `app/api/portal/[tenantSlug]/guardrail-templates/route.ts` | 126 | 6 | 1 | GET /api/portal/[tenantSlug]/guardrail-templates — the named guardrail-config templates a build can start from (the shared platform library + this ten |
-| `app/api/portal/[tenantSlug]/library/atoms/[atomId]/download/route.ts` | 75 | 7 | 0 | GET /api/portal/[tenantSlug]/library/atoms/[atomId]/download?format=docx\|pptx\|xlsx\|pdf — P3.3. Render any library atom (foundation / section / grou |
-| `app/api/portal/[tenantSlug]/library/atoms/route.ts` | 55 | 4 | 0 | GET /api/portal/[tenantSlug]/library/atoms — the faceted library list (P3.1). ?kind=&form=&context=&collection=&vehicle=&grain=&q=&page=&pageSize= AND |
-| `app/api/portal/[tenantSlug]/library/canvas/route.ts` | 73 | 6 | 0 | POST /api/portal/[tenantSlug]/library/canvas — Create Canvas (phase ②). Mints a FOUNDATION ARTIFACT in the tenant's library from a blank form (doc/ppt |
-| `app/api/portal/[tenantSlug]/library/foundation/[foundationId]/export/route.ts` | 65 | 6 | 0 | POST /api/portal/[tenantSlug]/library/foundation/[foundationId]/export — P2.2/P3.3. Render a foundation's canvas to its native format via renderCanvas |
-| `app/api/portal/[tenantSlug]/library/foundation/[foundationId]/save/route.ts` | 67 | 7 | 0 | PUT /api/portal/[tenantSlug]/library/foundation/[foundationId]/save — P2.2. Decompose-on-save for a library foundation: persist the edited canvas onto |
-| `app/api/portal/[tenantSlug]/library/past-proposals/route.ts` | 88 | 3 | 0 | GET /api/portal/[tenantSlug]/library/past-proposals |
-| `app/api/portal/[tenantSlug]/library/system-templates/route.ts` | 93 | 5 | 0 | Shared system-scaffold catalog + copy-on-use (docs/LIBRARY_AND_VAULTS_DESIGN.md §4). GET — list the shared system starter foundations any tenant can a |
-| `app/api/portal/[tenantSlug]/manager-requests/[taskId]/route.ts` | 59 | 6 | 0 | POST /api/portal/[tenantSlug]/manager-requests/[taskId] — the company admin's decision on a partner's manager-access request (docs/PARTNER_MANAGER_DES |
-| `app/api/portal/[tenantSlug]/managers/[membershipId]/route.ts` | 79 | 5 | 1 | DELETE /api/portal/[tenantSlug]/managers/[membershipId] |
-| `app/api/portal/[tenantSlug]/members/[userId]/scope/route.ts` | 97 | 5 | 1 | PATCH /api/portal/[tenantSlug]/members/[userId]/scope (CAP-3) |
-| `app/api/portal/[tenantSlug]/notifications/route.ts` | 302 | 4 | 0 | GET /api/portal/[tenantSlug]/notifications — Notification feed for tenant user |
-| `app/api/portal/[tenantSlug]/portals/[portalId]/route.ts` | 216 | 10 | 1 | GET /api/portal/[tenantSlug]/portals/[portalId] — portal + shadow grants POST /api/portal/[tenantSlug]/portals/[portalId]?action=accept — accept guard |
-| `app/api/portal/[tenantSlug]/portals/[portalId]/workflow/route.ts` | 156 | 7 | 0 | GET /api/portal/[tenantSlug]/portals/[portalId]/workflow — current config + limits + completeness (+ the history recommendation when unaccepted) PATCH |
-| `app/api/portal/[tenantSlug]/portals/route.ts` | 143 | 6 | 0 | GET /api/portal/[tenantSlug]/portals — list this tenant's portals (all builds) POST /api/portal/[tenantSlug]/portals — RFP-Admin: approve a FREE (comp |
-| `app/api/portal/[tenantSlug]/processes/[instanceId]/advance/route.ts` | 114 | 5 | 0 | POST /api/portal/[tenantSlug]/processes/[instanceId]/advance |
-| `app/api/portal/[tenantSlug]/processes/[instanceId]/route.ts` | 82 | 3 | 0 | GET /api/portal/[tenantSlug]/processes/[instanceId] |
-| `app/api/portal/[tenantSlug]/profile/route.ts` | 158 | 4 | 0 | — |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts` | 67 | 4 | 0 | Ask the post-award manager to assess this project's milestone health (A1). |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts` | 86 | 4 | 0 | Who is on this project — the roster, and the way people get onto it. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts` | 85 | 4 | 0 | Freezing the plan, and moving it afterwards. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts` | 108 | 5 | 0 | The CDRL register. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts` | 69 | 5 | 0 | CLINs on a project. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]/route.ts` | 60 | 3 | 0 | One comment: resolve it, reopen it, or edit your own words. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts` | 68 | 4 | 0 | The conversation on a project. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence/route.ts` | 72 | 3 | 0 | The backing for an acceptance — the customer's act, filed by a tenant_admin. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts` | 95 | 3 | 0 | One deliverable: attach a file, or accept it. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts` | 59 | 4 | 0 | Deliverables — the things a milestone is met BY. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts` | 82 | 3 | 0 | The anchor documents — the executed contract and the as-submitted proposal. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts` | 92 | 5 | 0 | Draft the narrative paragraphs of a status report (A2). |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts` | 80 | 6 | 0 | Who closes a milestone's gate, and the AI manager's attempt at it (A4). |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts` | 115 | 5 | 0 | Invoicing. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]/route.ts` | 69 | 3 | 0 | One meeting. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts` | 58 | 4 | 0 | Meetings on a project. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts` | 173 | 5 | 0 | Milestones on a project — the unit of project management. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts` | 132 | 5 | 0 | Contract modifications — the only write path to a CLIN. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/notifications/route.ts` | 92 | 5 | 0 | This project's notification policy — the THIRD level of the automation model. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]/route.ts` | 51 | 3 | 0 | Decide one review. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts` | 62 | 4 | 0 | Reviews on a project. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]/route.ts` | 90 | 3 | 0 | One risk. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts` | 66 | 4 | 0 | The risk and issue register. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts` | 42 | 4 | 0 | Progress — three measures, side by side, never blended. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/route.ts` | 97 | 7 | 0 | One project — the workspace header, its anchor documents, its CLINs, and whether its skeleton can be frozen. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments/route.ts` | 83 | 4 | 0 | Reference files on a task. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts` | 98 | 3 | 0 | One task: tick it off, block it, reopen it — or rearrange it. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts` | 74 | 4 | 0 | The task list under a project's milestones. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts` | 123 | 5 | 0 | Labour actuals. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/traceability/route.ts` | 28 | 3 | 0 | Contract traceability — CLIN → milestone → deliverable, and every gap in between. |
-| `app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts` | 70 | 5 | 0 | The work breakdown structure. |
-| `app/api/portal/[tenantSlug]/projects/route.ts` | 59 | 4 | 0 | Projects for a tenant. |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions/route.ts` | 183 | 7 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/activity/route.ts` | 298 | 4 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/advance/route.ts` | 104 | 5 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/ai-review/route.ts` | 271 | 7 | 1 | Manual AI (color-team) review — /api/portal/[tenantSlug]/proposals/[proposalId]/ai-review |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance/route.ts` | 591 | 8 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft/route.ts` | 203 | 4 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/research/route.ts` | 98 | 5 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai/research — queue an R&D research task. GET …/ai/research?taskId=… — poll the result. |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/amendments/[amendmentId]/document/route.ts` | 81 | 5 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/amendments/[amendmentId]/document |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/amendments/route.ts` | 137 | 5 | 1 | Proposal amendment flags — GET (unacknowledged flags for the banner) + POST (acknowledge one). |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/archive/route.ts` | 81 | 5 | 1 | Archive lifecycle — POST /api/portal/[tenantSlug]/proposals/[proposalId]/archive { action: 'restore' } → un-archive back to 'submitted'. { action: 'de |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export/route.ts` | 207 | 9 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export?format=<auto\|docx\|pptx\|xlsx\|pdf> |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/layout/route.ts` | 138 | 8 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/layout |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/[collaboratorId]/route.ts` | 165 | 5 | 0 | DELETE /api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/[collaboratorId] |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/route.ts` | 535 | 9 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/[commentId]/resolve/route.ts` | 165 | 6 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/route.ts` | 413 | 6 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/compliance/route.ts` | 134 | 7 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/document/route.ts` | 158 | 8 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/document |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/dropbox/route.ts` | 360 | 6 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/findings/route.ts` | 147 | 7 | 0 | GET /api/portal/[t]/proposals/[p]/findings?level=&nodeId=&groupId=&sectionId=&pages=a-b |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/full-draft/route.ts` | 323 | 4 | 1 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/full-draft |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/gates/route.ts` | 655 | 7 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions/route.ts` | 192 | 6 | 1 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/lock-scope/route.ts` | 170 | 6 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/lock-scope |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/lock/route.ts` | 527 | 7 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/outcome/route.ts` | 428 | 11 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/package-review/route.ts` | 77 | 5 | 0 | Submission-package review — POST /api/portal/[tenantSlug]/proposals/[proposalId]/package-review |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/package/route.ts` | 921 | 13 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/package |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/preview/route.ts` | 148 | 7 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/preview |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/readiness/route.ts` | 82 | 6 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/reuse-past/route.ts` | 191 | 7 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/reuse-past |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/route.ts` | 297 | 5 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assemble/route.ts` | 277 | 10 | 0 | POST /api/portal/[t]/proposals/[p]/sections/[s]/assemble |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assign/route.ts` | 87 | 7 | 0 | Section assignment (SPINE-T1). GET → the pickable assignees for this proposal (tenant editors + proposal collaborators). PATCH → assign the section to |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/atomize-node/route.ts` | 172 | 9 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/atomize-node |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/export/route.ts` | 244 | 11 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/export |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/lock/route.ts` | 248 | 7 | 1 | Section accept/lock lifecycle (V1 core feature). |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save/route.ts` | 471 | 7 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/versions/route.ts` | 474 | 7 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/route.ts` | 198 | 4 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply/route.ts` | 314 | 7 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/decide/route.ts` | 86 | 4 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/route.ts` | 69 | 3 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/select/route.ts` | 104 | 5 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/skip/route.ts` | 85 | 4 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/stage/route.ts` | 222 | 7 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/strategy/route.ts` | 101 | 7 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/strategy |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/studio/route.ts` | 175 | 5 | 1 | Proposal Studio — the 3-phase (Draft → Refine → Compliance) gated draft workflow. |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/[docId]/route.ts` | 551 | 7 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/route.ts` | 505 | 8 | 0 | — |
-| `app/api/portal/[tenantSlug]/proposals/create/route.ts` | 811 | 18 | 1 | — |
-| `app/api/portal/[tenantSlug]/proposals/route.ts` | 148 | 4 | 0 | GET /api/portal/[tenantSlug]/proposals — Tenant proposal list POST /api/portal/[tenantSlug]/proposals — Not used (see /proposals/create) |
-| `app/api/portal/[tenantSlug]/purchase/route.ts` | 240 | 8 | 0 | POST /api/portal/[tenantSlug]/purchase — buy a proposal workspace for a (pinned) opportunity. |
-| `app/api/portal/[tenantSlug]/purchases/route.ts` | 106 | 3 | 0 | GET /api/portal/[tenantSlug]/purchases — Tenant purchase history |
-| `app/api/portal/[tenantSlug]/section-standards/route.ts` | 64 | 3 | 0 | GET /api/portal/[tenantSlug]/section-standards |
-| `app/api/portal/[tenantSlug]/storage/route.ts` | 66 | 5 | 1 | Portal storage — presigned download URL for a tenant's own objects. |
-| `app/api/portal/[tenantSlug]/tasks/[taskId]/claim/route.ts` | 118 | 6 | 0 | POST /api/portal/[tenantSlug]/tasks/[taskId]/claim → take it (or renew your own) DELETE /api/portal/[tenantSlug]/tasks/[taskId]/claim → put it back |
-| `app/api/portal/[tenantSlug]/tasks/[taskId]/route.ts` | 66 | 7 | 0 | PATCH /api/portal/[tenantSlug]/tasks/[taskId] — reassign / reschedule / re-nudge a live workflow ToDo body { assigneeUserId?, assigneeRole?, dueAt?, n |
-| `app/api/portal/[tenantSlug]/tasks/assign/route.ts` | 110 | 5 | 1 | POST /api/portal/[tenantSlug]/tasks/assign — delegate a job (J1). |
-| `app/api/portal/[tenantSlug]/tasks/route.ts` | 120 | 6 | 0 | GET /api/portal/[tenantSlug]/tasks — my open task queue for this tenant POST /api/portal/[tenantSlug]/tasks — complete a task { taskId, result? } |
-| `app/api/portal/[tenantSlug]/taxonomy/route.ts` | 59 | 3 | 0 | GET /api/portal/[tenantSlug]/taxonomy — the curated tag vocabulary (mig 101). ?dimension=vol&program=cso — filter to one dimension / a program's appli |
-| `app/api/portal/[tenantSlug]/team/[userId]/route.ts` | 196 | 5 | 1 | Deactivate / reactivate a TEAM MEMBER (tenant employee) — tenant_admin only. |
-| `app/api/portal/[tenantSlug]/team/route.ts` | 362 | 6 | 0 | — |
-| `app/api/portal/[tenantSlug]/template-cards/[cardId]/ack/route.ts` | 79 | 6 | 0 | POST /api/portal/[tenantSlug]/template-cards/[cardId]/ack |
-| `app/api/portal/[tenantSlug]/template-cards/[cardId]/route.ts` | 86 | 7 | 0 | GET /api/portal/[tenantSlug]/template-cards/[cardId] |
-| `app/api/portal/[tenantSlug]/template-cards/[cardId]/use/route.ts` | 149 | 9 | 0 | POST /api/portal/[tenantSlug]/template-cards/[cardId]/use |
-| `app/api/portal/[tenantSlug]/template-cards/route.ts` | 79 | 5 | 0 | GET /api/portal/[tenantSlug]/template-cards |
-| `app/api/portal/[tenantSlug]/templates/extract/route.ts` | 191 | 9 | 0 | POST /api/portal/[tenantSlug]/templates/extract |
-| `app/api/portal/[tenantSlug]/templates/route.ts` | 99 | 4 | 0 | GET /api/portal/[tenantSlug]/templates |
-| `app/api/portal/[tenantSlug]/uploads/image/route.ts` | 94 | 5 | 1 | Portal image upload — canvas image nodes in a tenant's proposal sections. |
-| `app/api/portal/[tenantSlug]/uploads/route.ts` | 275 | 6 | 0 | GET /api/portal/[tenantSlug]/uploads — List uploaded library units POST /api/portal/[tenantSlug]/uploads — Upload a file to S3 + create library_unit |
-| `app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/download/route.ts` | 75 | 8 | 0 | Download a vault atom in its native format (P8.5/P8.6). GET ?format=docx\|pptx\|xlsx\|pdf. The whole-only gate: a collaborator may download only a WHO |
-| `app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/ingest/route.ts` | 39 | 5 | 0 | Ingest a vault foundation into the tenant's MAIN library (P8.6) — tenant-side only. POST — copies the whole grain tree with derived_from lineage; copi |
-| `app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/route.ts` | 87 | 6 | 0 | Vault content (P8.5/P8.6) — list + add artifacts to a nook. GET — list the vault's whole artifacts (both sides). POST { title, form?, kind?, context?, |
-| `app/api/portal/[tenantSlug]/vaults/[vaultId]/members/route.ts` | 115 | 6 | 0 | Vault members (P8.4) — invite partner emails into a nook + list them. GET — list the vault's members. POST { email } — invite a partner email (→ vault |
-| `app/api/portal/[tenantSlug]/vaults/route.ts` | 58 | 4 | 0 | Collaboration vaults ("nooks") — tenant-side list + create (P8.3). GET — list the tenant's active nooks. POST { partnerName, partnerOrg? } — create a  |
-| `app/api/presence/heartbeat/route.ts` | 47 | 2 | 0 | POST /api/presence/heartbeat — "the tab is still open". |
-| `app/api/storage/local/[...key]/route.ts` | 45 | 1 | 0 | GET/PUT /api/storage/local/<key> — the local-storage-driver serving route. |
-| `app/api/stripe/checkout/route.ts` | 138 | 5 | 0 | — |
-| `app/api/stripe/portal/route.ts` | 88 | 5 | 0 | — |
-| `app/api/stripe/webhook/route.ts` | 322 | 5 | 1 | — |
-| `app/api/tools/[name]/route.ts` | 90 | 3 | 0 | POST /api/tools/[name] |
-| `app/api/uploads/[...key]/route.ts` | 46 | 1 | 0 | GET /api/uploads/cms/<file> — public, permanent serving of CMS-uploaded images. |
-| `app/api/waitlist/route.ts` | 166 | 4 | 0 | GET /api/waitlist — Check if email is already on waitlist (admin only) POST /api/waitlist — Public endpoint to join the waitlist |
-| `app/api/webhooks/postmark/route.ts` | 198 | 2 | 2 | POST /api/webhooks/postmark — delivery outcomes from the provider. |
+| `frontend/app/api/admin/agent-gates/sweep/route.ts` | 44 | 3 | 0 | POST /api/admin/agent-gates/sweep |
+| `frontend/app/api/admin/agents/platform-config/route.ts` | 228 | 4 | 1 | GET /api/admin/agents/platform-config — pipeline-wide AI defaults + cap PATCH /api/admin/agents/platform-config — set defaults / cap / master switch |
+| `frontend/app/api/admin/agents/route.ts` | 106 | 3 | 0 | GET /api/admin/agents — Agent monitoring dashboard |
+| `frontend/app/api/admin/agents/usage/route.ts` | 245 | 3 | 0 | GET /api/admin/agents/usage — Admin agent usage dashboard |
+| `frontend/app/api/admin/agents/workforce/route.ts` | 83 | 3 | 0 | GET /api/admin/agents/workforce (#117) — RFP-admin oversight of the agent workforce. |
+| `frontend/app/api/admin/applications/[id]/accept/route.ts` | 400 | 14 | 0 | — |
+| `frontend/app/api/admin/applications/[id]/reject/route.ts` | 161 | 8 | 0 | — |
+| `frontend/app/api/admin/applications/[id]/status/route.ts` | 114 | 4 | 0 | — |
+| `frontend/app/api/admin/architecture/live/route.ts` | 44 | 2 | 0 | — |
+| `frontend/app/api/admin/architecture/schema/route.ts` | 80 | 2 | 0 | — |
+| `frontend/app/api/admin/architecture/stats/route.ts` | 49 | 2 | 0 | — |
+| `frontend/app/api/admin/automation-framework/route.ts` | 141 | 4 | 1 | GET /api/admin/automation-framework — the platform automation framework (mig 126). PATCH /api/admin/automation-framework — tune it (RFP-Pipeline admin |
+| `frontend/app/api/admin/automation/[ruleId]/route.ts` | 279 | 3 | 0 | PATCH /api/admin/automation/[ruleId] — Toggle active, update config |
+| `frontend/app/api/admin/automation/route.ts` | 196 | 3 | 0 | GET /api/admin/automation — List automation rules POST /api/admin/automation — Create a new automation rule |
+| `frontend/app/api/admin/compliance-presets/route.ts` | 237 | 4 | 0 | GET + POST /api/admin/compliance-presets |
+| `frontend/app/api/admin/compliance-suggest/route.ts` | 109 | 3 | 0 | GET /api/admin/compliance-suggest?namespace=...&variableName=... |
+| `frontend/app/api/admin/documents/[documentId]/export/route.ts` | 129 | 6 | 0 | /api/admin/documents/[documentId]/export — export a document to file format. |
+| `frontend/app/api/admin/documents/[documentId]/route.ts` | 320 | 4 | 0 | /api/admin/documents/[documentId] — single document operations. |
+| `frontend/app/api/admin/documents/route.ts` | 209 | 4 | 0 | /api/admin/documents — Admin Document Builder CRUD. |
+| `frontend/app/api/admin/documents/upload-image/route.ts` | 68 | 2 | 0 | — |
+| `frontend/app/api/admin/email/suppressions/route.ts` | 89 | 4 | 0 | — |
+| `frontend/app/api/admin/event-brackets/sweep/route.ts` | 66 | 3 | 0 | Close the event brackets a crashed process left open. |
+| `frontend/app/api/admin/expert-time/availability/route.ts` | 98 | 3 | 0 | RFP-Pipeline admin expert-time availability (Terms §7 calendar). GET — list non-cancelled upcoming slots (+ who booked each) POST { startAt, endAt } — |
+| `frontend/app/api/admin/extract-topics/route.ts` | 48 | 3 | 0 | POST /api/admin/extract-topics |
+| `frontend/app/api/admin/guardrail-defaults/route.ts` | 79 | 4 | 0 | GET /api/admin/guardrail-defaults — the RFP-admin default guardrails + hard limits PATCH /api/admin/guardrail-defaults — update them { limits?, defaul |
+| `frontend/app/api/admin/intake/route.ts` | 38 | 3 | 0 | POST /api/admin/intake — stage a found/uploaded opportunity NOTICE into the RFP review queue (the head of the RFP river; Scout-shaped). Creates a stag |
+| `frontend/app/api/admin/notes/[noteId]/route.ts` | 51 | 3 | 0 | PATCH /api/admin/notes/[noteId] — move a note along `watching → seen → resolved`. |
+| `frontend/app/api/admin/notes/route.ts` | 83 | 3 | 0 | POST /api/admin/notes — add a note to the shared board. |
+| `frontend/app/api/admin/observe/route.ts` | 85 | 4 | 0 | POST /api/admin/observe — ask the ops companion to read the window. |
+| `frontend/app/api/admin/opportunities/[oppId]/lifecycle/route.ts` | 236 | 8 | 1 | — |
+| `frontend/app/api/admin/opportunities/[oppId]/publish/route.ts` | 66 | 5 | 0 | POST /api/admin/opportunities/[oppId]/publish |
+| `frontend/app/api/admin/opportunities/[oppId]/watch/route.ts` | 71 | 5 | 0 | POST /api/admin/opportunities/[oppId]/watch → arm update-monitoring on a master opportunity DELETE /api/admin/opportunities/[oppId]/watch → disarm it |
+| `frontend/app/api/admin/partners/route.ts` | 49 | 4 | 0 | POST /api/admin/partners — an RFP admin creates a new partner-manager (EconDev org) (docs/PARTNER_MANAGER_DESIGN.md D4). Creates the partner_admin use |
+| `frontend/app/api/admin/promo-codes/route.ts` | 146 | 4 | 0 | Comp-code issuance — the admin side of the free-purchase path. |
+| `frontend/app/api/admin/proposals/[proposalId]/full-draft/route.ts` | 177 | 4 | 1 | POST /api/admin/proposals/[proposalId]/full-draft — the Proposal Auto-Drive "Doorbell". |
+| `frontend/app/api/admin/proposals/[proposalId]/studio/route.ts` | 71 | 4 | 0 | POST /api/admin/proposals/[proposalId]/studio — the Proposal Studio doorbell (full automation). |
+| `frontend/app/api/admin/proposals/route.ts` | 62 | 3 | 0 | GET /api/admin/proposals — recent proposals across ALL tenants, for the admin doorbell picker. |
+| `frontend/app/api/admin/provisioning/[portalId]/release/route.ts` | 151 | 7 | 0 | POST /api/admin/provisioning/[portalId]/release |
+| `frontend/app/api/admin/reconcile-cards/route.ts` | 65 | 5 | 0 | POST /api/admin/reconcile-cards |
+| `frontend/app/api/admin/rfp-curation/[solId]/amendments/[amendmentId]/route.ts` | 73 | 4 | 1 | Confirm or dismiss a detected amendment — POST { action: 'confirm' \| 'dismiss' }. |
+| `frontend/app/api/admin/rfp-curation/[solId]/amendments/route.ts` | 169 | 4 | 1 | Amendments for a solicitation — GET (list) + POST (log a detected amendment). |
+| `frontend/app/api/admin/rfp-curation/[solId]/annotations/[annotationId]/route.ts` | 118 | 5 | 0 | PATCH /api/admin/rfp-curation/[solId]/annotations/[annotationId] |
+| `frontend/app/api/admin/rfp-curation/[solId]/annotations/route.ts` | 215 | 4 | 0 | GET + POST /api/admin/rfp-curation/[solId]/annotations |
+| `frontend/app/api/admin/rfp-curation/[solId]/apply-preset/route.ts` | 392 | 6 | 0 | POST /api/admin/rfp-curation/[solId]/apply-preset |
+| `frontend/app/api/admin/rfp-curation/[solId]/assess-ingest/route.ts` | 198 | 7 | 1 | POST /api/admin/rfp-curation/[solId]/assess-ingest |
+| `frontend/app/api/admin/rfp-curation/[solId]/assessment/route.ts` | 73 | 5 | 0 | GET /api/admin/rfp-curation/[solId]/assessment |
+| `frontend/app/api/admin/rfp-curation/[solId]/broadcast/route.ts` | 62 | 6 | 0 | POST /api/admin/rfp-curation/[solId]/broadcast |
+| `frontend/app/api/admin/rfp-curation/[solId]/complete-buildout/route.ts` | 50 | 4 | 0 | POST /api/admin/rfp-curation/[solId]/complete-buildout |
+| `frontend/app/api/admin/rfp-curation/[solId]/compliance/route.ts` | 205 | 7 | 0 | GET + POST /api/admin/rfp-curation/[solId]/compliance |
+| `frontend/app/api/admin/rfp-curation/[solId]/force-release/route.ts` | 139 | 5 | 0 | POST /api/admin/rfp-curation/[solId]/force-release |
+| `frontend/app/api/admin/rfp-curation/[solId]/ingest-assist/route.ts` | 255 | 9 | 0 | POST /api/admin/rfp-curation/[solId]/ingest-assist |
+| `frontend/app/api/admin/rfp-curation/[solId]/ingest-phase/route.ts` | 324 | 9 | 0 | Ingest Studio — the phase gate. /api/admin/rfp-curation/[solId]/ingest-phase |
+| `frontend/app/api/admin/rfp-curation/[solId]/items/[itemId]/route.ts` | 109 | 4 | 0 | PATCH /api/admin/rfp-curation/[solId]/items/[itemId] — decide a required item's disposition. |
+| `frontend/app/api/admin/rfp-curation/[solId]/notes/route.ts` | 93 | 5 | 0 | GET + POST /api/admin/rfp-curation/[solId]/notes — the curation note thread (mig 190). |
+| `frontend/app/api/admin/rfp-curation/[solId]/route.ts` | 357 | 5 | 0 | GET /api/admin/rfp-curation/[solId] |
+| `frontend/app/api/admin/rfp-curation/[solId]/shred-audit/route.ts` | 75 | 4 | 0 | POST /api/admin/rfp-curation/[solId]/shred-audit |
+| `frontend/app/api/admin/rfp-curation/[solId]/topics/[topicId]/compliance/route.ts` | 366 | 5 | 0 | GET + PUT + DELETE /api/admin/rfp-curation/[solId]/topics/[topicId]/compliance |
+| `frontend/app/api/admin/rfp-curation/[solId]/triage/route.ts` | 255 | 4 | 0 | POST /api/admin/rfp-curation/[solId]/triage |
+| `frontend/app/api/admin/rfp-curation/[solId]/volumes/[volumeId]/route.ts` | 100 | 4 | 0 | PATCH /api/admin/rfp-curation/[solId]/volumes/[volumeId] — decide a whole volume's disposition. |
+| `frontend/app/api/admin/rfp-curation/route.ts` | 80 | 3 | 0 | GET /api/admin/rfp-curation |
+| `frontend/app/api/admin/rfp-document/[id]/set-primary/route.ts` | 89 | 4 | 0 | POST /api/admin/rfp-document/[id]/set-primary |
+| `frontend/app/api/admin/rfp-document/[id]/signed-url/route.ts` | 66 | 4 | 0 | GET /api/admin/rfp-document/[id]/signed-url |
+| `frontend/app/api/admin/rfp-upload/route.ts` | 675 | 11 | 0 | POST /api/admin/rfp-upload |
+| `frontend/app/api/admin/sbir-data/ingest/route.ts` | 613 | 4 | 0 | — |
+| `frontend/app/api/admin/sbir-data/lookup/route.ts` | 182 | 2 | 0 | GET /api/admin/sbir-data/lookup |
+| `frontend/app/api/admin/scout-review/[findingId]/route.ts` | 105 | 4 | 0 | POST /api/admin/scout-review/[findingId] — act on a scout candidate (#176). rfp_admin \| master_admin. |
+| `frontend/app/api/admin/scout-review/route.ts` | 40 | 3 | 0 | GET /api/admin/scout-review — the "potential NEW or UPDATED OPP" candidate queue (#176). |
+| `frontend/app/api/admin/section-standards/route.ts` | 110 | 4 | 1 | GET /api/admin/section-standards — list the section-standards taxonomy POST /api/admin/section-standards — add a standard (RFP admin) |
+| `frontend/app/api/admin/shadow-transition/route.ts` | 68 | 4 | 0 | POST /api/admin/shadow-transition — audit an RFP-admin's move between spaces. |
+| `frontend/app/api/admin/site/docs/[type]/[slug]/publish/route.ts` | 52 | 3 | 0 | POST /api/admin/site/docs/[type]/[slug]/publish — promote latest draft + revalidate. |
+| `frontend/app/api/admin/site/docs/[type]/[slug]/route.ts` | 17 | 2 | 0 | GET /api/admin/site/docs/[type]/[slug] — active + latest draft of a document. |
+| `frontend/app/api/admin/site/docs/[type]/[slug]/save/route.ts` | 64 | 3 | 0 | POST /api/admin/site/docs/[type]/[slug]/save — save a document draft. |
+| `frontend/app/api/admin/site/docs/[type]/[slug]/status/route.ts` | 71 | 3 | 0 | POST /api/admin/site/docs/[type]/[slug]/status — archive (retire) or restore a posting. |
+| `frontend/app/api/admin/site/docs/route.ts` | 16 | 2 | 0 | GET /api/admin/site/docs — list all documents (blog_post/resource/guide/testimonial/team_member). |
+| `frontend/app/api/admin/site/pages/[pageKey]/publish/route.ts` | 71 | 4 | 0 | POST /api/admin/site/pages/[pageKey]/publish — promote latest draft to active + revalidate. |
+| `frontend/app/api/admin/site/pages/[pageKey]/route.ts` | 18 | 2 | 0 | GET /api/admin/site/pages/[pageKey] — the active + latest draft version of a page. |
+| `frontend/app/api/admin/site/pages/[pageKey]/save/route.ts` | 53 | 4 | 0 | POST /api/admin/site/pages/[pageKey]/save — save a whole-page draft snapshot. |
+| `frontend/app/api/admin/site/pages/[pageKey]/versions/route.ts` | 18 | 2 | 0 | GET /api/admin/site/pages/[pageKey]/versions — full version history, newest first. |
+| `frontend/app/api/admin/site/pages/route.ts` | 17 | 2 | 0 | GET /api/admin/site/pages — list all content pages (active version + draft flag). |
+| `frontend/app/api/admin/site/upload-image/route.ts` | 55 | 2 | 0 | POST /api/admin/site/upload-image — upload a CMS image, return a stable public URL. |
+| `frontend/app/api/admin/sources/[profileId]/diffs/route.ts` | 188 | 3 | 0 | GET /api/admin/sources/[profileId]/diffs — List diffs for a source profile |
+| `frontend/app/api/admin/sources/[profileId]/expand-topics/route.ts` | 241 | 3 | 0 | POST /api/admin/sources/[profileId]/expand-topics — Enqueue topic expansion |
+| `frontend/app/api/admin/sources/[profileId]/regions/[regionId]/route.ts` | 94 | 3 | 0 | DELETE /api/admin/sources/[profileId]/regions/[regionId] — Soft-delete a region |
+| `frontend/app/api/admin/sources/[profileId]/regions/route.ts` | 208 | 3 | 0 | GET /api/admin/sources/[profileId]/regions — List regions for a source profile POST /api/admin/sources/[profileId]/regions — Create a new region annot |
+| `frontend/app/api/admin/sources/[profileId]/route.ts` | 169 | 3 | 0 | PATCH /api/admin/sources/[profileId] — Update source profile settings |
+| `frontend/app/api/admin/sources/[profileId]/scout/route.ts` | 112 | 3 | 0 | POST /api/admin/sources/[profileId]/scout — Trigger a manual scout run |
+| `frontend/app/api/admin/sources/[profileId]/visit/route.ts` | 155 | 3 | 0 | POST /api/admin/sources/[profileId]/visit — Log a source visit/action |
+| `frontend/app/api/admin/sources/route.ts` | 164 | 3 | 0 | GET /api/admin/sources — List all active source profiles with visit counts POST /api/admin/sources — Create a new source profile |
+| `frontend/app/api/admin/space-presence/sweep/route.ts` | 67 | 3 | 0 | POST /api/admin/space-presence/sweep |
+| `frontend/app/api/admin/storage/route.ts` | 510 | 5 | 0 | /api/admin/storage — S3 file manager for multiple prefixes. |
+| `frontend/app/api/admin/system/route.ts` | 80 | 3 | 0 | GET /api/admin/system |
+| `frontend/app/api/admin/tasks/route.ts` | 84 | 5 | 0 | GET /api/admin/tasks — the admin task queue (admin-scoped + all tenants) POST /api/admin/tasks — complete a task { taskId, result? } |
+| `frontend/app/api/admin/tasks/sweep-claims/route.ts` | 59 | 3 | 0 | POST /api/admin/tasks/sweep-claims — return abandoned ToDo claims to the queue. |
+| `frontend/app/api/admin/template-stable/[id]/publish/route.ts` | 86 | 6 | 0 | POST /api/admin/template-stable/[id]/publish |
+| `frontend/app/api/admin/template-stable/route.ts` | 58 | 3 | 0 | GET /api/admin/template-stable |
+| `frontend/app/api/admin/template-stable/sync/route.ts` | 63 | 4 | 0 | POST /api/admin/template-stable/sync |
+| `frontend/app/api/admin/templates/[templateId]/route.ts` | 230 | 5 | 1 | Template Studio — single template (E3b). |
+| `frontend/app/api/admin/templates/route.ts` | 177 | 5 | 1 | Template Studio — document_templates library (E3b). |
+| `frontend/app/api/admin/tenants/[tenantId]/agent-config/route.ts` | 221 | 5 | 1 | GET /api/admin/tenants/[tenantId]/agent-config — per-tenant AI limits PATCH /api/admin/tenants/[tenantId]/agent-config — set monthly budget + rate lim |
+| `frontend/app/api/admin/tenants/[tenantId]/archive/route.ts` | 120 | 5 | 0 | Company-level ARCHIVE (license slumber) — RFP-admin only. |
+| `frontend/app/api/admin/tenants/[tenantId]/backfill-cards/route.ts` | 49 | 5 | 0 | POST /api/admin/tenants/[tenantId]/backfill-cards |
+| `frontend/app/api/admin/tenants/[tenantId]/route.ts` | 280 | 5 | 0 | GET /api/admin/tenants/[tenantId] — Full tenant details PATCH /api/admin/tenants/[tenantId] — Update tenant fields |
+| `frontend/app/api/admin/tenants/route.ts` | 259 | 6 | 0 | GET /api/admin/tenants — List all tenants with stats POST /api/admin/tenants — Create tenant manually (bypass application flow) |
+| `frontend/app/api/admin/topics/[id]/route.ts` | 101 | 4 | 0 | PATCH /api/admin/topics/[id] |
+| `frontend/app/api/admin/upload-topic-files/route.ts` | 73 | 3 | 0 | POST /api/admin/upload-topic-files |
+| `frontend/app/api/admin/workflows/[instanceId]/advance/route.ts` | 111 | 5 | 0 | POST /api/admin/workflows/[instanceId]/advance |
+| `frontend/app/api/admin/workflows/[instanceId]/cancel/route.ts` | 122 | 4 | 0 | POST /api/admin/workflows/[instanceId]/cancel — Cancel a running/paused instance |
+| `frontend/app/api/admin/workflows/[instanceId]/retry/route.ts` | 187 | 5 | 0 | POST /api/admin/workflows/[instanceId]/retry — Retry a failed instance |
+| `frontend/app/api/admin/workflows/[instanceId]/route.ts` | 136 | 3 | 0 | GET /api/admin/workflows/[instanceId] — Get instance detail with transitions |
+| `frontend/app/api/admin/workflows/launch-collaboration/route.ts` | 127 | 5 | 0 | POST /api/admin/workflows/launch-collaboration — start a ProjectCollaboration HITL gate BY HAND (M3). The generic POST /api/admin/workflows can launch |
+| `frontend/app/api/admin/workflows/route.ts` | 276 | 5 | 0 | GET /api/admin/workflows — List workflow instances (active + recent) |
+| `frontend/app/api/admin/workflows/templates/route.ts` | 201 | 4 | 0 | GET /api/admin/workflows/templates — the workflow TEMPLATE CATALOG. PATCH /api/admin/workflows/templates — toggle a template active/inactive (audited) |
+| `frontend/app/api/admin/workspace-access/force-ascend/route.ts` | 97 | 5 | 0 | POST /api/admin/workspace-access/force-ascend — end somebody else's presence in a customer's workspace, now. |
+| `frontend/app/api/analytics/pageview/route.ts` | 167 | 2 | 0 | POST /api/analytics/pageview |
+| `frontend/app/api/applications/route.ts` | 270 | 6 | 0 | POST /api/applications |
+| `frontend/app/api/auth/[...nextauth]/route.ts` | 4 | 1 | 0 | — |
+| `frontend/app/api/auth/change-password/route.ts` | 127 | 5 | 0 | POST /api/auth/change-password |
+| `frontend/app/api/auth/forgot-password/route.ts` | 114 | 3 | 0 | — |
+| `frontend/app/api/auth/reset-password/route.ts` | 167 | 2 | 0 | — |
+| `frontend/app/api/cms/revalidate/route.ts` | 103 | 2 | 0 | CMS content revalidation webhook. |
+| `frontend/app/api/command/seen/route.ts` | 61 | 3 | 0 | POST /api/command/seen — stamp "I just looked at this Command Center tab". |
+| `frontend/app/api/consent/route.ts` | 143 | 4 | 0 | POST /api/consent — Record user consent acceptance |
+| `frontend/app/api/content/[slug]/route.ts` | 44 | 1 | 0 | GET /api/content/[slug] |
+| `frontend/app/api/enter/route.ts` | 65 | 3 | 0 | GET /api/enter?slug=<company>&next=<path> — company-specific deep-link landing. |
+| `frontend/app/api/events/route.ts` | 220 | 4 | 0 | GET /api/events — Recent events for the authenticated user (polling-based V1) POST /api/events — Emit a system event (admin only) |
+| `frontend/app/api/health/route.ts` | 296 | 4 | 0 | GET /api/health |
+| `frontend/app/api/invite/route.ts` | 253 | 2 | 1 | — |
+| `frontend/app/api/partner/enter/route.ts` | 84 | 5 | 0 | GET /api/partner/enter?slug=X — a partner-manager DESCENDS into one of their companies (docs/PARTNER_MANAGER_DESIGN.md §3b, D2). Pins the session as t |
+| `frontend/app/api/partner/exit/route.ts` | 60 | 5 | 0 | GET /api/partner/exit — a partner-manager ASCENDS back to their console (docs/PARTNER_MANAGER_DESIGN.md §3b, D2). Restores their real base role + thei |
+| `frontend/app/api/partner/manager-requests/route.ts` | 51 | 6 | 0 | POST /api/partner/manager-requests — a partner requests manager access to an EXISTING company (docs/PARTNER_MANAGER_DESIGN.md §4 Branch B). Raises a T |
+| `frontend/app/api/partner/registrations/route.ts` | 57 | 4 | 0 | POST /api/partner/registrations — submit a new client company for RFP-admin approval (docs/PARTNER_MANAGER_DESIGN.md §4 Branch A). Creates an applicat |
+| `frontend/app/api/partner/tenants/precheck/route.ts` | 46 | 3 | 0 | POST /api/partner/tenants/precheck — the add-company dedup check (docs/PARTNER_MANAGER_DESIGN.md §4). |
+| `frontend/app/api/partner/tenants/route.ts` | 65 | 5 | 0 | GET /api/partner/tenants — the partner console model: the partner's OWN org + their STABLE (owned/managed client companies) with rollup stats. Owner-s |
+| `frontend/app/api/portal/[tenantSlug]/agents/usage/route.ts` | 257 | 4 | 1 | GET /api/portal/[tenantSlug]/agents/usage — Tenant agent usage |
+| `frontend/app/api/portal/[tenantSlug]/atoms/[atomId]/archive/route.ts` | 100 | 6 | 0 | Soft-archive lifecycle — POST /api/portal/[tenantSlug]/atoms/[atomId]/archive { action: 'archive' } → soft-archive (archived_at = now()): the atom dro |
+| `frontend/app/api/portal/[tenantSlug]/atoms/[atomId]/route.ts` | 85 | 7 | 0 | GET /api/portal/[tenantSlug]/atoms/[atomId] — the atom + tags + members + lineage PATCH /api/portal/[tenantSlug]/atoms/[atomId] — confirm / add tags,  |
+| `frontend/app/api/portal/[tenantSlug]/atoms/apply-librarian-tags/route.ts` | 143 | 7 | 0 | POST /api/portal/[tenantSlug]/atoms/apply-librarian-tags |
+| `frontend/app/api/portal/[tenantSlug]/atoms/atomize-package/route.ts` | 193 | 8 | 0 | POST /api/portal/[tenantSlug]/atoms/atomize-package (multipart: files[], context?, packageName?) |
+| `frontend/app/api/portal/[tenantSlug]/atoms/bulk/route.ts` | 110 | 6 | 0 | POST /api/portal/[tenantSlug]/atoms/bulk — bulk-curate atoms in one transaction. |
+| `frontend/app/api/portal/[tenantSlug]/atoms/capture/route.ts` | 109 | 7 | 0 | POST /api/portal/[tenantSlug]/atoms/capture (multipart) |
+| `frontend/app/api/portal/[tenantSlug]/atoms/propose-regions/route.ts` | 57 | 4 | 0 | POST /api/portal/[tenantSlug]/atoms/propose-regions (JSON: { width, height }) |
+| `frontend/app/api/portal/[tenantSlug]/atoms/review/route.ts` | 115 | 4 | 0 | GET /api/portal/[tenantSlug]/atoms/review |
+| `frontend/app/api/portal/[tenantSlug]/atoms/route.ts` | 96 | 5 | 0 | GET /api/portal/[tenantSlug]/atoms — list/facet the tenant's atoms ?dimension=&value=&grain=&status=&q=&limit= POST /api/portal/[tenantSlug]/atoms — c |
+| `frontend/app/api/portal/[tenantSlug]/atoms/select/route.ts` | 145 | 7 | 0 | GET /api/portal/[tenantSlug]/atoms/select — the scored selector for a section mold. ?vol=key_personnel&kinds=bio,narrative&context=army,sbir,autonomy& |
+| `frontend/app/api/portal/[tenantSlug]/atoms/upload/route.ts` | 166 | 9 | 1 | POST /api/portal/[tenantSlug]/atoms/upload (multipart: file) |
+| `frontend/app/api/portal/[tenantSlug]/automation-overview/route.ts` | 155 | 6 | 1 | GET /api/portal/[tenantSlug]/automation-overview — the tenant's "Your automation" roll-up. |
+| `frontend/app/api/portal/[tenantSlug]/automation-policies/route.ts` | 173 | 7 | 1 | GET /api/portal/[tenantSlug]/automation-policies — the tenant's automation grammar. PATCH /api/portal/[tenantSlug]/automation-policies — upsert one po |
+| `frontend/app/api/portal/[tenantSlug]/buckets/[bucketId]/route.ts` | 159 | 8 | 0 | GET /api/portal/[tenantSlug]/buckets/[bucketId] — ranked cards for this bucket POST /api/portal/[tenantSlug]/buckets/[bucketId]?action=rank — (re)rank |
+| `frontend/app/api/portal/[tenantSlug]/buckets/route.ts` | 130 | 8 | 0 | GET /api/portal/[tenantSlug]/buckets — list the tenant's spotlight buckets POST /api/portal/[tenantSlug]/buckets — create one { name, description?, cr |
+| `frontend/app/api/portal/[tenantSlug]/cards/[opportunityId]/documents/route.ts` | 145 | 7 | 0 | POST …/cards/[opportunityId]/documents — "View Solicitation": copy them here POST …/cards/[opportunityId]/documents?action=resync — re-copy after the  |
+| `frontend/app/api/portal/[tenantSlug]/cards/[opportunityId]/pursuit/route.ts` | 100 | 6 | 0 | POST /api/portal/[tenantSlug]/cards/[opportunityId]/pursuit { status } |
+| `frontend/app/api/portal/[tenantSlug]/cards/route.ts` | 150 | 5 | 0 | GET /api/portal/[tenantSlug]/cards |
+| `frontend/app/api/portal/[tenantSlug]/dashboard/route.ts` | 186 | 3 | 0 | GET /api/portal/[tenantSlug]/dashboard |
+| `frontend/app/api/portal/[tenantSlug]/documents/[documentId]/export/route.ts` | 163 | 11 | 0 | POST /api/portal/[tenantSlug]/documents/[documentId]/export |
+| `frontend/app/api/portal/[tenantSlug]/documents/[documentId]/lock/route.ts` | 92 | 6 | 0 | POST /api/portal/[tenantSlug]/documents/[documentId]/lock |
+| `frontend/app/api/portal/[tenantSlug]/documents/[documentId]/save/route.ts` | 157 | 7 | 0 | PUT /api/portal/[tenantSlug]/documents/[documentId]/save |
+| `frontend/app/api/portal/[tenantSlug]/documents/route.ts` | 171 | 7 | 0 | POST /api/portal/[tenantSlug]/documents |
+| `frontend/app/api/portal/[tenantSlug]/guardrail-templates/route.ts` | 126 | 6 | 1 | GET /api/portal/[tenantSlug]/guardrail-templates — the named guardrail-config templates a build can start from (the shared platform library + this ten |
+| `frontend/app/api/portal/[tenantSlug]/library/atoms/[atomId]/download/route.ts` | 75 | 7 | 0 | GET /api/portal/[tenantSlug]/library/atoms/[atomId]/download?format=docx\|pptx\|xlsx\|pdf — P3.3. Render any library atom (foundation / section / grou |
+| `frontend/app/api/portal/[tenantSlug]/library/atoms/route.ts` | 55 | 4 | 0 | GET /api/portal/[tenantSlug]/library/atoms — the faceted library list (P3.1). ?kind=&form=&context=&collection=&vehicle=&grain=&q=&page=&pageSize= AND |
+| `frontend/app/api/portal/[tenantSlug]/library/canvas/route.ts` | 73 | 6 | 0 | POST /api/portal/[tenantSlug]/library/canvas — Create Canvas (phase ②). Mints a FOUNDATION ARTIFACT in the tenant's library from a blank form (doc/ppt |
+| `frontend/app/api/portal/[tenantSlug]/library/foundation/[foundationId]/export/route.ts` | 65 | 6 | 0 | POST /api/portal/[tenantSlug]/library/foundation/[foundationId]/export — P2.2/P3.3. Render a foundation's canvas to its native format via renderCanvas |
+| `frontend/app/api/portal/[tenantSlug]/library/foundation/[foundationId]/save/route.ts` | 67 | 7 | 0 | PUT /api/portal/[tenantSlug]/library/foundation/[foundationId]/save — P2.2. Decompose-on-save for a library foundation: persist the edited canvas onto |
+| `frontend/app/api/portal/[tenantSlug]/library/past-proposals/route.ts` | 88 | 3 | 0 | GET /api/portal/[tenantSlug]/library/past-proposals |
+| `frontend/app/api/portal/[tenantSlug]/library/system-templates/route.ts` | 93 | 5 | 0 | Shared system-scaffold catalog + copy-on-use (docs/LIBRARY_AND_VAULTS_DESIGN.md §4). GET — list the shared system starter foundations any tenant can a |
+| `frontend/app/api/portal/[tenantSlug]/manager-requests/[taskId]/route.ts` | 59 | 6 | 0 | POST /api/portal/[tenantSlug]/manager-requests/[taskId] — the company admin's decision on a partner's manager-access request (docs/PARTNER_MANAGER_DES |
+| `frontend/app/api/portal/[tenantSlug]/managers/[membershipId]/route.ts` | 79 | 5 | 1 | DELETE /api/portal/[tenantSlug]/managers/[membershipId] |
+| `frontend/app/api/portal/[tenantSlug]/members/[userId]/scope/route.ts` | 97 | 5 | 1 | PATCH /api/portal/[tenantSlug]/members/[userId]/scope (CAP-3) |
+| `frontend/app/api/portal/[tenantSlug]/notifications/route.ts` | 302 | 4 | 0 | GET /api/portal/[tenantSlug]/notifications — Notification feed for tenant user |
+| `frontend/app/api/portal/[tenantSlug]/portals/[portalId]/route.ts` | 216 | 10 | 1 | GET /api/portal/[tenantSlug]/portals/[portalId] — portal + shadow grants POST /api/portal/[tenantSlug]/portals/[portalId]?action=accept — accept guard |
+| `frontend/app/api/portal/[tenantSlug]/portals/[portalId]/workflow/route.ts` | 156 | 7 | 0 | GET /api/portal/[tenantSlug]/portals/[portalId]/workflow — current config + limits + completeness (+ the history recommendation when unaccepted) PATCH |
+| `frontend/app/api/portal/[tenantSlug]/portals/route.ts` | 143 | 6 | 0 | GET /api/portal/[tenantSlug]/portals — list this tenant's portals (all builds) POST /api/portal/[tenantSlug]/portals — RFP-Admin: approve a FREE (comp |
+| `frontend/app/api/portal/[tenantSlug]/processes/[instanceId]/advance/route.ts` | 114 | 5 | 0 | POST /api/portal/[tenantSlug]/processes/[instanceId]/advance |
+| `frontend/app/api/portal/[tenantSlug]/processes/[instanceId]/route.ts` | 82 | 3 | 0 | GET /api/portal/[tenantSlug]/processes/[instanceId] |
+| `frontend/app/api/portal/[tenantSlug]/profile/route.ts` | 158 | 4 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/assess-health/route.ts` | 67 | 4 | 0 | Ask the post-award manager to assess this project's milestone health (A1). |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts` | 86 | 4 | 0 | Who is on this project — the roster, and the way people get onto it. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts` | 85 | 4 | 0 | Freezing the plan, and moving it afterwards. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts` | 108 | 5 | 0 | The CDRL register. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts` | 69 | 5 | 0 | CLINs on a project. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]/route.ts` | 60 | 3 | 0 | One comment: resolve it, reopen it, or edit your own words. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts` | 68 | 4 | 0 | The conversation on a project. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence/route.ts` | 72 | 3 | 0 | The backing for an acceptance — the customer's act, filed by a tenant_admin. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts` | 95 | 3 | 0 | One deliverable: attach a file, or accept it. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts` | 59 | 4 | 0 | Deliverables — the things a milestone is met BY. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts` | 82 | 3 | 0 | The anchor documents — the executed contract and the as-submitted proposal. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/draft-narrative/route.ts` | 92 | 5 | 0 | Draft the narrative paragraphs of a status report (A2). |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts` | 80 | 6 | 0 | Who closes a milestone's gate, and the AI manager's attempt at it (A4). |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts` | 115 | 5 | 0 | Invoicing. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]/route.ts` | 69 | 3 | 0 | One meeting. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts` | 58 | 4 | 0 | Meetings on a project. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts` | 173 | 5 | 0 | Milestones on a project — the unit of project management. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts` | 132 | 5 | 0 | Contract modifications — the only write path to a CLIN. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/notifications/route.ts` | 92 | 5 | 0 | This project's notification policy — the THIRD level of the automation model. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]/route.ts` | 51 | 3 | 0 | Decide one review. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts` | 62 | 4 | 0 | Reviews on a project. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]/route.ts` | 90 | 3 | 0 | One risk. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts` | 66 | 4 | 0 | The risk and issue register. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/rollup/route.ts` | 42 | 4 | 0 | Progress — three measures, side by side, never blended. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/route.ts` | 97 | 7 | 0 | One project — the workspace header, its anchor documents, its CLINs, and whether its skeleton can be frozen. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments/route.ts` | 83 | 4 | 0 | Reference files on a task. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts` | 98 | 3 | 0 | One task: tick it off, block it, reopen it — or rearrange it. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts` | 74 | 4 | 0 | The task list under a project's milestones. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts` | 123 | 5 | 0 | Labour actuals. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/traceability/route.ts` | 28 | 3 | 0 | Contract traceability — CLIN → milestone → deliverable, and every gap in between. |
+| `frontend/app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts` | 70 | 5 | 0 | The work breakdown structure. |
+| `frontend/app/api/portal/[tenantSlug]/projects/route.ts` | 59 | 4 | 0 | Projects for a tenant. |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions/route.ts` | 183 | 7 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/accept-ai-revisions |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/activity/route.ts` | 298 | 4 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/advance/route.ts` | 104 | 5 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/ai-review/route.ts` | 271 | 7 | 1 | Manual AI (color-team) review — /api/portal/[tenantSlug]/proposals/[proposalId]/ai-review |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance/route.ts` | 591 | 8 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai/compliance |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft/route.ts` | 203 | 4 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai/draft |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/ai/research/route.ts` | 98 | 5 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/ai/research — queue an R&D research task. GET …/ai/research?taskId=… — poll the result. |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/amendments/[amendmentId]/document/route.ts` | 81 | 5 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/amendments/[amendmentId]/document |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/amendments/route.ts` | 137 | 5 | 1 | Proposal amendment flags — GET (unacknowledged flags for the banner) + POST (acknowledge one). |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/archive/route.ts` | 81 | 5 | 1 | Archive lifecycle — POST /api/portal/[tenantSlug]/proposals/[proposalId]/archive { action: 'restore' } → un-archive back to 'submitted'. { action: 'de |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export/route.ts` | 207 | 9 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/export?format=<auto\|docx\|pptx\|xlsx\|pdf> |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/layout/route.ts` | 138 | 8 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/artifacts/[artifactId]/layout |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/[collaboratorId]/route.ts` | 165 | 5 | 0 | DELETE /api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/[collaboratorId] |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/collaborators/route.ts` | 535 | 9 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/[commentId]/resolve/route.ts` | 165 | 6 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/comments/route.ts` | 413 | 6 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/compliance/route.ts` | 134 | 7 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/document/route.ts` | 158 | 8 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/document |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/dropbox/route.ts` | 360 | 6 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/findings/route.ts` | 147 | 7 | 0 | GET /api/portal/[t]/proposals/[p]/findings?level=&nodeId=&groupId=&sectionId=&pages=a-b |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/full-draft/route.ts` | 323 | 4 | 1 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/full-draft |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/gates/route.ts` | 655 | 7 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions/route.ts` | 192 | 6 | 1 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/lock-scope/route.ts` | 170 | 6 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/lock-scope |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/lock/route.ts` | 527 | 7 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/outcome/route.ts` | 428 | 11 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/package-review/route.ts` | 77 | 5 | 0 | Submission-package review — POST /api/portal/[tenantSlug]/proposals/[proposalId]/package-review |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/package/route.ts` | 921 | 13 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/package |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/preview/route.ts` | 148 | 7 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/preview |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/readiness/route.ts` | 82 | 6 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/reuse-past/route.ts` | 191 | 7 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/reuse-past |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/route.ts` | 297 | 5 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assemble/route.ts` | 277 | 10 | 0 | POST /api/portal/[t]/proposals/[p]/sections/[s]/assemble |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assign/route.ts` | 87 | 7 | 0 | Section assignment (SPINE-T1). GET → the pickable assignees for this proposal (tenant editors + proposal collaborators). PATCH → assign the section to |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/atomize-node/route.ts` | 172 | 9 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/atomize-node |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/export/route.ts` | 244 | 11 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/export |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/lock/route.ts` | 248 | 7 | 1 | Section accept/lock lifecycle (V1 core feature). |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save/route.ts` | 471 | 7 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/versions/route.ts` | 474 | 7 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/route.ts` | 198 | 4 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/apply/route.ts` | 314 | 7 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/decide/route.ts` | 86 | 4 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/route.ts` | 69 | 3 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/select/route.ts` | 104 | 5 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/skip/route.ts` | 85 | 4 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/stage/route.ts` | 222 | 7 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/strategy/route.ts` | 101 | 7 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/strategy |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/studio/route.ts` | 175 | 5 | 1 | Proposal Studio — the 3-phase (Draft → Refine → Compliance) gated draft workflow. |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/[docId]/route.ts` | 551 | 7 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/[proposalId]/supporting-docs/route.ts` | 505 | 8 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/create/route.ts` | 811 | 18 | 1 | — |
+| `frontend/app/api/portal/[tenantSlug]/proposals/route.ts` | 148 | 4 | 0 | GET /api/portal/[tenantSlug]/proposals — Tenant proposal list POST /api/portal/[tenantSlug]/proposals — Not used (see /proposals/create) |
+| `frontend/app/api/portal/[tenantSlug]/purchase/route.ts` | 240 | 8 | 0 | POST /api/portal/[tenantSlug]/purchase — buy a proposal workspace for a (pinned) opportunity. |
+| `frontend/app/api/portal/[tenantSlug]/purchases/route.ts` | 106 | 3 | 0 | GET /api/portal/[tenantSlug]/purchases — Tenant purchase history |
+| `frontend/app/api/portal/[tenantSlug]/section-standards/route.ts` | 64 | 3 | 0 | GET /api/portal/[tenantSlug]/section-standards |
+| `frontend/app/api/portal/[tenantSlug]/storage/route.ts` | 66 | 5 | 1 | Portal storage — presigned download URL for a tenant's own objects. |
+| `frontend/app/api/portal/[tenantSlug]/tasks/[taskId]/claim/route.ts` | 118 | 6 | 0 | POST /api/portal/[tenantSlug]/tasks/[taskId]/claim → take it (or renew your own) DELETE /api/portal/[tenantSlug]/tasks/[taskId]/claim → put it back |
+| `frontend/app/api/portal/[tenantSlug]/tasks/[taskId]/route.ts` | 66 | 7 | 0 | PATCH /api/portal/[tenantSlug]/tasks/[taskId] — reassign / reschedule / re-nudge a live workflow ToDo body { assigneeUserId?, assigneeRole?, dueAt?, n |
+| `frontend/app/api/portal/[tenantSlug]/tasks/assign/route.ts` | 110 | 5 | 1 | POST /api/portal/[tenantSlug]/tasks/assign — delegate a job (J1). |
+| `frontend/app/api/portal/[tenantSlug]/tasks/route.ts` | 120 | 6 | 0 | GET /api/portal/[tenantSlug]/tasks — my open task queue for this tenant POST /api/portal/[tenantSlug]/tasks — complete a task { taskId, result? } |
+| `frontend/app/api/portal/[tenantSlug]/taxonomy/route.ts` | 59 | 3 | 0 | GET /api/portal/[tenantSlug]/taxonomy — the curated tag vocabulary (mig 101). ?dimension=vol&program=cso — filter to one dimension / a program's appli |
+| `frontend/app/api/portal/[tenantSlug]/team/[userId]/route.ts` | 196 | 5 | 1 | Deactivate / reactivate a TEAM MEMBER (tenant employee) — tenant_admin only. |
+| `frontend/app/api/portal/[tenantSlug]/team/route.ts` | 362 | 6 | 0 | — |
+| `frontend/app/api/portal/[tenantSlug]/template-cards/[cardId]/ack/route.ts` | 79 | 6 | 0 | POST /api/portal/[tenantSlug]/template-cards/[cardId]/ack |
+| `frontend/app/api/portal/[tenantSlug]/template-cards/[cardId]/route.ts` | 86 | 7 | 0 | GET /api/portal/[tenantSlug]/template-cards/[cardId] |
+| `frontend/app/api/portal/[tenantSlug]/template-cards/[cardId]/use/route.ts` | 149 | 9 | 0 | POST /api/portal/[tenantSlug]/template-cards/[cardId]/use |
+| `frontend/app/api/portal/[tenantSlug]/template-cards/route.ts` | 79 | 5 | 0 | GET /api/portal/[tenantSlug]/template-cards |
+| `frontend/app/api/portal/[tenantSlug]/templates/extract/route.ts` | 191 | 9 | 0 | POST /api/portal/[tenantSlug]/templates/extract |
+| `frontend/app/api/portal/[tenantSlug]/templates/route.ts` | 99 | 4 | 0 | GET /api/portal/[tenantSlug]/templates |
+| `frontend/app/api/portal/[tenantSlug]/uploads/image/route.ts` | 94 | 5 | 1 | Portal image upload — canvas image nodes in a tenant's proposal sections. |
+| `frontend/app/api/portal/[tenantSlug]/uploads/route.ts` | 275 | 6 | 0 | GET /api/portal/[tenantSlug]/uploads — List uploaded library units POST /api/portal/[tenantSlug]/uploads — Upload a file to S3 + create library_unit |
+| `frontend/app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/download/route.ts` | 75 | 8 | 0 | Download a vault atom in its native format (P8.5/P8.6). GET ?format=docx\|pptx\|xlsx\|pdf. The whole-only gate: a collaborator may download only a WHO |
+| `frontend/app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/[atomId]/ingest/route.ts` | 39 | 5 | 0 | Ingest a vault foundation into the tenant's MAIN library (P8.6) — tenant-side only. POST — copies the whole grain tree with derived_from lineage; copi |
+| `frontend/app/api/portal/[tenantSlug]/vaults/[vaultId]/atoms/route.ts` | 87 | 6 | 0 | Vault content (P8.5/P8.6) — list + add artifacts to a nook. GET — list the vault's whole artifacts (both sides). POST { title, form?, kind?, context?, |
+| `frontend/app/api/portal/[tenantSlug]/vaults/[vaultId]/members/route.ts` | 115 | 6 | 0 | Vault members (P8.4) — invite partner emails into a nook + list them. GET — list the vault's members. POST { email } — invite a partner email (→ vault |
+| `frontend/app/api/portal/[tenantSlug]/vaults/route.ts` | 58 | 4 | 0 | Collaboration vaults ("nooks") — tenant-side list + create (P8.3). GET — list the tenant's active nooks. POST { partnerName, partnerOrg? } — create a  |
+| `frontend/app/api/presence/heartbeat/route.ts` | 47 | 2 | 0 | POST /api/presence/heartbeat — "the tab is still open". |
+| `frontend/app/api/storage/local/[...key]/route.ts` | 45 | 1 | 0 | GET/PUT /api/storage/local/<key> — the local-storage-driver serving route. |
+| `frontend/app/api/stripe/checkout/route.ts` | 138 | 5 | 0 | — |
+| `frontend/app/api/stripe/portal/route.ts` | 88 | 5 | 0 | — |
+| `frontend/app/api/stripe/webhook/route.ts` | 322 | 5 | 1 | — |
+| `frontend/app/api/tools/[name]/route.ts` | 90 | 3 | 0 | POST /api/tools/[name] |
+| `frontend/app/api/uploads/[...key]/route.ts` | 46 | 1 | 0 | GET /api/uploads/cms/<file> — public, permanent serving of CMS-uploaded images. |
+| `frontend/app/api/waitlist/route.ts` | 166 | 4 | 0 | GET /api/waitlist — Check if email is already on waitlist (admin only) POST /api/waitlist — Public endpoint to join the waitlist |
+| `frontend/app/api/webhooks/postmark/route.ts` | 198 | 2 | 2 | POST /api/webhooks/postmark — delivery outcomes from the provider. |
 
 ### frontend · auth pages · 4 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `app/(auth)/change-password/page.tsx` | 27 | 2 | 0 | — |
-| `app/(auth)/forgot-password/page.tsx` | 91 | 0 | 0 | — |
-| `app/(auth)/login/page.tsx` | 195 | 2 | 0 | — |
-| `app/(auth)/reset-password/page.tsx` | 165 | 0 | 0 | — |
+| `frontend/app/(auth)/change-password/page.tsx` | 27 | 2 | 0 | — |
+| `frontend/app/(auth)/forgot-password/page.tsx` | 91 | 0 | 0 | — |
+| `frontend/app/(auth)/login/page.tsx` | 195 | 2 | 0 | — |
+| `frontend/app/(auth)/reset-password/page.tsx` | 165 | 0 | 0 | — |
 
 ### frontend · components · 188 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `components/admin/admin-file-manager.tsx` | 779 | 2 | 1 | — |
-| `components/admin/admin-nav-context.tsx` | 101 | 0 | 5 | — |
-| `components/admin/admin-nav-data.ts` | 204 | 1 | 2 | THE single source of truth for the admin nav — consumed by BOTH the sidebar (app/admin/layout.tsx renders directly from ADMIN_NAV) AND the nav-trail b |
-| `components/admin/admin-nav-link.tsx` | 21 | 1 | 1 | — |
-| `components/admin/admin-nav-trail.tsx` | 115 | 1 | 1 | — |
-| `components/admin/agent-usage-summary.tsx` | 84 | 1 | 1 | — |
-| `components/admin/agent-workforce.tsx` | 229 | 1 | 1 | — |
-| `components/admin/application-review.tsx` | 686 | 1 | 1 | — |
-| `components/admin/automation-health.tsx` | 109 | 0 | 1 | Automation Health roll-up for /admin/automation (UI-gaps R2/R5/R11). The signals were scattered (rule counts here, log under System State's mislabeled |
-| `components/admin/comp-codes-panel.tsx` | 223 | 2 | 1 | — |
-| `components/admin/companion-button.tsx` | 61 | 0 | 1 | — |
-| `components/admin/crawl-settings.tsx` | 244 | 1 | 1 | — |
-| `components/admin/create-partner-org-form.tsx` | 98 | 0 | 1 | — |
-| `components/admin/descent-timeout-notice.tsx` | 51 | 0 | 1 | "You were moved out of a customer's workspace." |
-| `components/admin/diff-history.tsx` | 196 | 1 | 1 | — |
-| `components/admin/guardrail-defaults.tsx` | 64 | 0 | 1 | — |
-| `components/admin/guide-note.tsx` | 137 | 0 | 1 | — |
-| `components/admin/guide.tsx` | 104 | 1 | 6 | The in-page guide kit — the shared shell for an admin surface's "how this works", and the affordance that lets the person reading it say the guide is  |
-| `components/admin/image-upload-field.tsx` | 78 | 0 | 2 | — |
-| `components/admin/intake-form.tsx` | 68 | 0 | 1 | — |
-| `components/admin/intake-stage-strip.tsx` | 95 | 0 | 6 | The discovery river, drawn as one queue (#176). |
-| `components/admin/master-cards.tsx` | 324 | 2 | 1 | — |
-| `components/admin/new-company-form.tsx` | 117 | 0 | 1 | — |
-| `components/admin/note-actions.tsx` | 38 | 0 | 1 | — |
-| `components/admin/note-composer.tsx` | 61 | 0 | 1 | — |
-| `components/admin/opp-watch-toggle.tsx` | 48 | 1 | 1 | — |
-| `components/admin/platform-ai-config-card.tsx` | 214 | 1 | 1 | — |
-| `components/admin/proposal-autodrive.tsx` | 147 | 0 | 1 | — |
-| `components/admin/recent-sessions.tsx` | 120 | 3 | 1 | — |
-| `components/admin/region-annotation-form.tsx` | 204 | 0 | 1 | — |
-| `components/admin/region-list.tsx` | 163 | 1 | 1 | — |
-| `components/admin/source-card-actions.tsx` | 640 | 1 | 1 | — |
-| `components/admin/stat-card.tsx` | 156 | 0 | 6 | — |
-| `components/admin/suppression-list.tsx` | 141 | 1 | 1 | — |
-| `components/admin/template-canvas-editor.tsx` | 90 | 3 | 1 | — |
-| `components/admin/template-picker.tsx` | 121 | 0 | 1 | — |
-| `components/admin/template-previewer.tsx` | 270 | 3 | 1 | — |
-| `components/admin/tenant-ai-config-card.tsx` | 164 | 1 | 1 | — |
-| `components/admin/tenant-archive-control.tsx` | 60 | 0 | 1 | — |
-| `components/admin/tenant-details-editor.tsx` | 196 | 1 | 1 | — |
-| `components/analytics/tracker.tsx` | 104 | 0 | 1 | — |
-| `components/atomization/atom-bubble-rail.tsx` | 211 | 0 | 2 | — |
-| `components/auth/change-password-form.tsx` | 131 | 0 | 1 | — |
-| `components/auth/sign-out-button.tsx` | 27 | 0 | 5 | — |
-| `components/canvas/ai-revision-panel.tsx` | 193 | 2 | 1 | — |
-| `components/canvas/bounding-box-overlay.tsx` | 134 | 2 | 2 | — |
-| `components/canvas/canvas-editor-page.tsx` | 311 | 6 | 3 | — |
-| `components/canvas/canvas-editor.tsx` | 1290 | 16 | 4 | — |
-| `components/canvas/canvas-overlays.tsx` | 106 | 1 | 3 | — |
-| `components/canvas/canvas-renderer.tsx` | 1699 | 8 | 7 | — |
-| `components/canvas/canvas-sidebar.tsx` | 1220 | 11 | 2 | — |
-| `components/canvas/canvas-toolbar.tsx` | 269 | 2 | 1 | — |
-| `components/canvas/collaboration.tsx` | 280 | 2 | 2 | — |
-| `components/canvas/document-preview.tsx` | 119 | 2 | 1 | — |
-| `components/canvas/draft-all-sections.tsx` | 312 | 2 | 1 | — |
-| `components/canvas/fluid-document-view.tsx` | 661 | 9 | 1 | — |
-| `components/canvas/library-insert-panel.tsx` | 113 | 1 | 1 | — |
-| `components/canvas/library-picker.tsx` | 125 | 0 | 2 | — |
-| `components/canvas/measure-grid-overlay.tsx` | 222 | 2 | 1 | — |
-| `components/canvas/node-format-controls.tsx` | 358 | 2 | 1 | — |
-| `components/canvas/scope-bar.tsx` | 208 | 3 | 1 | — |
-| `components/canvas/section-top-ribbon.tsx` | 383 | 1 | 1 | — |
-| `components/canvas/selection-toolbar.tsx` | 99 | 2 | 2 | — |
-| `components/canvas/sheet-editor.tsx` | 1243 | 4 | 1 | — |
-| `components/canvas/sheet-media-strip.tsx` | 125 | 2 | 1 | — |
-| `components/canvas/slide-editor.tsx` | 366 | 3 | 1 | — |
-| `components/cards/card-format.ts` | 80 | 1 | 2 | Pure presentation helpers for the opportunity card (no React, no DB) so the formatting logic is unit-testable in the node test env. Imports are type-o |
-| `components/cards/opportunity-card.tsx` | 153 | 5 | 1 | — |
-| `components/command/command-tabs.tsx` | 111 | 2 | 2 | — |
-| `components/marketing/agency-mark.tsx` | 131 | 0 | 1 | AgencyMark — tasteful, ORIGINAL vector marks that evoke the federal R&D agencies our customers pursue. These are decorative, minimalist, single-color  |
-| `components/marketing/application-form.tsx` | 477 | 2 | 1 | — |
-| `components/marketing/cms-card.tsx` | 51 | 2 | 2 | — |
-| `components/marketing/custom-sections.tsx` | 79 | 4 | 13 | CustomSections — renders any blocks an editor adds whose `section` isn't one of the page's known (registry-default) sections, in a clean default layou |
-| `components/marketing/diagrams.tsx` | 47 | 0 | 1 | Custom vector diagrams for the marketing arc — hand-drawn SVG, no icon fonts, no emoji. Colors come from Tailwind text/fill utilities (currentColor),  |
-| `components/marketing/icons.tsx` | 657 | 0 | 8 | MarketingIcon — bespoke line-art icon palette for the marketing content buckets. |
-| `components/marketing/mobile-menu.tsx` | 109 | 0 | 1 | — |
-| `components/marketing/resources-filter.tsx` | 135 | 1 | 1 | — |
-| `components/marketing/rich-text.tsx` | 92 | 0 | 12 | RichText — inline marketing copy renderer for CMS-editable headings/copy. |
-| `components/marketing/safe-image.tsx` | 29 | 0 | 3 | — |
-| `components/marketing/section-layout.tsx` | 312 | 2 | 3 | Marketing section components — CMS-ready building blocks. |
-| `components/marketing/value-comparison.tsx` | 134 | 1 | 2 | — |
-| `components/marketing/waitlist-form.tsx` | 94 | 1 | 1 | — |
-| `components/marketing/wordmark.tsx` | 71 | 0 | 1 | CSS-only wordmark matching RFP Pipeline Logo V0.4. |
-| `components/nav-link.tsx` | 75 | 0 | 2 | — |
-| `components/portal/agent-usage-panel.tsx` | 237 | 2 | 2 | — |
-| `components/portal/amendment-banner.tsx` | 199 | 0 | 1 | — |
-| `components/portal/archive-portal-button.tsx` | 57 | 1 | 1 | — |
-| `components/portal/archived-proposals.tsx` | 163 | 1 | 1 | — |
-| `components/portal/atom-library.tsx` | 342 | 0 | 1 | — |
-| `components/portal/atomizer.tsx` | 334 | 0 | 1 | — |
-| `components/portal/atoms-workbench.tsx` | 40 | 5 | 1 | — |
-| `components/portal/automation-overview-card.tsx` | 195 | 0 | 1 | — |
-| `components/portal/automation-policies-card.tsx` | 240 | 0 | 2 | — |
-| `components/portal/billing-panel.tsx` | 341 | 1 | 3 | — |
-| `components/portal/capture-atomizer.tsx` | 372 | 0 | 1 | — |
-| `components/portal/cockpit.tsx` | 229 | 9 | 1 | — |
-| `components/portal/create-canvas-button.tsx` | 186 | 0 | 1 | — |
-| `components/portal/deep-link-gate.tsx` | 79 | 0 | 1 | — |
-| `components/portal/document-lock-bar.tsx` | 80 | 0 | 1 | — |
-| `components/portal/fluid-document-tab.tsx` | 82 | 2 | 1 | — |
-| `components/portal/guardrail-editor.tsx` | 280 | 2 | 1 | — |
-| `components/portal/indicator-rail.tsx` | 52 | 0 | 2 | — |
-| `components/portal/library-browser.tsx` | 162 | 1 | 1 | — |
-| `components/portal/library-review.tsx` | 245 | 2 | 1 | — |
-| `components/portal/library-seed-panel.tsx` | 483 | 0 | 1 | — |
-| `components/portal/manage-console.tsx` | 296 | 11 | 1 | — |
-| `components/portal/manager-remove-action.tsx` | 45 | 1 | 1 | — |
-| `components/portal/manager-request-actions.tsx` | 42 | 0 | 1 | — |
-| `components/portal/member-scope-control.tsx` | 87 | 1 | 1 | — |
-| `components/portal/new-document-chooser.tsx` | 249 | 1 | 1 | — |
-| `components/portal/notification-panel.tsx` | 200 | 2 | 1 | — |
-| `components/portal/outcome-recorder.tsx` | 113 | 1 | 1 | — |
-| `components/portal/package-atomizer.tsx` | 158 | 0 | 1 | — |
-| `components/portal/pending-build-banner.tsx` | 72 | 0 | 1 | — |
-| `components/portal/pipeline-cards.tsx` | 613 | 4 | 3 | — |
-| `components/portal/portal-nav-link.tsx` | 6 | 1 | 1 | — |
-| `components/portal/presence-heartbeat.tsx` | 62 | 0 | 1 | — |
-| `components/portal/profile-editor.tsx` | 317 | 0 | 2 | — |
-| `components/portal/proposal-admin-panel.tsx` | 1231 | 9 | 1 | — |
-| `components/portal/proposal-contributor-view.tsx` | 214 | 2 | 1 | — |
-| `components/portal/proposal-dropbox.tsx` | 256 | 1 | 2 | — |
-| `components/portal/proposal-portals.tsx` | 197 | 2 | 2 | — |
-| `components/portal/proposal-studio.tsx` | 244 | 0 | 1 | — |
-| `components/portal/proposal-timeline.tsx` | 141 | 3 | 1 | — |
-| `components/portal/proposal-workspace.tsx` | 441 | 9 | 1 | — |
-| `components/portal/purchase-modal.tsx` | 197 | 1 | 1 | — |
-| `components/portal/save-as-template.tsx` | 90 | 0 | 1 | — |
-| `components/portal/section-compliance-chip.tsx` | 113 | 0 | 3 | — |
-| `components/portal/shadow-space-banner.tsx` | 95 | 0 | 1 | — |
-| `components/portal/spotlight-buckets.tsx` | 398 | 1 | 3 | — |
-| `components/portal/stage-control.tsx` | 459 | 2 | 1 | — |
-| `components/portal/starter-catalog.tsx` | 125 | 0 | 1 | — |
-| `components/portal/strategy-panel.tsx` | 73 | 2 | 1 | — |
-| `components/portal/submission-readiness-card.tsx` | 220 | 2 | 1 | — |
-| `components/portal/supporting-doc-actions.tsx` | 204 | 0 | 1 | — |
-| `components/portal/team-invite-form.tsx` | 134 | 0 | 2 | — |
-| `components/portal/team-manager.tsx` | 396 | 2 | 1 | — |
-| `components/portal/team-member-actions.tsx` | 151 | 1 | 2 | — |
-| `components/portal/template-stable-gallery.tsx` | 262 | 3 | 1 | — |
-| `components/portal/templify-past-proposals.tsx` | 237 | 0 | 1 | — |
-| `components/portal/upload-atomize-card.tsx` | 220 | 0 | 2 | — |
-| `components/portal/vaults/nook-detail.tsx` | 202 | 0 | 2 | — |
-| `components/portal/vaults/nooks-index.tsx` | 90 | 0 | 1 | — |
-| `components/portal/volume-layout-gauge.tsx` | 89 | 0 | 1 | — |
-| `components/projects/cdrl-register.tsx` | 324 | 1 | 1 | — |
-| `components/projects/comment-thread.tsx` | 233 | 2 | 1 | — |
-| `components/projects/deliverable-row.tsx` | 214 | 1 | 1 | — |
-| `components/projects/evidence-panel.tsx` | 215 | 1 | 1 | — |
-| `components/projects/forecast-panel.tsx` | 112 | 0 | 1 | Estimate at completion — three of them, side by side (A5). |
-| `components/projects/gate-closer-control.tsx` | 138 | 1 | 1 | — |
-| `components/projects/invoice-ledger.tsx` | 409 | 2 | 1 | — |
-| `components/projects/meeting-log.tsx` | 283 | 1 | 1 | — |
-| `components/projects/milestone-checklist.tsx` | 387 | 1 | 1 | — |
-| `components/projects/modification-log.tsx` | 399 | 1 | 1 | — |
-| `components/projects/notification-policy.tsx` | 196 | 1 | 1 | — |
-| `components/projects/project-assistant.tsx` | 121 | 1 | 1 | — |
-| `components/projects/project-roster.tsx` | 122 | 1 | 1 | — |
-| `components/projects/review-panel.tsx` | 272 | 2 | 1 | — |
-| `components/projects/risk-register.tsx` | 259 | 1 | 1 | — |
-| `components/projects/traceability-map.tsx` | 111 | 0 | 1 | Contract traceability — every line item, and what satisfies it (A3). |
-| `components/proposal/section-assign-bar.tsx` | 69 | 1 | 1 | — |
-| `components/proposal/section-assist-bar.tsx` | 166 | 3 | 1 | — |
-| `components/rfp-curation/amendments-panel.tsx` | 304 | 0 | 1 | — |
-| `components/rfp-curation/annotation-atomize-rail.tsx` | 246 | 2 | 1 | — |
-| `components/rfp-curation/curation-notes-panel.tsx` | 133 | 2 | 2 | — |
-| `components/rfp-curation/curation-workspace.tsx` | 3502 | 15 | 1 | — |
-| `components/rfp-curation/disposition-control.tsx` | 169 | 1 | 1 | — |
-| `components/rfp-curation/ingest-plan-panel.tsx` | 121 | 1 | 1 | — |
-| `components/rfp-curation/ingest-studio.tsx` | 350 | 2 | 1 | — |
-| `components/rfp-curation/pdf-viewer.tsx` | 714 | 1 | 1 | — |
-| `components/rfp-curation/tag-popover.tsx` | 255 | 0 | 1 | — |
-| `components/rfp-curation/topic-compliance-manager.tsx` | 862 | 0 | 1 | — |
-| `components/rfp-curation/topic-detail.tsx` | 223 | 1 | 1 | — |
-| `components/rfp-curation/triage-queue.tsx` | 327 | 4 | 1 | — |
-| `components/rfp-curation/upload-form.tsx` | 549 | 2 | 1 | — |
-| `components/scout/candidate-queue.tsx` | 193 | 2 | 1 | — |
-| `components/tasks/assign-task-form.tsx` | 221 | 0 | 3 | — |
-| `components/tasks/task-claim.tsx` | 116 | 2 | 1 | — |
-| `components/tasks/task-queue.tsx` | 577 | 4 | 5 | — |
-| `components/tasks/todos-panel.tsx` | 48 | 2 | 2 | — |
-| `components/ui/advisory-overlay.tsx` | 111 | 1 | 1 | — |
-| `components/ui/autocomplete.tsx` | 172 | 0 | 2 | — |
-| `components/ui/count-badge.tsx` | 18 | 0 | 1 | CountBadge — the small "unread email" count pill, extracted from IndicatorRail (components/portal/indicator-rail.tsx) so it can badge Command Center t |
-| `components/ui/drawer.tsx` | 129 | 0 | 4 | — |
-| `components/ui/modal.tsx` | 74 | 0 | 1 | — |
-| `components/ui/nav-shell.tsx` | 68 | 1 | 3 | — |
-| `components/ui/tabs.tsx` | 120 | 0 | 2 | — |
-| `components/ui/time-ago.tsx` | 155 | 0 | 26 | — |
+| `frontend/components/admin/admin-file-manager.tsx` | 779 | 2 | 1 | — |
+| `frontend/components/admin/admin-nav-context.tsx` | 101 | 0 | 5 | — |
+| `frontend/components/admin/admin-nav-data.ts` | 204 | 1 | 2 | THE single source of truth for the admin nav — consumed by BOTH the sidebar (app/admin/layout.tsx renders directly from ADMIN_NAV) AND the nav-trail b |
+| `frontend/components/admin/admin-nav-link.tsx` | 21 | 1 | 1 | — |
+| `frontend/components/admin/admin-nav-trail.tsx` | 115 | 1 | 1 | — |
+| `frontend/components/admin/agent-usage-summary.tsx` | 84 | 1 | 1 | — |
+| `frontend/components/admin/agent-workforce.tsx` | 229 | 1 | 1 | — |
+| `frontend/components/admin/application-review.tsx` | 686 | 1 | 1 | — |
+| `frontend/components/admin/automation-health.tsx` | 109 | 0 | 1 | Automation Health roll-up for /admin/automation (UI-gaps R2/R5/R11). The signals were scattered (rule counts here, log under System State's mislabeled |
+| `frontend/components/admin/comp-codes-panel.tsx` | 223 | 2 | 1 | — |
+| `frontend/components/admin/companion-button.tsx` | 61 | 0 | 1 | — |
+| `frontend/components/admin/crawl-settings.tsx` | 244 | 1 | 1 | — |
+| `frontend/components/admin/create-partner-org-form.tsx` | 98 | 0 | 1 | — |
+| `frontend/components/admin/descent-timeout-notice.tsx` | 51 | 0 | 1 | "You were moved out of a customer's workspace." |
+| `frontend/components/admin/diff-history.tsx` | 196 | 1 | 1 | — |
+| `frontend/components/admin/guardrail-defaults.tsx` | 64 | 0 | 1 | — |
+| `frontend/components/admin/guide-note.tsx` | 137 | 0 | 1 | — |
+| `frontend/components/admin/guide.tsx` | 104 | 1 | 6 | The in-page guide kit — the shared shell for an admin surface's "how this works", and the affordance that lets the person reading it say the guide is  |
+| `frontend/components/admin/image-upload-field.tsx` | 78 | 0 | 2 | — |
+| `frontend/components/admin/intake-form.tsx` | 68 | 0 | 1 | — |
+| `frontend/components/admin/intake-stage-strip.tsx` | 95 | 0 | 6 | The discovery river, drawn as one queue (#176). |
+| `frontend/components/admin/master-cards.tsx` | 324 | 2 | 1 | — |
+| `frontend/components/admin/new-company-form.tsx` | 117 | 0 | 1 | — |
+| `frontend/components/admin/note-actions.tsx` | 38 | 0 | 1 | — |
+| `frontend/components/admin/note-composer.tsx` | 61 | 0 | 1 | — |
+| `frontend/components/admin/opp-watch-toggle.tsx` | 48 | 1 | 1 | — |
+| `frontend/components/admin/platform-ai-config-card.tsx` | 214 | 1 | 1 | — |
+| `frontend/components/admin/proposal-autodrive.tsx` | 147 | 0 | 1 | — |
+| `frontend/components/admin/recent-sessions.tsx` | 120 | 3 | 1 | — |
+| `frontend/components/admin/region-annotation-form.tsx` | 204 | 0 | 1 | — |
+| `frontend/components/admin/region-list.tsx` | 163 | 1 | 1 | — |
+| `frontend/components/admin/source-card-actions.tsx` | 640 | 1 | 1 | — |
+| `frontend/components/admin/stat-card.tsx` | 156 | 0 | 6 | — |
+| `frontend/components/admin/suppression-list.tsx` | 141 | 1 | 1 | — |
+| `frontend/components/admin/template-canvas-editor.tsx` | 90 | 3 | 1 | — |
+| `frontend/components/admin/template-picker.tsx` | 121 | 0 | 1 | — |
+| `frontend/components/admin/template-previewer.tsx` | 270 | 3 | 1 | — |
+| `frontend/components/admin/tenant-ai-config-card.tsx` | 164 | 1 | 1 | — |
+| `frontend/components/admin/tenant-archive-control.tsx` | 60 | 0 | 1 | — |
+| `frontend/components/admin/tenant-details-editor.tsx` | 196 | 1 | 1 | — |
+| `frontend/components/analytics/tracker.tsx` | 104 | 0 | 1 | — |
+| `frontend/components/atomization/atom-bubble-rail.tsx` | 211 | 0 | 2 | — |
+| `frontend/components/auth/change-password-form.tsx` | 131 | 0 | 1 | — |
+| `frontend/components/auth/sign-out-button.tsx` | 27 | 0 | 5 | — |
+| `frontend/components/canvas/ai-revision-panel.tsx` | 193 | 2 | 1 | — |
+| `frontend/components/canvas/bounding-box-overlay.tsx` | 134 | 2 | 2 | — |
+| `frontend/components/canvas/canvas-editor-page.tsx` | 311 | 6 | 3 | — |
+| `frontend/components/canvas/canvas-editor.tsx` | 1290 | 16 | 4 | — |
+| `frontend/components/canvas/canvas-overlays.tsx` | 106 | 1 | 3 | — |
+| `frontend/components/canvas/canvas-renderer.tsx` | 1699 | 8 | 7 | — |
+| `frontend/components/canvas/canvas-sidebar.tsx` | 1220 | 11 | 2 | — |
+| `frontend/components/canvas/canvas-toolbar.tsx` | 269 | 2 | 1 | — |
+| `frontend/components/canvas/collaboration.tsx` | 280 | 2 | 2 | — |
+| `frontend/components/canvas/document-preview.tsx` | 119 | 2 | 1 | — |
+| `frontend/components/canvas/draft-all-sections.tsx` | 312 | 2 | 1 | — |
+| `frontend/components/canvas/fluid-document-view.tsx` | 661 | 9 | 1 | — |
+| `frontend/components/canvas/library-insert-panel.tsx` | 113 | 1 | 1 | — |
+| `frontend/components/canvas/library-picker.tsx` | 125 | 0 | 2 | — |
+| `frontend/components/canvas/measure-grid-overlay.tsx` | 222 | 2 | 1 | — |
+| `frontend/components/canvas/node-format-controls.tsx` | 358 | 2 | 1 | — |
+| `frontend/components/canvas/scope-bar.tsx` | 208 | 3 | 1 | — |
+| `frontend/components/canvas/section-top-ribbon.tsx` | 383 | 1 | 1 | — |
+| `frontend/components/canvas/selection-toolbar.tsx` | 99 | 2 | 2 | — |
+| `frontend/components/canvas/sheet-editor.tsx` | 1243 | 4 | 1 | — |
+| `frontend/components/canvas/sheet-media-strip.tsx` | 125 | 2 | 1 | — |
+| `frontend/components/canvas/slide-editor.tsx` | 366 | 3 | 1 | — |
+| `frontend/components/cards/card-format.ts` | 80 | 1 | 2 | Pure presentation helpers for the opportunity card (no React, no DB) so the formatting logic is unit-testable in the node test env. Imports are type-o |
+| `frontend/components/cards/opportunity-card.tsx` | 153 | 5 | 1 | — |
+| `frontend/components/command/command-tabs.tsx` | 111 | 2 | 2 | — |
+| `frontend/components/marketing/agency-mark.tsx` | 131 | 0 | 1 | AgencyMark — tasteful, ORIGINAL vector marks that evoke the federal R&D agencies our customers pursue. These are decorative, minimalist, single-color  |
+| `frontend/components/marketing/application-form.tsx` | 477 | 2 | 1 | — |
+| `frontend/components/marketing/cms-card.tsx` | 51 | 2 | 2 | — |
+| `frontend/components/marketing/custom-sections.tsx` | 79 | 4 | 13 | CustomSections — renders any blocks an editor adds whose `section` isn't one of the page's known (registry-default) sections, in a clean default layou |
+| `frontend/components/marketing/diagrams.tsx` | 47 | 0 | 1 | Custom vector diagrams for the marketing arc — hand-drawn SVG, no icon fonts, no emoji. Colors come from Tailwind text/fill utilities (currentColor),  |
+| `frontend/components/marketing/icons.tsx` | 657 | 0 | 8 | MarketingIcon — bespoke line-art icon palette for the marketing content buckets. |
+| `frontend/components/marketing/mobile-menu.tsx` | 109 | 0 | 1 | — |
+| `frontend/components/marketing/resources-filter.tsx` | 135 | 1 | 1 | — |
+| `frontend/components/marketing/rich-text.tsx` | 92 | 0 | 12 | RichText — inline marketing copy renderer for CMS-editable headings/copy. |
+| `frontend/components/marketing/safe-image.tsx` | 29 | 0 | 3 | — |
+| `frontend/components/marketing/section-layout.tsx` | 312 | 2 | 3 | Marketing section components — CMS-ready building blocks. |
+| `frontend/components/marketing/value-comparison.tsx` | 134 | 1 | 2 | — |
+| `frontend/components/marketing/waitlist-form.tsx` | 94 | 1 | 1 | — |
+| `frontend/components/marketing/wordmark.tsx` | 71 | 0 | 1 | CSS-only wordmark matching RFP Pipeline Logo V0.4. |
+| `frontend/components/nav-link.tsx` | 75 | 0 | 2 | — |
+| `frontend/components/portal/agent-usage-panel.tsx` | 237 | 2 | 2 | — |
+| `frontend/components/portal/amendment-banner.tsx` | 199 | 0 | 1 | — |
+| `frontend/components/portal/archive-portal-button.tsx` | 57 | 1 | 1 | — |
+| `frontend/components/portal/archived-proposals.tsx` | 163 | 1 | 1 | — |
+| `frontend/components/portal/atom-library.tsx` | 342 | 0 | 1 | — |
+| `frontend/components/portal/atomizer.tsx` | 334 | 0 | 1 | — |
+| `frontend/components/portal/atoms-workbench.tsx` | 40 | 5 | 1 | — |
+| `frontend/components/portal/automation-overview-card.tsx` | 195 | 0 | 1 | — |
+| `frontend/components/portal/automation-policies-card.tsx` | 240 | 0 | 2 | — |
+| `frontend/components/portal/billing-panel.tsx` | 341 | 1 | 3 | — |
+| `frontend/components/portal/capture-atomizer.tsx` | 372 | 0 | 1 | — |
+| `frontend/components/portal/cockpit.tsx` | 229 | 9 | 1 | — |
+| `frontend/components/portal/create-canvas-button.tsx` | 186 | 0 | 1 | — |
+| `frontend/components/portal/deep-link-gate.tsx` | 79 | 0 | 1 | — |
+| `frontend/components/portal/document-lock-bar.tsx` | 80 | 0 | 1 | — |
+| `frontend/components/portal/fluid-document-tab.tsx` | 82 | 2 | 1 | — |
+| `frontend/components/portal/guardrail-editor.tsx` | 280 | 2 | 1 | — |
+| `frontend/components/portal/indicator-rail.tsx` | 52 | 0 | 2 | — |
+| `frontend/components/portal/library-browser.tsx` | 162 | 1 | 1 | — |
+| `frontend/components/portal/library-review.tsx` | 245 | 2 | 1 | — |
+| `frontend/components/portal/library-seed-panel.tsx` | 483 | 0 | 1 | — |
+| `frontend/components/portal/manage-console.tsx` | 296 | 11 | 1 | — |
+| `frontend/components/portal/manager-remove-action.tsx` | 45 | 1 | 1 | — |
+| `frontend/components/portal/manager-request-actions.tsx` | 42 | 0 | 1 | — |
+| `frontend/components/portal/member-scope-control.tsx` | 87 | 1 | 1 | — |
+| `frontend/components/portal/new-document-chooser.tsx` | 249 | 1 | 1 | — |
+| `frontend/components/portal/notification-panel.tsx` | 200 | 2 | 1 | — |
+| `frontend/components/portal/outcome-recorder.tsx` | 113 | 1 | 1 | — |
+| `frontend/components/portal/package-atomizer.tsx` | 158 | 0 | 1 | — |
+| `frontend/components/portal/pending-build-banner.tsx` | 72 | 0 | 1 | — |
+| `frontend/components/portal/pipeline-cards.tsx` | 613 | 4 | 3 | — |
+| `frontend/components/portal/portal-nav-link.tsx` | 6 | 1 | 1 | — |
+| `frontend/components/portal/presence-heartbeat.tsx` | 62 | 0 | 1 | — |
+| `frontend/components/portal/profile-editor.tsx` | 317 | 0 | 2 | — |
+| `frontend/components/portal/proposal-admin-panel.tsx` | 1231 | 9 | 1 | — |
+| `frontend/components/portal/proposal-contributor-view.tsx` | 214 | 2 | 1 | — |
+| `frontend/components/portal/proposal-dropbox.tsx` | 256 | 1 | 2 | — |
+| `frontend/components/portal/proposal-portals.tsx` | 197 | 2 | 2 | — |
+| `frontend/components/portal/proposal-studio.tsx` | 244 | 0 | 1 | — |
+| `frontend/components/portal/proposal-timeline.tsx` | 141 | 3 | 1 | — |
+| `frontend/components/portal/proposal-workspace.tsx` | 441 | 9 | 1 | — |
+| `frontend/components/portal/purchase-modal.tsx` | 197 | 1 | 1 | — |
+| `frontend/components/portal/save-as-template.tsx` | 90 | 0 | 1 | — |
+| `frontend/components/portal/section-compliance-chip.tsx` | 113 | 0 | 3 | — |
+| `frontend/components/portal/shadow-space-banner.tsx` | 95 | 0 | 1 | — |
+| `frontend/components/portal/spotlight-buckets.tsx` | 398 | 1 | 3 | — |
+| `frontend/components/portal/stage-control.tsx` | 459 | 2 | 1 | — |
+| `frontend/components/portal/starter-catalog.tsx` | 125 | 0 | 1 | — |
+| `frontend/components/portal/strategy-panel.tsx` | 73 | 2 | 1 | — |
+| `frontend/components/portal/submission-readiness-card.tsx` | 220 | 2 | 1 | — |
+| `frontend/components/portal/supporting-doc-actions.tsx` | 204 | 0 | 1 | — |
+| `frontend/components/portal/team-invite-form.tsx` | 134 | 0 | 2 | — |
+| `frontend/components/portal/team-manager.tsx` | 396 | 2 | 1 | — |
+| `frontend/components/portal/team-member-actions.tsx` | 151 | 1 | 2 | — |
+| `frontend/components/portal/template-stable-gallery.tsx` | 262 | 3 | 1 | — |
+| `frontend/components/portal/templify-past-proposals.tsx` | 237 | 0 | 1 | — |
+| `frontend/components/portal/upload-atomize-card.tsx` | 220 | 0 | 2 | — |
+| `frontend/components/portal/vaults/nook-detail.tsx` | 202 | 0 | 2 | — |
+| `frontend/components/portal/vaults/nooks-index.tsx` | 90 | 0 | 1 | — |
+| `frontend/components/portal/volume-layout-gauge.tsx` | 89 | 0 | 1 | — |
+| `frontend/components/projects/cdrl-register.tsx` | 324 | 1 | 1 | — |
+| `frontend/components/projects/comment-thread.tsx` | 233 | 2 | 1 | — |
+| `frontend/components/projects/deliverable-row.tsx` | 214 | 1 | 1 | — |
+| `frontend/components/projects/evidence-panel.tsx` | 215 | 1 | 1 | — |
+| `frontend/components/projects/forecast-panel.tsx` | 112 | 0 | 1 | Estimate at completion — three of them, side by side (A5). |
+| `frontend/components/projects/gate-closer-control.tsx` | 138 | 1 | 1 | — |
+| `frontend/components/projects/invoice-ledger.tsx` | 409 | 2 | 1 | — |
+| `frontend/components/projects/meeting-log.tsx` | 283 | 1 | 1 | — |
+| `frontend/components/projects/milestone-checklist.tsx` | 387 | 1 | 1 | — |
+| `frontend/components/projects/modification-log.tsx` | 399 | 1 | 1 | — |
+| `frontend/components/projects/notification-policy.tsx` | 196 | 1 | 1 | — |
+| `frontend/components/projects/project-assistant.tsx` | 121 | 1 | 1 | — |
+| `frontend/components/projects/project-roster.tsx` | 122 | 1 | 1 | — |
+| `frontend/components/projects/review-panel.tsx` | 272 | 2 | 1 | — |
+| `frontend/components/projects/risk-register.tsx` | 259 | 1 | 1 | — |
+| `frontend/components/projects/traceability-map.tsx` | 111 | 0 | 1 | Contract traceability — every line item, and what satisfies it (A3). |
+| `frontend/components/proposal/section-assign-bar.tsx` | 69 | 1 | 1 | — |
+| `frontend/components/proposal/section-assist-bar.tsx` | 166 | 3 | 1 | — |
+| `frontend/components/rfp-curation/amendments-panel.tsx` | 304 | 0 | 1 | — |
+| `frontend/components/rfp-curation/annotation-atomize-rail.tsx` | 246 | 2 | 1 | — |
+| `frontend/components/rfp-curation/curation-notes-panel.tsx` | 133 | 2 | 2 | — |
+| `frontend/components/rfp-curation/curation-workspace.tsx` | 3502 | 15 | 1 | — |
+| `frontend/components/rfp-curation/disposition-control.tsx` | 169 | 1 | 1 | — |
+| `frontend/components/rfp-curation/ingest-plan-panel.tsx` | 121 | 1 | 1 | — |
+| `frontend/components/rfp-curation/ingest-studio.tsx` | 350 | 2 | 1 | — |
+| `frontend/components/rfp-curation/pdf-viewer.tsx` | 714 | 1 | 1 | — |
+| `frontend/components/rfp-curation/tag-popover.tsx` | 255 | 0 | 1 | — |
+| `frontend/components/rfp-curation/topic-compliance-manager.tsx` | 862 | 0 | 1 | — |
+| `frontend/components/rfp-curation/topic-detail.tsx` | 223 | 1 | 1 | — |
+| `frontend/components/rfp-curation/triage-queue.tsx` | 327 | 4 | 1 | — |
+| `frontend/components/rfp-curation/upload-form.tsx` | 549 | 2 | 1 | — |
+| `frontend/components/scout/candidate-queue.tsx` | 193 | 2 | 1 | — |
+| `frontend/components/tasks/assign-task-form.tsx` | 221 | 0 | 3 | — |
+| `frontend/components/tasks/task-claim.tsx` | 116 | 2 | 1 | — |
+| `frontend/components/tasks/task-queue.tsx` | 577 | 4 | 5 | — |
+| `frontend/components/tasks/todos-panel.tsx` | 48 | 2 | 2 | — |
+| `frontend/components/ui/advisory-overlay.tsx` | 111 | 1 | 1 | — |
+| `frontend/components/ui/autocomplete.tsx` | 172 | 0 | 2 | — |
+| `frontend/components/ui/count-badge.tsx` | 18 | 0 | 1 | CountBadge — the small "unread email" count pill, extracted from IndicatorRail (components/portal/indicator-rail.tsx) so it can badge Command Center t |
+| `frontend/components/ui/drawer.tsx` | 129 | 0 | 4 | — |
+| `frontend/components/ui/modal.tsx` | 74 | 0 | 1 | — |
+| `frontend/components/ui/nav-shell.tsx` | 68 | 1 | 3 | — |
+| `frontend/components/ui/tabs.tsx` | 120 | 0 | 2 | — |
+| `frontend/components/ui/time-ago.tsx` | 155 | 0 | 26 | — |
 
 ### frontend · config · 13 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `auth.config.ts` | 149 | 2 | 2 | NextAuth v5 edge-safe configuration. |
-| `auth.ts` | 171 | 4 | 325 | NextAuth v5 configuration — full Node-runtime version. |
-| `entrypoint.sh` | 64 | 0 | 0 | — |
-| `middleware.ts` | 349 | 3 | 1 | — |
-| `next-env.d.ts` | 7 | 0 | 0 | / <reference types="next" /> / <reference types="next/image-types/global" /> / <reference path="./.next/types/routes.d.ts" /> |
-| `next.config.mjs` | 114 | 0 | 0 | @type {import('next').NextConfig} |
-| `playwright.config.ts` | 71 | 0 | 0 | — |
-| `postcss.config.js` | 7 | 0 | 0 | — |
-| `public/pdf.worker.min.mjs` | 28 | 0 | 0 | @licstart The following is the entire license notice for the JavaScript code in this page |
-| `public/pdfjs/pdf.min.mjs` | 28 | 0 | 0 | @licstart The following is the entire license notice for the JavaScript code in this page |
-| `public/pdfjs/pdf.worker.min.mjs` | 28 | 0 | 0 | @licstart The following is the entire license notice for the JavaScript code in this page |
-| `tailwind.config.ts` | 55 | 0 | 0 | — |
-| `vitest.config.ts` | 24 | 0 | 0 | — |
+| `frontend/auth.config.ts` | 149 | 2 | 2 | NextAuth v5 edge-safe configuration. |
+| `frontend/auth.ts` | 171 | 4 | 325 | NextAuth v5 configuration — full Node-runtime version. |
+| `frontend/entrypoint.sh` | 64 | 0 | 0 | — |
+| `frontend/middleware.ts` | 349 | 3 | 1 | — |
+| `frontend/next-env.d.ts` | 7 | 0 | 0 | / <reference types="next" /> / <reference types="next/image-types/global" /> / <reference path="./.next/types/routes.d.ts" /> |
+| `frontend/next.config.mjs` | 114 | 0 | 0 | @type {import('next').NextConfig} |
+| `frontend/playwright.config.ts` | 71 | 0 | 0 | — |
+| `frontend/postcss.config.js` | 7 | 0 | 0 | — |
+| `frontend/public/pdf.worker.min.mjs` | 28 | 0 | 0 | @licstart The following is the entire license notice for the JavaScript code in this page |
+| `frontend/public/pdfjs/pdf.min.mjs` | 28 | 0 | 0 | @licstart The following is the entire license notice for the JavaScript code in this page |
+| `frontend/public/pdfjs/pdf.worker.min.mjs` | 28 | 0 | 0 | @licstart The following is the entire license notice for the JavaScript code in this page |
+| `frontend/tailwind.config.ts` | 55 | 0 | 0 | — |
+| `frontend/vitest.config.ts` | 24 | 0 | 0 | — |
 
 ### frontend · e2e · 81 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `e2e/actor-walk-drive.spec.ts` | 164 | 0 | 0 | ACTOR WALK — every role walks its own surfaces, and each surface is SCREENSHOT so the picture (not a query) is the verification instrument. |
-| `e2e/admin-todo-complete-drive.spec.ts` | 56 | 0 | 0 | Can an rfp_admin actually COMPLETE a platform-scope ToDo? |
-| `e2e/atomloop.tenant.spec.ts` | 92 | 0 | 0 | Driven regression for the S4 atom-return loop — the closing leg of atomize → library → mold → draft → **back into the library**. |
-| `e2e/auth.setup.ts` | 54 | 0 | 0 | Playwright auth setup — logs in through the real Credentials form and saves a storageState per persona, so every spec reuses an authenticated session  |
-| `e2e/automation-190-shots.mts` | 53 | 0 | 0 | #190 F1 — capture the new automation surfaces as manual screenshots. Run from frontend/: node e2e/automation-190-shots.mts |
-| `e2e/automation-ui-shots.mts` | 62 | 0 | 0 | Live drive of this session's automation-UI surfaces (both roles). Proves they RENDER with real data, not just that they compile. Run from frontend/: n |
-| `e2e/b50-b53-reachability-drive.spec.ts` | 143 | 0 | 0 | B50 + B53 — two instruments that lied, checked by looking at them. |
-| `e2e/b51-application-todos-drive.spec.ts` | 227 | 0 | 0 | B51 — one application raises ONE ToDo, and deciding it drains that ToDo. |
-| `e2e/b52-shot-drive.spec.ts` | 23 | 0 | 0 | — |
-| `e2e/build-collab-drive.spec.ts` | 397 | 0 | 0 | PROPOSAL BUILD + COLLABORATION drive (docs/DATA_FLOW.md §section-save · §build→package, docs/TENANT_WORKFLOW_SETUP_DESIGN.md TW-1..6, docs/CANVAS_ARCH |
-| `e2e/collab.tenant.spec.ts` | 61 | 0 | 0 | Driven regression for Batch 2 canvas/project P0: #3 save authorization — an admin can save a section; a collaborator who is NOT assigned to it is reje |
-| `e2e/dow-assist-drive.spec.ts` | 188 | 1 | 0 | Ingest Assist, driven as a real rfp_admin against the live DoW 2026 SBIR BAA. |
-| `e2e/dow-full-ingest-drive.spec.ts` | 119 | 1 | 0 | The DoW 2026 SBIR BAA / T3CP ingest, end to end, through the product's own surfaces. |
-| `e2e/dow-ingest-drive.spec.ts` | 89 | 1 | 0 | DoW 2026 SBIR BAA + T3CP Patent Holiday topic — REAL rfp_admin ingest drive. |
-| `e2e/dow-matrix-drive.spec.ts` | 32 | 0 | 0 | Capture the compliance matrix as the curator sees it, post-mig-187. Every value written by Ingest Assist from DEFAULT_SBIR_CSO_SKELETON must render a  |
-| `e2e/dsip-deconstruct-drive.spec.ts` | 118 | 0 | 0 | DSIP FULL-PROPOSAL DECONSTRUCT drive — the reverse of the pipeline build-up. |
-| `e2e/fanout.admin.spec.ts` | 35 | 0 | 0 | Driven regression for design "A" (Greenfield Cards canonical): pushing a multi-topic solicitation must land ONE opportunity card per topic for the ten |
-| `e2e/flex-midwindow-drive.spec.ts` | 377 | 1 | 0 | FLEX MID-WINDOW DRIVE — the master OPP edited AFTER Spotlight release, BEFORE the buyer's portal release, as real actors on both sides (docs/MASTER_MI |
-| `e2e/fullloop.tenant.spec.ts` | 100 | 0 | 0 | Driven regression for the WHOLE greenfield atom loop, end to end, in one flow: |
-| `e2e/global-setup.ts` | 75 | 0 | 0 | E2E global setup — re-seed the driven-suite FIXTURES before every run. |
-| `e2e/hitl-bucket-rls.spec.ts` | 65 | 0 | 0 | Spotlight bucket lock-down — live drive under the forced-RLS govtech_app role (serve with DATABASE_URL=postgres://govtech_app:apppass@…). Proves the R |
-| `e2e/hitl-cc-actors.spec.ts` | 82 | 0 | 0 | Command Center — every actor × both modalities (desktop 1280 + mobile 390). Proves the same console renders correctly for each role and adapts across  |
-| `e2e/hitl-cc-mobile-audit.spec.ts` | 116 | 0 | 0 | Pristine pass — mobile audit of every Command Center destination (COMMAND_CENTER_DESIGN.md). At a 390px phone width, visit each surface the CC's actio |
-| `e2e/hitl-cc-newdot.spec.ts` | 91 | 0 | 0 | Command Center "new since you last looked" dot — live proof (mig 179 command_seen_state). With Kate's watermarks pre-seeded (todos/activity in the pas |
-| `e2e/hitl-cc-partner.spec.ts` | 46 | 0 | 0 | Command Center — partner-manager live drive (verification). Logs in as an EconDev partner-manager (pjackson @ Entrepreneurs' Center, managing Foundati |
-| `e2e/hitl-cc-tenant.spec.ts` | 84 | 0 | 0 | Command Center — tenant live drive (verification, not a committed guide). Logs in as Foundation's tenant_admin (Kate) and walks the 4 tabs of /portal/ |
-| `e2e/hitl-command-receipt.spec.ts` | 35 | 0 | 0 | Command Center read-receipt drive. A GENUINE acknowledgement (a lane whose new-dot was showing being cleared) emits ONE capture\|finder:command.acknow |
-| `e2e/hitl-deep-sweep.spec.ts` | 125 | 0 | 0 | HITL deep sweep — drive the platform as EVERY actor and touch every major surface, in one run, asserting no broken pages (500 / blank / auth-bounce) a |
-| `e2e/hitl-foundation-build.spec.ts` | 107 | 0 | 0 | Walk the Foundation TVSF build through the REAL pipeline gates: Kate (tenant_admin) redeems the comp code → proposal_portals `curation_pending` → rfp_ |
-| `e2e/hitl-foundation-guide.spec.ts` | 61 | 0 | 0 | Guidebook screenshots — the UPLOAD / build-your-library step that precedes drafting. Shows a customer (Kate, Foundation admin) landing in the Library  |
-| `e2e/hitl-foundation-ui-walk.spec.ts` | 326 | 0 | 0 | SCREENSHOT TOUR — Foundation TVSF build through the REAL UI, from selecting the TVSF opportunity to the completed, downloadable proposal. Each step sc |
-| `e2e/hitl-foundation-verify.spec.ts` | 79 | 0 | 0 | Verify the Foundation TVSF outcome through the REAL user-facing surfaces: 1. Kate (tenant_admin) downloads the final proposal via POST …/package?forma |
-| `e2e/hitl-full-draft.spec.ts` | 66 | 0 | 0 | HITL full-draft — the Proposal Draft Manager (P4) driven as the tenant_admin, through the real auth stack. Proves (1) the "Run full draft" panel is re |
-| `e2e/hitl-load-sbir.spec.ts` | 115 | 0 | 0 | Load a small set of SBIR/STTR master opportunities relevant to Foundation (3D-printed concrete formwork / additive construction), so they rank against |
-| `e2e/hitl-load-tvsf.spec.ts` | 104 | 0 | 0 | Load the TVSF opportunity into the master Opps list, with the REAL DMVEC/Round-45 format (Proposal + Budget, 7 pages total) and dates "opened 2 weeks  |
-| `e2e/hitl-onboard-tvs-build.spec.ts` | 63 | 0 | 0 | HITL onboard — Phase C6 (comp-code purchase) + C7 (release/provision) of the Fondation/TVS playbook, driven live: the new tenant_admin buys the portal |
-| `e2e/hitl-onboard-tvs.spec.ts` | 121 | 0 | 0 | HITL onboard — the Fondation / TVS playbook, driven as authenticated API calls through the real route handlers (docs/PLAYBOOK_ONBOARD_NEWCO_TVS.md). P |
-| `e2e/hitl-partner-manager.spec.ts` | 68 | 0 | 0 | Partner-manager E2E (docs/PARTNER_MANAGER_DESIGN.md). Drives the real UI as Paul Jackson (partner_admin) through the console, the add-company precheck |
-| `e2e/hitl-paul-login-trace.spec.ts` | 49 | 0 | 0 | Trace Paul Jackson's login from the public pages through to his landing — and confirm the shadow-admin (tenant_admin) permissions: buckets, ranked pip |
-| `e2e/hitl-preview.spec.ts` | 55 | 0 | 0 | Preview feature — the "see it as it will download" toolbox option. Drives it as Paul (Foundation tenant_admin) on the TVSF proposal: • opens Preview f |
-| `e2e/hitl-ranking-spine.spec.ts` | 91 | 0 | 0 | Opportunity ranking-spine live drive under the forced-RLS govtech_app role (serve with DATABASE_URL=postgres://govtech_app:apppass@…). Proves the RANK |
-| `e2e/hitl-role-smoke.spec.ts` | 52 | 0 | 0 | HITL role smoke — every one of the five HITL roles authenticates through the real Credentials form and lands with the correct session role. This is th |
-| `e2e/hitl-screenshots.spec.ts` | 80 | 0 | 0 | HITL screenshots — the visual manual. Logs in as each actor and captures a full-page PNG of every key surface into e2e/screenshots/. Each shot is also |
-| `e2e/hitl-tvsf-build-guide.spec.ts` | 110 | 1 | 0 | TVSF Proposal Pipeline Build Guide — the screenshot manual for Paul Jackson (Foundation's external shadow-admin). Drives the whole build the way Paul  |
-| `e2e/hitl-tvsf-verify.spec.ts` | 124 | 0 | 0 | Verify the rebuilt canonical TVSF: the full-document preview assembles its sections in NUMERIC order. |
-| `e2e/ingest-coverage-drive.spec.ts` | 386 | 1 | 0 | INGEST COVERAGE — the whole pipeline from scratch, every variant × every actor. |
-| `e2e/ingest-studio-drive.spec.ts` | 176 | 1 | 0 | Ingest Studio — the four gates, driven as a real rfp_admin. |
-| `e2e/library.tenant.spec.ts` | 41 | 0 | 0 | Driven regression for library atom visibility/ownership enforcement (Batch 1): - an admin (tenant_admin) sees the whole tenant library; - a collaborat |
-| `e2e/lock.tenant.spec.ts` | 56 | 0 | 0 | Driven regression for the section lock lifecycle (the build→lock loop): D1 — a locked section must be read-only through the SAVE API (not just the UI) |
-| `e2e/matrix.tenant.spec.ts` | 48 | 0 | 0 | Driven regression for the compliance MATRIX build: - provisioning a proposal populates proposal_compliance_matrix from the solicitation's required ite |
-| `e2e/mt-arc-drive.spec.ts` | 1521 | 0 | 0 | THE ARC — one end-to-end drive, composed entirely through the UI, with me as the human in the loop. |
-| `e2e/mt1-ingest-multi-drive.spec.ts` | 170 | 0 | 0 | MT-1 — ingest, curate and push FOUR opportunities across four agency shapes. |
-| `e2e/mt2-onboard-drive.spec.ts` | 181 | 0 | 0 | MT-2 — onboard companies through the OFFICIAL public application form. |
-| `e2e/mt3-library-drive.spec.ts` | 150 | 0 | 0 | MT-3 — each new tenant builds its OWN library, as its own admin. |
-| `e2e/onboarding.admin.spec.ts` | 65 | 0 | 0 | Driven regression for the customer-onboarding funnel: public application → admin accept → tenant + tenant_admin provisioned, the temp password is RETU |
-| `e2e/p2r-template-drive.spec.ts` | 302 | 1 | 0 | PURCHASE → RELEASE — per-volume TEMPLATE VALIDATION drive (docs/MID_WINDOW_RULES.md P1/P5, docs/CANVAS_ARCHITECTURE.md one-canvas rule). |
-| `e2e/probe-editor-drive.spec.ts` | 81 | 0 | 0 | A throwaway PROBE, not a test: open the section editor and report what it actually offers. |
-| `e2e/ranking.tenant.spec.ts` | 51 | 0 | 0 | Driven regression for Batch 4 (rankings): a customer's spotlight bucket ranks their pipeline. Cards are auto-scored on arrival (bridge fan-out), and / |
-| `e2e/reach.admin.spec.ts` | 39 | 0 | 0 | Reachability sweep (admin persona): every static admin page should load for an authenticated admin without a 5xx or a bounce to /login. Reports a stat |
-| `e2e/reach.tenant.spec.ts` | 46 | 0 | 0 | Reachability sweep (tenant persona): every static customer portal page should load for the Lighthouse tenant admin without a 5xx or a bounce to /login |
-| `e2e/redirect.tenant.spec.ts` | 18 | 0 | 0 | Convergence regression (design A): the legacy customer opportunity surfaces land on the canonical Greenfield Opportunities (/cards). Next serves the s |
-| `e2e/resolve-proposal.ts` | 77 | 0 | 1 | Resolve a tenant's richest proposal, and sections within it, from the DATA. |
-| `e2e/resolve-solicitation.ts` | 149 | 0 | 6 | Resolve the solicitation a drive spec runs against — from the DATA, not from an env var. |
-| `e2e/smoke.admin.spec.ts` | 14 | 0 | 0 | Smoke: the admin persona has a working, authenticated session that can reach a real admin surface backed by a live query. Proves the harness drives be |
-| `e2e/smoke.tenant.spec.ts` | 14 | 0 | 0 | Smoke: the tenant persona loads its own portal (tenant-scoped) with the tenant name rendered — i.e. the portal layout's auth + tenant-access check pas |
-| `e2e/spine-a1-ai-assist.mts` | 125 | 0 | 0 | SPINE-A1 — prove the section-bar AI assistance FIRES end-to-end (not just renders), against the live rig: frontend + pipeline worker + emulated-Claude |
-| `e2e/spine-a2-partner-collab.mts` | 138 | 0 | 0 | SPINE-A2 — a cross-company partner_user collaborator, end-to-end in the real browser. Proves the collaborator half of the spine (the createTask member |
-| `e2e/spine-b2-partner-bell.mts` | 70 | 0 | 0 | SPINE-B2 — the partner_user notification bell (H1), proven SCOPED (no tenant-wide leak). With an active collaboration, grace's /notifications feed ret |
-| `e2e/spine-section-shots.mts` | 82 | 0 | 0 | SPINE-T6 browser touch-test — the section-editing nervous system as a real actor. App must be serving on :3000 (node .next/standalone/server.js) with  |
-| `e2e/spine-t8-retest.mts` | 133 | 0 | 0 | SPINE-T8 browser retest — proves the rebuilt (T7 + T8) section-editing spine in the REAL UI. Server must be serving :3000 from the fresh .next/standal |
-| `e2e/t3cp-molds-drive.spec.ts` | 120 | 1 | 0 | The MOLDS gate, driven as a real rfp_admin. |
-| `e2e/t3cp-spine-drive.spec.ts` | 238 | 0 | 0 | T3CP end-to-end spine, driven as the real actors it belongs to. |
-| `e2e/t3cp-v1-items-drive.spec.ts` | 166 | 1 | 0 | T3CP Volume 1 — the two character-capped narrative documents, added as a real rfp_admin. |
-| `e2e/triage-todo-identity-drive.spec.ts` | 41 | 0 | 0 | B52 verification: does a fresh intake now raise a triage ToDo that a human can tell apart and open? |
-| `e2e/tw11-workflow-setup-shots.mts` | 83 | 0 | 0 | TW-11 browser touch-test — the NEW Tenant Workflow Setup surfaces render + fire, as real actors. App must be serving on :3000 (node .next/standalone/s |
-| `e2e/upload-fixtures.ts` | 39 | 0 | 3 | The ingest drives feed REAL solicitation PDFs through upload → shred → matrix → skeleton, which is the only honest way to test that path: the whole po |
-| `e2e/zzaudit.tenant.spec.ts` | 62 | 0 | 0 | Audit-sweep certification drive. Self-contained (fresh logins, no storageState). Run: npx playwright test e2e/zzaudit.tenant.spec.ts --project=tenant  |
-| `e2e/zzblockers.tenant.spec.ts` | 86 | 0 | 0 | Blocker-fix drive: screenshots the five changed surfaces against a live seeded instance. Self-contained — logs in per persona (fresh context), no stor |
-| `e2e/zzcollab.tenant.spec.ts` | 30 | 0 | 0 | Screenshot capture — COLLABORATOR persona (partner_user). Runs under the `tenant` project but OVERRIDES storageState to the collaborator session, so i |
-| `e2e/zzscreens.admin.spec.ts` | 46 | 0 | 0 | Screenshot capture — RFP-ADMIN persona (admin.json storageState via the `admin` project). Drives every key admin surface (esp. the ones shipped this s |
-| `e2e/zzscreens.tenant.spec.ts` | 40 | 0 | 0 | Screenshot capture — CUSTOMER-ADMIN persona (lighthouse.json via the `tenant` project). Drives the customer portal (cards spine, buckets/scoring, atom |
+| `frontend/e2e/actor-walk-drive.spec.ts` | 164 | 0 | 0 | ACTOR WALK — every role walks its own surfaces, and each surface is SCREENSHOT so the picture (not a query) is the verification instrument. |
+| `frontend/e2e/admin-todo-complete-drive.spec.ts` | 56 | 0 | 0 | Can an rfp_admin actually COMPLETE a platform-scope ToDo? |
+| `frontend/e2e/atomloop.tenant.spec.ts` | 92 | 0 | 0 | Driven regression for the S4 atom-return loop — the closing leg of atomize → library → mold → draft → **back into the library**. |
+| `frontend/e2e/auth.setup.ts` | 54 | 0 | 0 | Playwright auth setup — logs in through the real Credentials form and saves a storageState per persona, so every spec reuses an authenticated session  |
+| `frontend/e2e/automation-190-shots.mts` | 53 | 0 | 0 | #190 F1 — capture the new automation surfaces as manual screenshots. Run from frontend/: node e2e/automation-190-shots.mts |
+| `frontend/e2e/automation-ui-shots.mts` | 62 | 0 | 0 | Live drive of this session's automation-UI surfaces (both roles). Proves they RENDER with real data, not just that they compile. Run from frontend/: n |
+| `frontend/e2e/b50-b53-reachability-drive.spec.ts` | 143 | 0 | 0 | B50 + B53 — two instruments that lied, checked by looking at them. |
+| `frontend/e2e/b51-application-todos-drive.spec.ts` | 227 | 0 | 0 | B51 — one application raises ONE ToDo, and deciding it drains that ToDo. |
+| `frontend/e2e/b52-shot-drive.spec.ts` | 23 | 0 | 0 | — |
+| `frontend/e2e/build-collab-drive.spec.ts` | 397 | 0 | 0 | PROPOSAL BUILD + COLLABORATION drive (docs/DATA_FLOW.md §section-save · §build→package, docs/TENANT_WORKFLOW_SETUP_DESIGN.md TW-1..6, docs/CANVAS_ARCH |
+| `frontend/e2e/collab.tenant.spec.ts` | 61 | 0 | 0 | Driven regression for Batch 2 canvas/project P0: #3 save authorization — an admin can save a section; a collaborator who is NOT assigned to it is reje |
+| `frontend/e2e/dow-assist-drive.spec.ts` | 188 | 1 | 0 | Ingest Assist, driven as a real rfp_admin against the live DoW 2026 SBIR BAA. |
+| `frontend/e2e/dow-full-ingest-drive.spec.ts` | 119 | 1 | 0 | The DoW 2026 SBIR BAA / T3CP ingest, end to end, through the product's own surfaces. |
+| `frontend/e2e/dow-ingest-drive.spec.ts` | 89 | 1 | 0 | DoW 2026 SBIR BAA + T3CP Patent Holiday topic — REAL rfp_admin ingest drive. |
+| `frontend/e2e/dow-matrix-drive.spec.ts` | 32 | 0 | 0 | Capture the compliance matrix as the curator sees it, post-mig-187. Every value written by Ingest Assist from DEFAULT_SBIR_CSO_SKELETON must render a  |
+| `frontend/e2e/dsip-deconstruct-drive.spec.ts` | 118 | 0 | 0 | DSIP FULL-PROPOSAL DECONSTRUCT drive — the reverse of the pipeline build-up. |
+| `frontend/e2e/fanout.admin.spec.ts` | 35 | 0 | 0 | Driven regression for design "A" (Greenfield Cards canonical): pushing a multi-topic solicitation must land ONE opportunity card per topic for the ten |
+| `frontend/e2e/flex-midwindow-drive.spec.ts` | 377 | 1 | 0 | FLEX MID-WINDOW DRIVE — the master OPP edited AFTER Spotlight release, BEFORE the buyer's portal release, as real actors on both sides (docs/MASTER_MI |
+| `frontend/e2e/fullloop.tenant.spec.ts` | 100 | 0 | 0 | Driven regression for the WHOLE greenfield atom loop, end to end, in one flow: |
+| `frontend/e2e/global-setup.ts` | 75 | 0 | 0 | E2E global setup — re-seed the driven-suite FIXTURES before every run. |
+| `frontend/e2e/hitl-bucket-rls.spec.ts` | 65 | 0 | 0 | Spotlight bucket lock-down — live drive under the forced-RLS govtech_app role (serve with DATABASE_URL=postgres://govtech_app:apppass@…). Proves the R |
+| `frontend/e2e/hitl-cc-actors.spec.ts` | 82 | 0 | 0 | Command Center — every actor × both modalities (desktop 1280 + mobile 390). Proves the same console renders correctly for each role and adapts across  |
+| `frontend/e2e/hitl-cc-mobile-audit.spec.ts` | 116 | 0 | 0 | Pristine pass — mobile audit of every Command Center destination (COMMAND_CENTER_DESIGN.md). At a 390px phone width, visit each surface the CC's actio |
+| `frontend/e2e/hitl-cc-newdot.spec.ts` | 91 | 0 | 0 | Command Center "new since you last looked" dot — live proof (mig 179 command_seen_state). With Kate's watermarks pre-seeded (todos/activity in the pas |
+| `frontend/e2e/hitl-cc-partner.spec.ts` | 46 | 0 | 0 | Command Center — partner-manager live drive (verification). Logs in as an EconDev partner-manager (pjackson @ Entrepreneurs' Center, managing Foundati |
+| `frontend/e2e/hitl-cc-tenant.spec.ts` | 84 | 0 | 0 | Command Center — tenant live drive (verification, not a committed guide). Logs in as Foundation's tenant_admin (Kate) and walks the 4 tabs of /portal/ |
+| `frontend/e2e/hitl-command-receipt.spec.ts` | 35 | 0 | 0 | Command Center read-receipt drive. A GENUINE acknowledgement (a lane whose new-dot was showing being cleared) emits ONE capture\|finder:command.acknow |
+| `frontend/e2e/hitl-deep-sweep.spec.ts` | 125 | 0 | 0 | HITL deep sweep — drive the platform as EVERY actor and touch every major surface, in one run, asserting no broken pages (500 / blank / auth-bounce) a |
+| `frontend/e2e/hitl-foundation-build.spec.ts` | 107 | 0 | 0 | Walk the Foundation TVSF build through the REAL pipeline gates: Kate (tenant_admin) redeems the comp code → proposal_portals `curation_pending` → rfp_ |
+| `frontend/e2e/hitl-foundation-guide.spec.ts` | 61 | 0 | 0 | Guidebook screenshots — the UPLOAD / build-your-library step that precedes drafting. Shows a customer (Kate, Foundation admin) landing in the Library  |
+| `frontend/e2e/hitl-foundation-ui-walk.spec.ts` | 326 | 0 | 0 | SCREENSHOT TOUR — Foundation TVSF build through the REAL UI, from selecting the TVSF opportunity to the completed, downloadable proposal. Each step sc |
+| `frontend/e2e/hitl-foundation-verify.spec.ts` | 79 | 0 | 0 | Verify the Foundation TVSF outcome through the REAL user-facing surfaces: 1. Kate (tenant_admin) downloads the final proposal via POST …/package?forma |
+| `frontend/e2e/hitl-full-draft.spec.ts` | 66 | 0 | 0 | HITL full-draft — the Proposal Draft Manager (P4) driven as the tenant_admin, through the real auth stack. Proves (1) the "Run full draft" panel is re |
+| `frontend/e2e/hitl-load-sbir.spec.ts` | 115 | 0 | 0 | Load a small set of SBIR/STTR master opportunities relevant to Foundation (3D-printed concrete formwork / additive construction), so they rank against |
+| `frontend/e2e/hitl-load-tvsf.spec.ts` | 104 | 0 | 0 | Load the TVSF opportunity into the master Opps list, with the REAL DMVEC/Round-45 format (Proposal + Budget, 7 pages total) and dates "opened 2 weeks  |
+| `frontend/e2e/hitl-onboard-tvs-build.spec.ts` | 63 | 0 | 0 | HITL onboard — Phase C6 (comp-code purchase) + C7 (release/provision) of the Fondation/TVS playbook, driven live: the new tenant_admin buys the portal |
+| `frontend/e2e/hitl-onboard-tvs.spec.ts` | 121 | 0 | 0 | HITL onboard — the Fondation / TVS playbook, driven as authenticated API calls through the real route handlers (docs/PLAYBOOK_ONBOARD_NEWCO_TVS.md). P |
+| `frontend/e2e/hitl-partner-manager.spec.ts` | 68 | 0 | 0 | Partner-manager E2E (docs/PARTNER_MANAGER_DESIGN.md). Drives the real UI as Paul Jackson (partner_admin) through the console, the add-company precheck |
+| `frontend/e2e/hitl-paul-login-trace.spec.ts` | 49 | 0 | 0 | Trace Paul Jackson's login from the public pages through to his landing — and confirm the shadow-admin (tenant_admin) permissions: buckets, ranked pip |
+| `frontend/e2e/hitl-preview.spec.ts` | 55 | 0 | 0 | Preview feature — the "see it as it will download" toolbox option. Drives it as Paul (Foundation tenant_admin) on the TVSF proposal: • opens Preview f |
+| `frontend/e2e/hitl-ranking-spine.spec.ts` | 91 | 0 | 0 | Opportunity ranking-spine live drive under the forced-RLS govtech_app role (serve with DATABASE_URL=postgres://govtech_app:apppass@…). Proves the RANK |
+| `frontend/e2e/hitl-role-smoke.spec.ts` | 52 | 0 | 0 | HITL role smoke — every one of the five HITL roles authenticates through the real Credentials form and lands with the correct session role. This is th |
+| `frontend/e2e/hitl-screenshots.spec.ts` | 80 | 0 | 0 | HITL screenshots — the visual manual. Logs in as each actor and captures a full-page PNG of every key surface into e2e/screenshots/. Each shot is also |
+| `frontend/e2e/hitl-tvsf-build-guide.spec.ts` | 110 | 1 | 0 | TVSF Proposal Pipeline Build Guide — the screenshot manual for Paul Jackson (Foundation's external shadow-admin). Drives the whole build the way Paul  |
+| `frontend/e2e/hitl-tvsf-verify.spec.ts` | 124 | 0 | 0 | Verify the rebuilt canonical TVSF: the full-document preview assembles its sections in NUMERIC order. |
+| `frontend/e2e/ingest-coverage-drive.spec.ts` | 386 | 1 | 0 | INGEST COVERAGE — the whole pipeline from scratch, every variant × every actor. |
+| `frontend/e2e/ingest-studio-drive.spec.ts` | 176 | 1 | 0 | Ingest Studio — the four gates, driven as a real rfp_admin. |
+| `frontend/e2e/library.tenant.spec.ts` | 41 | 0 | 0 | Driven regression for library atom visibility/ownership enforcement (Batch 1): - an admin (tenant_admin) sees the whole tenant library; - a collaborat |
+| `frontend/e2e/lock.tenant.spec.ts` | 56 | 0 | 0 | Driven regression for the section lock lifecycle (the build→lock loop): D1 — a locked section must be read-only through the SAVE API (not just the UI) |
+| `frontend/e2e/matrix.tenant.spec.ts` | 48 | 0 | 0 | Driven regression for the compliance MATRIX build: - provisioning a proposal populates proposal_compliance_matrix from the solicitation's required ite |
+| `frontend/e2e/mt-arc-drive.spec.ts` | 1521 | 0 | 0 | THE ARC — one end-to-end drive, composed entirely through the UI, with me as the human in the loop. |
+| `frontend/e2e/mt1-ingest-multi-drive.spec.ts` | 170 | 0 | 0 | MT-1 — ingest, curate and push FOUR opportunities across four agency shapes. |
+| `frontend/e2e/mt2-onboard-drive.spec.ts` | 181 | 0 | 0 | MT-2 — onboard companies through the OFFICIAL public application form. |
+| `frontend/e2e/mt3-library-drive.spec.ts` | 150 | 0 | 0 | MT-3 — each new tenant builds its OWN library, as its own admin. |
+| `frontend/e2e/onboarding.admin.spec.ts` | 65 | 0 | 0 | Driven regression for the customer-onboarding funnel: public application → admin accept → tenant + tenant_admin provisioned, the temp password is RETU |
+| `frontend/e2e/p2r-template-drive.spec.ts` | 302 | 1 | 0 | PURCHASE → RELEASE — per-volume TEMPLATE VALIDATION drive (docs/MID_WINDOW_RULES.md P1/P5, docs/CANVAS_ARCHITECTURE.md one-canvas rule). |
+| `frontend/e2e/probe-editor-drive.spec.ts` | 81 | 0 | 0 | A throwaway PROBE, not a test: open the section editor and report what it actually offers. |
+| `frontend/e2e/ranking.tenant.spec.ts` | 51 | 0 | 0 | Driven regression for Batch 4 (rankings): a customer's spotlight bucket ranks their pipeline. Cards are auto-scored on arrival (bridge fan-out), and / |
+| `frontend/e2e/reach.admin.spec.ts` | 39 | 0 | 0 | Reachability sweep (admin persona): every static admin page should load for an authenticated admin without a 5xx or a bounce to /login. Reports a stat |
+| `frontend/e2e/reach.tenant.spec.ts` | 46 | 0 | 0 | Reachability sweep (tenant persona): every static customer portal page should load for the Lighthouse tenant admin without a 5xx or a bounce to /login |
+| `frontend/e2e/redirect.tenant.spec.ts` | 18 | 0 | 0 | Convergence regression (design A): the legacy customer opportunity surfaces land on the canonical Greenfield Opportunities (/cards). Next serves the s |
+| `frontend/e2e/resolve-proposal.ts` | 77 | 0 | 1 | Resolve a tenant's richest proposal, and sections within it, from the DATA. |
+| `frontend/e2e/resolve-solicitation.ts` | 149 | 0 | 6 | Resolve the solicitation a drive spec runs against — from the DATA, not from an env var. |
+| `frontend/e2e/smoke.admin.spec.ts` | 14 | 0 | 0 | Smoke: the admin persona has a working, authenticated session that can reach a real admin surface backed by a live query. Proves the harness drives be |
+| `frontend/e2e/smoke.tenant.spec.ts` | 14 | 0 | 0 | Smoke: the tenant persona loads its own portal (tenant-scoped) with the tenant name rendered — i.e. the portal layout's auth + tenant-access check pas |
+| `frontend/e2e/spine-a1-ai-assist.mts` | 125 | 0 | 0 | SPINE-A1 — prove the section-bar AI assistance FIRES end-to-end (not just renders), against the live rig: frontend + pipeline worker + emulated-Claude |
+| `frontend/e2e/spine-a2-partner-collab.mts` | 138 | 0 | 0 | SPINE-A2 — a cross-company partner_user collaborator, end-to-end in the real browser. Proves the collaborator half of the spine (the createTask member |
+| `frontend/e2e/spine-b2-partner-bell.mts` | 70 | 0 | 0 | SPINE-B2 — the partner_user notification bell (H1), proven SCOPED (no tenant-wide leak). With an active collaboration, grace's /notifications feed ret |
+| `frontend/e2e/spine-section-shots.mts` | 82 | 0 | 0 | SPINE-T6 browser touch-test — the section-editing nervous system as a real actor. App must be serving on :3000 (node .next/standalone/server.js) with  |
+| `frontend/e2e/spine-t8-retest.mts` | 133 | 0 | 0 | SPINE-T8 browser retest — proves the rebuilt (T7 + T8) section-editing spine in the REAL UI. Server must be serving :3000 from the fresh .next/standal |
+| `frontend/e2e/t3cp-molds-drive.spec.ts` | 120 | 1 | 0 | The MOLDS gate, driven as a real rfp_admin. |
+| `frontend/e2e/t3cp-spine-drive.spec.ts` | 238 | 0 | 0 | T3CP end-to-end spine, driven as the real actors it belongs to. |
+| `frontend/e2e/t3cp-v1-items-drive.spec.ts` | 166 | 1 | 0 | T3CP Volume 1 — the two character-capped narrative documents, added as a real rfp_admin. |
+| `frontend/e2e/triage-todo-identity-drive.spec.ts` | 41 | 0 | 0 | B52 verification: does a fresh intake now raise a triage ToDo that a human can tell apart and open? |
+| `frontend/e2e/tw11-workflow-setup-shots.mts` | 83 | 0 | 0 | TW-11 browser touch-test — the NEW Tenant Workflow Setup surfaces render + fire, as real actors. App must be serving on :3000 (node .next/standalone/s |
+| `frontend/e2e/upload-fixtures.ts` | 39 | 0 | 3 | The ingest drives feed REAL solicitation PDFs through upload → shred → matrix → skeleton, which is the only honest way to test that path: the whole po |
+| `frontend/e2e/zzaudit.tenant.spec.ts` | 62 | 0 | 0 | Audit-sweep certification drive. Self-contained (fresh logins, no storageState). Run: npx playwright test e2e/zzaudit.tenant.spec.ts --project=tenant  |
+| `frontend/e2e/zzblockers.tenant.spec.ts` | 86 | 0 | 0 | Blocker-fix drive: screenshots the five changed surfaces against a live seeded instance. Self-contained — logs in per persona (fresh context), no stor |
+| `frontend/e2e/zzcollab.tenant.spec.ts` | 30 | 0 | 0 | Screenshot capture — COLLABORATOR persona (partner_user). Runs under the `tenant` project but OVERRIDES storageState to the collaborator session, so i |
+| `frontend/e2e/zzscreens.admin.spec.ts` | 46 | 0 | 0 | Screenshot capture — RFP-ADMIN persona (admin.json storageState via the `admin` project). Drives every key admin surface (esp. the ones shipped this s |
+| `frontend/e2e/zzscreens.tenant.spec.ts` | 40 | 0 | 0 | Screenshot capture — CUSTOMER-ADMIN persona (lighthouse.json via the `tenant` project). Drives the customer portal (cards spine, buckets/scoring, atom |
 
 ### frontend · harnesses · 331 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `scripts/analyze-node-demand.mjs` | 125 | 0 | 0 | Which canvas node types does the product actually DEMAND? |
-| `scripts/architecture/extract.mjs` | 97 | 0 | 0 | — |
-| `scripts/architecture/generate.mjs` | 87 | 0 | 0 | — |
-| `scripts/audit-automation-spine.mjs` | 742 | 0 | 0 | — |
-| `scripts/audit-card-fields.mjs` | 222 | 0 | 0 | audit-card-fields — is "declared, documented, and written by nothing" systemic? |
-| `scripts/audit-dead-code.mjs` | 289 | 0 | 0 | — |
-| `scripts/audit-doc-currency.mjs` | 354 | 0 | 0 | — |
-| `scripts/audit-empty-not-null.mjs` | 307 | 0 | 0 | — |
-| `scripts/audit-env-inventory.mjs` | 238 | 0 | 0 | — |
-| `scripts/audit-env-parity.mjs` | 415 | 0 | 0 | — |
-| `scripts/audit-pinned-fixtures.mjs` | 128 | 0 | 0 | HOW MUCH OF THE LIVE SAFETY NET IS POINTING AT THINGS THAT NO LONGER EXIST? |
-| `scripts/audit-pipeline-coherence.mjs` | 430 | 0 | 0 | — |
-| `scripts/audit-producer-consumer.mjs` | 254 | 0 | 0 | — |
-| `scripts/audit-ranking-readiness.mjs` | 190 | 0 | 0 | audit-ranking-readiness — is the model implemented, and is the corpus it depends on actually fed? |
-| `scripts/audit-refusal-observability.mjs` | 244 | 0 | 0 | EVERY REFUSAL IN THE TREE, AND WHETHER ANYTHING BUT THE CALLER LEARNS OF IT. |
-| `scripts/audit-row-type-truth.mjs` | 537 | 0 | 0 | — |
-| `scripts/audit-runtime-assets.mjs` | 430 | 0 | 0 | — |
-| `scripts/audit-wipe-impact.mjs` | 167 | 0 | 0 | — |
-| `scripts/backfill-buckets.mts` | 29 | 4 | 0 | Backfill default spotlight buckets for existing tenants + rank their cards. Scoring is per-bucket now (rankBucket, event-driven port) — the old in-tx  |
-| `scripts/backfill-corpus-verbatim.mts` | 61 | 1 | 0 | Backfill `library_atoms.corpus_verbatim` (mig 197 / LIB-HYGIENE). |
-| `scripts/bug-log-status.mjs` | 140 | 0 | 0 | — |
-| `scripts/build-doc-guide.mjs` | 352 | 0 | 0 | Build the illustrated "Creating documents" guide: resize the session screenshots into the repo's docs/user-guides/img/ (committed) AND embed them as d |
-| `scripts/build-project-tree.mjs` | 810 | 0 | 0 | THE STATIC BASELINE — every file in the system, what it is, who uses it, and what it uses. |
-| `scripts/build-ui-contact-sheets.mjs` | 116 | 0 | 0 | — |
-| `scripts/calibrate-page-ruler.mts` | 386 | 2 | 0 | calibrate-page-ruler — pit `paginate()` against what Chromium actually prints. |
-| `scripts/calibrate-slide-ruler.mts` | 158 | 2 | 0 | calibrate-slide-ruler — the deck counterpart to calibrate-page-ruler. |
-| `scripts/capture-collab.mjs` | 158 | 0 | 0 | The collaborator's own screens, captured as the collaborator. |
-| `scripts/capture-guide-crops.mts` | 135 | 0 | 0 | Element-accurate crops for the guide steps that describe a specific control. |
-| `scripts/capture-guides.mjs` | 747 | 1 | 0 | The two front-door guides, captured against the build that is actually running. |
-| `scripts/capture-hydration-diff.mjs` | 162 | 0 | 0 | CAPTURE THE UNMINIFIED HYDRATION DIFF — the step the #418 entries kept naming and nobody could run. |
-| `scripts/capture-mobile-guide.mts` | 147 | 1 | 0 | — |
-| `scripts/capture-projects-guide.mjs` | 96 | 0 | 0 | — |
-| `scripts/capture-shots.mts` | 361 | 0 | 0 | User-guide screenshot harness. Logs in through the real login form as a given role and captures a scripted walk of the product to PNGs under docs/user |
-| `scripts/capture-stage-walk.mjs` | 273 | 0 | 0 | capture-stage-walk — photograph the ingest → ranking → build-out flow, stage by stage. |
-| `scripts/capture-templates.mts` | 175 | 2 | 0 | #151 — capture the THREE template surfaces as the real actors, and check what they show against what the system actually holds. |
-| `scripts/capture-ui-atlas.mjs` | 391 | 2 | 0 | — |
-| `scripts/capture-vaults.mjs` | 109 | 0 | 0 | Capture the two-sided collaboration-vault ("nook") UI for the manuals (P8.9/P8.7/P8.8): TENANT side — eric@immobileyes → /portal/immobileyes/vaults (i |
-| `scripts/catalog-guides.mjs` | 158 | 0 | 0 | — |
-| `scripts/catalog-ui.mjs` | 344 | 0 | 0 | — |
-| `scripts/check-async-workers.mjs` | 221 | 0 | 0 | — |
-| `scripts/check-cms-content-retirable.mjs` | 174 | 0 | 0 | — |
-| `scripts/check-harness-syntax.mjs` | 100 | 0 | 0 | — |
-| `scripts/check-office-filters.mjs` | 80 | 0 | 0 | — |
-| `scripts/check-rig-hydration.mjs` | 139 | 0 | 0 | Is the server actually serving the build that is on disk, and does the client half RUN? |
-| `scripts/check-rls-posture.mjs` | 400 | 0 | 0 | PREFLIGHT: is this box actually enforcing RLS, or only appearing to? |
-| `scripts/check-tenant-isolation-invariant.mjs` | 146 | 0 | 0 | THE INVARIANT: nothing reads or writes cross-tenant. Ever. |
-| `scripts/classify-migrations.mjs` | 270 | 0 | 0 | — |
-| `scripts/close-e2e-cms.mjs` | 159 | 0 | 0 | CLOSE-CMS — real-actor E2E: admin reviews a queued guide draft in Content Studio and PUBLISHES it; verify it goes live (active) and renders on the pub |
-| `scripts/close-e2e-marketing.mjs` | 74 | 0 | 0 | CLOSE-MARKETING — real-actor E2E: tenant_admin (kate) creates a marketing document from a starter mold (Capability Statement), opens it in the editor, |
-| `scripts/close-e2e-proposal.mjs` | 60 | 0 | 0 | CLOSE-PROPOSAL — real-actor E2E: tenant_admin (kate) opens the AI-built proposal (sections drafted by section_drafter), sees the readiness roll-up, an |
-| `scripts/crosscheck-canvas-normalize.mts` | 106 | 1 | 0 | Cross-check for B78 — at the layer where the bug actually lived. |
-| `scripts/crosscheck-shipped-fixes.sh` | 129 | 0 | 0 | crosscheck-shipped-fixes — confirm B79 and B80 by a DIFFERENT method than the lenses that originally reported them. WHY THIS EXISTS. The four `verify- |
-| `scripts/demo-atoms-ui.mjs` | 82 | 0 | 0 | Demo — moving atoms & groups around in the portal UI: (1) Library: select primitive atoms → "Group into new atom" (compose a group / "Team"). (2) Prop |
-| `scripts/demo-canvas-capabilities.mts` | 274 | 4 | 0 | From nothing to a finished document and deck — every capability, captured as screen grabs. |
-| `scripts/derive-capability-map.mjs` | 165 | 0 | 0 | derive-capability-map — what can each actor DO, derived from the tree rather than remembered. |
-| `scripts/diagnose-mold-ruler.mts` | 198 | 5 | 0 | Why does the ruler disagree with the page on THIS mold? |
-| `scripts/drive-admin-demand.mts` | 153 | 0 | 0 | drive-admin-demand — does a customer's thumb reach the person who can act on it? |
-| `scripts/drive-agent-flows.mjs` | 235 | 0 | 0 | — |
-| `scripts/drive-amendment.mjs` | 200 | 0 | 0 | Drive the amendment engine end to end: detect → confirm → fan-out → tenant acknowledge. |
-| `scripts/drive-application-intake.mts` | 376 | 2 | 0 | drive-application-intake — the public→private notification, driven as a stranger. |
-| `scripts/drive-archive.mts` | 204 | 1 | 0 | drive-archive — the archivable contract, driven on all three entities. |
-| `scripts/drive-atomization.mts` | 297 | 2 | 0 | Drive upload → atomize → library → draft-selection, with real documents. |
-| `scripts/drive-award-to-contract.mts` | 111 | 3 | 0 | RECORD A WIN, AS THE CUSTOMER, AND CHECK WHAT THE WIN PRODUCED. |
-| `scripts/drive-b1-auto-advance.mts` | 82 | 2 | 0 | SPINE-B1 live drive — the AI-manager AUTONOMOUS auto-advance (TW-8 fast-follow). Proves sweepAutoAdvanceGates() closes an agent_manager+autoAdvance ga |
-| `scripts/drive-baa-forward.mjs` | 162 | 0 | 0 | Drive an ingested solicitation the whole way forward, as rfp_admin, over HTTP. |
-| `scripts/drive-box-pdf.mts` | 152 | 0 | 0 | Live drive: box a PDF PAGE → image atom (BOX-1b, the scanned-table / figure-heavy case). Generates a real 2-page PDF (Chromium page.pdf), uploads it i |
-| `scripts/drive-box-upload.mts` | 73 | 0 | 0 | Live drive: box an uploaded image → image atom (the "worst-case baseline" ingest). Upload a PNG into the Capture tab → draw a box → Atomize → verify a |
-| `scripts/drive-box2-suggest.mts` | 86 | 0 | 0 | Live drive (BOX-2): the machine draws the boxes. Load a frame → "✨ Suggest regions" pre-populates proposed boxes → the human confirms → Atomize → DB-p |
-| `scripts/drive-box3-nudge.mts` | 60 | 0 | 0 | Live drive (BOX-3): drop a scanned / image-only PDF on the "Add content" card and confirm the preview surfaces the un-extractable nudge + a deep-link  |
-| `scripts/drive-bridge-buckets.mjs` | 351 | 1 | 0 | Drive the OPP bridge and the bucket ranking spine — one chain, driven as one. |
-| `scripts/drive-bucket-authoring.mts` | 289 | 1 | 0 | drive-bucket-authoring — the tenant side of the ranking spine, as the three actors who own it. |
-| `scripts/drive-buy-and-build.mjs` | 260 | 0 | 0 | Carry one solicitation all the way to a tenant's proposal — the WHOLE commercial spine. |
-| `scripts/drive-canvas-authoring.mts` | 631 | 5 | 0 | CANVAS AUTHORING SWEEP — author NEW documents from a blank canvas, as real actors, and take them out in every format the product offers. |
-| `scripts/drive-canvas-overlays.mjs` | 363 | 0 | 0 | — |
-| `scripts/drive-capability-deck.mts` | 455 | 6 | 0 | Build a real capability deck for a real tenant, through the product's own routes only. |
-| `scripts/drive-card-decision.mts` | 347 | 1 | 0 | drive-card-decision — the two things the card was NOT expanded for, driven on the real product. |
-| `scripts/drive-cms-generate.mts` | 126 | 2 | 0 | CLOSE-CMS, THE GENERATE HALF — an rfp_admin fills the Generate Content form and a draft appears. |
-| `scripts/drive-collaborator-boundary.mts` | 114 | 1 | 0 | Live COLLABORATOR-boundary negative drive (FINDING 1). A cross-company collaborator holds a partner_user membership that PASSES verifyTenantAccess (se |
-| `scripts/drive-commercial-path.mts` | 377 | 3 | 0 | drive-commercial-path — the funnel a PROSPECT walks, driven as the prospect. |
-| `scripts/drive-control-reachability.mts` | 238 | 4 | 0 | Which format controls can a user actually REACH, on each canvas surface? |
-| `scripts/drive-copy-inward-isolation.sql` | 121 | 0 | 0 | drive-copy-inward-isolation.sql ───────────────────────────────────────────────────────────────────────────── Live proof of the "Sharing is copy-inwar |
-| `scripts/drive-copy-starter.mts` | 103 | 2 | 0 | Drive-test: copy a system_starter foundation into a tenant (the P5 copy-on-use path) and prove the FULL grain tree — foundation ⊃ section ⊃ group ⊃ pr |
-| `scripts/drive-corpus-copy-inward.mts` | 331 | 2 | 0 | drive-corpus-copy-inward — does the solicitation reach the tenant WHEN THEY PIN, and stay out of ranking until then? |
-| `scripts/drive-corpus-verbatim.mts` | 132 | 1 | 0 | Live proof (LIB-HYGIENE / mig 197): the corpus check tells the agency's words from the tenant's. |
-| `scripts/drive-curate-baa.mts` | 251 | 3 | 0 | drive-curate-baa — do the rfp_admin's actual job on a real BAA, and produce the OPP cards. |
-| `scripts/drive-curated-ranking.mts` | 166 | 3 | 0 | drive-curated-ranking — an admin marks a passage, and a tenant's lens finds the opportunity. |
-| `scripts/drive-descent-timeout.mts` | 239 | 0 | 0 | — |
-| `scripts/drive-dormant-surface.mjs` | 274 | 0 | 0 | — |
-| `scripts/drive-email-spine.mts` | 266 | 2 | 0 | The email spine, driven end to end against the emulator — send → ledger → webhook → suppression. |
-| `scripts/drive-end-to-end.mjs` | 449 | 0 | 0 | The whole arc, on one artifact: a government PDF nobody wrote for us → a file on disk you could submit. Ingest · curate · push · discover · buy · prov |
-| `scripts/drive-enrich-prod.mts` | 64 | 0 | 0 | Prod-build proof of the enrich step: POST a TEXT crop to the real /atoms/capture route (authenticated) and confirm the created image atom's content ca |
-| `scripts/drive-f1-fluid.mts` | 122 | 0 | 0 | Live drive for fluid-canvas F1 — the whole-proposal "Document" view. |
-| `scripts/drive-f2-annotate.mts` | 57 | 0 | 0 | Live drive for F2 annotate — highlight a span in the fluid Document view → Annotate → note → a comment on the owning section. Usage: node --import tsx |
-| `scripts/drive-failure-observability.mts` | 177 | 1 | 0 | WHEN A HANDLER FAILS, DOES ANYTHING BUT THE CALLER EVER KNOW? |
-| `scripts/drive-finish-build.mjs` | 162 | 0 | 0 | Finish a provisioned build: extend if closed, lock, advance, lock, package. The last mile. |
-| `scripts/drive-force-ascend.mts` | 195 | 0 | 0 | — |
-| `scripts/drive-foundation-tvsf.mts` | 260 | 3 | 0 | Drive the Foundation TVSF build: draft the 13 provisioned sections (Proposal 7pp: Abstract + #1–#11, and Budget: #12) with real canvas content grounde |
-| `scripts/drive-full-draft.mts` | 31 | 3 | 0 | Fires the canonical full-draft path (same helper the admin doorbell + portal call) → the pipeline worker's OnFullDraftRequestedModeC runs the whole co |
-| `scripts/drive-full-journey.mts` | 956 | 5 | 0 | THE WHOLE ARC, as a person walks it, with a screen grab at every step. |
-| `scripts/drive-guide-note.mts` | 118 | 0 | 0 | — |
-| `scripts/drive-identity-deeplink.mts` | 225 | 3 | 0 | IDENTITY HOLDS EVEN WHEN THE LINK CAME FROM AN EMAIL. |
-| `scripts/drive-immobileyes.mts` | 22 | 0 | 0 | — |
-| `scripts/drive-ingest-scenario.mjs` | 108 | 0 | 0 | Build a NEW curated solicitation from a PDF the repository actually owns. |
-| `scripts/drive-item-template-picker.mts` | 107 | 0 | 0 | Drive-test #77: required-item → template picker in the curation workspace. |
-| `scripts/drive-leakage.mts` | 52 | 0 | 0 | Live cross-boundary LEAKAGE negative drive. Kate (Foundation tenant_admin, active) must NOT be able to read another tenant's data — via a foreign tena |
-| `scripts/drive-librarian-review.mts` | 52 | 0 | 0 | Live drive: the librarian AI-catalog layer in the Review tab (persisted agent output, surfaced). cd frontend && node --import tsx scripts/drive-librar |
-| `scripts/drive-library-review.mts` | 53 | 0 | 0 | Live drive: the Library Review tab — duplicates + quality flags + one-click archive. Then the Library tab's editable detail drawer. cd frontend && nod |
-| `scripts/drive-library-starter-copy.mts` | 246 | 0 | 0 | drive-library-starter-copy — covering two routes by USING the capabilities behind them. |
-| `scripts/drive-milestone-construct.mts` | 289 | 1 | 0 | — |
-| `scripts/drive-navair-build.mts` | 456 | 4 | 0 | Drive the FULL govwin proposal chain for the Immobileyes DON26BX03-NP002 C-UAS effort: align Volume 2 to the DON Phase-I Open-Topic TV2 template → lin |
-| `scripts/drive-navair-draft-proof.mts` | 64 | 3 | 0 | FAITHFUL STEP C — invoke the REAL proposal.draft_section agent tool (the same tool the "Draft all sections" UI runs) per Technical-Volume section, gro |
-| `scripts/drive-navair-faithful-bd.mts` | 84 | 6 | 0 | FAITHFUL STEP B (template templify) + STEP D (real lock) — through the platform's genuine cores. B: atomize the DON TV2 template docx → templify its c |
-| `scripts/drive-navair-faithful.mts` | 67 | 3 | 0 | FAITHFUL end-to-end re-run — every step through the platform's REAL cores (the exact code the UI routes wrap), no direct-SQL short-circuits. Step A: t |
-| `scripts/drive-opp-scout.mts` | 154 | 1 | 0 | Live proof (AGENTS-LIVE-3): waking opportunity_scout via the new stageIntake producer. Calls the REAL stageIntake (emits finder:opportunities.detected |
-| `scripts/drive-oversight-surfaces.mts` | 394 | 1 | 0 | drive-oversight-surfaces — the two operators' consoles, driven as the operator, checked against the database. |
-| `scripts/drive-p3-invite.mts` | 99 | 3 | 0 | COLLABORATOR INVITE → MEMBERSHIP, without clobbering anybody's home. |
-| `scripts/drive-p3-lifecycle.mts` | 100 | 3 | 0 | COLLABORATOR MEMBERSHIP LIFECYCLE — invite · remove · re-invite · the still-collaborating guard. |
-| `scripts/drive-past-proposal-templify.mts` | 207 | 0 | 0 | Drive-test #18: past-proposal → template (templify) + regen, via the real API. |
-| `scripts/drive-pin-honesty.mts` | 157 | 1 | 0 | drive-pin-honesty — a local-copy pointer exists only when the local copy does. |
-| `scripts/drive-pin.mts` | 123 | 2 | 0 | THE SINGULAR SESSION — one identity, several companies, exactly one of them active at a time. |
-| `scripts/drive-preview-atomize.mts` | 59 | 0 | 0 | Live drive: preview-before-atomize on the "Add content" card. Drop a doc → PREVIEW (no write) → confirm → atoms created. cd frontend && node --import  |
-| `scripts/drive-project-lifecycle.mts` | 2506 | 2 | 0 | — |
-| `scripts/drive-provisioning-cockpit.mts` | 273 | 4 | 0 | Live proof of the provisioning cockpit's two-outcome "Complete & Release" (PV-3/PV-6). Drives the REAL completeBuildOut + provisionAndReleasePortal ag |
-| `scripts/drive-real-solicitation.mts` | 302 | 2 | 0 | drive-real-solicitation — put an actual government solicitation through the actual product. |
-| `scripts/drive-remaining-cohorts.mts` | 119 | 5 | 0 | Drives the remaining agent cohorts live through the SAME producer/emit paths the app uses, so the running pipeline worker fires each archetype and rec |
-| `scripts/drive-review-gate.mts` | 67 | 3 | 0 | Live proof of the P0a review-gate: materializeSkeleton must NOT make anything customer-visible when publish=false (a build for review), only when publ |
-| `scripts/drive-rfp-admin-role.mts` | 368 | 2 | 0 | THE ROLE THE WHOLE OF FUNCTION 2 IS SPECIFIED FOR, AND WHICH NOTHING HAS EVER SIGNED IN AS. |
-| `scripts/drive-rls-admin-fnd.mjs` | 84 | 0 | 0 | Admin-side RLS proof (retargeted). App as govtech_app (NOBYPASSRLS). Log in as rfp_admin and GET cross-tenant admin routes — these legitimately span t |
-| `scripts/drive-rls-admin.mjs` | 104 | 2 | 0 | Admin-side RLS proof (docs/RLS_CUTOVER.md P5). App connected as govtech_app (NOBYPASSRLS). Log in as the platform admin (master_admin) and GET the cro |
-| `scripts/drive-rls-app.mjs` | 164 | 2 | 0 | App-level RLS proof: with the app connected as `govtech_app` (NOBYPASSRLS), sign in as a real tenant admin and hit the portal API routes that read iso |
-| `scripts/drive-rls-context.mts` | 42 | 2 | 0 | Prove the context-aware `sql` Proxy (lib/db.ts + lib/tenant-context.ts) enforces tenant isolation when the app connects as govtech_app (NOBYPASSRLS).  |
-| `scripts/drive-rls-pages-fnd.mjs` | 85 | 0 | 0 | Server-component RLS proof retargeted to FOUNDATION. App as govtech_app (NOBYPASSRLS). Navigate to real pages, assert a forced-data token appears in t |
-| `scripts/drive-rls-pages.mjs` | 176 | 2 | 0 | Server-component RLS proof (docs/RLS_CUTOVER.md P5). App connected as govtech_app (NOBYPASSRLS). Next server components (page.tsx) query forced tables |
-| `scripts/drive-rls-portal-fnd.mjs` | 106 | 0 | 0 | App-level RLS proof retargeted to the FOUNDATION tenant (this DB's real seed). App connected as govtech_app (NOBYPASSRLS). Log in as the Foundation te |
-| `scripts/drive-rls-portal.mjs` | 189 | 2 | 0 | Comprehensive app-level RLS proof (docs/RLS_CUTOVER.md P5). App connected as govtech_app (NOBYPASSRLS). Log in as the immobileyes tenant admin and GET |
-| `scripts/drive-ruler-overlays.mts` | 128 | 3 | 0 | The ruler system, driven in a real browser on the case that motivates it. |
-| `scripts/drive-scenario-factory.mts` | 161 | 2 | 0 | THE INSTRUMENT BEFORE THE FINDING — a self-test for the scenario factory. |
-| `scripts/drive-scenario-matrix.mts` | 480 | 2 | 0 | THE SCENARIO MATRIX — drive the combinations the two guides describe, as real actors. |
-| `scripts/drive-scout-intake.mts` | 209 | 1 | 0 | Live end-to-end proof for the SCOUT-INTAKE candidate review→release queue (#176). Exercises the REAL lib (classifyFinding / releaseAsNew / releaseAsUp |
-| `scripts/drive-scout.mjs` | 341 | 0 | 0 | Drive the scout intake queue — the coldest subsystem in the product. |
-| `scripts/drive-shadow-tenant-admin.mts` | 115 | 3 | 0 | A SHADOW PLATFORM-ADMIN IS A TRUE IN-SESSION COMPANY ADMIN — with the customer-admin's authority, but keeping their OWN identity for the audit trail. |
-| `scripts/drive-sheet-numfmt.mts` | 52 | 0 | 0 | Live drive for SHEETS-clean number formatting. Opens the cost sheet, applies Currency to the Direct Cost column + Percent to Fringe, screenshots befor |
-| `scripts/drive-sheet-style.mts` | 62 | 0 | 0 | Live drive: SheetEditor text-color (fg) + thick border + add a shape via the media strip. Usage: DOC_ID=<uuid> node --import tsx scripts/drive-sheet-s |
-| `scripts/drive-slides-frame.mts` | 89 | 0 | 0 | Live drive for SLIDES-clean — the slide-frame control (size · ratio · count + background). Opens the seeded Foundation deck as the tenant_admin and ex |
-| `scripts/drive-space-presence.mts` | 280 | 1 | 0 | SPACE PRESENCE — every way OUT of a customer's workspace, driven as the actor who leaves. |
-| `scripts/drive-spine-t1-section-todo.mts` | 138 | 5 | 0 | SPINE-T1 — the section-editing ToDo spine, against the real database. |
-| `scripts/drive-spine-t4-buildout.mts` | 88 | 2 | 0 | SPINE-T4 live drive — build-out correctness on a REAL provision. Proves: • every REQUIRED volume/artifact ends up with ≥1 section (no invisible zero-i |
-| `scripts/drive-spine-t7-anchor.mts` | 78 | 1 | 0 | SPINE-T7 live drive — span/node-anchored comments, against the REAL DB (owner escape hatch). Proves the exact write+read shapes the comments route use |
-| `scripts/drive-starter-bulk.mts` | 61 | 3 | 0 | Drive-test P5.2 — copyStarterSetToTenant bulk copy-on-use, idempotent. 3 real-DB scenarios against the immobileyes test tenant: 1) fresh empty → adds  |
-| `scripts/drive-starter-offer.mts` | 89 | 4 | 0 | Drive-test P5.3 — offerStarterSet onboarding offer. 3 real-DB scenarios against the immobileyes tenant (eric = tenant_admin): 1) fresh → creates a ten |
-| `scripts/drive-submit-gate.mts` | 67 | 3 | 0 | Live proof of the C1 submission-readiness gate against the REAL computeSubmissionReadiness + the real advance transaction + the real DB. Creates a thr |
-| `scripts/drive-task-claim.mts` | 250 | 0 | 0 | — |
-| `scripts/drive-tenant-workflow-setup.mts` | 163 | 3 | 0 | Live proof of the Tenant Workflow Setup write paths (TW-2+) against the REAL DB under production-faithful RLS (govtech_app app conn + owner escape hat |
-| `scripts/drive-tw8c-gate-close.mts` | 117 | 3 | 0 | TW-8c live drive — the FRONTEND gate-close half of the AI-manager stage gate, against the REAL DB under production-faithful RLS (govtech_app app conn  |
-| `scripts/drive-ui-responsive.mjs` | 235 | 0 | 0 | — |
-| `scripts/drive-ui-states.mjs` | 516 | 0 | 0 | — |
-| `scripts/drive-uncovered-triggers.mts` | 221 | 5 | 0 | FIRE THE TRIGGERS THE AI_INVOKE CONTRACT LENS HAS NEVER SEEN — through their DOMAIN emitters. |
-| `scripts/drive-vault-isolation.mts` | 124 | 3 | 0 | THE VAULT AUTHORIZATION CONTRACT, adversarially (P8.10 security gate over P8.2/P8.5/P8.6). |
-| `scripts/drive-verdict-and-transfer.mts` | 289 | 1 | 0 | drive-verdict-and-transfer — the thumb, the copy, and the page the copy was for. |
-| `scripts/dsip-plan-check.mts` | 22 | 1 | 0 | One-off harness: prove the DSIP plan detects the fixture's five volumes (pre-drive). |
-| `scripts/embed-atoms.mts` | 46 | 2 | 0 | Backfill / refresh the semantic index (atom_embeddings, mig 171) for existing atoms. Embeds every approved, non-archived, non-reference atom via the S |
-| `scripts/estimate-full-build-cost.mts` | 454 | 2 | 0 | — |
-| `scripts/fire-uncovered-lib-triggers.mts` | 91 | 1 | 0 | The lib half of the UNCOVERED sweep — domain emitters that are functions, not routes. |
-| `scripts/fire-uncovered-triggers.mjs` | 152 | 0 | 0 | Bring UNCOVERED AI_INVOKE workflows under the contract lens by firing their DOMAIN emitters. |
-| `scripts/fix-open-event-brackets.mjs` | 172 | 0 | 0 | — |
-| `scripts/gen-guide-queue-seed.mts` | 114 | 0 | 0 | Capture the queued guide drafts + their review ToDos into a durable migration. |
-| `scripts/gen-immobileyes-seed.mts` | 141 | 1 | 0 | Generate db/migrations/191_seed_immobileyes_proposals.sql from the LIVE sandbox rows — the four real DSIP proposals ingested through the product (tena |
-| `scripts/gen-navy-sttr-proposal.mts` | 482 | 5 | 0 | Generate the complete Aerivio Systems → US Navy STTR Phase I proposal deliverables via the real exporters (docx / pptx / xlsx / pdf), and persist each |
-| `scripts/gen-page-seeds.ts` | 25 | 1 | 0 | Build-time snapshot: serialize the code-owned marketing page seeds (lib/page-content/PAGE_SEEDS) to JSON so the deploy-time seed script (scripts/seed_ |
-| `scripts/gen-sample-proposal.mts` | 328 | 5 | 0 | Generate the complete Aerivio Systems SBIR Phase I proposal deliverables via the real exporters (docx / pptx / xlsx / pdf), and persist each canvas do |
-| `scripts/gen-starter-set-seed.mts` | 146 | 2 | 0 | Generate db/migrations/152_seed_system_starter_library.sql — the SHARED system-starter master library (the "master tables" new tenants copy their star |
-| `scripts/health-manager.sh` | 80 | 0 | 0 | health-manager — keeps the demo box alive between turns, two cadences: • KEEPALIVE (~17s): writes to the pad — a continuous ping so the VM never looks |
-| `scripts/hitl-setup.mts` | 109 | 3 | 0 | HITL setup — make a couple of the seeded DSIP OPPs RELEASE-READY so a human-in-the-loop run goes card → purchase → release → a real multi-volume build |
-| `scripts/immo-ingest-drive.mts` | 129 | 0 | 0 | HITL Immobileyes-admin ingestion drive — the four REAL DSIP proposals through the LIVE system process (login → Add Content API → PREVIEW gate → human  |
-| `scripts/ingest-assist-e2e.mts` | 106 | 4 | 0 | Drive-test the Ingest Assist materializer (default + multi-topic) vs the sandbox. |
-| `scripts/inventory-crm.mjs` | 411 | 0 | 0 | THE CRM HAS NEVER BEEN SWEPT, and the reason is structural: its database is not on this box. |
-| `scripts/inventory-frontend.mjs` | 722 | 0 | 0 | — |
-| `scripts/inventory-scripts.mjs` | 207 | 0 | 0 | GENERATE docs/SCRIPT_INVENTORY.md — what every harness script is, and whether anything needs it. |
-| `scripts/j1-cold-start.mjs` | 153 | 0 | 0 | J1 — Cold start: does the bus leave the depot. |
-| `scripts/lib/client-ip.mjs` | 48 | 0 | 8 | EVERY SIMULATED PERSON GETS THEIR OWN CLIENT ADDRESS. |
-| `scripts/lib/cross-company.mts` | 206 | 3 | 19 | THE CROSS-COMPANY SHAPE — two companies, a person who belongs to both, and a control who does not. |
-| `scripts/lib/drive-actor.mjs` | 156 | 0 | 6 | Resolve a drive's actor from the database, and refuse to continue if the login did not take. |
-| `scripts/lib/error-surface.mjs` | 121 | 0 | 4 | THE ONE DEFINITION OF "THIS PAGE IS BROKEN", shared by every harness that looks at a page. |
-| `scripts/lib/finish-measure.mts` | 298 | 0 | 1 | THE ONE DEFINITION OF "FINISH" — what a customer actually sees, measured from the DOM. |
-| `scripts/lib/harness-residue.mts` | 108 | 1 | 5 | Put the box back as found — by measuring what a run CAUSED, not by remembering what it inserted. |
-| `scripts/lib/mobile-measure.mts` | 246 | 0 | 4 | What "too wide", "too small" and "clipped" MEAN — in one place. |
-| `scripts/lib/py-imports.py` | 75 | 0 | 0 | What does each Python file import, and what does it define? |
-| `scripts/lib/scenario.mts` | 527 | 5 | 15 | THE SCENARIO FACTORY — build the situation a drive needs, then take it away again. |
-| `scripts/make-dsip-fixture.mts` | 80 | 2 | 0 | Build the DSIP-style single-PDF fixture for the deconstruct drive. |
-| `scripts/map-coverage.mjs` | 211 | 0 | 0 | WHICH FUNCTION DOES EACH DRIVE ACTUALLY COVER, AND AS WHOM? |
-| `scripts/measure-canvas-flow.mts` | 73 | 2 | 0 | Measure canvas FLOW — the Phase-1 proof (docs/CANVAS_GEOMETRY_REDESIGN.md §6, §9). |
-| `scripts/measure-char-width.mts` | 94 | 3 | 0 | CHAR_W — the ruler's average glyph advance, as a fraction of the font size. |
-| `scripts/measure-image-placeholder.mts` | 123 | 3 | 0 | measure-image-placeholder — read the real laid-out height of an image node from Chromium. |
-| `scripts/measure-ranking-change.mts` | 157 | 1 | 0 | measure-ranking-change — what did mig 238 actually do to the numbers? |
-| `scripts/measure-table-row-height.mts` | 71 | 2 | 0 | Measure the TRUE rendered height of a table row, by rendering and counting rather than by reading the CSS and hoping. The calibration harness showed t |
-| `scripts/measure-volumes.mts` | 88 | 3 | 0 | Measure every volume of a proposal against the quality bar. |
-| `scripts/mirage-ingest.mts` | 39 | 0 | 0 | Ingest the MIRAGE Technical Volume as the GOLD-STANDARD past proposal, through the live product path (preview → HITL review → commit) as the Immobiley |
-| `scripts/monday-journey-e2e.mts` | 187 | 4 | 0 | FULL MONDAY-JOURNEY E2E — the whole value-prop loop in one run, against the live schema and the REAL product functions: |
-| `scripts/navy-sttr-e2e.mts` | 210 | 1 | 0 | END-TO-END emulation: US Navy STTR Phase I — matrix + skeleton + the REUSE loop. |
-| `scripts/niloc/_shared.mts` | 137 | 4 | 5 | Shared helpers for the NILOC Technologies gold-example set. |
-| `scripts/niloc/computed-cost.mts` | 102 | 5 | 0 | The IN-SYSTEM computed cost path for the NILOC examples. |
-| `scripts/niloc/export.mts` | 43 | 4 | 0 | Regenerate the NILOC gold-example deliverables (no DB needed — pure canvas → bytes): · prose proposals (Phase I & II technical, CSO brief, NSF pitch,  |
-| `scripts/niloc/seed.mts` | 95 | 6 | 0 | Seed the NILOC Technologies gold-example library (idempotent). |
-| `scripts/niloc/verify.mts` | 75 | 4 | 0 | Prove the NILOC gold examples are correct + reusable: A. COST ROLL-UP — each cost workbook's Summary total price equals the portal cost engine (lib/pr |
-| `scripts/note.mts` | 40 | 1 | 0 | note — write to the shared board from a Claude Code session. |
-| `scripts/parity-score-ts.mts` | 34 | 1 | 0 | TS half of the scorer parity check. Reads scripts/fixtures/scorer-parity.json, runs the SHIPPING `scoreCard` over every case, and writes the results t |
-| `scripts/probe-bucket-merge.mjs` | 57 | 0 | 0 | Narrow the bucket-PATCH merge failure to ONE step. |
-| `scripts/probe-bucket-rerank.mjs` | 69 | 0 | 0 | Why does hitl-bucket-rls see non-zero scores after a PATCH to a keyword that matches nothing? |
-| `scripts/probe-build-or-mark.mjs` | 155 | 0 | 0 | Prove the build-or-mark decision reaches a buyer's build. |
-| `scripts/probe-comp-codes.mjs` | 122 | 0 | 0 | Drive the comp-code path as the two real actors, through the real routes. |
-| `scripts/probe-customer-finish.mts` | 441 | 2 | 0 | FINISH — is what a person sees actually finished, or merely correct? |
-| `scripts/probe-deck-overlap.mts` | 318 | 3 | 0 | Does the deck writer tell the truth about how tall a node is? |
-| `scripts/probe-deliverable-artifacts.mts` | 217 | 7 | 0 | What does the customer actually RECEIVE when a project deliverable is authored and exported? |
-| `scripts/probe-disposition-ui.mjs` | 114 | 0 | 0 | Drive the build-or-mark control as a real rfp_admin, in a real browser. |
-| `scripts/probe-interaction-mobile.mts` | 540 | 2 | 0 | Every pipeline's dense page on a phone — with its overlays OPEN. |
-| `scripts/probe-measure-grid.mts` | 58 | 2 | 0 | The measurement grid, checked against the page it measures. |
-| `scripts/probe-mobile-overflow.mjs` | 63 | 0 | 0 | Name the element that makes the portal shell scroll sideways at 390px, with its ancestry. |
-| `scripts/probe-node-vocabulary.mts` | 133 | 5 | 2 | Which node types actually survive which exporter? |
-| `scripts/probe-page-scale.mts` | 144 | 2 | 0 | Does the editor page render at the size it computes for itself? |
-| `scripts/probe-partner-multi.mjs` | 101 | 0 | 0 | Paul is a partner MANAGER. He signs in to his console, not to a company. |
-| `scripts/probe-pattern-extract.mts` | 114 | 1 | 0 | Run the REAL compliance extractor over the REAL shredded text of each solicitation fixture. |
-| `scripts/probe-portal-forms.mjs` | 110 | 0 | 0 | A portal form is not a blank page, and completed-elsewhere is not "not required". |
-| `scripts/probe-preview-download.mjs` | 65 | 0 | 0 | Two failures on the paths a customer actually cares about: seeing the assembled document, and downloading it. Both time out rather than erroring, whic |
-| `scripts/probe-project-mobile.mts` | 131 | 1 | 0 | The project workspace on a phone — with its dense states OPEN. |
-| `scripts/probe-provision-elsewhere.mts` | 141 | 4 | 0 | Provision a real build off a real master and count what the buyer is actually shown. |
-| `scripts/probe-review-and-land.mjs` | 193 | 0 | 0 | Drive the rfp_admin REVIEW-AND-LAND path on a matrix the machine refused to publish. |
-| `scripts/probe-session-lifecycle.mts` | 253 | 0 | 0 | — |
-| `scripts/probe-structural-nodes.mts` | 126 | 4 | 0 | The four STRUCTURAL canvas primitives, each measured by the effect it actually has. |
-| `scripts/probe-style-matrix.mts` | 360 | 5 | 0 | Which STYLE actually survives which exporter — the ribbon's equivalent of the node-type survey. |
-| `scripts/prove-pdf-export.mts` | 29 | 1 | 0 | Proves lib/export/pdf-exporter.ts produces a real PDF under the sandbox chromium (validates the prod fix: resolveExecutable path-detection + --no-sand |
-| `scripts/prove-session-cap.mts` | 244 | 0 | 0 | — |
-| `scripts/reconcile-capability.mjs` | 717 | 0 | 0 | — |
-| `scripts/rehydrate-sandbox.sh` | 143 | 0 | 0 | rehydrate-sandbox — bring the demo box back after a VM reclaim / re-provision. A reclaimed VM comes up with the repo re-cloned but NO running services |
-| `scripts/render-artifact-pages.mts` | 99 | 1 | 0 | Render an exported artifact to page images, so a person can LOOK at what the customer receives. |
-| `scripts/render-tv-preview.mjs` | 83 | 0 | 0 | Render a faithful PDF twin of the exported Technical Volume for page-count + visual verification (LibreOffice is unavailable in this sandbox). Reads t |
-| `scripts/repair-card-dates.mts` | 73 | 1 | 0 | Rewrite card dates that were stored as Date.prototype.toString(), then rescore. |
-| `scripts/repair-section-page-caps.mts` | 82 | 1 | 0 | Repair `canvas.max_pages` on drafted sections so it carries the VOLUME's page cap. |
-| `scripts/repair-truncated-source-text.mts` | 105 | 3 | 0 | Re-extract solicitation documents that the old 500,000-char cap cut short. |
-| `scripts/run-branch-drives.sh` | 719 | 0 | 0 | Run every BRANCH drive against the live rig and print one table. `drive-end-to-end.mjs` proves the happy spine on one artifact: ingest → curate → push |
-| `scripts/sandbox-heartbeat.sh` | 269 | 0 | 0 | sandbox-heartbeat — SOP keep-alive manager for the demo/test sandbox. ⭐ SOP: launch this as a BACKGROUND task at the START of every working session, a |
-| `scripts/seed-cuas-immobileyes.mts` | 191 | 6 | 0 | Seed the Immobileyes CUAS OPP end-to-end from the uploaded solicitation. |
-| `scripts/seed-demo-automation.mts` | 28 | 2 | 0 | Seed a few clean automation firings (#107) so the admin Automation surface shows real recent executions and the created ToDos land in the admin queue. |
-| `scripts/seed-dsip-opps.mts` | 95 | 2 | 0 | Seed REAL current DoD SBIR 2026 (DSIP) opportunities into the demo, and drive the product's own bridge (publishAndFanOut) so they land on BOTH surface |
-| `scripts/seed-followon-guides.mts` | 277 | 3 | 0 | #168 CONTENT-QUEUE — draft + queue the three guides the published library still lacks. |
-| `scripts/seed-house-library.mts` | 43 | 2 | 0 | Eat our own cooking — seed the RFP-Pipeline house tenant's library with the documents we produce (ops runbooks), as canvas-backed atoms via the real c |
-| `scripts/seed-isolation-fixture.mts` | 449 | 1 | 0 | The second tenant, and the in-flight build — the fixture gaps that cap what can be MEASURED. |
-| `scripts/seed-launch-todos.mts` | 128 | 2 | 0 | seed-launch-todos — the pre-launch decisions, raised as real work items. |
-| `scripts/seed-librarian-catalog.mjs` | 53 | 0 | 0 | Seed a persisted librarian catalog result for Foundation, as if the pipeline agent had run (the sandbox LLM is sk-noop, so we hand-craft the exact wra |
-| `scripts/seed-practice-guides.mts` | 282 | 3 | 0 | #168 CONTENT-QUEUE, WAVE 3 — the three practice guides the other two waves still leave out. |
-| `scripts/seed-program-guides.mts` | 239 | 3 | 0 | #168 CONTENT-QUEUE — draft + queue program guides (BAA · OTA · CSO · Grants/NOFO) for review. |
-| `scripts/seed-project-scenario.mjs` | 234 | 0 | 0 | A project workspace with real content, for the lenses and the visual sweep. |
-| `scripts/seed-review-junk.mjs` | 34 | 0 | 0 | Seed a few "messy" atoms (duplicates + tiny + untagged + unconfirmed-tags) for the Foundation tenant so the Library Review panel has real findings to  |
-| `scripts/seed-sheet-doc.mts` | 46 | 1 | 0 | Seed a spreadsheet-format tenant_document (a small cost table) for SHEETS-clean review. cd frontend && node --import tsx scripts/seed-sheet-doc.mts |
-| `scripts/seed-slide-deck.mts` | 57 | 1 | 0 | Seed a small slide-format tenant_document (for SLIDES-clean live verification). Creates a 3-slide 16:9 deck owned by the Foundation tenant + prints it |
-| `scripts/seed-template-masters.mts` | 42 | 3 | 0 | Seed the template stable: materialize the lib/templates code catalog into master_templates, then publish v1 of each to the template bridge and fan out |
-| `scripts/seed-vault-demo.mts` | 60 | 3 | 0 | Seed a demo collaboration vault ("nook") for screenshots — tenant + collaborator sides. • nook "Acme Robotics" owned by Immobileyes • a login-capable  |
-| `scripts/setup-tw11-browser-portal.mts` | 49 | 3 | 0 | TW-11 browser-test fixture — stage a Foundation portal that exercises every NEW Workflow Setup surface: • an accepted workflow (so the live surfaces r |
-| `scripts/shoot-immobileyes.mjs` | 54 | 0 | 0 | Reusable login + screenshot driver for the Immobileyes CUAS build. Logs in as the Immobileyes tenant_admin and captures the routes passed as argv (nam |
-| `scripts/shot-content-queue.mjs` | 47 | 0 | 0 | Screenshot the #168 content queue: the content_publish review ToDos + a guide in Content Studio. DATABASE_URL=… node scripts/shot-content-queue.mjs |
-| `scripts/shot-doc.mts` | 25 | 0 | 0 | Quick login + open a tenant document + screenshot. Usage: DOC_ID=.. NAME=.. node --import tsx scripts/shot-doc.mts |
-| `scripts/shot-provisioning-cockpit.mjs` | 56 | 0 | 0 | Browser drive of the provisioning cockpit (PV-6): log in as rfp_admin, open the cockpit for a curation_pending portal, screenshot it (readiness bar +  |
-| `scripts/shot-scout-intake.mjs` | 57 | 0 | 0 | Screenshot the scout-intake candidate review→release queue + drive a real release via the UI. DATABASE_URL=… node scripts/shot-scout-intake.mjs |
-| `scripts/shot-workflow-setup.mjs` | 46 | 0 | 0 | Browser drive of the tenant Workflow Setup page (TW-6): log in as a tenant_admin, open the required setup for a launched _setup:pending portal (recomm |
-| `scripts/stage-collaborator-fixture.mts` | 149 | 0 | 0 | A real collaborator, with real assigned work — staged through the product. |
-| `scripts/stage-guide-fixtures.mts` | 140 | 0 | 0 | Put the product into the state the guides describe — through the product. |
-| `scripts/sweep-mold-quality.mts` | 171 | 4 | 0 | The pristine pass, measured across EVERY mold (#152). |
-| `scripts/sync-pdf-worker.mjs` | 76 | 0 | 0 | — |
-| `scripts/t3cp-agent-config.mjs` | 33 | 0 | 0 | Read or raise a tenant's agent rate limit through the product's own admin route, as an rfp_admin. |
-| `scripts/t3cp-archive-atoms.mjs` | 46 | 0 | 0 | Retire a set of library atoms through the product's OWN archive route, as the tenant_admin. |
-| `scripts/t3cp-archive-goldstandard.mjs` | 27 | 0 | 0 | Archive the user's own hand-written MIRAGE volume out of the Immobileyes library. |
-| `scripts/t3cp-attach-docs.mjs` | 119 | 0 | 0 | Attach the proposal's required supporting documents through the product's OWN presigned-upload flow, as the buying tenant_admin. |
-| `scripts/t3cp-color-team.mjs` | 62 | 0 | 0 | Run the AI color-team review over a build and READ BACK what it produced, as the buying tenant_admin, through the product's own routes. |
-| `scripts/t3cp-fulldraft.mjs` | 24 | 0 | 0 | Run the full draft for the T3CP build, as the buying tenant_admin, through the product's own front door (POST …/proposals/[p]/full-draft). Then report |
-| `scripts/t3cp-ingest.mts` | 178 | 0 | 0 | REAL ingest of OSW26BZ04-DP013 (T3CP Patent Holiday SBIR Open Topic Call) as an rfp_admin, through the product's own intake path — replacing the cover |
-| `scripts/t3cp-lock-and-package.mjs` | 114 | 0 | 0 | Take a drafted build all the way to a downloadable submission package, through the product's OWN routes, as the buying tenant_admin: |
-| `scripts/t3cp-reatomize.mjs` | 66 | 0 | 0 | Re-atomize the tenant's past proposals through the product's OWN upload route, as the tenant_admin, from inside the browser — the same FormData the "A |
-| `scripts/t3cp-reset-build.sh` | 63 | 0 | 0 | Test-fixture reset: drop the provisioned T3CP portal + proposal so the spine drive re-runs purchase → release → provision for real. Fixture only — nev |
-| `scripts/t3cp-restore-sections.mjs` | 62 | 0 | 0 | Restore every section of a build to its last substantial version, through the product's OWN version-restore route (POST …/sections/[s]/versions {versi |
-| `scripts/test-harness/emulated-claude.mjs` | 1105 | 0 | 0 | — |
-| `scripts/test-harness/emulated-postmark.mjs` | 171 | 0 | 0 | — |
-| `scripts/tier2-documents-e2e.mts` | 185 | 4 | 0 | TIER 2 DRIVE-TEST — standalone documents (#3/#4), against the live sandbox schema and the REAL product functions (starterFromTemplate / starterFromPre |
-| `scripts/usaf-cso-e2e.mts` | 145 | 1 | 0 | END-TO-END emulation: USAF AFWERX CSO SBIR Phase I. |
-| `scripts/ux-capture-supp.mjs` | 56 | 0 | 0 | Supplemental UX capture — tenant surfaces missed/mis-targeted in the first pass. |
-| `scripts/ux-capture.mjs` | 131 | 0 | 0 | UX touch-capture: log in as each real actor, visit every primary surface, and record screenshot + HTTP status + console errors + pageerrors + load tim |
-| `scripts/ux-nav-proof.mjs` | 37 | 0 | 0 | Proof: sectioned tenant nav — admin sees Pursue/Build/Work/Account; tenant_user sees the subset, no empty headers. |
-| `scripts/ux-ops-mobile.mjs` | 96 | 0 | 0 | Mobile admin-ops drive (390×844): exercise the operational interactions — review progress, issue ToDos, approve & advance, review→release — as tenant_ |
-| `scripts/ux-ops-proof.mjs` | 35 | 0 | 0 | Proof re-drive (390×844): confirm the polished operational surfaces now work on mobile. |
-| `scripts/ux-polish2-proof.mjs` | 47 | 0 | 0 | Proof: batch-2 polish — greeting by name · library not "empty" · per-tab titles · connor gates 403 gone. |
-| `scripts/ux-polish3-proof.mjs` | 38 | 0 | 0 | Proof: batch-3a — proposal "Manage" segmented control (double tab-row fixed) · cards de-jargon · buckets gated btn. |
-| `scripts/verify-api-contract.mjs` | 388 | 0 | 0 | Lens 2 of 3 — the API CONTRACT. Does every GET route return the envelope the SOP promises? |
-| `scripts/verify-assemble-from-library.mjs` | 320 | 0 | 0 | ASSEMBLE-FROM-LIBRARY, on a running box — the middle of the assembly spine, finally wired. |
-| `scripts/verify-assembled-flow.mts` | 96 | 3 | 0 | Drive-verify the APP's assembled-export flow (Phase 1b) — the exact path the download routes use: assembleArtifactCanvas(molds) → renderCanvas(fmt). |
-| `scripts/verify-atom-enrich.mts` | 57 | 1 | 0 | Proves the enrich step: a boxed TEXT image → OCR → the image atom's content/summary carry the extracted text (DB-proven), so it's searchable + machine |
-| `scripts/verify-capture-backend.mts` | 42 | 0 | 0 | Proves the box→crop→/atoms/capture→IMAGE ATOM→storage path end-to-end (local R2 emulation). This is the backend the box-on-upload UI posts to; the dro |
-| `scripts/verify-collaborator-blast-radius.mjs` | 316 | 0 | 0 | WHAT CAN A COLLABORATOR ACTUALLY REACH — the negative space, measured. |
-| `scripts/verify-compliance-matrix.mts` | 255 | 1 | 0 | The ruler aggregating into CANVAS COMPLIANCE — all 22 primitives, mixed orders, real matrices. |
-| `scripts/verify-db-crud.mjs` | 444 | 0 | 0 | Lens 3 of 3 — DB CRUD. When the product says it saved, did the row actually change? |
-| `scripts/verify-deck-ruler-live.mts` | 376 | 5 | 0 | The ruler, the grid boundaries and the group boxes — on REAL DECKS, stored through the product. |
-| `scripts/verify-email-ledger-rls.mjs` | 249 | 0 | 0 | Does the outbound-mail ledger actually isolate, or only appear to? |
-| `scripts/verify-embeddings.mts` | 109 | 2 | 0 | Live proof for the semantic-retrieval spine (mig 171 + lib/embeddings + hybrid selectForSection). Runs with the LOCAL engine so it needs no key. Prove |
-| `scripts/verify-exports-on-stored-artifacts.mts` | 122 | 7 | 0 | Can every stored volume actually be DOWNLOADED, in every format the product offers? |
-| `scripts/verify-groups-overlay.mjs` | 249 | 0 | 0 | THE GROUP LAYER, ON SCREEN — does a canvas that carries groups actually render, and can a person see them? |
-| `scripts/verify-guide-controls.mjs` | 215 | 0 | 0 | — |
-| `scripts/verify-ingest-coverage.mts` | 137 | 0 | 0 | Ingest Studio — the DB-side coverage verifier (run after e2e/ingest-coverage-drive). |
-| `scripts/verify-insert-fidelity.mts` | 37 | 1 | 0 | Proves FIX-INSERT-1's data path: selectForSection now returns an image atom's canvas_nodes, so a boxed figure/table can insert into a section (not jus |
-| `scripts/verify-keep-copy.mts` | 79 | 2 | 0 | Prove "keep + copy" + ISOLATION end-to-end against the seeded master library (mig 152). Runs the EXACT call the tenant-creation routes make — copyStar |
-| `scripts/verify-library-soundness.mts` | 80 | 0 | 0 | Non-destructive soundness check for the library + atom→OPP-structure path (the gate before the embeddings iteration). Proves the DATA invariants that  |
-| `scripts/verify-local-storage.mts` | 29 | 1 | 0 | Proves the local storage driver round-trips through the SAME s3-client calls prod uses. STORAGE_DRIVER=local LOCAL_STORAGE_DIR=… AWS_S3_BUCKET=rfp-pip |
-| `scripts/verify-media-export.mts` | 65 | 3 | 0 | Byte-level export check for the ppt/xls media+style work. Shapes rasterize via sharp (no S3), so this exercises the pptx shape/position/border path +  |
-| `scripts/verify-mt1-compliance.mts` | 91 | 0 | 0 | MT-1, machine half: assert the LANDED compliance values and their provenance. |
-| `scripts/verify-pptx-tables.mts` | 49 | 2 | 0 | Integration proof: a real .pptx zip with a slide table → readPptx yields a table node. (unit test covers the parser; this proves the whole reader on a |
-| `scripts/verify-project-isolation.mjs` | 289 | 0 | 0 | Does the project spine isolate, and does the baseline actually refuse to move? |
-| `scripts/verify-project-rollup.mjs` | 233 | 2 | 0 | Do the three measures compute what a person would compute by hand? |
-| `scripts/verify-public-links.mjs` | 149 | 0 | 0 | — |
-| `scripts/verify-ruler-composition.mts` | 259 | 1 | 0 | The ruler must COMPOSE — intra-segment measure and universal fold agreeing, across doc · ppt · xls. |
-| `scripts/verify-ruler-on-proposals.mts` | 53 | 3 | 0 | The page ruler against REAL, hand-authored proposals — not synthetic cases, not molds. |
-| `scripts/verify-ruler-on-stored-artifacts.mts` | 93 | 4 | 0 | The page ruler against the artifacts that are actually IN THE DATABASE. |
-| `scripts/verify-scope-bar.mjs` | 267 | 0 | 0 | THE SCOPE BAR, DRIVEN — does choosing a rung actually change what gets reviewed? |
-| `scripts/verify-scope-end-to-end.mjs` | 370 | 0 | 0 | THE WHOLE THING, ONCE, ON A RUNNING BOX — Phase G. |
-| `scripts/verify-scoped-gates.mjs` | 303 | 0 | 0 | THE GATE AS A LIVE CHECKLIST, AND WHO CAN WORK IT DOWN — Phases E and F, proven together. |
-| `scripts/verify-scoped-review.mjs` | 379 | 0 | 0 | SCOPED COLOUR-TEAM REVIEW, on a running box — does aiming a reviewer at one thing actually work? |
-| `scripts/verify-scorer-parity.mjs` | 90 | 0 | 0 | verify-scorer-parity — the two scorers are a mirror pair. Assert it. |
-| `scripts/verify-storage-server.mts` | 42 | 0 | 0 | Full server round-trip: upload an image → putObject(local) → getSignedGetUrl → serving route serves bytes. |
-| `scripts/verify-studio-voice-route.mjs` | 164 | 0 | 0 | The Studio ROUTE end of B84 — driven as a real signed-in tenant admin against a running box. |
-| `scripts/verify-studio-voice.mts` | 117 | 1 | 0 | Does the Voice-of-Proposal a tenant SET actually reach the drafting agent from the Studio? |
-| `scripts/verify-surfaced-capability.mjs` | 122 | 0 | 0 | — |
-| `scripts/verify-surfaces.mjs` | 398 | 1 | 0 | Does every page in the product actually render for the person who is allowed to see it? |
-| `scripts/verify-ui-vs-db.mjs` | 301 | 0 | 0 | Lens 4 — RECONCILIATION. Is the number on the page the number in the table? |
-| `scripts/verify-unextractable.mts` | 40 | 1 | 0 | Proves the reader → plan threading of the BOX-3 "un-extractable content" signal, with NO server: a scanned (text-less) PDF and a PPTX carrying a <p:pi |
-| `scripts/verify-write-contract.mjs` | 287 | 0 | 0 | Lens 5 — the WRITE surface. Does every POST/PATCH/PUT/DELETE refuse bad input in the SOP shape? |
-| `scripts/write-ui-docs.mjs` | 279 | 0 | 0 | — |
+| `frontend/scripts/analyze-node-demand.mjs` | 125 | 0 | 0 | Which canvas node types does the product actually DEMAND? |
+| `frontend/scripts/architecture/extract.mjs` | 97 | 0 | 0 | — |
+| `frontend/scripts/architecture/generate.mjs` | 87 | 0 | 0 | — |
+| `frontend/scripts/audit-automation-spine.mjs` | 742 | 0 | 0 | — |
+| `frontend/scripts/audit-card-fields.mjs` | 222 | 0 | 0 | audit-card-fields — is "declared, documented, and written by nothing" systemic? |
+| `frontend/scripts/audit-dead-code.mjs` | 289 | 0 | 0 | — |
+| `frontend/scripts/audit-doc-currency.mjs` | 354 | 0 | 0 | — |
+| `frontend/scripts/audit-empty-not-null.mjs` | 307 | 0 | 0 | — |
+| `frontend/scripts/audit-env-inventory.mjs` | 238 | 0 | 0 | — |
+| `frontend/scripts/audit-env-parity.mjs` | 415 | 0 | 0 | — |
+| `frontend/scripts/audit-pinned-fixtures.mjs` | 128 | 0 | 0 | HOW MUCH OF THE LIVE SAFETY NET IS POINTING AT THINGS THAT NO LONGER EXIST? |
+| `frontend/scripts/audit-pipeline-coherence.mjs` | 430 | 0 | 0 | — |
+| `frontend/scripts/audit-producer-consumer.mjs` | 254 | 0 | 0 | — |
+| `frontend/scripts/audit-ranking-readiness.mjs` | 190 | 0 | 0 | audit-ranking-readiness — is the model implemented, and is the corpus it depends on actually fed? |
+| `frontend/scripts/audit-refusal-observability.mjs` | 244 | 0 | 0 | EVERY REFUSAL IN THE TREE, AND WHETHER ANYTHING BUT THE CALLER LEARNS OF IT. |
+| `frontend/scripts/audit-row-type-truth.mjs` | 537 | 0 | 0 | — |
+| `frontend/scripts/audit-runtime-assets.mjs` | 430 | 0 | 0 | — |
+| `frontend/scripts/audit-wipe-impact.mjs` | 167 | 0 | 0 | — |
+| `frontend/scripts/backfill-buckets.mts` | 29 | 4 | 0 | Backfill default spotlight buckets for existing tenants + rank their cards. Scoring is per-bucket now (rankBucket, event-driven port) — the old in-tx  |
+| `frontend/scripts/backfill-corpus-verbatim.mts` | 61 | 1 | 0 | Backfill `library_atoms.corpus_verbatim` (mig 197 / LIB-HYGIENE). |
+| `frontend/scripts/bug-log-status.mjs` | 140 | 0 | 0 | — |
+| `frontend/scripts/build-doc-guide.mjs` | 352 | 0 | 0 | Build the illustrated "Creating documents" guide: resize the session screenshots into the repo's docs/user-guides/img/ (committed) AND embed them as d |
+| `frontend/scripts/build-project-tree.mjs` | 889 | 0 | 0 | THE STATIC BASELINE — every file in the system, what it is, who uses it, and what it uses. |
+| `frontend/scripts/build-ui-contact-sheets.mjs` | 116 | 0 | 0 | — |
+| `frontend/scripts/calibrate-page-ruler.mts` | 386 | 2 | 0 | calibrate-page-ruler — pit `paginate()` against what Chromium actually prints. |
+| `frontend/scripts/calibrate-slide-ruler.mts` | 158 | 2 | 0 | calibrate-slide-ruler — the deck counterpart to calibrate-page-ruler. |
+| `frontend/scripts/capture-collab.mjs` | 158 | 0 | 0 | The collaborator's own screens, captured as the collaborator. |
+| `frontend/scripts/capture-guide-crops.mts` | 135 | 0 | 0 | Element-accurate crops for the guide steps that describe a specific control. |
+| `frontend/scripts/capture-guides.mjs` | 747 | 1 | 0 | The two front-door guides, captured against the build that is actually running. |
+| `frontend/scripts/capture-hydration-diff.mjs` | 162 | 0 | 0 | CAPTURE THE UNMINIFIED HYDRATION DIFF — the step the #418 entries kept naming and nobody could run. |
+| `frontend/scripts/capture-mobile-guide.mts` | 147 | 1 | 0 | — |
+| `frontend/scripts/capture-projects-guide.mjs` | 96 | 0 | 0 | — |
+| `frontend/scripts/capture-shots.mts` | 361 | 0 | 0 | User-guide screenshot harness. Logs in through the real login form as a given role and captures a scripted walk of the product to PNGs under docs/user |
+| `frontend/scripts/capture-stage-walk.mjs` | 273 | 0 | 0 | capture-stage-walk — photograph the ingest → ranking → build-out flow, stage by stage. |
+| `frontend/scripts/capture-templates.mts` | 175 | 2 | 0 | #151 — capture the THREE template surfaces as the real actors, and check what they show against what the system actually holds. |
+| `frontend/scripts/capture-ui-atlas.mjs` | 391 | 2 | 0 | — |
+| `frontend/scripts/capture-vaults.mjs` | 109 | 0 | 0 | Capture the two-sided collaboration-vault ("nook") UI for the manuals (P8.9/P8.7/P8.8): TENANT side — eric@immobileyes → /portal/immobileyes/vaults (i |
+| `frontend/scripts/catalog-guides.mjs` | 158 | 0 | 0 | — |
+| `frontend/scripts/catalog-ui.mjs` | 344 | 0 | 0 | — |
+| `frontend/scripts/check-async-workers.mjs` | 221 | 0 | 0 | — |
+| `frontend/scripts/check-cms-content-retirable.mjs` | 174 | 0 | 0 | — |
+| `frontend/scripts/check-harness-syntax.mjs` | 100 | 0 | 0 | — |
+| `frontend/scripts/check-office-filters.mjs` | 80 | 0 | 0 | — |
+| `frontend/scripts/check-rig-hydration.mjs` | 139 | 0 | 0 | Is the server actually serving the build that is on disk, and does the client half RUN? |
+| `frontend/scripts/check-rls-posture.mjs` | 400 | 0 | 0 | PREFLIGHT: is this box actually enforcing RLS, or only appearing to? |
+| `frontend/scripts/check-tenant-isolation-invariant.mjs` | 146 | 0 | 0 | THE INVARIANT: nothing reads or writes cross-tenant. Ever. |
+| `frontend/scripts/classify-migrations.mjs` | 270 | 0 | 0 | — |
+| `frontend/scripts/close-e2e-cms.mjs` | 159 | 0 | 0 | CLOSE-CMS — real-actor E2E: admin reviews a queued guide draft in Content Studio and PUBLISHES it; verify it goes live (active) and renders on the pub |
+| `frontend/scripts/close-e2e-marketing.mjs` | 74 | 0 | 0 | CLOSE-MARKETING — real-actor E2E: tenant_admin (kate) creates a marketing document from a starter mold (Capability Statement), opens it in the editor, |
+| `frontend/scripts/close-e2e-proposal.mjs` | 60 | 0 | 0 | CLOSE-PROPOSAL — real-actor E2E: tenant_admin (kate) opens the AI-built proposal (sections drafted by section_drafter), sees the readiness roll-up, an |
+| `frontend/scripts/crosscheck-canvas-normalize.mts` | 106 | 1 | 0 | Cross-check for B78 — at the layer where the bug actually lived. |
+| `frontend/scripts/crosscheck-shipped-fixes.sh` | 129 | 0 | 0 | crosscheck-shipped-fixes — confirm B79 and B80 by a DIFFERENT method than the lenses that originally reported them. WHY THIS EXISTS. The four `verify- |
+| `frontend/scripts/demo-atoms-ui.mjs` | 82 | 0 | 0 | Demo — moving atoms & groups around in the portal UI: (1) Library: select primitive atoms → "Group into new atom" (compose a group / "Team"). (2) Prop |
+| `frontend/scripts/demo-canvas-capabilities.mts` | 274 | 4 | 0 | From nothing to a finished document and deck — every capability, captured as screen grabs. |
+| `frontend/scripts/derive-capability-map.mjs` | 165 | 0 | 0 | derive-capability-map — what can each actor DO, derived from the tree rather than remembered. |
+| `frontend/scripts/diagnose-mold-ruler.mts` | 198 | 5 | 0 | Why does the ruler disagree with the page on THIS mold? |
+| `frontend/scripts/drive-admin-demand.mts` | 153 | 0 | 0 | drive-admin-demand — does a customer's thumb reach the person who can act on it? |
+| `frontend/scripts/drive-agent-flows.mjs` | 235 | 0 | 0 | — |
+| `frontend/scripts/drive-amendment.mjs` | 200 | 0 | 0 | Drive the amendment engine end to end: detect → confirm → fan-out → tenant acknowledge. |
+| `frontend/scripts/drive-application-intake.mts` | 376 | 2 | 0 | drive-application-intake — the public→private notification, driven as a stranger. |
+| `frontend/scripts/drive-archive.mts` | 204 | 1 | 0 | drive-archive — the archivable contract, driven on all three entities. |
+| `frontend/scripts/drive-atomization.mts` | 297 | 2 | 0 | Drive upload → atomize → library → draft-selection, with real documents. |
+| `frontend/scripts/drive-award-to-contract.mts` | 111 | 3 | 0 | RECORD A WIN, AS THE CUSTOMER, AND CHECK WHAT THE WIN PRODUCED. |
+| `frontend/scripts/drive-b1-auto-advance.mts` | 82 | 2 | 0 | SPINE-B1 live drive — the AI-manager AUTONOMOUS auto-advance (TW-8 fast-follow). Proves sweepAutoAdvanceGates() closes an agent_manager+autoAdvance ga |
+| `frontend/scripts/drive-baa-forward.mjs` | 162 | 0 | 0 | Drive an ingested solicitation the whole way forward, as rfp_admin, over HTTP. |
+| `frontend/scripts/drive-box-pdf.mts` | 152 | 0 | 0 | Live drive: box a PDF PAGE → image atom (BOX-1b, the scanned-table / figure-heavy case). Generates a real 2-page PDF (Chromium page.pdf), uploads it i |
+| `frontend/scripts/drive-box-upload.mts` | 73 | 0 | 0 | Live drive: box an uploaded image → image atom (the "worst-case baseline" ingest). Upload a PNG into the Capture tab → draw a box → Atomize → verify a |
+| `frontend/scripts/drive-box2-suggest.mts` | 86 | 0 | 0 | Live drive (BOX-2): the machine draws the boxes. Load a frame → "✨ Suggest regions" pre-populates proposed boxes → the human confirms → Atomize → DB-p |
+| `frontend/scripts/drive-box3-nudge.mts` | 60 | 0 | 0 | Live drive (BOX-3): drop a scanned / image-only PDF on the "Add content" card and confirm the preview surfaces the un-extractable nudge + a deep-link  |
+| `frontend/scripts/drive-bridge-buckets.mjs` | 351 | 1 | 0 | Drive the OPP bridge and the bucket ranking spine — one chain, driven as one. |
+| `frontend/scripts/drive-bucket-authoring.mts` | 289 | 1 | 0 | drive-bucket-authoring — the tenant side of the ranking spine, as the three actors who own it. |
+| `frontend/scripts/drive-buy-and-build.mjs` | 260 | 0 | 0 | Carry one solicitation all the way to a tenant's proposal — the WHOLE commercial spine. |
+| `frontend/scripts/drive-canvas-authoring.mts` | 631 | 5 | 0 | CANVAS AUTHORING SWEEP — author NEW documents from a blank canvas, as real actors, and take them out in every format the product offers. |
+| `frontend/scripts/drive-canvas-overlays.mjs` | 363 | 0 | 0 | — |
+| `frontend/scripts/drive-capability-deck.mts` | 455 | 6 | 0 | Build a real capability deck for a real tenant, through the product's own routes only. |
+| `frontend/scripts/drive-card-decision.mts` | 347 | 1 | 0 | drive-card-decision — the two things the card was NOT expanded for, driven on the real product. |
+| `frontend/scripts/drive-cms-generate.mts` | 126 | 2 | 0 | CLOSE-CMS, THE GENERATE HALF — an rfp_admin fills the Generate Content form and a draft appears. |
+| `frontend/scripts/drive-collaborator-boundary.mts` | 114 | 1 | 0 | Live COLLABORATOR-boundary negative drive (FINDING 1). A cross-company collaborator holds a partner_user membership that PASSES verifyTenantAccess (se |
+| `frontend/scripts/drive-commercial-path.mts` | 377 | 3 | 0 | drive-commercial-path — the funnel a PROSPECT walks, driven as the prospect. |
+| `frontend/scripts/drive-control-reachability.mts` | 238 | 4 | 0 | Which format controls can a user actually REACH, on each canvas surface? |
+| `frontend/scripts/drive-copy-inward-isolation.sql` | 121 | 0 | 0 | drive-copy-inward-isolation.sql ───────────────────────────────────────────────────────────────────────────── Live proof of the "Sharing is copy-inwar |
+| `frontend/scripts/drive-copy-starter.mts` | 103 | 2 | 0 | Drive-test: copy a system_starter foundation into a tenant (the P5 copy-on-use path) and prove the FULL grain tree — foundation ⊃ section ⊃ group ⊃ pr |
+| `frontend/scripts/drive-corpus-copy-inward.mts` | 331 | 2 | 0 | drive-corpus-copy-inward — does the solicitation reach the tenant WHEN THEY PIN, and stay out of ranking until then? |
+| `frontend/scripts/drive-corpus-verbatim.mts` | 132 | 1 | 0 | Live proof (LIB-HYGIENE / mig 197): the corpus check tells the agency's words from the tenant's. |
+| `frontend/scripts/drive-curate-baa.mts` | 251 | 3 | 0 | drive-curate-baa — do the rfp_admin's actual job on a real BAA, and produce the OPP cards. |
+| `frontend/scripts/drive-curated-ranking.mts` | 166 | 3 | 0 | drive-curated-ranking — an admin marks a passage, and a tenant's lens finds the opportunity. |
+| `frontend/scripts/drive-descent-timeout.mts` | 239 | 0 | 0 | — |
+| `frontend/scripts/drive-dormant-surface.mjs` | 274 | 0 | 0 | — |
+| `frontend/scripts/drive-email-spine.mts` | 266 | 2 | 0 | The email spine, driven end to end against the emulator — send → ledger → webhook → suppression. |
+| `frontend/scripts/drive-end-to-end.mjs` | 449 | 0 | 0 | The whole arc, on one artifact: a government PDF nobody wrote for us → a file on disk you could submit. Ingest · curate · push · discover · buy · prov |
+| `frontend/scripts/drive-enrich-prod.mts` | 64 | 0 | 0 | Prod-build proof of the enrich step: POST a TEXT crop to the real /atoms/capture route (authenticated) and confirm the created image atom's content ca |
+| `frontend/scripts/drive-f1-fluid.mts` | 122 | 0 | 0 | Live drive for fluid-canvas F1 — the whole-proposal "Document" view. |
+| `frontend/scripts/drive-f2-annotate.mts` | 57 | 0 | 0 | Live drive for F2 annotate — highlight a span in the fluid Document view → Annotate → note → a comment on the owning section. Usage: node --import tsx |
+| `frontend/scripts/drive-failure-observability.mts` | 177 | 1 | 0 | WHEN A HANDLER FAILS, DOES ANYTHING BUT THE CALLER EVER KNOW? |
+| `frontend/scripts/drive-finish-build.mjs` | 162 | 0 | 0 | Finish a provisioned build: extend if closed, lock, advance, lock, package. The last mile. |
+| `frontend/scripts/drive-force-ascend.mts` | 195 | 0 | 0 | — |
+| `frontend/scripts/drive-foundation-tvsf.mts` | 260 | 3 | 0 | Drive the Foundation TVSF build: draft the 13 provisioned sections (Proposal 7pp: Abstract + #1–#11, and Budget: #12) with real canvas content grounde |
+| `frontend/scripts/drive-full-draft.mts` | 31 | 3 | 0 | Fires the canonical full-draft path (same helper the admin doorbell + portal call) → the pipeline worker's OnFullDraftRequestedModeC runs the whole co |
+| `frontend/scripts/drive-full-journey.mts` | 956 | 5 | 0 | THE WHOLE ARC, as a person walks it, with a screen grab at every step. |
+| `frontend/scripts/drive-guide-note.mts` | 118 | 0 | 0 | — |
+| `frontend/scripts/drive-identity-deeplink.mts` | 225 | 3 | 0 | IDENTITY HOLDS EVEN WHEN THE LINK CAME FROM AN EMAIL. |
+| `frontend/scripts/drive-immobileyes.mts` | 22 | 0 | 0 | — |
+| `frontend/scripts/drive-ingest-scenario.mjs` | 108 | 0 | 0 | Build a NEW curated solicitation from a PDF the repository actually owns. |
+| `frontend/scripts/drive-item-template-picker.mts` | 107 | 0 | 0 | Drive-test #77: required-item → template picker in the curation workspace. |
+| `frontend/scripts/drive-leakage.mts` | 52 | 0 | 0 | Live cross-boundary LEAKAGE negative drive. Kate (Foundation tenant_admin, active) must NOT be able to read another tenant's data — via a foreign tena |
+| `frontend/scripts/drive-librarian-review.mts` | 52 | 0 | 0 | Live drive: the librarian AI-catalog layer in the Review tab (persisted agent output, surfaced). cd frontend && node --import tsx scripts/drive-librar |
+| `frontend/scripts/drive-library-review.mts` | 53 | 0 | 0 | Live drive: the Library Review tab — duplicates + quality flags + one-click archive. Then the Library tab's editable detail drawer. cd frontend && nod |
+| `frontend/scripts/drive-library-starter-copy.mts` | 246 | 0 | 0 | drive-library-starter-copy — covering two routes by USING the capabilities behind them. |
+| `frontend/scripts/drive-milestone-construct.mts` | 289 | 1 | 0 | — |
+| `frontend/scripts/drive-navair-build.mts` | 456 | 4 | 0 | Drive the FULL govwin proposal chain for the Immobileyes DON26BX03-NP002 C-UAS effort: align Volume 2 to the DON Phase-I Open-Topic TV2 template → lin |
+| `frontend/scripts/drive-navair-draft-proof.mts` | 64 | 3 | 0 | FAITHFUL STEP C — invoke the REAL proposal.draft_section agent tool (the same tool the "Draft all sections" UI runs) per Technical-Volume section, gro |
+| `frontend/scripts/drive-navair-faithful-bd.mts` | 84 | 6 | 0 | FAITHFUL STEP B (template templify) + STEP D (real lock) — through the platform's genuine cores. B: atomize the DON TV2 template docx → templify its c |
+| `frontend/scripts/drive-navair-faithful.mts` | 67 | 3 | 0 | FAITHFUL end-to-end re-run — every step through the platform's REAL cores (the exact code the UI routes wrap), no direct-SQL short-circuits. Step A: t |
+| `frontend/scripts/drive-opp-scout.mts` | 154 | 1 | 0 | Live proof (AGENTS-LIVE-3): waking opportunity_scout via the new stageIntake producer. Calls the REAL stageIntake (emits finder:opportunities.detected |
+| `frontend/scripts/drive-oversight-surfaces.mts` | 394 | 1 | 0 | drive-oversight-surfaces — the two operators' consoles, driven as the operator, checked against the database. |
+| `frontend/scripts/drive-p3-invite.mts` | 99 | 3 | 0 | COLLABORATOR INVITE → MEMBERSHIP, without clobbering anybody's home. |
+| `frontend/scripts/drive-p3-lifecycle.mts` | 100 | 3 | 0 | COLLABORATOR MEMBERSHIP LIFECYCLE — invite · remove · re-invite · the still-collaborating guard. |
+| `frontend/scripts/drive-past-proposal-templify.mts` | 207 | 0 | 0 | Drive-test #18: past-proposal → template (templify) + regen, via the real API. |
+| `frontend/scripts/drive-pin-honesty.mts` | 157 | 1 | 0 | drive-pin-honesty — a local-copy pointer exists only when the local copy does. |
+| `frontend/scripts/drive-pin.mts` | 123 | 2 | 0 | THE SINGULAR SESSION — one identity, several companies, exactly one of them active at a time. |
+| `frontend/scripts/drive-preview-atomize.mts` | 59 | 0 | 0 | Live drive: preview-before-atomize on the "Add content" card. Drop a doc → PREVIEW (no write) → confirm → atoms created. cd frontend && node --import  |
+| `frontend/scripts/drive-project-lifecycle.mts` | 2506 | 2 | 0 | — |
+| `frontend/scripts/drive-provisioning-cockpit.mts` | 273 | 4 | 0 | Live proof of the provisioning cockpit's two-outcome "Complete & Release" (PV-3/PV-6). Drives the REAL completeBuildOut + provisionAndReleasePortal ag |
+| `frontend/scripts/drive-real-solicitation.mts` | 302 | 2 | 0 | drive-real-solicitation — put an actual government solicitation through the actual product. |
+| `frontend/scripts/drive-remaining-cohorts.mts` | 119 | 5 | 0 | Drives the remaining agent cohorts live through the SAME producer/emit paths the app uses, so the running pipeline worker fires each archetype and rec |
+| `frontend/scripts/drive-review-gate.mts` | 67 | 3 | 0 | Live proof of the P0a review-gate: materializeSkeleton must NOT make anything customer-visible when publish=false (a build for review), only when publ |
+| `frontend/scripts/drive-rfp-admin-role.mts` | 368 | 2 | 0 | THE ROLE THE WHOLE OF FUNCTION 2 IS SPECIFIED FOR, AND WHICH NOTHING HAS EVER SIGNED IN AS. |
+| `frontend/scripts/drive-rls-admin-fnd.mjs` | 84 | 0 | 0 | Admin-side RLS proof (retargeted). App as govtech_app (NOBYPASSRLS). Log in as rfp_admin and GET cross-tenant admin routes — these legitimately span t |
+| `frontend/scripts/drive-rls-admin.mjs` | 104 | 2 | 0 | Admin-side RLS proof (docs/RLS_CUTOVER.md P5). App connected as govtech_app (NOBYPASSRLS). Log in as the platform admin (master_admin) and GET the cro |
+| `frontend/scripts/drive-rls-app.mjs` | 164 | 2 | 0 | App-level RLS proof: with the app connected as `govtech_app` (NOBYPASSRLS), sign in as a real tenant admin and hit the portal API routes that read iso |
+| `frontend/scripts/drive-rls-context.mts` | 42 | 2 | 0 | Prove the context-aware `sql` Proxy (lib/db.ts + lib/tenant-context.ts) enforces tenant isolation when the app connects as govtech_app (NOBYPASSRLS).  |
+| `frontend/scripts/drive-rls-pages-fnd.mjs` | 85 | 0 | 0 | Server-component RLS proof retargeted to FOUNDATION. App as govtech_app (NOBYPASSRLS). Navigate to real pages, assert a forced-data token appears in t |
+| `frontend/scripts/drive-rls-pages.mjs` | 176 | 2 | 0 | Server-component RLS proof (docs/RLS_CUTOVER.md P5). App connected as govtech_app (NOBYPASSRLS). Next server components (page.tsx) query forced tables |
+| `frontend/scripts/drive-rls-portal-fnd.mjs` | 106 | 0 | 0 | App-level RLS proof retargeted to the FOUNDATION tenant (this DB's real seed). App connected as govtech_app (NOBYPASSRLS). Log in as the Foundation te |
+| `frontend/scripts/drive-rls-portal.mjs` | 189 | 2 | 0 | Comprehensive app-level RLS proof (docs/RLS_CUTOVER.md P5). App connected as govtech_app (NOBYPASSRLS). Log in as the immobileyes tenant admin and GET |
+| `frontend/scripts/drive-ruler-overlays.mts` | 128 | 3 | 0 | The ruler system, driven in a real browser on the case that motivates it. |
+| `frontend/scripts/drive-scenario-factory.mts` | 161 | 2 | 0 | THE INSTRUMENT BEFORE THE FINDING — a self-test for the scenario factory. |
+| `frontend/scripts/drive-scenario-matrix.mts` | 480 | 2 | 0 | THE SCENARIO MATRIX — drive the combinations the two guides describe, as real actors. |
+| `frontend/scripts/drive-scout-intake.mts` | 209 | 1 | 0 | Live end-to-end proof for the SCOUT-INTAKE candidate review→release queue (#176). Exercises the REAL lib (classifyFinding / releaseAsNew / releaseAsUp |
+| `frontend/scripts/drive-scout.mjs` | 341 | 0 | 0 | Drive the scout intake queue — the coldest subsystem in the product. |
+| `frontend/scripts/drive-shadow-tenant-admin.mts` | 115 | 3 | 0 | A SHADOW PLATFORM-ADMIN IS A TRUE IN-SESSION COMPANY ADMIN — with the customer-admin's authority, but keeping their OWN identity for the audit trail. |
+| `frontend/scripts/drive-sheet-numfmt.mts` | 52 | 0 | 0 | Live drive for SHEETS-clean number formatting. Opens the cost sheet, applies Currency to the Direct Cost column + Percent to Fringe, screenshots befor |
+| `frontend/scripts/drive-sheet-style.mts` | 62 | 0 | 0 | Live drive: SheetEditor text-color (fg) + thick border + add a shape via the media strip. Usage: DOC_ID=<uuid> node --import tsx scripts/drive-sheet-s |
+| `frontend/scripts/drive-slides-frame.mts` | 89 | 0 | 0 | Live drive for SLIDES-clean — the slide-frame control (size · ratio · count + background). Opens the seeded Foundation deck as the tenant_admin and ex |
+| `frontend/scripts/drive-space-presence.mts` | 280 | 1 | 0 | SPACE PRESENCE — every way OUT of a customer's workspace, driven as the actor who leaves. |
+| `frontend/scripts/drive-spine-t1-section-todo.mts` | 138 | 5 | 0 | SPINE-T1 — the section-editing ToDo spine, against the real database. |
+| `frontend/scripts/drive-spine-t4-buildout.mts` | 88 | 2 | 0 | SPINE-T4 live drive — build-out correctness on a REAL provision. Proves: • every REQUIRED volume/artifact ends up with ≥1 section (no invisible zero-i |
+| `frontend/scripts/drive-spine-t7-anchor.mts` | 78 | 1 | 0 | SPINE-T7 live drive — span/node-anchored comments, against the REAL DB (owner escape hatch). Proves the exact write+read shapes the comments route use |
+| `frontend/scripts/drive-starter-bulk.mts` | 61 | 3 | 0 | Drive-test P5.2 — copyStarterSetToTenant bulk copy-on-use, idempotent. 3 real-DB scenarios against the immobileyes test tenant: 1) fresh empty → adds  |
+| `frontend/scripts/drive-starter-offer.mts` | 89 | 4 | 0 | Drive-test P5.3 — offerStarterSet onboarding offer. 3 real-DB scenarios against the immobileyes tenant (eric = tenant_admin): 1) fresh → creates a ten |
+| `frontend/scripts/drive-submit-gate.mts` | 67 | 3 | 0 | Live proof of the C1 submission-readiness gate against the REAL computeSubmissionReadiness + the real advance transaction + the real DB. Creates a thr |
+| `frontend/scripts/drive-task-claim.mts` | 250 | 0 | 0 | — |
+| `frontend/scripts/drive-tenant-workflow-setup.mts` | 163 | 3 | 0 | Live proof of the Tenant Workflow Setup write paths (TW-2+) against the REAL DB under production-faithful RLS (govtech_app app conn + owner escape hat |
+| `frontend/scripts/drive-tw8c-gate-close.mts` | 117 | 3 | 0 | TW-8c live drive — the FRONTEND gate-close half of the AI-manager stage gate, against the REAL DB under production-faithful RLS (govtech_app app conn  |
+| `frontend/scripts/drive-ui-responsive.mjs` | 235 | 0 | 0 | — |
+| `frontend/scripts/drive-ui-states.mjs` | 516 | 0 | 0 | — |
+| `frontend/scripts/drive-uncovered-triggers.mts` | 221 | 5 | 0 | FIRE THE TRIGGERS THE AI_INVOKE CONTRACT LENS HAS NEVER SEEN — through their DOMAIN emitters. |
+| `frontend/scripts/drive-vault-isolation.mts` | 124 | 3 | 0 | THE VAULT AUTHORIZATION CONTRACT, adversarially (P8.10 security gate over P8.2/P8.5/P8.6). |
+| `frontend/scripts/drive-verdict-and-transfer.mts` | 289 | 1 | 0 | drive-verdict-and-transfer — the thumb, the copy, and the page the copy was for. |
+| `frontend/scripts/dsip-plan-check.mts` | 22 | 1 | 0 | One-off harness: prove the DSIP plan detects the fixture's five volumes (pre-drive). |
+| `frontend/scripts/embed-atoms.mts` | 46 | 2 | 0 | Backfill / refresh the semantic index (atom_embeddings, mig 171) for existing atoms. Embeds every approved, non-archived, non-reference atom via the S |
+| `frontend/scripts/estimate-full-build-cost.mts` | 454 | 2 | 0 | — |
+| `frontend/scripts/fire-uncovered-lib-triggers.mts` | 91 | 1 | 0 | The lib half of the UNCOVERED sweep — domain emitters that are functions, not routes. |
+| `frontend/scripts/fire-uncovered-triggers.mjs` | 152 | 0 | 0 | Bring UNCOVERED AI_INVOKE workflows under the contract lens by firing their DOMAIN emitters. |
+| `frontend/scripts/fix-open-event-brackets.mjs` | 172 | 0 | 0 | — |
+| `frontend/scripts/gen-guide-queue-seed.mts` | 114 | 0 | 0 | Capture the queued guide drafts + their review ToDos into a durable migration. |
+| `frontend/scripts/gen-immobileyes-seed.mts` | 141 | 1 | 0 | Generate db/migrations/191_seed_immobileyes_proposals.sql from the LIVE sandbox rows — the four real DSIP proposals ingested through the product (tena |
+| `frontend/scripts/gen-navy-sttr-proposal.mts` | 482 | 5 | 0 | Generate the complete Aerivio Systems → US Navy STTR Phase I proposal deliverables via the real exporters (docx / pptx / xlsx / pdf), and persist each |
+| `frontend/scripts/gen-page-seeds.ts` | 25 | 1 | 0 | Build-time snapshot: serialize the code-owned marketing page seeds (lib/page-content/PAGE_SEEDS) to JSON so the deploy-time seed script (scripts/seed_ |
+| `frontend/scripts/gen-sample-proposal.mts` | 328 | 5 | 0 | Generate the complete Aerivio Systems SBIR Phase I proposal deliverables via the real exporters (docx / pptx / xlsx / pdf), and persist each canvas do |
+| `frontend/scripts/gen-starter-set-seed.mts` | 146 | 2 | 0 | Generate db/migrations/152_seed_system_starter_library.sql — the SHARED system-starter master library (the "master tables" new tenants copy their star |
+| `frontend/scripts/health-manager.sh` | 80 | 0 | 0 | health-manager — keeps the demo box alive between turns, two cadences: • KEEPALIVE (~17s): writes to the pad — a continuous ping so the VM never looks |
+| `frontend/scripts/hitl-setup.mts` | 109 | 3 | 0 | HITL setup — make a couple of the seeded DSIP OPPs RELEASE-READY so a human-in-the-loop run goes card → purchase → release → a real multi-volume build |
+| `frontend/scripts/immo-ingest-drive.mts` | 129 | 0 | 0 | HITL Immobileyes-admin ingestion drive — the four REAL DSIP proposals through the LIVE system process (login → Add Content API → PREVIEW gate → human  |
+| `frontend/scripts/ingest-assist-e2e.mts` | 106 | 4 | 0 | Drive-test the Ingest Assist materializer (default + multi-topic) vs the sandbox. |
+| `frontend/scripts/inventory-crm.mjs` | 411 | 0 | 0 | THE CRM HAS NEVER BEEN SWEPT, and the reason is structural: its database is not on this box. |
+| `frontend/scripts/inventory-frontend.mjs` | 722 | 0 | 0 | — |
+| `frontend/scripts/inventory-scripts.mjs` | 207 | 0 | 0 | GENERATE docs/SCRIPT_INVENTORY.md — what every harness script is, and whether anything needs it. |
+| `frontend/scripts/j1-cold-start.mjs` | 153 | 0 | 0 | J1 — Cold start: does the bus leave the depot. |
+| `frontend/scripts/lib/client-ip.mjs` | 48 | 0 | 8 | EVERY SIMULATED PERSON GETS THEIR OWN CLIENT ADDRESS. |
+| `frontend/scripts/lib/cross-company.mts` | 206 | 3 | 19 | THE CROSS-COMPANY SHAPE — two companies, a person who belongs to both, and a control who does not. |
+| `frontend/scripts/lib/drive-actor.mjs` | 156 | 0 | 6 | Resolve a drive's actor from the database, and refuse to continue if the login did not take. |
+| `frontend/scripts/lib/error-surface.mjs` | 121 | 0 | 4 | THE ONE DEFINITION OF "THIS PAGE IS BROKEN", shared by every harness that looks at a page. |
+| `frontend/scripts/lib/finish-measure.mts` | 298 | 0 | 1 | THE ONE DEFINITION OF "FINISH" — what a customer actually sees, measured from the DOM. |
+| `frontend/scripts/lib/harness-residue.mts` | 108 | 1 | 5 | Put the box back as found — by measuring what a run CAUSED, not by remembering what it inserted. |
+| `frontend/scripts/lib/mobile-measure.mts` | 246 | 0 | 4 | What "too wide", "too small" and "clipped" MEAN — in one place. |
+| `frontend/scripts/lib/py-imports.py` | 75 | 0 | 0 | What does each Python file import, and what does it define? |
+| `frontend/scripts/lib/scenario.mts` | 527 | 5 | 15 | THE SCENARIO FACTORY — build the situation a drive needs, then take it away again. |
+| `frontend/scripts/make-dsip-fixture.mts` | 80 | 2 | 0 | Build the DSIP-style single-PDF fixture for the deconstruct drive. |
+| `frontend/scripts/map-coverage.mjs` | 211 | 0 | 0 | WHICH FUNCTION DOES EACH DRIVE ACTUALLY COVER, AND AS WHOM? |
+| `frontend/scripts/measure-canvas-flow.mts` | 73 | 2 | 0 | Measure canvas FLOW — the Phase-1 proof (docs/CANVAS_GEOMETRY_REDESIGN.md §6, §9). |
+| `frontend/scripts/measure-char-width.mts` | 94 | 3 | 0 | CHAR_W — the ruler's average glyph advance, as a fraction of the font size. |
+| `frontend/scripts/measure-image-placeholder.mts` | 123 | 3 | 0 | measure-image-placeholder — read the real laid-out height of an image node from Chromium. |
+| `frontend/scripts/measure-ranking-change.mts` | 157 | 1 | 0 | measure-ranking-change — what did mig 238 actually do to the numbers? |
+| `frontend/scripts/measure-table-row-height.mts` | 71 | 2 | 0 | Measure the TRUE rendered height of a table row, by rendering and counting rather than by reading the CSS and hoping. The calibration harness showed t |
+| `frontend/scripts/measure-volumes.mts` | 88 | 3 | 0 | Measure every volume of a proposal against the quality bar. |
+| `frontend/scripts/mirage-ingest.mts` | 39 | 0 | 0 | Ingest the MIRAGE Technical Volume as the GOLD-STANDARD past proposal, through the live product path (preview → HITL review → commit) as the Immobiley |
+| `frontend/scripts/monday-journey-e2e.mts` | 187 | 4 | 0 | FULL MONDAY-JOURNEY E2E — the whole value-prop loop in one run, against the live schema and the REAL product functions: |
+| `frontend/scripts/navy-sttr-e2e.mts` | 210 | 1 | 0 | END-TO-END emulation: US Navy STTR Phase I — matrix + skeleton + the REUSE loop. |
+| `frontend/scripts/niloc/_shared.mts` | 137 | 4 | 5 | Shared helpers for the NILOC Technologies gold-example set. |
+| `frontend/scripts/niloc/computed-cost.mts` | 102 | 5 | 0 | The IN-SYSTEM computed cost path for the NILOC examples. |
+| `frontend/scripts/niloc/export.mts` | 43 | 4 | 0 | Regenerate the NILOC gold-example deliverables (no DB needed — pure canvas → bytes): · prose proposals (Phase I & II technical, CSO brief, NSF pitch,  |
+| `frontend/scripts/niloc/seed.mts` | 95 | 6 | 0 | Seed the NILOC Technologies gold-example library (idempotent). |
+| `frontend/scripts/niloc/verify.mts` | 75 | 4 | 0 | Prove the NILOC gold examples are correct + reusable: A. COST ROLL-UP — each cost workbook's Summary total price equals the portal cost engine (lib/pr |
+| `frontend/scripts/note.mts` | 40 | 1 | 0 | note — write to the shared board from a Claude Code session. |
+| `frontend/scripts/parity-score-ts.mts` | 34 | 1 | 0 | TS half of the scorer parity check. Reads scripts/fixtures/scorer-parity.json, runs the SHIPPING `scoreCard` over every case, and writes the results t |
+| `frontend/scripts/probe-bucket-merge.mjs` | 57 | 0 | 0 | Narrow the bucket-PATCH merge failure to ONE step. |
+| `frontend/scripts/probe-bucket-rerank.mjs` | 69 | 0 | 0 | Why does hitl-bucket-rls see non-zero scores after a PATCH to a keyword that matches nothing? |
+| `frontend/scripts/probe-build-or-mark.mjs` | 155 | 0 | 0 | Prove the build-or-mark decision reaches a buyer's build. |
+| `frontend/scripts/probe-comp-codes.mjs` | 122 | 0 | 0 | Drive the comp-code path as the two real actors, through the real routes. |
+| `frontend/scripts/probe-customer-finish.mts` | 441 | 2 | 0 | FINISH — is what a person sees actually finished, or merely correct? |
+| `frontend/scripts/probe-deck-overlap.mts` | 318 | 3 | 0 | Does the deck writer tell the truth about how tall a node is? |
+| `frontend/scripts/probe-deliverable-artifacts.mts` | 217 | 7 | 0 | What does the customer actually RECEIVE when a project deliverable is authored and exported? |
+| `frontend/scripts/probe-disposition-ui.mjs` | 114 | 0 | 0 | Drive the build-or-mark control as a real rfp_admin, in a real browser. |
+| `frontend/scripts/probe-interaction-mobile.mts` | 540 | 2 | 0 | Every pipeline's dense page on a phone — with its overlays OPEN. |
+| `frontend/scripts/probe-measure-grid.mts` | 58 | 2 | 0 | The measurement grid, checked against the page it measures. |
+| `frontend/scripts/probe-mobile-overflow.mjs` | 63 | 0 | 0 | Name the element that makes the portal shell scroll sideways at 390px, with its ancestry. |
+| `frontend/scripts/probe-node-vocabulary.mts` | 133 | 5 | 2 | Which node types actually survive which exporter? |
+| `frontend/scripts/probe-page-scale.mts` | 144 | 2 | 0 | Does the editor page render at the size it computes for itself? |
+| `frontend/scripts/probe-partner-multi.mjs` | 101 | 0 | 0 | Paul is a partner MANAGER. He signs in to his console, not to a company. |
+| `frontend/scripts/probe-pattern-extract.mts` | 114 | 1 | 0 | Run the REAL compliance extractor over the REAL shredded text of each solicitation fixture. |
+| `frontend/scripts/probe-portal-forms.mjs` | 110 | 0 | 0 | A portal form is not a blank page, and completed-elsewhere is not "not required". |
+| `frontend/scripts/probe-preview-download.mjs` | 65 | 0 | 0 | Two failures on the paths a customer actually cares about: seeing the assembled document, and downloading it. Both time out rather than erroring, whic |
+| `frontend/scripts/probe-project-mobile.mts` | 131 | 1 | 0 | The project workspace on a phone — with its dense states OPEN. |
+| `frontend/scripts/probe-provision-elsewhere.mts` | 141 | 4 | 0 | Provision a real build off a real master and count what the buyer is actually shown. |
+| `frontend/scripts/probe-review-and-land.mjs` | 193 | 0 | 0 | Drive the rfp_admin REVIEW-AND-LAND path on a matrix the machine refused to publish. |
+| `frontend/scripts/probe-session-lifecycle.mts` | 253 | 0 | 0 | — |
+| `frontend/scripts/probe-structural-nodes.mts` | 126 | 4 | 0 | The four STRUCTURAL canvas primitives, each measured by the effect it actually has. |
+| `frontend/scripts/probe-style-matrix.mts` | 360 | 5 | 0 | Which STYLE actually survives which exporter — the ribbon's equivalent of the node-type survey. |
+| `frontend/scripts/prove-pdf-export.mts` | 29 | 1 | 0 | Proves lib/export/pdf-exporter.ts produces a real PDF under the sandbox chromium (validates the prod fix: resolveExecutable path-detection + --no-sand |
+| `frontend/scripts/prove-session-cap.mts` | 244 | 0 | 0 | — |
+| `frontend/scripts/reconcile-capability.mjs` | 717 | 0 | 0 | — |
+| `frontend/scripts/rehydrate-sandbox.sh` | 143 | 0 | 0 | rehydrate-sandbox — bring the demo box back after a VM reclaim / re-provision. A reclaimed VM comes up with the repo re-cloned but NO running services |
+| `frontend/scripts/render-artifact-pages.mts` | 99 | 1 | 0 | Render an exported artifact to page images, so a person can LOOK at what the customer receives. |
+| `frontend/scripts/render-tv-preview.mjs` | 83 | 0 | 0 | Render a faithful PDF twin of the exported Technical Volume for page-count + visual verification (LibreOffice is unavailable in this sandbox). Reads t |
+| `frontend/scripts/repair-card-dates.mts` | 73 | 1 | 0 | Rewrite card dates that were stored as Date.prototype.toString(), then rescore. |
+| `frontend/scripts/repair-section-page-caps.mts` | 82 | 1 | 0 | Repair `canvas.max_pages` on drafted sections so it carries the VOLUME's page cap. |
+| `frontend/scripts/repair-truncated-source-text.mts` | 105 | 3 | 0 | Re-extract solicitation documents that the old 500,000-char cap cut short. |
+| `frontend/scripts/run-branch-drives.sh` | 725 | 0 | 0 | Run every BRANCH drive against the live rig and print one table. `drive-end-to-end.mjs` proves the happy spine on one artifact: ingest → curate → push |
+| `frontend/scripts/sandbox-heartbeat.sh` | 269 | 0 | 0 | sandbox-heartbeat — SOP keep-alive manager for the demo/test sandbox. ⭐ SOP: launch this as a BACKGROUND task at the START of every working session, a |
+| `frontend/scripts/seed-cuas-immobileyes.mts` | 191 | 6 | 0 | Seed the Immobileyes CUAS OPP end-to-end from the uploaded solicitation. |
+| `frontend/scripts/seed-demo-automation.mts` | 28 | 2 | 0 | Seed a few clean automation firings (#107) so the admin Automation surface shows real recent executions and the created ToDos land in the admin queue. |
+| `frontend/scripts/seed-dsip-opps.mts` | 95 | 2 | 0 | Seed REAL current DoD SBIR 2026 (DSIP) opportunities into the demo, and drive the product's own bridge (publishAndFanOut) so they land on BOTH surface |
+| `frontend/scripts/seed-followon-guides.mts` | 277 | 3 | 0 | #168 CONTENT-QUEUE — draft + queue the three guides the published library still lacks. |
+| `frontend/scripts/seed-house-library.mts` | 43 | 2 | 0 | Eat our own cooking — seed the RFP-Pipeline house tenant's library with the documents we produce (ops runbooks), as canvas-backed atoms via the real c |
+| `frontend/scripts/seed-isolation-fixture.mts` | 449 | 1 | 0 | The second tenant, and the in-flight build — the fixture gaps that cap what can be MEASURED. |
+| `frontend/scripts/seed-launch-todos.mts` | 128 | 2 | 0 | seed-launch-todos — the pre-launch decisions, raised as real work items. |
+| `frontend/scripts/seed-librarian-catalog.mjs` | 53 | 0 | 0 | Seed a persisted librarian catalog result for Foundation, as if the pipeline agent had run (the sandbox LLM is sk-noop, so we hand-craft the exact wra |
+| `frontend/scripts/seed-practice-guides.mts` | 282 | 3 | 0 | #168 CONTENT-QUEUE, WAVE 3 — the three practice guides the other two waves still leave out. |
+| `frontend/scripts/seed-program-guides.mts` | 239 | 3 | 0 | #168 CONTENT-QUEUE — draft + queue program guides (BAA · OTA · CSO · Grants/NOFO) for review. |
+| `frontend/scripts/seed-project-scenario.mjs` | 234 | 0 | 0 | A project workspace with real content, for the lenses and the visual sweep. |
+| `frontend/scripts/seed-review-junk.mjs` | 34 | 0 | 0 | Seed a few "messy" atoms (duplicates + tiny + untagged + unconfirmed-tags) for the Foundation tenant so the Library Review panel has real findings to  |
+| `frontend/scripts/seed-sheet-doc.mts` | 46 | 1 | 0 | Seed a spreadsheet-format tenant_document (a small cost table) for SHEETS-clean review. cd frontend && node --import tsx scripts/seed-sheet-doc.mts |
+| `frontend/scripts/seed-slide-deck.mts` | 57 | 1 | 0 | Seed a small slide-format tenant_document (for SLIDES-clean live verification). Creates a 3-slide 16:9 deck owned by the Foundation tenant + prints it |
+| `frontend/scripts/seed-template-masters.mts` | 42 | 3 | 0 | Seed the template stable: materialize the lib/templates code catalog into master_templates, then publish v1 of each to the template bridge and fan out |
+| `frontend/scripts/seed-vault-demo.mts` | 60 | 3 | 0 | Seed a demo collaboration vault ("nook") for screenshots — tenant + collaborator sides. • nook "Acme Robotics" owned by Immobileyes • a login-capable  |
+| `frontend/scripts/setup-tw11-browser-portal.mts` | 49 | 3 | 0 | TW-11 browser-test fixture — stage a Foundation portal that exercises every NEW Workflow Setup surface: • an accepted workflow (so the live surfaces r |
+| `frontend/scripts/shoot-immobileyes.mjs` | 54 | 0 | 0 | Reusable login + screenshot driver for the Immobileyes CUAS build. Logs in as the Immobileyes tenant_admin and captures the routes passed as argv (nam |
+| `frontend/scripts/shot-content-queue.mjs` | 47 | 0 | 0 | Screenshot the #168 content queue: the content_publish review ToDos + a guide in Content Studio. DATABASE_URL=… node scripts/shot-content-queue.mjs |
+| `frontend/scripts/shot-doc.mts` | 25 | 0 | 0 | Quick login + open a tenant document + screenshot. Usage: DOC_ID=.. NAME=.. node --import tsx scripts/shot-doc.mts |
+| `frontend/scripts/shot-provisioning-cockpit.mjs` | 56 | 0 | 0 | Browser drive of the provisioning cockpit (PV-6): log in as rfp_admin, open the cockpit for a curation_pending portal, screenshot it (readiness bar +  |
+| `frontend/scripts/shot-scout-intake.mjs` | 57 | 0 | 0 | Screenshot the scout-intake candidate review→release queue + drive a real release via the UI. DATABASE_URL=… node scripts/shot-scout-intake.mjs |
+| `frontend/scripts/shot-workflow-setup.mjs` | 46 | 0 | 0 | Browser drive of the tenant Workflow Setup page (TW-6): log in as a tenant_admin, open the required setup for a launched _setup:pending portal (recomm |
+| `frontend/scripts/stage-collaborator-fixture.mts` | 149 | 0 | 0 | A real collaborator, with real assigned work — staged through the product. |
+| `frontend/scripts/stage-guide-fixtures.mts` | 140 | 0 | 0 | Put the product into the state the guides describe — through the product. |
+| `frontend/scripts/sweep-mold-quality.mts` | 171 | 4 | 0 | The pristine pass, measured across EVERY mold (#152). |
+| `frontend/scripts/sync-pdf-worker.mjs` | 76 | 0 | 0 | — |
+| `frontend/scripts/t3cp-agent-config.mjs` | 33 | 0 | 0 | Read or raise a tenant's agent rate limit through the product's own admin route, as an rfp_admin. |
+| `frontend/scripts/t3cp-archive-atoms.mjs` | 46 | 0 | 0 | Retire a set of library atoms through the product's OWN archive route, as the tenant_admin. |
+| `frontend/scripts/t3cp-archive-goldstandard.mjs` | 27 | 0 | 0 | Archive the user's own hand-written MIRAGE volume out of the Immobileyes library. |
+| `frontend/scripts/t3cp-attach-docs.mjs` | 119 | 0 | 0 | Attach the proposal's required supporting documents through the product's OWN presigned-upload flow, as the buying tenant_admin. |
+| `frontend/scripts/t3cp-color-team.mjs` | 62 | 0 | 0 | Run the AI color-team review over a build and READ BACK what it produced, as the buying tenant_admin, through the product's own routes. |
+| `frontend/scripts/t3cp-fulldraft.mjs` | 24 | 0 | 0 | Run the full draft for the T3CP build, as the buying tenant_admin, through the product's own front door (POST …/proposals/[p]/full-draft). Then report |
+| `frontend/scripts/t3cp-ingest.mts` | 178 | 0 | 0 | REAL ingest of OSW26BZ04-DP013 (T3CP Patent Holiday SBIR Open Topic Call) as an rfp_admin, through the product's own intake path — replacing the cover |
+| `frontend/scripts/t3cp-lock-and-package.mjs` | 114 | 0 | 0 | Take a drafted build all the way to a downloadable submission package, through the product's OWN routes, as the buying tenant_admin: |
+| `frontend/scripts/t3cp-reatomize.mjs` | 66 | 0 | 0 | Re-atomize the tenant's past proposals through the product's OWN upload route, as the tenant_admin, from inside the browser — the same FormData the "A |
+| `frontend/scripts/t3cp-reset-build.sh` | 63 | 0 | 0 | Test-fixture reset: drop the provisioned T3CP portal + proposal so the spine drive re-runs purchase → release → provision for real. Fixture only — nev |
+| `frontend/scripts/t3cp-restore-sections.mjs` | 62 | 0 | 0 | Restore every section of a build to its last substantial version, through the product's OWN version-restore route (POST …/sections/[s]/versions {versi |
+| `frontend/scripts/test-harness/emulated-claude.mjs` | 1105 | 0 | 0 | — |
+| `frontend/scripts/test-harness/emulated-postmark.mjs` | 171 | 0 | 0 | — |
+| `frontend/scripts/tier2-documents-e2e.mts` | 185 | 4 | 0 | TIER 2 DRIVE-TEST — standalone documents (#3/#4), against the live sandbox schema and the REAL product functions (starterFromTemplate / starterFromPre |
+| `frontend/scripts/usaf-cso-e2e.mts` | 145 | 1 | 0 | END-TO-END emulation: USAF AFWERX CSO SBIR Phase I. |
+| `frontend/scripts/ux-capture-supp.mjs` | 56 | 0 | 0 | Supplemental UX capture — tenant surfaces missed/mis-targeted in the first pass. |
+| `frontend/scripts/ux-capture.mjs` | 131 | 0 | 0 | UX touch-capture: log in as each real actor, visit every primary surface, and record screenshot + HTTP status + console errors + pageerrors + load tim |
+| `frontend/scripts/ux-nav-proof.mjs` | 37 | 0 | 0 | Proof: sectioned tenant nav — admin sees Pursue/Build/Work/Account; tenant_user sees the subset, no empty headers. |
+| `frontend/scripts/ux-ops-mobile.mjs` | 96 | 0 | 0 | Mobile admin-ops drive (390×844): exercise the operational interactions — review progress, issue ToDos, approve & advance, review→release — as tenant_ |
+| `frontend/scripts/ux-ops-proof.mjs` | 35 | 0 | 0 | Proof re-drive (390×844): confirm the polished operational surfaces now work on mobile. |
+| `frontend/scripts/ux-polish2-proof.mjs` | 47 | 0 | 0 | Proof: batch-2 polish — greeting by name · library not "empty" · per-tab titles · connor gates 403 gone. |
+| `frontend/scripts/ux-polish3-proof.mjs` | 38 | 0 | 0 | Proof: batch-3a — proposal "Manage" segmented control (double tab-row fixed) · cards de-jargon · buckets gated btn. |
+| `frontend/scripts/verify-api-contract.mjs` | 388 | 0 | 0 | Lens 2 of 3 — the API CONTRACT. Does every GET route return the envelope the SOP promises? |
+| `frontend/scripts/verify-assemble-from-library.mjs` | 320 | 0 | 0 | ASSEMBLE-FROM-LIBRARY, on a running box — the middle of the assembly spine, finally wired. |
+| `frontend/scripts/verify-assembled-flow.mts` | 96 | 3 | 0 | Drive-verify the APP's assembled-export flow (Phase 1b) — the exact path the download routes use: assembleArtifactCanvas(molds) → renderCanvas(fmt). |
+| `frontend/scripts/verify-atom-enrich.mts` | 57 | 1 | 0 | Proves the enrich step: a boxed TEXT image → OCR → the image atom's content/summary carry the extracted text (DB-proven), so it's searchable + machine |
+| `frontend/scripts/verify-capture-backend.mts` | 42 | 0 | 0 | Proves the box→crop→/atoms/capture→IMAGE ATOM→storage path end-to-end (local R2 emulation). This is the backend the box-on-upload UI posts to; the dro |
+| `frontend/scripts/verify-collaborator-blast-radius.mjs` | 316 | 0 | 0 | WHAT CAN A COLLABORATOR ACTUALLY REACH — the negative space, measured. |
+| `frontend/scripts/verify-compliance-matrix.mts` | 255 | 1 | 0 | The ruler aggregating into CANVAS COMPLIANCE — all 22 primitives, mixed orders, real matrices. |
+| `frontend/scripts/verify-db-crud.mjs` | 444 | 0 | 0 | Lens 3 of 3 — DB CRUD. When the product says it saved, did the row actually change? |
+| `frontend/scripts/verify-deck-ruler-live.mts` | 376 | 5 | 0 | The ruler, the grid boundaries and the group boxes — on REAL DECKS, stored through the product. |
+| `frontend/scripts/verify-email-ledger-rls.mjs` | 249 | 0 | 0 | Does the outbound-mail ledger actually isolate, or only appear to? |
+| `frontend/scripts/verify-embeddings.mts` | 109 | 2 | 0 | Live proof for the semantic-retrieval spine (mig 171 + lib/embeddings + hybrid selectForSection). Runs with the LOCAL engine so it needs no key. Prove |
+| `frontend/scripts/verify-exports-on-stored-artifacts.mts` | 122 | 7 | 0 | Can every stored volume actually be DOWNLOADED, in every format the product offers? |
+| `frontend/scripts/verify-groups-overlay.mjs` | 249 | 0 | 0 | THE GROUP LAYER, ON SCREEN — does a canvas that carries groups actually render, and can a person see them? |
+| `frontend/scripts/verify-guide-controls.mjs` | 215 | 0 | 0 | — |
+| `frontend/scripts/verify-ingest-coverage.mts` | 137 | 0 | 0 | Ingest Studio — the DB-side coverage verifier (run after e2e/ingest-coverage-drive). |
+| `frontend/scripts/verify-insert-fidelity.mts` | 37 | 1 | 0 | Proves FIX-INSERT-1's data path: selectForSection now returns an image atom's canvas_nodes, so a boxed figure/table can insert into a section (not jus |
+| `frontend/scripts/verify-keep-copy.mts` | 79 | 2 | 0 | Prove "keep + copy" + ISOLATION end-to-end against the seeded master library (mig 152). Runs the EXACT call the tenant-creation routes make — copyStar |
+| `frontend/scripts/verify-library-soundness.mts` | 80 | 0 | 0 | Non-destructive soundness check for the library + atom→OPP-structure path (the gate before the embeddings iteration). Proves the DATA invariants that  |
+| `frontend/scripts/verify-local-storage.mts` | 29 | 1 | 0 | Proves the local storage driver round-trips through the SAME s3-client calls prod uses. STORAGE_DRIVER=local LOCAL_STORAGE_DIR=… AWS_S3_BUCKET=rfp-pip |
+| `frontend/scripts/verify-media-export.mts` | 65 | 3 | 0 | Byte-level export check for the ppt/xls media+style work. Shapes rasterize via sharp (no S3), so this exercises the pptx shape/position/border path +  |
+| `frontend/scripts/verify-mt1-compliance.mts` | 91 | 0 | 0 | MT-1, machine half: assert the LANDED compliance values and their provenance. |
+| `frontend/scripts/verify-pptx-tables.mts` | 49 | 2 | 0 | Integration proof: a real .pptx zip with a slide table → readPptx yields a table node. (unit test covers the parser; this proves the whole reader on a |
+| `frontend/scripts/verify-project-isolation.mjs` | 289 | 0 | 0 | Does the project spine isolate, and does the baseline actually refuse to move? |
+| `frontend/scripts/verify-project-rollup.mjs` | 233 | 2 | 0 | Do the three measures compute what a person would compute by hand? |
+| `frontend/scripts/verify-public-links.mjs` | 149 | 0 | 0 | — |
+| `frontend/scripts/verify-ruler-composition.mts` | 259 | 1 | 0 | The ruler must COMPOSE — intra-segment measure and universal fold agreeing, across doc · ppt · xls. |
+| `frontend/scripts/verify-ruler-on-proposals.mts` | 53 | 3 | 0 | The page ruler against REAL, hand-authored proposals — not synthetic cases, not molds. |
+| `frontend/scripts/verify-ruler-on-stored-artifacts.mts` | 93 | 4 | 0 | The page ruler against the artifacts that are actually IN THE DATABASE. |
+| `frontend/scripts/verify-scope-bar.mjs` | 267 | 0 | 0 | THE SCOPE BAR, DRIVEN — does choosing a rung actually change what gets reviewed? |
+| `frontend/scripts/verify-scope-end-to-end.mjs` | 370 | 0 | 0 | THE WHOLE THING, ONCE, ON A RUNNING BOX — Phase G. |
+| `frontend/scripts/verify-scoped-gates.mjs` | 303 | 0 | 0 | THE GATE AS A LIVE CHECKLIST, AND WHO CAN WORK IT DOWN — Phases E and F, proven together. |
+| `frontend/scripts/verify-scoped-review.mjs` | 379 | 0 | 0 | SCOPED COLOUR-TEAM REVIEW, on a running box — does aiming a reviewer at one thing actually work? |
+| `frontend/scripts/verify-scorer-parity.mjs` | 90 | 0 | 0 | verify-scorer-parity — the two scorers are a mirror pair. Assert it. |
+| `frontend/scripts/verify-storage-server.mts` | 42 | 0 | 0 | Full server round-trip: upload an image → putObject(local) → getSignedGetUrl → serving route serves bytes. |
+| `frontend/scripts/verify-studio-voice-route.mjs` | 164 | 0 | 0 | The Studio ROUTE end of B84 — driven as a real signed-in tenant admin against a running box. |
+| `frontend/scripts/verify-studio-voice.mts` | 117 | 1 | 0 | Does the Voice-of-Proposal a tenant SET actually reach the drafting agent from the Studio? |
+| `frontend/scripts/verify-surfaced-capability.mjs` | 122 | 0 | 0 | — |
+| `frontend/scripts/verify-surfaces.mjs` | 398 | 1 | 0 | Does every page in the product actually render for the person who is allowed to see it? |
+| `frontend/scripts/verify-ui-vs-db.mjs` | 301 | 0 | 0 | Lens 4 — RECONCILIATION. Is the number on the page the number in the table? |
+| `frontend/scripts/verify-unextractable.mts` | 40 | 1 | 0 | Proves the reader → plan threading of the BOX-3 "un-extractable content" signal, with NO server: a scanned (text-less) PDF and a PPTX carrying a <p:pi |
+| `frontend/scripts/verify-write-contract.mjs` | 287 | 0 | 0 | Lens 5 — the WRITE surface. Does every POST/PATCH/PUT/DELETE refuse bad input in the SOP shape? |
+| `frontend/scripts/write-ui-docs.mjs` | 279 | 0 | 0 | — |
 
 ### frontend · lib · 342 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `lib/admin-auth.ts` | 38 | 1 | 13 | Shared admin guard for API route handlers. Returns the acting admin's id/email or a ready-to-return error response. Usage: |
-| `lib/admin/intake-stage-counts.ts` | 42 | 2 | 5 | How much is waiting at each stage of the discovery river (#176). |
-| `lib/admin/review-queue.ts` | 307 | 2 | 1 | The admin Review Queue — the single "what needs my attention" aggregation behind the Command Center. It fuses the three attention sources that today l |
-| `lib/agent-client.ts` | 62 | 1 | 10 | — |
-| `lib/agent-labels.ts` | 87 | 1 | 4 | ONE map from an agent role to the name a PERSON reads. A zero-import leaf. |
-| `lib/agent-output.ts` | 33 | 0 | 2 | Shared reader for agent/workflow step output. |
-| `lib/ai/agent-guard.ts` | 307 | 2 | 3 | Unified AI spend guard + ledger for the LIVE (frontend) product-AI surfaces. |
-| `lib/ai/endpoint.ts` | 62 | 0 | 3 | Where the model lives, and the key to reach it — in ONE place. |
-| `lib/amendments.ts` | 238 | 4 | 6 | Amendment fan-out engine (M3) — the canonical helpers for the amendment state machine. |
-| `lib/analytics-admin.ts` | 188 | 1 | 3 | Admin-side visitor analytics reads for the Site Content view (V8). |
-| `lib/api-helpers.ts` | 246 | 4 | 3 | Response builders + handler wrapper for API routes. |
-| `lib/api-refusal.ts` | 118 | 1 | 42 | THE SEAM THAT MAKES "RETURN A CODE" AND "EMIT WHEN IT DID NOT HAPPEN" INSEPARABLE. |
-| `lib/architecture-live.ts` | 158 | 1 | 2 | The architecture map's LIVE layer — which tables the system actually touches. |
-| `lib/artifact-spec.ts` | 205 | 1 | 6 | Artifact spec builder (E2). |
-| `lib/atom-embed.ts` | 56 | 2 | 2 | atom-embed — store an atom's semantic vector (mig 171 atom_embeddings), gated + best-effort. |
-| `lib/atom-enrich.ts` | 90 | 2 | 2 | Image-atom enrichment — the step that stops a boxed/uploaded image from being a dead-end. |
-| `lib/atom-review.ts` | 236 | 0 | 6 | Library Review — the deterministic "librarian" the UI can run right now. |
-| `lib/atom-size.ts` | 89 | 2 | 7 | Atom size — the currency shared between an atom and a section mold. Pure (no DB), so it's safe in client bundles and unit tests. An atom's words/chars |
-| `lib/atomize-capture.ts` | 192 | 7 | 3 | Capture → annotate → atomize (drivable core; the `/atoms/capture` route is a thin wrapper). A screen capture is boxed into regions in the browser (the |
-| `lib/atomize-package.ts` | 443 | 10 | 9 | Package atomization core — the reusable logic behind POST /api/portal/[tenantSlug]/atoms/atomize-package. |
-| `lib/atoms.ts` | 622 | 8 | 25 | Atom library service (greenfield, mig 101/102) — the engine that drives the upload → atomize → select → fill-the-mold loop. |
-| `lib/automation/catalog.ts` | 120 | 0 | 5 | The tenant-governable trigger catalog (#190 Phase D). The fixed grammar the tenant Automation editor renders — one row per (scope, trigger_key) a cust |
-| `lib/automation/match.ts` | 56 | 0 | 2 | Pure automation-matching helpers (#107) — DB-free so unit tests can import them without pulling in @/lib/db. The runtime evaluator (triggers.ts) build |
-| `lib/automation/policy.ts` | 213 | 3 | 10 | resolveGatePolicy — the single injection point for the global automation-policy layer (#190). See docs/AUTOMATION_POLICY_DESIGN.md. |
-| `lib/automation/prestage-todos.ts` | 127 | 4 | 1 | preStageProposalReviewTodos — #190 Phase C3 (docs/AUTOMATION_POLICY_DESIGN.md §13). |
-| `lib/automation/triggers.ts` | 187 | 3 | 1 | Automation trigger evaluator (#107) — the "completion" that turns stored automation_rules into REAL firings off the event queue. |
-| `lib/bucket-ranking.ts` | 183 | 4 | 11 | Per-tenant spotlight bucket ranking (greenfield, mig 096). A bucket ranks the tenant's LOCAL pipeline (tenant_opportunity_cards) against weighted crit |
-| `lib/bucket-scoring.ts` | 554 | 0 | 7 | The bucket scorer — a ZERO-IMPORT LEAF. |
-| `lib/calendar.ts` | 231 | 2 | 1 | Expert-time calendar (Terms §7) — the "super simple" scheduling primitive. |
-| `lib/canvas/assemble-from-atoms.ts` | 188 | 1 | 2 | The missing middle of the assembly spine: ATOMS → GROUPS → SECTION. |
-| `lib/canvas/assemble-proposal.ts` | 175 | 2 | 5 | Whole-proposal document assembly (fluid-canvas F1). |
-| `lib/canvas/capabilities.ts` | 133 | 1 | 9 | resolveCanvasCapabilities — the ONE gate every canvas toolbar/panel reads (docs/CANVAS_GEOMETRY_REDESIGN.md §8a). |
-| `lib/canvas/format-controls.ts` | 134 | 1 | 5 | Which formatting controls apply to a given node type — the model behind the canvas editor's context-aware "ribbon" drawer (NodeFormatControls). Pure s |
-| `lib/canvas/measure-grid.ts` | 174 | 1 | 5 | The measurement grid — spatial landmarks in the document's OWN units. |
-| `lib/canvas/scope.ts` | 480 | 2 | 8 | SCOPE — the ladder a selection sits on, and the one answer two surfaces share. |
-| `lib/canvas/selection.ts` | 64 | 1 | 4 | Canvas selection model — the "selection is the verb" spine (fluid-canvas F0). |
-| `lib/canvas/toolbox.ts` | 81 | 1 | 2 | resolveCanvasToolbox — the canvas sidebar as a PRIORITIZED CARD LIST (docs/CANVAS_GEOMETRY_REDESIGN.md §8b). |
-| `lib/capacity.ts` | 243 | 2 | 4 | Capacity metrics — tool invocation counters + system health snapshot readers used by the /admin/system page. |
-| `lib/cards/card.ts` | 254 | 1 | 6 | Opportunity card read-model (R0.3). |
-| `lib/cards/score-tenant.ts` | 32 | 2 | 3 | Score a freshly-provisioned tenant's opportunity cards against all its buckets — SYNCHRONOUSLY, so a new company lands with a RANKED pipeline immediat |
-| `lib/clean-text.ts` | 40 | 0 | 4 | Strip bytes Postgres text/jsonb reject — NUL + other C0 control chars (except tab / newline / CR) and lone UTF-16 surrogates — which OCR, malformed PD |
-| `lib/cms.ts` | 267 | 1 | 19 | CMS content helpers for server components. |
-| `lib/command/seen.ts` | 62 | 1 | 3 | Command Center "last looked at" watermark (mig 179 command_seen_state). |
-| `lib/compliance-resolver.ts` | 371 | 1 | 6 | — |
-| `lib/compliance/shred-audit.ts` | 145 | 2 | 2 | Shred-completeness audit — did the ingest capture EVERY obligation the solicitation states into the compliance structure (volume_required_items + soli |
-| `lib/contacts.ts` | 306 | 2 | 6 | `contacts` — the subject the CRM never had, and the one writer that maintains it. |
-| `lib/content-admin.ts` | 515 | 7 | 19 | V8 content admin — server-side CRUD for the page-versioned content store (content_pages, Main DB). Drafts are whole-page snapshots; publish promotes t |
-| `lib/content-canvas.ts` | 335 | 1 | 6 | Content Studio ⇄ Canvas bridge (pure, IO-free, unit-testable). |
-| `lib/crypto.ts` | 68 | 0 | 0 | AES-256-GCM for stored third-party API keys — the WRITER half of a cross-language pair. |
-| `lib/curation/republish.ts` | 217 | 4 | 19 | Mid-window propagation — the missing half of "edit the master after push". |
-| `lib/db.ts` | 281 | 2 | 486 | — |
-| `lib/documents/atomize-on-export.ts` | 92 | 5 | 1 | Atomize-on-download for standalone tenant documents (template bridge Phase 2, docs/TEMPLATE_BRIDGE_DESIGN.md). |
-| `lib/documents/duplicate-past-proposal.ts` | 75 | 3 | 1 | #18 branch-and-promote — the DUPLICATE leg. |
-| `lib/documents/lock-document.ts` | 34 | 1 | 1 | #18 branch-and-promote — the PROMOTE leg. |
-| `lib/documents/starter.ts` | 177 | 2 | 9 | Starter-canvas builder for standalone tenant documents (Tier 2, #3). |
-| `lib/email-templates.ts` | 385 | 0 | 8 | Email template functions for the RFP Pipeline platform. |
-| `lib/email/drivers/gmail.ts` | 150 | 2 | 1 | The Gmail transport, behind the seam. |
-| `lib/email/drivers/postmark.ts` | 108 | 2 | 2 | The Postmark transport. |
-| `lib/email/index.ts` | 207 | 5 | 18 | `send()` — the one seam every outbound message in the platform goes through. |
-| `lib/email/ledger.ts` | 397 | 2 | 1 | The `email_send_ledger` table and the suppression list (migration 215). |
-| `lib/email/sender-identity.ts` | 104 | 1 | 4 | Who a message is from — resolved as an object, never assembled at the call site. |
-| `lib/email/types.ts` | 167 | 0 | 6 | The outbound-mail contract. One shape, every send in the platform. |
-| `lib/embeddings.ts` | 142 | 0 | 5 | Embeddings — the drop-in "retrieve by MEANING" engine for the atom library. |
-| `lib/errors.ts` | 170 | 0 | 39 | Canonical error class hierarchy for the RFP Pipeline frontend. |
-| `lib/event-labels.ts` | 920 | 0 | 13 | Canonical event label + deep-link map for customer-facing audit surfaces. |
-| `lib/event-namespaces.ts` | 40 | 0 | 4 | THE EVENT-NAMESPACE REGISTRY — the one TypeScript copy, in a module with NO imports. |
-| `lib/events.ts` | 491 | 4 | 244 | Structured event emitter for the RFP Pipeline platform. |
-| `lib/export/artifact-export.ts` | 223 | 7 | 21 | Per-artifact / per-format export helpers. |
-| `lib/export/canvas-html.ts` | 693 | 3 | 19 | Render a CanvasDocument to styled, self-contained HTML. |
-| `lib/export/chromium.ts` | 68 | 0 | 5 | Where Chromium is — one rule, for every part of the product that needs a browser. |
-| `lib/export/docx-exporter.ts` | 751 | 3 | 16 | Canvas JSON → Word (.docx) export engine. |
-| `lib/export/image-raster.ts` | 148 | 2 | 5 | Shared image rasterizer for the export engines. |
-| `lib/export/latex-html.ts` | 167 | 0 | 2 | LaTeX → HTML for the subset that appears in engineering proposals. |
-| `lib/export/paginate.ts` | 13 | 1 | 4 | paginate() — re-exported from the canonical ruler in lib/types/canvas-document. |
-| `lib/export/pdf-exporter.ts` | 85 | 4 | 20 | Export a CanvasDocument to a PDF Buffer via Chromium (Playwright). |
-| `lib/export/pptx-exporter.ts` | 730 | 2 | 19 | Canvas JSON → PowerPoint (.pptx) export engine. |
-| `lib/export/xlsx-exporter.ts` | 560 | 3 | 16 | Canvas JSON → Excel (.xlsx) export engine. |
-| `lib/extract-topics.ts` | 277 | 1 | 3 | Shared topic extraction logic. |
-| `lib/fmt.ts` | 80 | 0 | 37 | Deterministic formatting for anything a CLIENT component renders — a zero-import leaf. |
-| `lib/geoip.ts` | 125 | 0 | 1 | Server-side IP → connection info (ISP / org / ASN / geo) for visitor analytics. |
-| `lib/google-calendar.ts` | 112 | 0 | 0 | Google Calendar events, via the same Workspace OAuth credentials the Gmail driver uses. |
-| `lib/guardrail-defaults.ts` | 51 | 0 | 3 | Recommended default portal build-workflow (pure — safe to import from client components; no DB/server deps, unlike lib/portal-workflow.ts). The Guardr |
-| `lib/guides/coverage.ts` | 113 | 1 | 2 | Guide coverage — the two halves, joined. |
-| `lib/hooks/use-container-scale.ts` | 36 | 0 | 1 | — |
-| `lib/hooks/use-tool.ts` | 60 | 0 | 5 | — |
-| `lib/humanize.ts` | 50 | 0 | 3 | Turn a system identifier into something a person reads. A zero-import leaf. |
-| `lib/import/docx-reader.ts` | 636 | 2 | 2 | — |
-| `lib/import/index.ts` | 55 | 6 | 2 | — |
-| `lib/import/markdown-canvas.ts` | 77 | 2 | 2 | Prose (markdown) → CanvasDocument — the in-system importer that turns an authored markdown draft into a section-structured `CanvasDocument` (the shape |
-| `lib/import/pdf-reader.ts` | 523 | 3 | 1 | — |
-| `lib/import/pptx-reader.ts` | 401 | 2 | 5 | — |
-| `lib/import/text-reader.ts` | 482 | 2 | 3 | — |
-| `lib/import/types.ts` | 83 | 1 | 7 | — |
-| `lib/import/xlsx-reader.ts` | 73 | 2 | 1 | — |
-| `lib/ingest/assessment.ts` | 118 | 1 | 2 | Ingest-assessment reader (#12) — surfaces the OnIngestAssessmentRequested advisory manager. |
-| `lib/ingest/ingest-topic-files.ts` | 359 | 6 | 2 | ingest-topic-files — the "N topic files → N topic opportunities" ingest. |
-| `lib/ingest/materialize.ts` | 223 | 4 | 3 | Ingest Assist — the deterministic MATERIALIZER (DB). |
-| `lib/ingest/molds.ts` | 527 | 4 | 2 | Ingest Studio — the MOLDS gate: propose a master response skeleton, then build the molds. |
-| `lib/ingest/parse-solicitation.ts` | 277 | 3 | 5 | Ingest Assist — the PARSE step. Turns raw solicitation text (from the uploaded PDF) into a structured ParsedSolicitation the materializer builds from. |
-| `lib/ingest/pattern-extract.ts` | 674 | 2 | 6 | Ingest Assist — the DETERMINISTIC extractor (`pattern_match`). |
-| `lib/ingest/provenance-audit.ts` | 248 | 0 | 5 | Ingest QA — the PROVENANCE AUDIT (pure, DB-free). |
-| `lib/ingest/skeleton.ts` | 142 | 0 | 7 | Ingest Assist — the PARSE CONTRACT + the default SBIR/CSO skeleton (PURE). |
-| `lib/ingest/source-text-cap.ts` | 95 | 0 | 7 | How much of a solicitation we read, and saying so when it is not all of it. |
-| `lib/ingest/stage-skeleton.ts` | 280 | 7 | 3 | Ingest Studio — STAGE and LAND (the split that gives the matrix a gate). |
-| `lib/intake.ts` | 157 | 2 | 4 | RFP intake staging (greenfield-adjacent; the head of the RFP river). Stages a found/uploaded opportunity NOTICE into the review queue: creates an oppo |
-| `lib/jsonb.ts` | 26 | 0 | 50 | coerceJsonb — read a jsonb column safely regardless of how it was written. |
-| `lib/library/artifact-canvas.ts` | 96 | 2 | 8 | Pure builders that turn our house content into native-format CanvasDocuments — doc (letter), sheet (spreadsheet), etc. IO-free so they're unit-testabl |
-| `lib/library/corpus-verbatim.ts` | 108 | 1 | 4 | Whose words are these? (LIB-HYGIENE) |
-| `lib/library/dsip-deconstruct.ts` | 340 | 0 | 3 | DSIP full-proposal deconstruct — the deterministic volume segmenter. |
-| `lib/library/foundation.ts` | 439 | 6 | 15 | Foundation-artifact decomposition (docs/LIBRARY_AND_VAULTS_DESIGN.md §1). |
-| `lib/library/house-docs.ts` | 118 | 5 | 2 | "Eat our own cooking" — ingest the documents WE produce (ops runbooks, design notes) into our own tenant library as canvas-backed atoms, via the REAL  |
-| `lib/library/library-query.ts` | 30 | 0 | 2 | The library-browser filter state → the GET /library/atoms query string (P3.2). Pure so the URL construction is unit-testable independent of the React  |
-| `lib/library/markdown-sections.ts` | 27 | 0 | 2 | Pure markdown → section splitter for the house-library dogfood. Kept free of any DB/IO imports so it's unit-testable in isolation (house-docs.ts, whic |
-| `lib/library/page-furniture.ts` | 251 | 0 | 2 | Strip a document's RUNNING PAGE FURNITURE — the header/footer lines a word processor repeats on every page, plus bare page numbers — before its pages  |
-| `lib/library/starter-offer.ts` | 75 | 5 | 3 | One-time onboarding OFFER (P5.3) — nudge a new tenant_admin to add the dogfooded starter template set to their (empty) library (docs/LIBRARY_AND_VAULT |
-| `lib/library/starter-set.ts` | 239 | 2 | 5 | The dogfooded STARTER SET (docs/LIBRARY_VAULTS_BUILD_PLAN.md P4) — the generic + proposal-vehicle foundation artifacts we author once and seed into th |
-| `lib/lifecycle.ts` | 70 | 0 | 5 | Canonical opportunity submission lifecycle (Tranche 1, mig 100). |
-| `lib/logger.ts` | 149 | 0 | 17 | Structured logger — pino wrapper with scope-based child loggers, redaction, and environment-aware transport. |
-| `lib/markdown.ts` | 24 | 0 | 1 | Simple regex-based markdown renderer. |
-| `lib/memberships.ts` | 58 | 1 | 6 | Membership reads (multi-membership identity, P1) — see docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md. |
-| `lib/numeric-cell.ts` | 83 | 0 | 6 | Parse the numeric value a user sees/types in a table cell. |
-| `lib/observe.ts` | 252 | 3 | 3 | The observation window — what the system ACTUALLY did in the last N minutes. |
-| `lib/onboarding.ts` | 135 | 1 | 1 | First-run onboarding: carry what the customer already told us into the workspace they land in. |
-| `lib/opportunity-bridge.ts` | 807 | 5 | 21 | Opportunity-card bridge — the L0→L1 spine (mig 094). |
-| `lib/opportunity-context.ts` | 52 | 0 | 2 | Opportunity context slugs — normalize an opportunity's human-readable agency / program strings into the unified-taxonomy context values (mig 101) that |
-| `lib/opportunity-pin.ts` | 275 | 5 | 3 | Pin = full copy (greenfield, mig 094/095). Pinning a card copies the global read-only opportunity folder into the tenant's own space and records the m |
-| `lib/page-content/about.ts` | 58 | 1 | 1 | — |
-| `lib/page-content/apply.ts` | 22 | 1 | 1 | — |
-| `lib/page-content/customers.ts` | 51 | 1 | 1 | — |
-| `lib/page-content/features.ts` | 93 | 1 | 1 | — |
-| `lib/page-content/federal-rd-101.ts` | 54 | 1 | 1 | — |
-| `lib/page-content/homepage.ts` | 123 | 1 | 1 | — |
-| `lib/page-content/howItWorks.ts` | 176 | 1 | 1 | — |
-| `lib/page-content/index.ts` | 43 | 15 | 7 | Registry of marketing-page seed defaults (V8). See ./types.ts. |
-| `lib/page-content/infosec.ts` | 134 | 1 | 1 | — |
-| `lib/page-content/pricing.ts` | 238 | 1 | 1 | — |
-| `lib/page-content/resources.ts` | 32 | 1 | 1 | — |
-| `lib/page-content/site-chrome.ts` | 24 | 2 | 1 | — |
-| `lib/page-content/team.ts` | 33 | 1 | 1 | — |
-| `lib/page-content/theExpert.ts` | 235 | 1 | 1 | — |
-| `lib/page-content/types.ts` | 20 | 1 | 15 | Seed defaults for marketing pages (V8). |
-| `lib/page-content/value.ts` | 91 | 1 | 1 | — |
-| `lib/partner/create-partner-org.ts` | 111 | 6 | 2 | Create a new partner-manager (EconDev org) — the RFP-admin onboarding path (docs/PARTNER_MANAGER_DESIGN.md D4). Creates the partner_admin user + their |
-| `lib/partner/manager-request.ts` | 149 | 5 | 3 | Manager-access handshake (docs/PARTNER_MANAGER_DESIGN.md §4 Branch B / §5). |
-| `lib/partner/own-org.ts` | 78 | 6 | 2 | Partner-manager OWN-org provisioning (docs/PARTNER_MANAGER_DESIGN.md D4). |
-| `lib/partner/precheck.ts` | 53 | 2 | 3 | Add-company precheck (docs/PARTNER_MANAGER_DESIGN.md §4). Three independent signals decide the branch the partner takes: • emailInUseAsAdmin (D5) — ha |
-| `lib/partner/registration.ts` | 136 | 4 | 2 | Partner company registration (docs/PARTNER_MANAGER_DESIGN.md §4 Branch A). |
-| `lib/partner/rollup.ts` | 63 | 1 | 2 | Per-tenant rollup stats for the partner console cards (docs/PARTNER_MANAGER_DESIGN.md §3a). One query over the partner's scope tenants: buckets, pins  |
-| `lib/partner/scope.ts` | 106 | 1 | 7 | Partner-manager scoping helpers (docs/PARTNER_MANAGER_DESIGN.md §3, D2/D5). |
-| `lib/partner/todos.ts` | 67 | 2 | 2 | Partner cross-stable to-do feed (#16). |
-| `lib/paywall.ts` | 21 | 0 | 2 | Founding-cohort proposal paywall. |
-| `lib/pdf-node-globals.ts` | 24 | 0 | 1 | Silence pdfjs-dist's Node canvas-polyfill warnings (imported by pdf-parse). |
-| `lib/pdf-parse-quiet.ts` | 72 | 1 | 4 | Load `pdf-parse` (which bundles pdf.js) for TEXT EXTRACTION with pdf.js's one-time Node setup noise silenced. |
-| `lib/pdf/figure-harvest.ts` | 143 | 3 | 1 | Harvest a PDF's FIGURES into the tenant's library. |
-| `lib/pdf/page-capture.ts` | 363 | 1 | 8 | PDF page capture — the foundational floor under every visual check in the product. |
-| `lib/portal-launch.ts` | 159 | 2 | 3 | Portal launch + shadow-admin + guardrail flow (greenfield L3, mig 097). |
-| `lib/portal-workflow-recommend.ts` | 104 | 4 | 2 | History-aware workflow recommendation (docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½.3, TW-1). |
-| `lib/portal-workflow.ts` | 806 | 6 | 17 | Per-portal workflow (greenfield, mig 097/098). The guardrail template the customer admin accepts at launch is instantiated as that portal's workflow — |
-| `lib/process/force-advance.ts` | 174 | 4 | 4 | Force-advance a paused (HITL-waiting) process instance — an authorized operator supplies the input the workflow was parked for, marking the gate step  |
-| `lib/process/health.ts` | 83 | 0 | 4 | Process health classification — the stall / fail indicators for the process ledger (tenant `portal/<slug>/processes` and the admin monitor). |
-| `lib/process/launch-template.ts` | 190 | 3 | 3 | Launch a process TEMPLATE by name with an OVERLAY — the explicit, GUI-facing entry point for starting a workflow on demand (vs. reactive event trigger |
-| `lib/process/project-collaboration.ts` | 130 | 2 | 6 | launchProjectCollaboration — the CANONICAL way to start a project/opportunity HITL reaction from the frontend. New project automation calls THIS, not  |
-| `lib/projects/access.ts` | 298 | 3 | 31 | Who may see a project — the layer RLS cannot express. |
-| `lib/projects/baseline.ts` | 336 | 6 | 2 | Freezing the plan, and moving it afterwards without losing what was frozen. |
-| `lib/projects/cdrl.ts` | 393 | 5 | 3 | The CDRL register — DD-1423 data requirements, and what has actually been sent against them. |
-| `lib/projects/clins.ts` | 188 | 5 | 4 | CLINs — the contract line items a project is measured against. |
-| `lib/projects/closeout.ts` | 177 | 5 | 1 | Close-out — the end of the project's life, recorded rather than merely flagged. |
-| `lib/projects/comments.ts` | 419 | 8 | 4 | The conversation on a project. |
-| `lib/projects/dates.ts` | 81 | 0 | 11 | Dates that come back from the database as `Date`, not as strings. |
-| `lib/projects/evidence.ts` | 189 | 6 | 3 | The backing for an acceptance — filed by a tenant_admin, about the customer. |
-| `lib/projects/forecast.ts` | 154 | 0 | 3 | Estimate at completion, and what it costs to be honest about it (A5). |
-| `lib/projects/gate-closer.ts` | 205 | 5 | 2 | The AI-manager gate closer (A4) — and the reason it cannot do any harm. |
-| `lib/projects/gate.ts` | 110 | 5 | 32 | The gate every project route runs first. |
-| `lib/projects/invoices.ts` | 663 | 6 | 5 | Invoicing — where everything else in this capability becomes money. |
-| `lib/projects/meetings.ts` | 264 | 8 | 4 | Meetings, their notes, and the action items that come out of them. |
-| `lib/projects/mentions.ts` | 94 | 0 | 2 | Parsing `@someone` out of a comment. |
-| `lib/projects/milestone-tasks.ts` | 777 | 6 | 9 | The checklist under a milestone — and the serial dates that turn a list of them into a plan. |
-| `lib/projects/milestones.ts` | 686 | 13 | 7 | Milestones and deliverables — and the distinction the whole module exists to keep. |
-| `lib/projects/modifications.ts` | 638 | 8 | 3 | Contract modifications — the only write path to a CLIN. |
-| `lib/projects/money.ts` | 58 | 0 | 2 | Contract money, as a person reads it. |
-| `lib/projects/narrative-fidelity.ts` | 137 | 0 | 3 | Did the drafted narrative invent a number? |
-| `lib/projects/narrative-read.ts` | 81 | 4 | 2 | Reading back a drafted status narrative — ONE implementation. |
-| `lib/projects/notify-policy.ts` | 171 | 3 | 4 | What a project's reminders do — resolved, not hard-coded. |
-| `lib/projects/project.ts` | 236 | 5 | 42 | Projects and their anchor documents. |
-| `lib/projects/provenance.ts` | 214 | 1 | 6 | Where a project value came from — the ingest-provenance doctrine, one domain over. |
-| `lib/projects/reviews.ts` | 404 | 8 | 5 | "I looked at this and it is not right, because X." |
-| `lib/projects/risks.ts` | 371 | 5 | 5 | The risk and issue register. |
-| `lib/projects/rollup.ts` | 288 | 1 | 8 | Three measures of progress, reported side by side and never blended. |
-| `lib/projects/status-report-data.ts` | 66 | 5 | 2 | Gathering what a status report says. |
-| `lib/projects/status-report.ts` | 241 | 4 | 3 | The status report — a canvas document whose numbers are read, not typed. |
-| `lib/projects/task-attachments.ts` | 183 | 6 | 2 | Reference files on a project task. |
-| `lib/projects/time.ts` | 253 | 4 | 2 | Labour actuals — the source the cost measure never had. |
-| `lib/projects/todos.ts` | 278 | 7 | 7 | Project work, projected onto the platform ToDo spine — the same infrastructure the build portal uses. |
-| `lib/projects/traceability.ts` | 186 | 1 | 2 | Contract traceability — CLIN → milestone → deliverable, and every gap in between. |
-| `lib/projects/wbs.ts` | 245 | 5 | 2 | The work breakdown structure — and its projection onto the `workplan` canvas. |
-| `lib/promo-codes.ts` | 148 | 1 | 2 | Comp-code issuance — mint a one-time code that opens a proposal portal without a card. |
-| `lib/proposal-access.ts` | 278 | 2 | 30 | Proposal workspace access resolver. |
-| `lib/proposal-advance.ts` | 577 | 10 | 5 | — |
-| `lib/proposal-ai-review.ts` | 315 | 7 | 2 | Manual AI (color-team) review — the ONE canonical path for an admin-triggered proposal review. |
-| `lib/proposal-archive.ts` | 174 | 3 | 3 | Portal (pipeline) archive lifecycle — archive / restore, with workflow cascade. |
-| `lib/proposal-atom-harvest.ts` | 191 | 4 | 3 | Greenfield atom return — the closing leg of the atom loop: atomize → library → mold → draft → **back into the library**. |
-| `lib/proposal-color-team.ts` | 282 | 1 | 3 | Color-team review STATUS — what actually happened to the reviews the customer asked for. |
-| `lib/proposal-full-draft.ts` | 108 | 3 | 3 | requestFullDraft — the ONE canonical emission path for a proposal full-draft request. |
-| `lib/proposal-package-review.ts` | 64 | 3 | 1 | Submission-package review — the canonical path for an admin-triggered packaging_specialist pass. |
-| `lib/proposal-studio.ts` | 105 | 4 | 4 | Proposal Studio — the ONE canonical emission path for a review-phase request. |
-| `lib/proposal-visual-review.ts` | 185 | 5 | 1 | Visual page review, as part of the color-team review. |
-| `lib/proposal/brand.ts` | 71 | 1 | 2 | Brand + mandatory-table styling for the OPP sheet and the provisioned template. |
-| `lib/proposal/cost-forms.ts` | 262 | 3 | 3 | Cost-volume FORM LAYER — render a computed cost/budget as one of the most common government budget forms. |
-| `lib/proposal/cost-model.ts` | 463 | 0 | 9 | Cost model — the deterministic government cost-volume burden waterfall, in TypeScript. |
-| `lib/proposal/cost-volume-canvas.ts` | 444 | 5 | 4 | Universal cost-volume canvas generator. |
-| `lib/proposal/cost-workbook-item.ts` | 58 | 0 | 3 | Which required item in a COST volume receives the computed budget workbook. |
-| `lib/proposal/document-furniture.ts` | 571 | 1 | 6 | Document furniture — the apparatus that separates a drafted document from a finished one. |
-| `lib/proposal/figures.ts` | 381 | 2 | 2 | Proposal figures — the pictures a technical volume needs, generated from its own data. |
-| `lib/proposal/lock-section.ts` | 237 | 6 | 3 | The per-section accept/lock STRICTURE — the single audited unit of work. |
-| `lib/proposal/outcome-todo.ts` | 105 | 4 | 3 | Post-submission outcome-nudge ToDo (#13). |
-| `lib/proposal/scoped-findings.ts` | 195 | 2 | 3 | WHAT IS STILL OUTSTANDING, AND WHERE — the gate as a live checklist instead of a boolean. |
-| `lib/proposal/section-todo.ts` | 160 | 6 | 4 | Section-editing ToDo spine (SPINE-T1) — the missing per-section layer of the nervous system. |
-| `lib/proposal/section-writable.ts` | 42 | 0 | 4 | The single source of truth for "may this section be written right now?" — the immutability contract the PUT …/save route enforces (SECTION_LOCKED + ST |
-| `lib/proposal/strategy.ts` | 57 | 1 | 3 | Capture-strategy reader (#1) — surfaces the OnProposalCreated advisory AI actors. |
-| `lib/proposal/sttr-split.ts` | 75 | 2 | 2 | STTR cooperative work-split — COMPUTED from the Cost Volume (not asserted in prose). |
-| `lib/proposal/submission-readiness.ts` | 580 | 10 | 4 | Submission-readiness — the "can this proposal go out the door?" roll-up. |
-| `lib/proposal/volume-facts.ts` | 248 | 2 | 4 | The identifiers a finished volume prints on itself. |
-| `lib/proposal/volume-finish.ts` | 616 | 3 | 3 | Volume finishing — turn an assembled volume into a document somebody would want to read. |
-| `lib/propose-regions.ts` | 40 | 0 | 2 | Region proposer — the "machine draws the boxes" half of the box-ingestion loop (BOX-2). |
-| `lib/provision-proposal.ts` | 508 | 16 | 9 | Provision a real proposal build for a greenfield portal — the V0→V1 substrate. |
-| `lib/provisioning/authored-scope.ts` | 109 | 0 | 4 | What a buyer is asked to WRITE, versus what they must obtain, sign, file or fetch elsewhere. |
-| `lib/provisioning/complete.ts` | 97 | 4 | 3 | Complete a master OPP's build-out and broadcast it (docs/PROVISIONING_WORKSPACE_DESIGN.md, PV-2). |
-| `lib/provisioning/readiness.ts` | 137 | 1 | 7 | Master OPP build-out readiness (docs/PROVISIONING_WORKSPACE_DESIGN.md, PV-1). |
-| `lib/provisioning/release-portal.ts` | 200 | 9 | 3 | Provision + release a PURCHASED portal from curation — the shared discovery→build hand-off. |
-| `lib/rate-limit.ts` | 81 | 0 | 1 | In-memory IP-based rate limiter for public endpoints. |
-| `lib/rbac.ts` | 200 | 0 | 298 | Role-based access control helpers — the single source of truth for role hierarchy checks. Middleware and API routes both consume hasRoleAtLeast / canA |
-| `lib/review/visual-review.ts` | 248 | 3 | 2 | Visual page review — reading the document the way an evaluator does: by looking at it. |
-| `lib/rfp-filename-parser.ts` | 137 | 0 | 1 | Best-effort parser for solicitation filename / first-line text. |
-| `lib/rls.ts` | 23 | 1 | 50 | — |
-| `lib/sbir-ingest.ts` | 307 | 1 | 1 | — |
-| `lib/scout/candidates.ts` | 320 | 6 | 4 | Scout candidate queue — the DB layer for the "potential NEW or UPDATED OPP" review→release queue (#176). One reviewable surface (`scout_findings`, pur |
-| `lib/scout/classify.ts` | 189 | 0 | 2 | Scout candidate classification — deterministic NEW-vs-UPDATE matcher (#176). |
-| `lib/section-budget.ts` | 107 | 1 | 4 | Section budget — the "mold" side of the atoms⟷canvas loop. |
-| `lib/section-standards.ts` | 44 | 0 | 3 | Section-standards taxonomy helpers (Phase 3, C1). |
-| `lib/session-policy.ts` | 167 | 0 | 4 | SESSION BOUNDS — how long a session may live, and how long it may sit idle. |
-| `lib/site-chrome.ts` | 157 | 1 | 2 | Site chrome (marketing header + footer) as editable content (V8). |
-| `lib/space-presence-oversight.ts` | 129 | 1 | 1 | WHO IS INSIDE A CUSTOMER'S WORKSPACE — the read side of the presence bracket. |
-| `lib/space-presence.ts` | 454 | 3 | 10 | SPACE PRESENCE — one writer owns both ends of "somebody from outside is in your workspace". |
-| `lib/spotlight/default-buckets.ts` | 82 | 1 | 2 | Starter spotlight buckets — a FIXTURE catalog, no longer a production path (#104, then #189). |
-| `lib/storage/paths.ts` | 304 | 0 | 14 | Object-storage path helpers — canonical source for S3 keys. |
-| `lib/storage/s3-client.ts` | 368 | 0 | 32 | Shared S3 client for the frontend (Next.js server routes + server components). The AWS SDK auto-reads AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DE |
-| `lib/stripe.ts` | 174 | 1 | 3 | Stripe SDK client and billing helpers. |
-| `lib/tasks/completers.ts` | 150 | 0 | 7 | Typed task completers (W-M/J3). A task's `params.kind` selects how it is completed in the queue: a plain review (approve/dismiss), an upload (go do it |
-| `lib/tasks/tasks.ts` | 823 | 5 | 35 | Task ledger — shared query + completion core for the unified `tasks` table. |
-| `lib/tasks/update-task.ts` | 108 | 4 | 2 | Mutate a LIVE workflow ToDo — reassign / reschedule / re-nudge (TW-4, docs/TENANT_WORKFLOW_SETUP_DESIGN.md §5 PATCH B). The frozen model had no path t |
-| `lib/tasks/urgency.ts` | 37 | 0 | 2 | Task urgency — the in-app nudge logic. A due date in the past is 'overdue'; within 24h is 'soon'; otherwise 'normal'. This is what makes a deadline fe |
-| `lib/tasks/workflows.ts` | 397 | 1 | 3 | Task → workflow catalog (#101). |
-| `lib/template-bridge.ts` | 257 | 4 | 10 | Template bridge — the L0→L1 spine for the pristine-template stable (mig 177), a 1:1 mirror of the opportunity-card bridge (lib/opportunity-bridge.ts,  |
-| `lib/template-stable-sync.ts` | 90 | 3 | 2 | Template-stable sync — the productized seed (template bridge Phase 3, docs/TEMPLATE_BRIDGE_DESIGN.md). Materializes the lib/templates code catalog int |
-| `lib/templates/baa-white-paper.ts` | 72 | 1 | 1 | BAA White Paper Template — AFRL "BAA Guide for Industry" A–D format |
-| `lib/templates/biographical-sketch.ts` | 76 | 1 | 1 | Biographical Sketch Template — Common Form (NIH & NSF) + NIH Supplement |
-| `lib/templates/budget-justification.ts` | 73 | 1 | 1 | Budget Justification Template — SF424 R&R (A–K) narrative |
-| `lib/templates/commercialization-plan.ts` | 281 | 1 | 1 | Commercialization Plan Template (standalone) |
-| `lib/templates/company-capability-deck.ts` | 206 | 1 | 1 | Company Capability Deck Template (8 slides) |
-| `lib/templates/cost/burden-cost-sheet.ts` | 226 | 1 | 2 | Parameterized burden-waterfall COST SHEET generator (formula spreadsheet templates). |
-| `lib/templates/cost/variants.ts` | 52 | 1 | 1 | The cost-volume PoP variants — the common periods of performance, each a formula-driven burden-waterfall workbook (see ./burden-cost-sheet.ts). All ro |
-| `lib/templates/current-and-pending-support.ts` | 61 | 1 | 1 | Current & Pending (Other) Support Template — Common Form |
-| `lib/templates/data-management-plan.ts` | 46 | 1 | 1 | Data Management & Sharing Plan (DMSP) Template — NSF PAPPG 24-1 style (2 pages) |
-| `lib/templates/dod-cso-phase1-briefing.ts` | 316 | 1 | 1 | DoD CSO Phase I — Pitch Briefing Template (10 slides) |
-| `lib/templates/dod-d2p2-technical.ts` | 333 | 1 | 1 | DoW Direct to Phase II (D2P2) — Technical Volume Template |
-| `lib/templates/dod-sbir-phase1-cost.ts` | 529 | 1 | 1 | DoD SBIR Phase I — Cost Volume Template |
-| `lib/templates/dod-sbir-phase1-technical.ts` | 296 | 1 | 1 | DoD SBIR Phase I — Technical Volume Template (15 pages) |
-| `lib/templates/dod-sbir-phase2-technical.ts` | 269 | 1 | 1 | DoD SBIR Phase II — Technical Volume Template (50 pages) |
-| `lib/templates/dod-sttr-phase1-technical.ts` | 376 | 1 | 1 | DoW STTR Phase I — Technical Volume Template (15 pages) |
-| `lib/templates/dod-sttr-phase2-technical.ts` | 380 | 1 | 1 | DoW STTR Phase II — Technical Volume Template |
-| `lib/templates/doe-sbir-phase1-technical.ts` | 296 | 1 | 1 | DOE SBIR Phase I — Technical Narrative Template (20 pages) |
-| `lib/templates/doe-sttr-phase1-technical.ts` | 353 | 1 | 1 | DOE STTR Phase I — Technical Narrative Template (20 pages) |
-| `lib/templates/executive-summary.ts` | 44 | 1 | 1 | Executive Summary / Cover Letter Template (1 page) |
-| `lib/templates/extract-skeleton.ts` | 135 | 1 | 4 | Template extraction (docs/CANVAS_GEOMETRY_REDESIGN.md §5d) — turn an ingested proposal into a reusable SKELETON template in one pass, when the admin d |
-| `lib/templates/facilities-equipment.ts` | 36 | 1 | 1 | Facilities, Equipment & Other Resources Template — NSF style |
-| `lib/templates/index.ts` | 299 | 36 | 13 | Canvas document templates — structured starter content for common proposal and collateral types across DoD/DoW, NSF, and DOE, plus marketing, commerci |
-| `lib/templates/investment-one-pager.ts` | 160 | 1 | 1 | Investor One-Pager Template (1 page) |
-| `lib/templates/investment-pitch-deck.ts` | 366 | 1 | 1 | Investor Pitch Deck Template (11 slides) |
-| `lib/templates/letter-of-collaboration.ts` | 37 | 1 | 1 | Letter of Collaboration / Support Template (1 page) |
-| `lib/templates/marketing-one-pager.ts` | 151 | 1 | 1 | Marketing One-Pager Template (single page) |
-| `lib/templates/marketing-slide-deck.ts` | 275 | 1 | 1 | Marketing / Capability Deck Template (9 slides) |
-| `lib/templates/marketing-two-pager.ts` | 204 | 1 | 1 | Government Capability Statement Template (2 pages) |
-| `lib/templates/marketing-whitepaper.ts` | 274 | 1 | 1 | Thought-Leadership White Paper Template (~6–8 pages) |
-| `lib/templates/nasa-sbir-phase1-technical.ts` | 66 | 1 | 1 | NASA SBIR/STTR Phase I — Technical Proposal Template (EHB, 10 parts) |
-| `lib/templates/nih-research-strategy.ts` | 55 | 1 | 1 | NIH Research Strategy Template — PHS 398 Research Plan (SBIR/STTR) |
-| `lib/templates/nsf-project-pitch.ts` | 146 | 1 | 1 | NSF Project Pitch Template (3 pages) |
-| `lib/templates/nsf-sbir-phase1-project-description.ts` | 351 | 1 | 1 | NSF SBIR/STTR Phase I — Project Description Template (15 pages) |
-| `lib/templates/ota-solution-brief.ts` | 55 | 1 | 1 | OTA Solution Brief Template — DIU CSO model (also NSTXL/SOSSEC shape) |
-| `lib/templates/past-proposal-canvas.ts` | 57 | 1 | 3 | pastProposalToCanvas (#18) — build a v2 CanvasDocument from a past proposal's ordered section atoms: ONE section per atom (its title → a heading, its  |
-| `lib/templates/quad-chart.ts` | 71 | 1 | 1 | Quad Chart Template (1 page, DoD/SBIR) |
-| `lib/templates/sf424a-budget.ts` | 81 | 1 | 1 | SF-424A — Budget Information (Non-Construction Programs) Template |
-| `lib/templates/statement-of-work.ts` | 88 | 1 | 1 | Statement of Work (SOW) Template — MIL-HDBK-245D structure |
-| `lib/templates/tech-overview-deck.ts` | 233 | 1 | 1 | Technology Overview Deck Template (9 slides) |
-| `lib/tenant-context.ts` | 53 | 0 | 23 | Per-request tenant context (docs/RLS_CUTOVER.md) — the choke-point that makes the NOBYPASSRLS cutover a ~4-file change instead of 73 call-site edits. |
-| `lib/tenants/create-tenant.ts` | 187 | 7 | 3 | Tenant onboarding core — ONE system path for creating (or completing) a company. |
-| `lib/tenants/name-match.ts` | 83 | 1 | 2 | Company-name matching for the partner add-company dedup precheck (docs/PARTNER_MANAGER_DESIGN.md §4, D6). |
-| `lib/terms.ts` | 176 | 0 | 5 | The binding customer agreement — one source of truth. |
-| `lib/toast.tsx` | 95 | 0 | 47 | — |
-| `lib/tools/base.ts` | 155 | 2 | 44 | Tool interface — the canonical dual-use construct. |
-| `lib/tools/compliance-add-variable.ts` | 89 | 4 | 2 | compliance.add_variable (Phase 1 §E13). |
-| `lib/tools/compliance-extract-from-text.ts` | 137 | 2 | 2 | compliance.extract_from_text (Phase 1 §E14). |
-| `lib/tools/compliance-list-variables.ts` | 58 | 2 | 2 | compliance.list_variables (Phase 1 §E12). |
-| `lib/tools/compliance-save-variable-value.ts` | 401 | 5 | 3 | compliance.save_variable_value (Phase 1 §E15) — THE marquee HITL write site. |
-| `lib/tools/curation-memory.ts` | 204 | 3 | 4 | Curation memory writer — the HITL learning-loop write side. |
-| `lib/tools/errors.ts` | 60 | 1 | 15 | Tool-specific error classes. Extend AppError so the HTTP mapping in lib/api-helpers.ts withHandler works unchanged. |
-| `lib/tools/index.ts` | 116 | 35 | 5 | Tool module index — registers every tool at import time. |
-| `lib/tools/ingest-get-run-detail.ts` | 157 | 3 | 2 | ingest.get_run_detail (Phase 1 §E21). |
-| `lib/tools/ingest-list-recent-runs.ts` | 109 | 2 | 2 | ingest.list_recent_runs (Phase 1 §E20). |
-| `lib/tools/ingest-trigger-manual.ts` | 77 | 3 | 2 | ingest.trigger_manual (Phase 1 §E19). |
-| `lib/tools/library-search-atoms.ts` | 199 | 3 | 1 | library.search_atoms — search the customer's library for relevant reusable content atoms. |
-| `lib/tools/memory-search.ts` | 191 | 3 | 1 | memory.search — reference tool demonstrating the dual-use pattern. |
-| `lib/tools/memory-write.ts` | 175 | 3 | 1 | memory.write — reference tool demonstrating the dual-use pattern. |
-| `lib/tools/opportunity-add-topic.ts` | 198 | 5 | 1 | opportunity.add_topic (Phase 1 §E extension). |
-| `lib/tools/opportunity-bulk-add-topics.ts` | 214 | 5 | 1 | opportunity.bulk_add_topics (Phase 1 §E extension). |
-| `lib/tools/opportunity-get-by-id.ts` | 97 | 3 | 2 | opportunity.get_by_id (Phase 1 §E16). |
-| `lib/tools/opportunity-update-topic.ts` | 239 | 5 | 1 | opportunity.update_topic (Phase 1 §E extension / Scouting Spine M1 T1.3). |
-| `lib/tools/proposal-draft-section.ts` | 504 | 6 | 3 | proposal.draft_section — AI-powered section drafting tool. |
-| `lib/tools/registry.ts` | 275 | 6 | 9 | Tool registry — the single entry point for invoking any tool. |
-| `lib/tools/solicitation-approve.ts` | 182 | 5 | 3 | solicitation.approve (Phase 1 §E7). |
-| `lib/tools/solicitation-claim.ts` | 122 | 4 | 3 | solicitation.claim (Phase 1 §E3). |
-| `lib/tools/solicitation-delete-annotation.ts` | 73 | 4 | 2 | solicitation.delete_annotation (Phase 1 §E11). |
-| `lib/tools/solicitation-dismiss.ts` | 196 | 5 | 2 | solicitation.dismiss (Phase 1 §E5). |
-| `lib/tools/solicitation-get-detail.ts` | 288 | 3 | 2 | solicitation.get_detail (Phase 1 §E2). |
-| `lib/tools/solicitation-list-triage.ts` | 219 | 2 | 3 | solicitation.list_triage (Phase 1 §E1). |
-| `lib/tools/solicitation-push.ts` | 425 | 6 | 3 | solicitation.push (Phase 1 §E9) — the canonical Phase 1 success event. |
-| `lib/tools/solicitation-reject-review.ts` | 108 | 4 | 2 | solicitation.reject_review (Phase 1 §E8). |
-| `lib/tools/solicitation-release.ts` | 151 | 4 | 3 | solicitation.release (Phase 1 §E4). |
-| `lib/tools/solicitation-request-review.ts` | 144 | 4 | 4 | solicitation.request_review (Phase 1 §E6). |
-| `lib/tools/solicitation-save-annotation.ts` | 182 | 4 | 5 | solicitation.save_annotation (Phase 1 §E10). |
-| `lib/tools/source-scout.ts` | 556 | 7 | 2 | finder.scout_source — Source Scout tool. |
-| `lib/tools/volume-add-required-item.ts` | 154 | 5 | 2 | volume.add_required_item — adds a proposer-produced artifact (Word doc, slide deck, spreadsheet, form) with per-item compliance. |
-| `lib/tools/volume-add.ts` | 104 | 5 | 2 | volume.add (Phase 1 §E extension, post-migration 012). |
-| `lib/tools/volume-delete-required-item.ts` | 58 | 5 | 2 | volume.delete_required_item — remove one artifact from a volume. |
-| `lib/tools/volume-delete.ts` | 58 | 5 | 2 | volume.delete — remove a volume and its required items (CASCADE). |
-| `lib/tools/volume-update-required-item.ts` | 143 | 5 | 2 | volume.update_required_item — edit compliance fields on an existing item. |
-| `lib/types/canvas-document.ts` | 2205 | 1 | 237 | Canvas Document types — the unified content model for all proposal artifacts. Every document (Word, slides, PDF) is a JSON canvas populated with typed |
-| `lib/types/source-anchor.ts` | 126 | 0 | 3 | Universal source-anchor schema — the canonical way to point at a specific location in any document across the entire system. |
-| `lib/validation.ts` | 105 | 0 | 111 | Shared zod primitives. Imported by API route schemas + tool input schemas so there's one canonical definition for UUIDs, tenant slugs, email addresses |
-| `lib/vaults/vaults.ts` | 339 | 6 | 11 | Collaboration vaults ("nooks") — the segregated external-partner bridge (docs/LIBRARY_AND_VAULTS_DESIGN.md §5). This module is the ISOLATION CONTRACT  |
-| `lib/vision.ts` | 51 | 0 | 2 | Vision captioning — the drop-in "read what the image SHOWS" engine that complements OCR. |
-| `lib/visitor-session.ts` | 47 | 0 | 2 | The analytics visitor session, read from the browser — the one client-side half of the attribution chain. |
-| `lib/working-notes.ts` | 178 | 2 | 4 | The working-notes board — one ledger, three writers, and the one place they meet. |
+| `frontend/lib/admin-auth.ts` | 38 | 1 | 13 | Shared admin guard for API route handlers. Returns the acting admin's id/email or a ready-to-return error response. Usage: |
+| `frontend/lib/admin/intake-stage-counts.ts` | 42 | 2 | 5 | How much is waiting at each stage of the discovery river (#176). |
+| `frontend/lib/admin/review-queue.ts` | 307 | 2 | 1 | The admin Review Queue — the single "what needs my attention" aggregation behind the Command Center. It fuses the three attention sources that today l |
+| `frontend/lib/agent-client.ts` | 62 | 1 | 10 | — |
+| `frontend/lib/agent-labels.ts` | 87 | 1 | 4 | ONE map from an agent role to the name a PERSON reads. A zero-import leaf. |
+| `frontend/lib/agent-output.ts` | 33 | 0 | 2 | Shared reader for agent/workflow step output. |
+| `frontend/lib/ai/agent-guard.ts` | 307 | 2 | 3 | Unified AI spend guard + ledger for the LIVE (frontend) product-AI surfaces. |
+| `frontend/lib/ai/endpoint.ts` | 62 | 0 | 3 | Where the model lives, and the key to reach it — in ONE place. |
+| `frontend/lib/amendments.ts` | 238 | 4 | 6 | Amendment fan-out engine (M3) — the canonical helpers for the amendment state machine. |
+| `frontend/lib/analytics-admin.ts` | 188 | 1 | 3 | Admin-side visitor analytics reads for the Site Content view (V8). |
+| `frontend/lib/api-helpers.ts` | 246 | 4 | 3 | Response builders + handler wrapper for API routes. |
+| `frontend/lib/api-refusal.ts` | 118 | 1 | 42 | THE SEAM THAT MAKES "RETURN A CODE" AND "EMIT WHEN IT DID NOT HAPPEN" INSEPARABLE. |
+| `frontend/lib/architecture-live.ts` | 158 | 1 | 2 | The architecture map's LIVE layer — which tables the system actually touches. |
+| `frontend/lib/artifact-spec.ts` | 205 | 1 | 6 | Artifact spec builder (E2). |
+| `frontend/lib/atom-embed.ts` | 56 | 2 | 2 | atom-embed — store an atom's semantic vector (mig 171 atom_embeddings), gated + best-effort. |
+| `frontend/lib/atom-enrich.ts` | 90 | 2 | 2 | Image-atom enrichment — the step that stops a boxed/uploaded image from being a dead-end. |
+| `frontend/lib/atom-review.ts` | 236 | 0 | 6 | Library Review — the deterministic "librarian" the UI can run right now. |
+| `frontend/lib/atom-size.ts` | 89 | 2 | 7 | Atom size — the currency shared between an atom and a section mold. Pure (no DB), so it's safe in client bundles and unit tests. An atom's words/chars |
+| `frontend/lib/atomize-capture.ts` | 192 | 7 | 3 | Capture → annotate → atomize (drivable core; the `/atoms/capture` route is a thin wrapper). A screen capture is boxed into regions in the browser (the |
+| `frontend/lib/atomize-package.ts` | 443 | 10 | 9 | Package atomization core — the reusable logic behind POST /api/portal/[tenantSlug]/atoms/atomize-package. |
+| `frontend/lib/atoms.ts` | 622 | 8 | 25 | Atom library service (greenfield, mig 101/102) — the engine that drives the upload → atomize → select → fill-the-mold loop. |
+| `frontend/lib/automation/catalog.ts` | 120 | 0 | 5 | The tenant-governable trigger catalog (#190 Phase D). The fixed grammar the tenant Automation editor renders — one row per (scope, trigger_key) a cust |
+| `frontend/lib/automation/match.ts` | 56 | 0 | 2 | Pure automation-matching helpers (#107) — DB-free so unit tests can import them without pulling in @/lib/db. The runtime evaluator (triggers.ts) build |
+| `frontend/lib/automation/policy.ts` | 213 | 3 | 10 | resolveGatePolicy — the single injection point for the global automation-policy layer (#190). See docs/AUTOMATION_POLICY_DESIGN.md. |
+| `frontend/lib/automation/prestage-todos.ts` | 127 | 4 | 1 | preStageProposalReviewTodos — #190 Phase C3 (docs/AUTOMATION_POLICY_DESIGN.md §13). |
+| `frontend/lib/automation/triggers.ts` | 187 | 3 | 1 | Automation trigger evaluator (#107) — the "completion" that turns stored automation_rules into REAL firings off the event queue. |
+| `frontend/lib/bucket-ranking.ts` | 183 | 4 | 11 | Per-tenant spotlight bucket ranking (greenfield, mig 096). A bucket ranks the tenant's LOCAL pipeline (tenant_opportunity_cards) against weighted crit |
+| `frontend/lib/bucket-scoring.ts` | 554 | 0 | 7 | The bucket scorer — a ZERO-IMPORT LEAF. |
+| `frontend/lib/calendar.ts` | 231 | 2 | 1 | Expert-time calendar (Terms §7) — the "super simple" scheduling primitive. |
+| `frontend/lib/canvas/assemble-from-atoms.ts` | 188 | 1 | 2 | The missing middle of the assembly spine: ATOMS → GROUPS → SECTION. |
+| `frontend/lib/canvas/assemble-proposal.ts` | 175 | 2 | 5 | Whole-proposal document assembly (fluid-canvas F1). |
+| `frontend/lib/canvas/capabilities.ts` | 133 | 1 | 9 | resolveCanvasCapabilities — the ONE gate every canvas toolbar/panel reads (docs/CANVAS_GEOMETRY_REDESIGN.md §8a). |
+| `frontend/lib/canvas/format-controls.ts` | 134 | 1 | 5 | Which formatting controls apply to a given node type — the model behind the canvas editor's context-aware "ribbon" drawer (NodeFormatControls). Pure s |
+| `frontend/lib/canvas/measure-grid.ts` | 174 | 1 | 5 | The measurement grid — spatial landmarks in the document's OWN units. |
+| `frontend/lib/canvas/scope.ts` | 480 | 2 | 8 | SCOPE — the ladder a selection sits on, and the one answer two surfaces share. |
+| `frontend/lib/canvas/selection.ts` | 64 | 1 | 4 | Canvas selection model — the "selection is the verb" spine (fluid-canvas F0). |
+| `frontend/lib/canvas/toolbox.ts` | 81 | 1 | 2 | resolveCanvasToolbox — the canvas sidebar as a PRIORITIZED CARD LIST (docs/CANVAS_GEOMETRY_REDESIGN.md §8b). |
+| `frontend/lib/capacity.ts` | 243 | 2 | 4 | Capacity metrics — tool invocation counters + system health snapshot readers used by the /admin/system page. |
+| `frontend/lib/cards/card.ts` | 254 | 1 | 6 | Opportunity card read-model (R0.3). |
+| `frontend/lib/cards/score-tenant.ts` | 32 | 2 | 3 | Score a freshly-provisioned tenant's opportunity cards against all its buckets — SYNCHRONOUSLY, so a new company lands with a RANKED pipeline immediat |
+| `frontend/lib/clean-text.ts` | 40 | 0 | 4 | Strip bytes Postgres text/jsonb reject — NUL + other C0 control chars (except tab / newline / CR) and lone UTF-16 surrogates — which OCR, malformed PD |
+| `frontend/lib/cms.ts` | 267 | 1 | 19 | CMS content helpers for server components. |
+| `frontend/lib/command/seen.ts` | 62 | 1 | 3 | Command Center "last looked at" watermark (mig 179 command_seen_state). |
+| `frontend/lib/compliance-resolver.ts` | 371 | 1 | 6 | — |
+| `frontend/lib/compliance/shred-audit.ts` | 145 | 2 | 2 | Shred-completeness audit — did the ingest capture EVERY obligation the solicitation states into the compliance structure (volume_required_items + soli |
+| `frontend/lib/contacts.ts` | 306 | 2 | 6 | `contacts` — the subject the CRM never had, and the one writer that maintains it. |
+| `frontend/lib/content-admin.ts` | 515 | 7 | 19 | V8 content admin — server-side CRUD for the page-versioned content store (content_pages, Main DB). Drafts are whole-page snapshots; publish promotes t |
+| `frontend/lib/content-canvas.ts` | 335 | 1 | 6 | Content Studio ⇄ Canvas bridge (pure, IO-free, unit-testable). |
+| `frontend/lib/crypto.ts` | 68 | 0 | 0 | AES-256-GCM for stored third-party API keys — the WRITER half of a cross-language pair. |
+| `frontend/lib/curation/republish.ts` | 217 | 4 | 19 | Mid-window propagation — the missing half of "edit the master after push". |
+| `frontend/lib/db.ts` | 281 | 2 | 486 | — |
+| `frontend/lib/documents/atomize-on-export.ts` | 92 | 5 | 1 | Atomize-on-download for standalone tenant documents (template bridge Phase 2, docs/TEMPLATE_BRIDGE_DESIGN.md). |
+| `frontend/lib/documents/duplicate-past-proposal.ts` | 75 | 3 | 1 | #18 branch-and-promote — the DUPLICATE leg. |
+| `frontend/lib/documents/lock-document.ts` | 34 | 1 | 1 | #18 branch-and-promote — the PROMOTE leg. |
+| `frontend/lib/documents/starter.ts` | 177 | 2 | 9 | Starter-canvas builder for standalone tenant documents (Tier 2, #3). |
+| `frontend/lib/email-templates.ts` | 385 | 0 | 8 | Email template functions for the RFP Pipeline platform. |
+| `frontend/lib/email/drivers/gmail.ts` | 150 | 2 | 1 | The Gmail transport, behind the seam. |
+| `frontend/lib/email/drivers/postmark.ts` | 108 | 2 | 2 | The Postmark transport. |
+| `frontend/lib/email/index.ts` | 207 | 5 | 18 | `send()` — the one seam every outbound message in the platform goes through. |
+| `frontend/lib/email/ledger.ts` | 397 | 2 | 1 | The `email_send_ledger` table and the suppression list (migration 215). |
+| `frontend/lib/email/sender-identity.ts` | 104 | 1 | 4 | Who a message is from — resolved as an object, never assembled at the call site. |
+| `frontend/lib/email/types.ts` | 167 | 0 | 6 | The outbound-mail contract. One shape, every send in the platform. |
+| `frontend/lib/embeddings.ts` | 142 | 0 | 5 | Embeddings — the drop-in "retrieve by MEANING" engine for the atom library. |
+| `frontend/lib/errors.ts` | 170 | 0 | 39 | Canonical error class hierarchy for the RFP Pipeline frontend. |
+| `frontend/lib/event-labels.ts` | 920 | 0 | 13 | Canonical event label + deep-link map for customer-facing audit surfaces. |
+| `frontend/lib/event-namespaces.ts` | 40 | 0 | 4 | THE EVENT-NAMESPACE REGISTRY — the one TypeScript copy, in a module with NO imports. |
+| `frontend/lib/events.ts` | 491 | 4 | 244 | Structured event emitter for the RFP Pipeline platform. |
+| `frontend/lib/export/artifact-export.ts` | 223 | 7 | 21 | Per-artifact / per-format export helpers. |
+| `frontend/lib/export/canvas-html.ts` | 693 | 3 | 19 | Render a CanvasDocument to styled, self-contained HTML. |
+| `frontend/lib/export/chromium.ts` | 68 | 0 | 5 | Where Chromium is — one rule, for every part of the product that needs a browser. |
+| `frontend/lib/export/docx-exporter.ts` | 751 | 3 | 16 | Canvas JSON → Word (.docx) export engine. |
+| `frontend/lib/export/image-raster.ts` | 148 | 2 | 5 | Shared image rasterizer for the export engines. |
+| `frontend/lib/export/latex-html.ts` | 167 | 0 | 2 | LaTeX → HTML for the subset that appears in engineering proposals. |
+| `frontend/lib/export/paginate.ts` | 13 | 1 | 4 | paginate() — re-exported from the canonical ruler in lib/types/canvas-document. |
+| `frontend/lib/export/pdf-exporter.ts` | 85 | 4 | 20 | Export a CanvasDocument to a PDF Buffer via Chromium (Playwright). |
+| `frontend/lib/export/pptx-exporter.ts` | 730 | 2 | 19 | Canvas JSON → PowerPoint (.pptx) export engine. |
+| `frontend/lib/export/xlsx-exporter.ts` | 560 | 3 | 16 | Canvas JSON → Excel (.xlsx) export engine. |
+| `frontend/lib/extract-topics.ts` | 277 | 1 | 3 | Shared topic extraction logic. |
+| `frontend/lib/fmt.ts` | 80 | 0 | 37 | Deterministic formatting for anything a CLIENT component renders — a zero-import leaf. |
+| `frontend/lib/geoip.ts` | 125 | 0 | 1 | Server-side IP → connection info (ISP / org / ASN / geo) for visitor analytics. |
+| `frontend/lib/google-calendar.ts` | 112 | 0 | 0 | Google Calendar events, via the same Workspace OAuth credentials the Gmail driver uses. |
+| `frontend/lib/guardrail-defaults.ts` | 51 | 0 | 3 | Recommended default portal build-workflow (pure — safe to import from client components; no DB/server deps, unlike lib/portal-workflow.ts). The Guardr |
+| `frontend/lib/guides/coverage.ts` | 113 | 1 | 2 | Guide coverage — the two halves, joined. |
+| `frontend/lib/hooks/use-container-scale.ts` | 36 | 0 | 1 | — |
+| `frontend/lib/hooks/use-tool.ts` | 60 | 0 | 5 | — |
+| `frontend/lib/humanize.ts` | 50 | 0 | 3 | Turn a system identifier into something a person reads. A zero-import leaf. |
+| `frontend/lib/import/docx-reader.ts` | 636 | 2 | 2 | — |
+| `frontend/lib/import/index.ts` | 55 | 6 | 2 | — |
+| `frontend/lib/import/markdown-canvas.ts` | 77 | 2 | 2 | Prose (markdown) → CanvasDocument — the in-system importer that turns an authored markdown draft into a section-structured `CanvasDocument` (the shape |
+| `frontend/lib/import/pdf-reader.ts` | 523 | 3 | 1 | — |
+| `frontend/lib/import/pptx-reader.ts` | 401 | 2 | 5 | — |
+| `frontend/lib/import/text-reader.ts` | 482 | 2 | 3 | — |
+| `frontend/lib/import/types.ts` | 83 | 1 | 7 | — |
+| `frontend/lib/import/xlsx-reader.ts` | 73 | 2 | 1 | — |
+| `frontend/lib/ingest/assessment.ts` | 118 | 1 | 2 | Ingest-assessment reader (#12) — surfaces the OnIngestAssessmentRequested advisory manager. |
+| `frontend/lib/ingest/ingest-topic-files.ts` | 359 | 6 | 2 | ingest-topic-files — the "N topic files → N topic opportunities" ingest. |
+| `frontend/lib/ingest/materialize.ts` | 223 | 4 | 3 | Ingest Assist — the deterministic MATERIALIZER (DB). |
+| `frontend/lib/ingest/molds.ts` | 527 | 4 | 2 | Ingest Studio — the MOLDS gate: propose a master response skeleton, then build the molds. |
+| `frontend/lib/ingest/parse-solicitation.ts` | 277 | 3 | 5 | Ingest Assist — the PARSE step. Turns raw solicitation text (from the uploaded PDF) into a structured ParsedSolicitation the materializer builds from. |
+| `frontend/lib/ingest/pattern-extract.ts` | 674 | 2 | 6 | Ingest Assist — the DETERMINISTIC extractor (`pattern_match`). |
+| `frontend/lib/ingest/provenance-audit.ts` | 248 | 0 | 5 | Ingest QA — the PROVENANCE AUDIT (pure, DB-free). |
+| `frontend/lib/ingest/skeleton.ts` | 142 | 0 | 7 | Ingest Assist — the PARSE CONTRACT + the default SBIR/CSO skeleton (PURE). |
+| `frontend/lib/ingest/source-text-cap.ts` | 95 | 0 | 7 | How much of a solicitation we read, and saying so when it is not all of it. |
+| `frontend/lib/ingest/stage-skeleton.ts` | 280 | 7 | 3 | Ingest Studio — STAGE and LAND (the split that gives the matrix a gate). |
+| `frontend/lib/intake.ts` | 157 | 2 | 4 | RFP intake staging (greenfield-adjacent; the head of the RFP river). Stages a found/uploaded opportunity NOTICE into the review queue: creates an oppo |
+| `frontend/lib/jsonb.ts` | 26 | 0 | 50 | coerceJsonb — read a jsonb column safely regardless of how it was written. |
+| `frontend/lib/library/artifact-canvas.ts` | 96 | 2 | 8 | Pure builders that turn our house content into native-format CanvasDocuments — doc (letter), sheet (spreadsheet), etc. IO-free so they're unit-testabl |
+| `frontend/lib/library/corpus-verbatim.ts` | 108 | 1 | 4 | Whose words are these? (LIB-HYGIENE) |
+| `frontend/lib/library/dsip-deconstruct.ts` | 340 | 0 | 3 | DSIP full-proposal deconstruct — the deterministic volume segmenter. |
+| `frontend/lib/library/foundation.ts` | 439 | 6 | 15 | Foundation-artifact decomposition (docs/LIBRARY_AND_VAULTS_DESIGN.md §1). |
+| `frontend/lib/library/house-docs.ts` | 118 | 5 | 2 | "Eat our own cooking" — ingest the documents WE produce (ops runbooks, design notes) into our own tenant library as canvas-backed atoms, via the REAL  |
+| `frontend/lib/library/library-query.ts` | 30 | 0 | 2 | The library-browser filter state → the GET /library/atoms query string (P3.2). Pure so the URL construction is unit-testable independent of the React  |
+| `frontend/lib/library/markdown-sections.ts` | 27 | 0 | 2 | Pure markdown → section splitter for the house-library dogfood. Kept free of any DB/IO imports so it's unit-testable in isolation (house-docs.ts, whic |
+| `frontend/lib/library/page-furniture.ts` | 251 | 0 | 2 | Strip a document's RUNNING PAGE FURNITURE — the header/footer lines a word processor repeats on every page, plus bare page numbers — before its pages  |
+| `frontend/lib/library/starter-offer.ts` | 75 | 5 | 3 | One-time onboarding OFFER (P5.3) — nudge a new tenant_admin to add the dogfooded starter template set to their (empty) library (docs/LIBRARY_AND_VAULT |
+| `frontend/lib/library/starter-set.ts` | 239 | 2 | 5 | The dogfooded STARTER SET (docs/LIBRARY_VAULTS_BUILD_PLAN.md P4) — the generic + proposal-vehicle foundation artifacts we author once and seed into th |
+| `frontend/lib/lifecycle.ts` | 70 | 0 | 5 | Canonical opportunity submission lifecycle (Tranche 1, mig 100). |
+| `frontend/lib/logger.ts` | 149 | 0 | 17 | Structured logger — pino wrapper with scope-based child loggers, redaction, and environment-aware transport. |
+| `frontend/lib/markdown.ts` | 24 | 0 | 1 | Simple regex-based markdown renderer. |
+| `frontend/lib/memberships.ts` | 58 | 1 | 6 | Membership reads (multi-membership identity, P1) — see docs/MULTI_MEMBERSHIP_IDENTITY_DESIGN.md. |
+| `frontend/lib/numeric-cell.ts` | 83 | 0 | 6 | Parse the numeric value a user sees/types in a table cell. |
+| `frontend/lib/observe.ts` | 252 | 3 | 3 | The observation window — what the system ACTUALLY did in the last N minutes. |
+| `frontend/lib/onboarding.ts` | 135 | 1 | 1 | First-run onboarding: carry what the customer already told us into the workspace they land in. |
+| `frontend/lib/opportunity-bridge.ts` | 807 | 5 | 21 | Opportunity-card bridge — the L0→L1 spine (mig 094). |
+| `frontend/lib/opportunity-context.ts` | 52 | 0 | 2 | Opportunity context slugs — normalize an opportunity's human-readable agency / program strings into the unified-taxonomy context values (mig 101) that |
+| `frontend/lib/opportunity-pin.ts` | 275 | 5 | 3 | Pin = full copy (greenfield, mig 094/095). Pinning a card copies the global read-only opportunity folder into the tenant's own space and records the m |
+| `frontend/lib/page-content/about.ts` | 58 | 1 | 1 | — |
+| `frontend/lib/page-content/apply.ts` | 22 | 1 | 1 | — |
+| `frontend/lib/page-content/customers.ts` | 51 | 1 | 1 | — |
+| `frontend/lib/page-content/features.ts` | 93 | 1 | 1 | — |
+| `frontend/lib/page-content/federal-rd-101.ts` | 54 | 1 | 1 | — |
+| `frontend/lib/page-content/homepage.ts` | 123 | 1 | 1 | — |
+| `frontend/lib/page-content/howItWorks.ts` | 176 | 1 | 1 | — |
+| `frontend/lib/page-content/index.ts` | 43 | 15 | 7 | Registry of marketing-page seed defaults (V8). See ./types.ts. |
+| `frontend/lib/page-content/infosec.ts` | 134 | 1 | 1 | — |
+| `frontend/lib/page-content/pricing.ts` | 238 | 1 | 1 | — |
+| `frontend/lib/page-content/resources.ts` | 32 | 1 | 1 | — |
+| `frontend/lib/page-content/site-chrome.ts` | 24 | 2 | 1 | — |
+| `frontend/lib/page-content/team.ts` | 33 | 1 | 1 | — |
+| `frontend/lib/page-content/theExpert.ts` | 235 | 1 | 1 | — |
+| `frontend/lib/page-content/types.ts` | 20 | 1 | 15 | Seed defaults for marketing pages (V8). |
+| `frontend/lib/page-content/value.ts` | 91 | 1 | 1 | — |
+| `frontend/lib/partner/create-partner-org.ts` | 111 | 6 | 2 | Create a new partner-manager (EconDev org) — the RFP-admin onboarding path (docs/PARTNER_MANAGER_DESIGN.md D4). Creates the partner_admin user + their |
+| `frontend/lib/partner/manager-request.ts` | 149 | 5 | 3 | Manager-access handshake (docs/PARTNER_MANAGER_DESIGN.md §4 Branch B / §5). |
+| `frontend/lib/partner/own-org.ts` | 78 | 6 | 2 | Partner-manager OWN-org provisioning (docs/PARTNER_MANAGER_DESIGN.md D4). |
+| `frontend/lib/partner/precheck.ts` | 53 | 2 | 3 | Add-company precheck (docs/PARTNER_MANAGER_DESIGN.md §4). Three independent signals decide the branch the partner takes: • emailInUseAsAdmin (D5) — ha |
+| `frontend/lib/partner/registration.ts` | 136 | 4 | 2 | Partner company registration (docs/PARTNER_MANAGER_DESIGN.md §4 Branch A). |
+| `frontend/lib/partner/rollup.ts` | 63 | 1 | 2 | Per-tenant rollup stats for the partner console cards (docs/PARTNER_MANAGER_DESIGN.md §3a). One query over the partner's scope tenants: buckets, pins  |
+| `frontend/lib/partner/scope.ts` | 106 | 1 | 7 | Partner-manager scoping helpers (docs/PARTNER_MANAGER_DESIGN.md §3, D2/D5). |
+| `frontend/lib/partner/todos.ts` | 67 | 2 | 2 | Partner cross-stable to-do feed (#16). |
+| `frontend/lib/paywall.ts` | 21 | 0 | 2 | Founding-cohort proposal paywall. |
+| `frontend/lib/pdf-node-globals.ts` | 24 | 0 | 1 | Silence pdfjs-dist's Node canvas-polyfill warnings (imported by pdf-parse). |
+| `frontend/lib/pdf-parse-quiet.ts` | 72 | 1 | 4 | Load `pdf-parse` (which bundles pdf.js) for TEXT EXTRACTION with pdf.js's one-time Node setup noise silenced. |
+| `frontend/lib/pdf/figure-harvest.ts` | 143 | 3 | 1 | Harvest a PDF's FIGURES into the tenant's library. |
+| `frontend/lib/pdf/page-capture.ts` | 363 | 1 | 8 | PDF page capture — the foundational floor under every visual check in the product. |
+| `frontend/lib/portal-launch.ts` | 159 | 2 | 3 | Portal launch + shadow-admin + guardrail flow (greenfield L3, mig 097). |
+| `frontend/lib/portal-workflow-recommend.ts` | 104 | 4 | 2 | History-aware workflow recommendation (docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½.3, TW-1). |
+| `frontend/lib/portal-workflow.ts` | 806 | 6 | 17 | Per-portal workflow (greenfield, mig 097/098). The guardrail template the customer admin accepts at launch is instantiated as that portal's workflow — |
+| `frontend/lib/process/force-advance.ts` | 174 | 4 | 4 | Force-advance a paused (HITL-waiting) process instance — an authorized operator supplies the input the workflow was parked for, marking the gate step  |
+| `frontend/lib/process/health.ts` | 83 | 0 | 4 | Process health classification — the stall / fail indicators for the process ledger (tenant `portal/<slug>/processes` and the admin monitor). |
+| `frontend/lib/process/launch-template.ts` | 190 | 3 | 3 | Launch a process TEMPLATE by name with an OVERLAY — the explicit, GUI-facing entry point for starting a workflow on demand (vs. reactive event trigger |
+| `frontend/lib/process/project-collaboration.ts` | 130 | 2 | 6 | launchProjectCollaboration — the CANONICAL way to start a project/opportunity HITL reaction from the frontend. New project automation calls THIS, not  |
+| `frontend/lib/projects/access.ts` | 298 | 3 | 31 | Who may see a project — the layer RLS cannot express. |
+| `frontend/lib/projects/baseline.ts` | 336 | 6 | 2 | Freezing the plan, and moving it afterwards without losing what was frozen. |
+| `frontend/lib/projects/cdrl.ts` | 393 | 5 | 3 | The CDRL register — DD-1423 data requirements, and what has actually been sent against them. |
+| `frontend/lib/projects/clins.ts` | 188 | 5 | 4 | CLINs — the contract line items a project is measured against. |
+| `frontend/lib/projects/closeout.ts` | 177 | 5 | 1 | Close-out — the end of the project's life, recorded rather than merely flagged. |
+| `frontend/lib/projects/comments.ts` | 419 | 8 | 4 | The conversation on a project. |
+| `frontend/lib/projects/dates.ts` | 81 | 0 | 11 | Dates that come back from the database as `Date`, not as strings. |
+| `frontend/lib/projects/evidence.ts` | 189 | 6 | 3 | The backing for an acceptance — filed by a tenant_admin, about the customer. |
+| `frontend/lib/projects/forecast.ts` | 154 | 0 | 3 | Estimate at completion, and what it costs to be honest about it (A5). |
+| `frontend/lib/projects/gate-closer.ts` | 205 | 5 | 2 | The AI-manager gate closer (A4) — and the reason it cannot do any harm. |
+| `frontend/lib/projects/gate.ts` | 110 | 5 | 32 | The gate every project route runs first. |
+| `frontend/lib/projects/invoices.ts` | 663 | 6 | 5 | Invoicing — where everything else in this capability becomes money. |
+| `frontend/lib/projects/meetings.ts` | 264 | 8 | 4 | Meetings, their notes, and the action items that come out of them. |
+| `frontend/lib/projects/mentions.ts` | 94 | 0 | 2 | Parsing `@someone` out of a comment. |
+| `frontend/lib/projects/milestone-tasks.ts` | 777 | 6 | 9 | The checklist under a milestone — and the serial dates that turn a list of them into a plan. |
+| `frontend/lib/projects/milestones.ts` | 686 | 13 | 7 | Milestones and deliverables — and the distinction the whole module exists to keep. |
+| `frontend/lib/projects/modifications.ts` | 638 | 8 | 3 | Contract modifications — the only write path to a CLIN. |
+| `frontend/lib/projects/money.ts` | 58 | 0 | 2 | Contract money, as a person reads it. |
+| `frontend/lib/projects/narrative-fidelity.ts` | 137 | 0 | 3 | Did the drafted narrative invent a number? |
+| `frontend/lib/projects/narrative-read.ts` | 81 | 4 | 2 | Reading back a drafted status narrative — ONE implementation. |
+| `frontend/lib/projects/notify-policy.ts` | 171 | 3 | 4 | What a project's reminders do — resolved, not hard-coded. |
+| `frontend/lib/projects/project.ts` | 236 | 5 | 42 | Projects and their anchor documents. |
+| `frontend/lib/projects/provenance.ts` | 214 | 1 | 6 | Where a project value came from — the ingest-provenance doctrine, one domain over. |
+| `frontend/lib/projects/reviews.ts` | 404 | 8 | 5 | "I looked at this and it is not right, because X." |
+| `frontend/lib/projects/risks.ts` | 371 | 5 | 5 | The risk and issue register. |
+| `frontend/lib/projects/rollup.ts` | 288 | 1 | 8 | Three measures of progress, reported side by side and never blended. |
+| `frontend/lib/projects/status-report-data.ts` | 66 | 5 | 2 | Gathering what a status report says. |
+| `frontend/lib/projects/status-report.ts` | 241 | 4 | 3 | The status report — a canvas document whose numbers are read, not typed. |
+| `frontend/lib/projects/task-attachments.ts` | 183 | 6 | 2 | Reference files on a project task. |
+| `frontend/lib/projects/time.ts` | 253 | 4 | 2 | Labour actuals — the source the cost measure never had. |
+| `frontend/lib/projects/todos.ts` | 278 | 7 | 7 | Project work, projected onto the platform ToDo spine — the same infrastructure the build portal uses. |
+| `frontend/lib/projects/traceability.ts` | 186 | 1 | 2 | Contract traceability — CLIN → milestone → deliverable, and every gap in between. |
+| `frontend/lib/projects/wbs.ts` | 245 | 5 | 2 | The work breakdown structure — and its projection onto the `workplan` canvas. |
+| `frontend/lib/promo-codes.ts` | 148 | 1 | 2 | Comp-code issuance — mint a one-time code that opens a proposal portal without a card. |
+| `frontend/lib/proposal-access.ts` | 278 | 2 | 30 | Proposal workspace access resolver. |
+| `frontend/lib/proposal-advance.ts` | 577 | 10 | 5 | — |
+| `frontend/lib/proposal-ai-review.ts` | 315 | 7 | 2 | Manual AI (color-team) review — the ONE canonical path for an admin-triggered proposal review. |
+| `frontend/lib/proposal-archive.ts` | 174 | 3 | 3 | Portal (pipeline) archive lifecycle — archive / restore, with workflow cascade. |
+| `frontend/lib/proposal-atom-harvest.ts` | 191 | 4 | 3 | Greenfield atom return — the closing leg of the atom loop: atomize → library → mold → draft → **back into the library**. |
+| `frontend/lib/proposal-color-team.ts` | 282 | 1 | 3 | Color-team review STATUS — what actually happened to the reviews the customer asked for. |
+| `frontend/lib/proposal-full-draft.ts` | 108 | 3 | 3 | requestFullDraft — the ONE canonical emission path for a proposal full-draft request. |
+| `frontend/lib/proposal-package-review.ts` | 64 | 3 | 1 | Submission-package review — the canonical path for an admin-triggered packaging_specialist pass. |
+| `frontend/lib/proposal-studio.ts` | 105 | 4 | 4 | Proposal Studio — the ONE canonical emission path for a review-phase request. |
+| `frontend/lib/proposal-visual-review.ts` | 185 | 5 | 1 | Visual page review, as part of the color-team review. |
+| `frontend/lib/proposal/brand.ts` | 71 | 1 | 2 | Brand + mandatory-table styling for the OPP sheet and the provisioned template. |
+| `frontend/lib/proposal/cost-forms.ts` | 262 | 3 | 3 | Cost-volume FORM LAYER — render a computed cost/budget as one of the most common government budget forms. |
+| `frontend/lib/proposal/cost-model.ts` | 463 | 0 | 9 | Cost model — the deterministic government cost-volume burden waterfall, in TypeScript. |
+| `frontend/lib/proposal/cost-volume-canvas.ts` | 444 | 5 | 4 | Universal cost-volume canvas generator. |
+| `frontend/lib/proposal/cost-workbook-item.ts` | 58 | 0 | 3 | Which required item in a COST volume receives the computed budget workbook. |
+| `frontend/lib/proposal/document-furniture.ts` | 571 | 1 | 6 | Document furniture — the apparatus that separates a drafted document from a finished one. |
+| `frontend/lib/proposal/figures.ts` | 381 | 2 | 2 | Proposal figures — the pictures a technical volume needs, generated from its own data. |
+| `frontend/lib/proposal/lock-section.ts` | 237 | 6 | 3 | The per-section accept/lock STRICTURE — the single audited unit of work. |
+| `frontend/lib/proposal/outcome-todo.ts` | 105 | 4 | 3 | Post-submission outcome-nudge ToDo (#13). |
+| `frontend/lib/proposal/scoped-findings.ts` | 195 | 2 | 3 | WHAT IS STILL OUTSTANDING, AND WHERE — the gate as a live checklist instead of a boolean. |
+| `frontend/lib/proposal/section-todo.ts` | 160 | 6 | 4 | Section-editing ToDo spine (SPINE-T1) — the missing per-section layer of the nervous system. |
+| `frontend/lib/proposal/section-writable.ts` | 42 | 0 | 4 | The single source of truth for "may this section be written right now?" — the immutability contract the PUT …/save route enforces (SECTION_LOCKED + ST |
+| `frontend/lib/proposal/strategy.ts` | 57 | 1 | 3 | Capture-strategy reader (#1) — surfaces the OnProposalCreated advisory AI actors. |
+| `frontend/lib/proposal/sttr-split.ts` | 75 | 2 | 2 | STTR cooperative work-split — COMPUTED from the Cost Volume (not asserted in prose). |
+| `frontend/lib/proposal/submission-readiness.ts` | 580 | 10 | 4 | Submission-readiness — the "can this proposal go out the door?" roll-up. |
+| `frontend/lib/proposal/volume-facts.ts` | 248 | 2 | 4 | The identifiers a finished volume prints on itself. |
+| `frontend/lib/proposal/volume-finish.ts` | 616 | 3 | 3 | Volume finishing — turn an assembled volume into a document somebody would want to read. |
+| `frontend/lib/propose-regions.ts` | 40 | 0 | 2 | Region proposer — the "machine draws the boxes" half of the box-ingestion loop (BOX-2). |
+| `frontend/lib/provision-proposal.ts` | 508 | 16 | 9 | Provision a real proposal build for a greenfield portal — the V0→V1 substrate. |
+| `frontend/lib/provisioning/authored-scope.ts` | 109 | 0 | 4 | What a buyer is asked to WRITE, versus what they must obtain, sign, file or fetch elsewhere. |
+| `frontend/lib/provisioning/complete.ts` | 97 | 4 | 3 | Complete a master OPP's build-out and broadcast it (docs/PROVISIONING_WORKSPACE_DESIGN.md, PV-2). |
+| `frontend/lib/provisioning/readiness.ts` | 137 | 1 | 7 | Master OPP build-out readiness (docs/PROVISIONING_WORKSPACE_DESIGN.md, PV-1). |
+| `frontend/lib/provisioning/release-portal.ts` | 200 | 9 | 3 | Provision + release a PURCHASED portal from curation — the shared discovery→build hand-off. |
+| `frontend/lib/rate-limit.ts` | 81 | 0 | 1 | In-memory IP-based rate limiter for public endpoints. |
+| `frontend/lib/rbac.ts` | 200 | 0 | 298 | Role-based access control helpers — the single source of truth for role hierarchy checks. Middleware and API routes both consume hasRoleAtLeast / canA |
+| `frontend/lib/review/visual-review.ts` | 248 | 3 | 2 | Visual page review — reading the document the way an evaluator does: by looking at it. |
+| `frontend/lib/rfp-filename-parser.ts` | 137 | 0 | 1 | Best-effort parser for solicitation filename / first-line text. |
+| `frontend/lib/rls.ts` | 23 | 1 | 50 | — |
+| `frontend/lib/sbir-ingest.ts` | 307 | 1 | 1 | — |
+| `frontend/lib/scout/candidates.ts` | 320 | 6 | 4 | Scout candidate queue — the DB layer for the "potential NEW or UPDATED OPP" review→release queue (#176). One reviewable surface (`scout_findings`, pur |
+| `frontend/lib/scout/classify.ts` | 189 | 0 | 2 | Scout candidate classification — deterministic NEW-vs-UPDATE matcher (#176). |
+| `frontend/lib/section-budget.ts` | 107 | 1 | 4 | Section budget — the "mold" side of the atoms⟷canvas loop. |
+| `frontend/lib/section-standards.ts` | 44 | 0 | 3 | Section-standards taxonomy helpers (Phase 3, C1). |
+| `frontend/lib/session-policy.ts` | 167 | 0 | 4 | SESSION BOUNDS — how long a session may live, and how long it may sit idle. |
+| `frontend/lib/site-chrome.ts` | 157 | 1 | 2 | Site chrome (marketing header + footer) as editable content (V8). |
+| `frontend/lib/space-presence-oversight.ts` | 129 | 1 | 1 | WHO IS INSIDE A CUSTOMER'S WORKSPACE — the read side of the presence bracket. |
+| `frontend/lib/space-presence.ts` | 454 | 3 | 10 | SPACE PRESENCE — one writer owns both ends of "somebody from outside is in your workspace". |
+| `frontend/lib/spotlight/default-buckets.ts` | 82 | 1 | 2 | Starter spotlight buckets — a FIXTURE catalog, no longer a production path (#104, then #189). |
+| `frontend/lib/storage/paths.ts` | 304 | 0 | 14 | Object-storage path helpers — canonical source for S3 keys. |
+| `frontend/lib/storage/s3-client.ts` | 368 | 0 | 32 | Shared S3 client for the frontend (Next.js server routes + server components). The AWS SDK auto-reads AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DE |
+| `frontend/lib/stripe.ts` | 174 | 1 | 3 | Stripe SDK client and billing helpers. |
+| `frontend/lib/tasks/completers.ts` | 150 | 0 | 7 | Typed task completers (W-M/J3). A task's `params.kind` selects how it is completed in the queue: a plain review (approve/dismiss), an upload (go do it |
+| `frontend/lib/tasks/tasks.ts` | 823 | 5 | 35 | Task ledger — shared query + completion core for the unified `tasks` table. |
+| `frontend/lib/tasks/update-task.ts` | 108 | 4 | 2 | Mutate a LIVE workflow ToDo — reassign / reschedule / re-nudge (TW-4, docs/TENANT_WORKFLOW_SETUP_DESIGN.md §5 PATCH B). The frozen model had no path t |
+| `frontend/lib/tasks/urgency.ts` | 37 | 0 | 2 | Task urgency — the in-app nudge logic. A due date in the past is 'overdue'; within 24h is 'soon'; otherwise 'normal'. This is what makes a deadline fe |
+| `frontend/lib/tasks/workflows.ts` | 397 | 1 | 3 | Task → workflow catalog (#101). |
+| `frontend/lib/template-bridge.ts` | 257 | 4 | 10 | Template bridge — the L0→L1 spine for the pristine-template stable (mig 177), a 1:1 mirror of the opportunity-card bridge (lib/opportunity-bridge.ts,  |
+| `frontend/lib/template-stable-sync.ts` | 90 | 3 | 2 | Template-stable sync — the productized seed (template bridge Phase 3, docs/TEMPLATE_BRIDGE_DESIGN.md). Materializes the lib/templates code catalog int |
+| `frontend/lib/templates/baa-white-paper.ts` | 72 | 1 | 1 | BAA White Paper Template — AFRL "BAA Guide for Industry" A–D format |
+| `frontend/lib/templates/biographical-sketch.ts` | 76 | 1 | 1 | Biographical Sketch Template — Common Form (NIH & NSF) + NIH Supplement |
+| `frontend/lib/templates/budget-justification.ts` | 73 | 1 | 1 | Budget Justification Template — SF424 R&R (A–K) narrative |
+| `frontend/lib/templates/commercialization-plan.ts` | 281 | 1 | 1 | Commercialization Plan Template (standalone) |
+| `frontend/lib/templates/company-capability-deck.ts` | 206 | 1 | 1 | Company Capability Deck Template (8 slides) |
+| `frontend/lib/templates/cost/burden-cost-sheet.ts` | 226 | 1 | 2 | Parameterized burden-waterfall COST SHEET generator (formula spreadsheet templates). |
+| `frontend/lib/templates/cost/variants.ts` | 52 | 1 | 1 | The cost-volume PoP variants — the common periods of performance, each a formula-driven burden-waterfall workbook (see ./burden-cost-sheet.ts). All ro |
+| `frontend/lib/templates/current-and-pending-support.ts` | 61 | 1 | 1 | Current & Pending (Other) Support Template — Common Form |
+| `frontend/lib/templates/data-management-plan.ts` | 46 | 1 | 1 | Data Management & Sharing Plan (DMSP) Template — NSF PAPPG 24-1 style (2 pages) |
+| `frontend/lib/templates/dod-cso-phase1-briefing.ts` | 316 | 1 | 1 | DoD CSO Phase I — Pitch Briefing Template (10 slides) |
+| `frontend/lib/templates/dod-d2p2-technical.ts` | 333 | 1 | 1 | DoW Direct to Phase II (D2P2) — Technical Volume Template |
+| `frontend/lib/templates/dod-sbir-phase1-cost.ts` | 529 | 1 | 1 | DoD SBIR Phase I — Cost Volume Template |
+| `frontend/lib/templates/dod-sbir-phase1-technical.ts` | 296 | 1 | 1 | DoD SBIR Phase I — Technical Volume Template (15 pages) |
+| `frontend/lib/templates/dod-sbir-phase2-technical.ts` | 269 | 1 | 1 | DoD SBIR Phase II — Technical Volume Template (50 pages) |
+| `frontend/lib/templates/dod-sttr-phase1-technical.ts` | 376 | 1 | 1 | DoW STTR Phase I — Technical Volume Template (15 pages) |
+| `frontend/lib/templates/dod-sttr-phase2-technical.ts` | 380 | 1 | 1 | DoW STTR Phase II — Technical Volume Template |
+| `frontend/lib/templates/doe-sbir-phase1-technical.ts` | 296 | 1 | 1 | DOE SBIR Phase I — Technical Narrative Template (20 pages) |
+| `frontend/lib/templates/doe-sttr-phase1-technical.ts` | 353 | 1 | 1 | DOE STTR Phase I — Technical Narrative Template (20 pages) |
+| `frontend/lib/templates/executive-summary.ts` | 44 | 1 | 1 | Executive Summary / Cover Letter Template (1 page) |
+| `frontend/lib/templates/extract-skeleton.ts` | 135 | 1 | 4 | Template extraction (docs/CANVAS_GEOMETRY_REDESIGN.md §5d) — turn an ingested proposal into a reusable SKELETON template in one pass, when the admin d |
+| `frontend/lib/templates/facilities-equipment.ts` | 36 | 1 | 1 | Facilities, Equipment & Other Resources Template — NSF style |
+| `frontend/lib/templates/index.ts` | 299 | 36 | 13 | Canvas document templates — structured starter content for common proposal and collateral types across DoD/DoW, NSF, and DOE, plus marketing, commerci |
+| `frontend/lib/templates/investment-one-pager.ts` | 160 | 1 | 1 | Investor One-Pager Template (1 page) |
+| `frontend/lib/templates/investment-pitch-deck.ts` | 366 | 1 | 1 | Investor Pitch Deck Template (11 slides) |
+| `frontend/lib/templates/letter-of-collaboration.ts` | 37 | 1 | 1 | Letter of Collaboration / Support Template (1 page) |
+| `frontend/lib/templates/marketing-one-pager.ts` | 151 | 1 | 1 | Marketing One-Pager Template (single page) |
+| `frontend/lib/templates/marketing-slide-deck.ts` | 275 | 1 | 1 | Marketing / Capability Deck Template (9 slides) |
+| `frontend/lib/templates/marketing-two-pager.ts` | 204 | 1 | 1 | Government Capability Statement Template (2 pages) |
+| `frontend/lib/templates/marketing-whitepaper.ts` | 274 | 1 | 1 | Thought-Leadership White Paper Template (~6–8 pages) |
+| `frontend/lib/templates/nasa-sbir-phase1-technical.ts` | 66 | 1 | 1 | NASA SBIR/STTR Phase I — Technical Proposal Template (EHB, 10 parts) |
+| `frontend/lib/templates/nih-research-strategy.ts` | 55 | 1 | 1 | NIH Research Strategy Template — PHS 398 Research Plan (SBIR/STTR) |
+| `frontend/lib/templates/nsf-project-pitch.ts` | 146 | 1 | 1 | NSF Project Pitch Template (3 pages) |
+| `frontend/lib/templates/nsf-sbir-phase1-project-description.ts` | 351 | 1 | 1 | NSF SBIR/STTR Phase I — Project Description Template (15 pages) |
+| `frontend/lib/templates/ota-solution-brief.ts` | 55 | 1 | 1 | OTA Solution Brief Template — DIU CSO model (also NSTXL/SOSSEC shape) |
+| `frontend/lib/templates/past-proposal-canvas.ts` | 57 | 1 | 3 | pastProposalToCanvas (#18) — build a v2 CanvasDocument from a past proposal's ordered section atoms: ONE section per atom (its title → a heading, its  |
+| `frontend/lib/templates/quad-chart.ts` | 71 | 1 | 1 | Quad Chart Template (1 page, DoD/SBIR) |
+| `frontend/lib/templates/sf424a-budget.ts` | 81 | 1 | 1 | SF-424A — Budget Information (Non-Construction Programs) Template |
+| `frontend/lib/templates/statement-of-work.ts` | 88 | 1 | 1 | Statement of Work (SOW) Template — MIL-HDBK-245D structure |
+| `frontend/lib/templates/tech-overview-deck.ts` | 233 | 1 | 1 | Technology Overview Deck Template (9 slides) |
+| `frontend/lib/tenant-context.ts` | 53 | 0 | 23 | Per-request tenant context (docs/RLS_CUTOVER.md) — the choke-point that makes the NOBYPASSRLS cutover a ~4-file change instead of 73 call-site edits. |
+| `frontend/lib/tenants/create-tenant.ts` | 187 | 7 | 3 | Tenant onboarding core — ONE system path for creating (or completing) a company. |
+| `frontend/lib/tenants/name-match.ts` | 83 | 1 | 2 | Company-name matching for the partner add-company dedup precheck (docs/PARTNER_MANAGER_DESIGN.md §4, D6). |
+| `frontend/lib/terms.ts` | 176 | 0 | 5 | The binding customer agreement — one source of truth. |
+| `frontend/lib/toast.tsx` | 95 | 0 | 47 | — |
+| `frontend/lib/tools/base.ts` | 155 | 2 | 44 | Tool interface — the canonical dual-use construct. |
+| `frontend/lib/tools/compliance-add-variable.ts` | 89 | 4 | 2 | compliance.add_variable (Phase 1 §E13). |
+| `frontend/lib/tools/compliance-extract-from-text.ts` | 137 | 2 | 2 | compliance.extract_from_text (Phase 1 §E14). |
+| `frontend/lib/tools/compliance-list-variables.ts` | 58 | 2 | 2 | compliance.list_variables (Phase 1 §E12). |
+| `frontend/lib/tools/compliance-save-variable-value.ts` | 401 | 5 | 3 | compliance.save_variable_value (Phase 1 §E15) — THE marquee HITL write site. |
+| `frontend/lib/tools/curation-memory.ts` | 204 | 3 | 4 | Curation memory writer — the HITL learning-loop write side. |
+| `frontend/lib/tools/errors.ts` | 60 | 1 | 15 | Tool-specific error classes. Extend AppError so the HTTP mapping in lib/api-helpers.ts withHandler works unchanged. |
+| `frontend/lib/tools/index.ts` | 116 | 35 | 5 | Tool module index — registers every tool at import time. |
+| `frontend/lib/tools/ingest-get-run-detail.ts` | 157 | 3 | 2 | ingest.get_run_detail (Phase 1 §E21). |
+| `frontend/lib/tools/ingest-list-recent-runs.ts` | 109 | 2 | 2 | ingest.list_recent_runs (Phase 1 §E20). |
+| `frontend/lib/tools/ingest-trigger-manual.ts` | 77 | 3 | 2 | ingest.trigger_manual (Phase 1 §E19). |
+| `frontend/lib/tools/library-search-atoms.ts` | 199 | 3 | 1 | library.search_atoms — search the customer's library for relevant reusable content atoms. |
+| `frontend/lib/tools/memory-search.ts` | 191 | 3 | 1 | memory.search — reference tool demonstrating the dual-use pattern. |
+| `frontend/lib/tools/memory-write.ts` | 175 | 3 | 1 | memory.write — reference tool demonstrating the dual-use pattern. |
+| `frontend/lib/tools/opportunity-add-topic.ts` | 198 | 5 | 1 | opportunity.add_topic (Phase 1 §E extension). |
+| `frontend/lib/tools/opportunity-bulk-add-topics.ts` | 214 | 5 | 1 | opportunity.bulk_add_topics (Phase 1 §E extension). |
+| `frontend/lib/tools/opportunity-get-by-id.ts` | 97 | 3 | 2 | opportunity.get_by_id (Phase 1 §E16). |
+| `frontend/lib/tools/opportunity-update-topic.ts` | 239 | 5 | 1 | opportunity.update_topic (Phase 1 §E extension / Scouting Spine M1 T1.3). |
+| `frontend/lib/tools/proposal-draft-section.ts` | 504 | 6 | 3 | proposal.draft_section — AI-powered section drafting tool. |
+| `frontend/lib/tools/registry.ts` | 275 | 6 | 9 | Tool registry — the single entry point for invoking any tool. |
+| `frontend/lib/tools/solicitation-approve.ts` | 182 | 5 | 3 | solicitation.approve (Phase 1 §E7). |
+| `frontend/lib/tools/solicitation-claim.ts` | 122 | 4 | 3 | solicitation.claim (Phase 1 §E3). |
+| `frontend/lib/tools/solicitation-delete-annotation.ts` | 73 | 4 | 2 | solicitation.delete_annotation (Phase 1 §E11). |
+| `frontend/lib/tools/solicitation-dismiss.ts` | 196 | 5 | 2 | solicitation.dismiss (Phase 1 §E5). |
+| `frontend/lib/tools/solicitation-get-detail.ts` | 288 | 3 | 2 | solicitation.get_detail (Phase 1 §E2). |
+| `frontend/lib/tools/solicitation-list-triage.ts` | 219 | 2 | 3 | solicitation.list_triage (Phase 1 §E1). |
+| `frontend/lib/tools/solicitation-push.ts` | 425 | 6 | 3 | solicitation.push (Phase 1 §E9) — the canonical Phase 1 success event. |
+| `frontend/lib/tools/solicitation-reject-review.ts` | 108 | 4 | 2 | solicitation.reject_review (Phase 1 §E8). |
+| `frontend/lib/tools/solicitation-release.ts` | 151 | 4 | 3 | solicitation.release (Phase 1 §E4). |
+| `frontend/lib/tools/solicitation-request-review.ts` | 144 | 4 | 4 | solicitation.request_review (Phase 1 §E6). |
+| `frontend/lib/tools/solicitation-save-annotation.ts` | 182 | 4 | 5 | solicitation.save_annotation (Phase 1 §E10). |
+| `frontend/lib/tools/source-scout.ts` | 556 | 7 | 2 | finder.scout_source — Source Scout tool. |
+| `frontend/lib/tools/volume-add-required-item.ts` | 154 | 5 | 2 | volume.add_required_item — adds a proposer-produced artifact (Word doc, slide deck, spreadsheet, form) with per-item compliance. |
+| `frontend/lib/tools/volume-add.ts` | 104 | 5 | 2 | volume.add (Phase 1 §E extension, post-migration 012). |
+| `frontend/lib/tools/volume-delete-required-item.ts` | 58 | 5 | 2 | volume.delete_required_item — remove one artifact from a volume. |
+| `frontend/lib/tools/volume-delete.ts` | 58 | 5 | 2 | volume.delete — remove a volume and its required items (CASCADE). |
+| `frontend/lib/tools/volume-update-required-item.ts` | 143 | 5 | 2 | volume.update_required_item — edit compliance fields on an existing item. |
+| `frontend/lib/types/canvas-document.ts` | 2205 | 1 | 237 | Canvas Document types — the unified content model for all proposal artifacts. Every document (Word, slides, PDF) is a JSON canvas populated with typed |
+| `frontend/lib/types/source-anchor.ts` | 126 | 0 | 3 | Universal source-anchor schema — the canonical way to point at a specific location in any document across the entire system. |
+| `frontend/lib/validation.ts` | 105 | 0 | 111 | Shared zod primitives. Imported by API route schemas + tool input schemas so there's one canonical definition for UUIDs, tenant slugs, email addresses |
+| `frontend/lib/vaults/vaults.ts` | 339 | 6 | 11 | Collaboration vaults ("nooks") — the segregated external-partner bridge (docs/LIBRARY_AND_VAULTS_DESIGN.md §5). This module is the ISOLATION CONTRACT  |
+| `frontend/lib/vision.ts` | 51 | 0 | 2 | Vision captioning — the drop-in "read what the image SHOWS" engine that complements OCR. |
+| `frontend/lib/visitor-session.ts` | 47 | 0 | 2 | The analytics visitor session, read from the browser — the one client-side half of the attribution chain. |
+| `frontend/lib/working-notes.ts` | 178 | 2 | 4 | The working-notes board — one ledger, three writers, and the one place they meet. |
 
 ### frontend · marketing pages · 25 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `app/(marketing)/about/page.tsx` | 90 | 4 | 0 | — |
-| `app/(marketing)/apply/page.tsx` | 51 | 3 | 0 | — |
-| `app/(marketing)/blog/[slug]/page.tsx` | 10 | 0 | 0 | — |
-| `app/(marketing)/customers/page.tsx` | 138 | 4 | 0 | — |
-| `app/(marketing)/engine/page.tsx` | 8 | 0 | 0 | — |
-| `app/(marketing)/features/page.tsx` | 89 | 4 | 0 | — |
-| `app/(marketing)/federal-rd-101/page.tsx` | 127 | 5 | 0 | — |
-| `app/(marketing)/get-started/page.tsx` | 6 | 0 | 0 | — |
-| `app/(marketing)/how-it-works/page.tsx` | 179 | 4 | 0 | — |
-| `app/(marketing)/infosec/page.tsx` | 157 | 4 | 0 | — |
-| `app/(marketing)/layout.tsx` | 120 | 4 | 0 | — |
-| `app/(marketing)/legal/acceptable-use/page.tsx` | 112 | 0 | 0 | — |
-| `app/(marketing)/legal/ai-disclosure/page.tsx` | 144 | 0 | 0 | — |
-| `app/(marketing)/legal/layout.tsx` | 14 | 0 | 0 | — |
-| `app/(marketing)/legal/page.tsx` | 41 | 0 | 0 | — |
-| `app/(marketing)/legal/privacy/page.tsx` | 151 | 0 | 0 | — |
-| `app/(marketing)/legal/terms/page.tsx` | 56 | 1 | 0 | — |
-| `app/(marketing)/page.tsx` | 328 | 4 | 0 | — |
-| `app/(marketing)/pricing/page.tsx` | 282 | 5 | 0 | — |
-| `app/(marketing)/resources/[slug]/page.tsx` | 151 | 2 | 0 | — |
-| `app/(marketing)/resources/page.tsx` | 99 | 5 | 0 | — |
-| `app/(marketing)/security/page.tsx` | 6 | 0 | 0 | — |
-| `app/(marketing)/team/page.tsx` | 143 | 3 | 0 | — |
-| `app/(marketing)/the-expert/page.tsx` | 271 | 3 | 0 | — |
-| `app/(marketing)/value/page.tsx` | 227 | 6 | 0 | — |
+| `frontend/app/(marketing)/about/page.tsx` | 90 | 4 | 0 | — |
+| `frontend/app/(marketing)/apply/page.tsx` | 51 | 3 | 0 | — |
+| `frontend/app/(marketing)/blog/[slug]/page.tsx` | 10 | 0 | 0 | — |
+| `frontend/app/(marketing)/customers/page.tsx` | 138 | 4 | 0 | — |
+| `frontend/app/(marketing)/engine/page.tsx` | 8 | 0 | 0 | — |
+| `frontend/app/(marketing)/features/page.tsx` | 89 | 4 | 0 | — |
+| `frontend/app/(marketing)/federal-rd-101/page.tsx` | 127 | 5 | 0 | — |
+| `frontend/app/(marketing)/get-started/page.tsx` | 6 | 0 | 0 | — |
+| `frontend/app/(marketing)/how-it-works/page.tsx` | 179 | 4 | 0 | — |
+| `frontend/app/(marketing)/infosec/page.tsx` | 157 | 4 | 0 | — |
+| `frontend/app/(marketing)/layout.tsx` | 120 | 4 | 0 | — |
+| `frontend/app/(marketing)/legal/acceptable-use/page.tsx` | 112 | 0 | 0 | — |
+| `frontend/app/(marketing)/legal/ai-disclosure/page.tsx` | 144 | 0 | 0 | — |
+| `frontend/app/(marketing)/legal/layout.tsx` | 14 | 0 | 0 | — |
+| `frontend/app/(marketing)/legal/page.tsx` | 41 | 0 | 0 | — |
+| `frontend/app/(marketing)/legal/privacy/page.tsx` | 151 | 0 | 0 | — |
+| `frontend/app/(marketing)/legal/terms/page.tsx` | 56 | 1 | 0 | — |
+| `frontend/app/(marketing)/page.tsx` | 328 | 4 | 0 | — |
+| `frontend/app/(marketing)/pricing/page.tsx` | 282 | 5 | 0 | — |
+| `frontend/app/(marketing)/resources/[slug]/page.tsx` | 151 | 2 | 0 | — |
+| `frontend/app/(marketing)/resources/page.tsx` | 99 | 5 | 0 | — |
+| `frontend/app/(marketing)/security/page.tsx` | 6 | 0 | 0 | — |
+| `frontend/app/(marketing)/team/page.tsx` | 143 | 3 | 0 | — |
+| `frontend/app/(marketing)/the-expert/page.tsx` | 271 | 3 | 0 | — |
+| `frontend/app/(marketing)/value/page.tsx` | 227 | 6 | 0 | — |
 
 ### frontend · other pages · 16 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `app/actions/auth-actions.ts` | 45 | 3 | 1 | — |
-| `app/blog/feed.xml/route.ts` | 35 | 1 | 0 | — |
-| `app/dashboard/page.tsx` | 66 | 3 | 0 | — |
-| `app/error.tsx` | 16 | 0 | 0 | — |
-| `app/global-error.tsx` | 18 | 0 | 0 | — |
-| `app/go/page.tsx` | 157 | 5 | 0 | — |
-| `app/invite/[token]/page.tsx` | 243 | 0 | 0 | — |
-| `app/layout.tsx` | 22 | 1 | 0 | — |
-| `app/partner/add-company-flow.tsx` | 205 | 0 | 1 | — |
-| `app/partner/page.tsx` | 254 | 9 | 0 | /partner — the partner-manager console (docs/PARTNER_MANAGER_DESIGN.md §3a). |
-| `app/partner/partner-guide.tsx` | 72 | 0 | 1 | In-page guide on the partner-manager console (/partner): the higher-order org + a stable of client companies, the add-company precheck + branches, the |
-| `app/select-company/page.tsx` | 92 | 5 | 0 | — |
-| `app/sitemap.ts` | 58 | 1 | 0 | — |
-| `app/vaults/[vaultId]/page.tsx` | 43 | 4 | 0 | — |
-| `app/vaults/layout.tsx` | 33 | 2 | 0 | — |
-| `app/vaults/page.tsx` | 56 | 3 | 0 | — |
+| `frontend/app/actions/auth-actions.ts` | 45 | 3 | 1 | — |
+| `frontend/app/blog/feed.xml/route.ts` | 35 | 1 | 0 | — |
+| `frontend/app/dashboard/page.tsx` | 66 | 3 | 0 | — |
+| `frontend/app/error.tsx` | 16 | 0 | 0 | — |
+| `frontend/app/global-error.tsx` | 18 | 0 | 0 | — |
+| `frontend/app/go/page.tsx` | 157 | 5 | 0 | — |
+| `frontend/app/invite/[token]/page.tsx` | 243 | 0 | 0 | — |
+| `frontend/app/layout.tsx` | 22 | 1 | 0 | — |
+| `frontend/app/partner/add-company-flow.tsx` | 205 | 0 | 1 | — |
+| `frontend/app/partner/page.tsx` | 254 | 9 | 0 | /partner — the partner-manager console (docs/PARTNER_MANAGER_DESIGN.md §3a). |
+| `frontend/app/partner/partner-guide.tsx` | 72 | 0 | 1 | In-page guide on the partner-manager console (/partner): the higher-order org + a stable of client companies, the add-company precheck + branches, the |
+| `frontend/app/select-company/page.tsx` | 92 | 5 | 0 | — |
+| `frontend/app/sitemap.ts` | 58 | 1 | 0 | — |
+| `frontend/app/vaults/[vaultId]/page.tsx` | 43 | 4 | 0 | — |
+| `frontend/app/vaults/layout.tsx` | 33 | 2 | 0 | — |
+| `frontend/app/vaults/page.tsx` | 56 | 3 | 0 | — |
 
 ### frontend · portal pages · 47 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `app/portal/[tenantSlug]/activity/activity-stream-client.tsx` | 587 | 4 | 1 | — |
-| `app/portal/[tenantSlug]/activity/page.tsx` | 217 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/agents/page.tsx` | 52 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/atoms/page.tsx` | 57 | 8 | 0 | — |
-| `app/portal/[tenantSlug]/automation/page.tsx` | 45 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/billing/page.tsx` | 134 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/buckets/page.tsx` | 34 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/cards/[opportunityId]/solicitation/page.tsx` | 223 | 6 | 0 | — |
-| `app/portal/[tenantSlug]/cards/page.tsx` | 33 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/command/page.tsx` | 396 | 11 | 0 | — |
-| `app/portal/[tenantSlug]/contracts/[contractId]/page.tsx` | 176 | 3 | 0 | — |
-| `app/portal/[tenantSlug]/contracts/page.tsx` | 156 | 3 | 0 | — |
-| `app/portal/[tenantSlug]/dashboard/page.tsx` | 268 | 6 | 0 | — |
-| `app/portal/[tenantSlug]/documents/[documentId]/page.tsx` | 115 | 9 | 0 | — |
-| `app/portal/[tenantSlug]/documents/new/page.tsx` | 36 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/documents/page.tsx` | 579 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/error.tsx` | 46 | 0 | 0 | — |
-| `app/portal/[tenantSlug]/layout.tsx` | 283 | 12 | 0 | — |
-| `app/portal/[tenantSlug]/library/foundation/[foundationId]/page.tsx` | 78 | 8 | 0 | — |
-| `app/portal/[tenantSlug]/library/page.tsx` | 16 | 0 | 0 | — |
-| `app/portal/[tenantSlug]/library/review/page.tsx` | 14 | 0 | 0 | — |
-| `app/portal/[tenantSlug]/library/upload/page.tsx` | 14 | 0 | 0 | — |
-| `app/portal/[tenantSlug]/loading.tsx` | 28 | 0 | 0 | Portal route loading boundary. |
-| `app/portal/[tenantSlug]/manage/page.tsx` | 172 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/not-found.tsx` | 24 | 0 | 0 | Portal route not-found boundary. `notFound()` calls in portal pages (e.g. a proposal/section the user can't access) render here, inside the portal she |
-| `app/portal/[tenantSlug]/page.tsx` | 12 | 0 | 0 | — |
-| `app/portal/[tenantSlug]/pipeline/page.tsx` | 15 | 0 | 0 | — |
-| `app/portal/[tenantSlug]/portals/[portalId]/page.tsx` | 128 | 7 | 0 | Tenant Workflow Setup page — /portal/[tenantSlug]/portals/[portalId] (TW-6, docs/TENANT_WORKFLOW_SETUP_DESIGN.md §6). The dedicated per-portal surface |
-| `app/portal/[tenantSlug]/portals/[portalId]/workflow-setup-client.tsx` | 405 | 1 | 1 | — |
-| `app/portal/[tenantSlug]/portals/page.tsx` | 33 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/processes/page.tsx` | 82 | 4 | 0 | Tenant Process Ledger — portal/<slug>/processes |
-| `app/portal/[tenantSlug]/processes/processes-client.tsx` | 354 | 2 | 2 | — |
-| `app/portal/[tenantSlug]/profile/page.tsx` | 225 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/projects/[projectId]/page.tsx` | 742 | 42 | 0 | — |
-| `app/portal/[tenantSlug]/projects/page.tsx` | 126 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx` | 651 | 13 | 0 | — |
-| `app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx` | 827 | 0 | 1 | — |
-| `app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx` | 257 | 11 | 0 | — |
-| `app/portal/[tenantSlug]/proposals/page.tsx` | 250 | 6 | 0 | — |
-| `app/portal/[tenantSlug]/spotlights/[spotlightId]/page.tsx` | 14 | 0 | 0 | — |
-| `app/portal/[tenantSlug]/spotlights/page.tsx` | 16 | 0 | 0 | — |
-| `app/portal/[tenantSlug]/team/page.tsx` | 365 | 9 | 0 | — |
-| `app/portal/[tenantSlug]/templates/page.tsx` | 36 | 4 | 0 | — |
-| `app/portal/[tenantSlug]/todos/page.tsx` | 38 | 4 | 0 | Portal To-dos page — a direct ToDo surface for EVERY tenant role, including partner_user (HITL G4). tenant_user+ also have the cockpit drawer; partner |
-| `app/portal/[tenantSlug]/vaults/[vaultId]/page.tsx` | 45 | 5 | 0 | — |
-| `app/portal/[tenantSlug]/vaults/page.tsx` | 24 | 4 | 0 | — |
-| `app/portal/page.tsx` | 155 | 6 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/activity/activity-stream-client.tsx` | 587 | 4 | 1 | — |
+| `frontend/app/portal/[tenantSlug]/activity/page.tsx` | 217 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/agents/page.tsx` | 52 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/atoms/page.tsx` | 57 | 8 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/automation/page.tsx` | 45 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/billing/page.tsx` | 134 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/buckets/page.tsx` | 34 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/cards/[opportunityId]/solicitation/page.tsx` | 223 | 6 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/cards/page.tsx` | 33 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/command/page.tsx` | 396 | 11 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/contracts/[contractId]/page.tsx` | 176 | 3 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/contracts/page.tsx` | 156 | 3 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/dashboard/page.tsx` | 268 | 6 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/documents/[documentId]/page.tsx` | 115 | 9 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/documents/new/page.tsx` | 36 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/documents/page.tsx` | 579 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/error.tsx` | 46 | 0 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/layout.tsx` | 283 | 12 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/library/foundation/[foundationId]/page.tsx` | 78 | 8 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/library/page.tsx` | 16 | 0 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/library/review/page.tsx` | 14 | 0 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/library/upload/page.tsx` | 14 | 0 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/loading.tsx` | 28 | 0 | 0 | Portal route loading boundary. |
+| `frontend/app/portal/[tenantSlug]/manage/page.tsx` | 172 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/not-found.tsx` | 24 | 0 | 0 | Portal route not-found boundary. `notFound()` calls in portal pages (e.g. a proposal/section the user can't access) render here, inside the portal she |
+| `frontend/app/portal/[tenantSlug]/page.tsx` | 12 | 0 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/pipeline/page.tsx` | 15 | 0 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/portals/[portalId]/page.tsx` | 128 | 7 | 0 | Tenant Workflow Setup page — /portal/[tenantSlug]/portals/[portalId] (TW-6, docs/TENANT_WORKFLOW_SETUP_DESIGN.md §6). The dedicated per-portal surface |
+| `frontend/app/portal/[tenantSlug]/portals/[portalId]/workflow-setup-client.tsx` | 405 | 1 | 1 | — |
+| `frontend/app/portal/[tenantSlug]/portals/page.tsx` | 33 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/processes/page.tsx` | 82 | 4 | 0 | Tenant Process Ledger — portal/<slug>/processes |
+| `frontend/app/portal/[tenantSlug]/processes/processes-client.tsx` | 354 | 2 | 2 | — |
+| `frontend/app/portal/[tenantSlug]/profile/page.tsx` | 225 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/projects/[projectId]/page.tsx` | 742 | 42 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/projects/page.tsx` | 126 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/proposals/[proposalId]/page.tsx` | 651 | 13 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx` | 827 | 0 | 1 | — |
+| `frontend/app/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/page.tsx` | 257 | 11 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/proposals/page.tsx` | 250 | 6 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/spotlights/[spotlightId]/page.tsx` | 14 | 0 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/spotlights/page.tsx` | 16 | 0 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/team/page.tsx` | 365 | 9 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/templates/page.tsx` | 36 | 4 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/todos/page.tsx` | 38 | 4 | 0 | Portal To-dos page — a direct ToDo surface for EVERY tenant role, including partner_user (HITL G4). tenant_user+ also have the cockpit drawer; partner |
+| `frontend/app/portal/[tenantSlug]/vaults/[vaultId]/page.tsx` | 45 | 5 | 0 | — |
+| `frontend/app/portal/[tenantSlug]/vaults/page.tsx` | 24 | 4 | 0 | — |
+| `frontend/app/portal/page.tsx` | 155 | 6 | 0 | — |
 
 ### frontend · unit tests · 256 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `__tests__/admin-agent-config.test.ts` | 259 | 2 | 0 | Admin AI-config routes: - /api/admin/tenants/[tenantId]/agent-config (per-tenant, rfp_admin+) - /api/admin/agents/platform-config (pipeline-wide, mast |
-| `__tests__/admin-doorbell.test.ts` | 122 | 1 | 0 | Admin Proposal Auto-Drive "Doorbell" — POST /api/admin/proposals/[proposalId]/full-draft. |
-| `__tests__/admin-guides-invariants.test.ts` | 166 | 0 | 0 | THE DISCOVERY GUIDES MAY NOT QUIETLY BECOME A FEATURE TOUR. |
-| `__tests__/admin-templates.test.ts` | 104 | 2 | 0 | E3b — Template Studio CRUD (admin/templates + admin/templates/[templateId]). |
-| `__tests__/advance.test.ts` | 744 | 1 | 0 | TEST-05 — POST /api/portal/[tenantSlug]/proposals/[proposalId]/advance |
-| `__tests__/agent-guard.test.ts` | 205 | 1 | 0 | Unified AI spend guard (lib/ai/agent-guard.ts). |
-| `__tests__/agent-labels.test.ts` | 73 | 1 | 0 | A customer must never read a system identifier where a name belongs. |
-| `__tests__/agent-roster-complete.test.ts` | 119 | 1 | 0 | AN AGENT MISSING FROM THE ROSTER IS INVISIBLE TO THE PERSON WHOSE WORKFORCE IT IS. |
-| `__tests__/ai-endpoint-single-source.test.ts` | 93 | 1 | 0 | Where the model lives is answered in ONE file. |
-| `__tests__/ai-review.test.ts` | 130 | 1 | 0 | Manual AI (color-team) review — POST /api/portal/[t]/proposals/[p]/ai-review. |
-| `__tests__/amendments.test.ts` | 147 | 3 | 0 | Amendment fan-out engine (M3) — audit contracts across the three routes. |
-| `__tests__/architecture-live.test.ts` | 85 | 1 | 0 | The live layer classifies tables by what the DATABASE says touched them. These tests exist because the first version of that classification was wrong  |
-| `__tests__/archive.test.ts` | 116 | 1 | 0 | Archive lifecycle (V1-11) — restore/delete route gating + the restore audit contract. The FK-safe permanent delete transaction is proven by a live DB  |
-| `__tests__/artifact-canvas.test.ts` | 50 | 1 | 0 | — |
-| `__tests__/artifact-export.test.ts` | 96 | 2 | 0 | — |
-| `__tests__/artifact-spec.test.ts` | 206 | 1 | 0 | E2 — artifact-spec builder: TEXT spec parsing + frozen CanvasRules/ComplianceSpec. |
-| `__tests__/assemble-from-atoms.test.ts` | 139 | 2 | 0 | atoms → groups → section, fitted by the intra-segment ruler. |
-| `__tests__/assemble-route-gates.test.ts` | 97 | 0 | 0 | THE TWO GATES ON THE LIBRARY ASSEMBLER — pinned in the source, because they were absent once. |
-| `__tests__/assess-ingest.test.ts` | 96 | 1 | 0 | Assess ingest readiness — POST /api/admin/rfp-curation/[solId]/assess-ingest. |
-| `__tests__/atom-harvest.test.ts` | 49 | 2 | 0 | — |
-| `__tests__/atom-review-librarian.test.ts` | 73 | 1 | 0 | Librarian catalog parsing (#5, the librarian half) — lib/atom-review.ts. |
-| `__tests__/atom-titles.test.ts` | 95 | 2 | 0 | AN ATOM IS NEVER NAMED AFTER A NODE TYPE. |
-| `__tests__/atoms-upload-auto.test.ts` | 118 | 1 | 0 | Auto-atomize on upload (#6) — POST /api/portal/[t]/atoms/upload?mode=auto. |
-| `__tests__/atoms.test.ts` | 52 | 2 | 0 | — |
-| `__tests__/audit-coverage.test.ts` | 190 | 0 | 0 | AUDIT-COVERAGE INVARIANT — "no business write without a domain event." |
-| `__tests__/audit-log-destination.test.ts` | 98 | 0 | 0 | THERE IS ONE AUDIT TRAIL, AND ONE WAY INTO IT. |
-| `__tests__/auth-authorize.test.ts` | 296 | 1 | 0 | TEST-03 — auth.ts authorize() logic |
-| `__tests__/authored-scope.test.ts` | 177 | 1 | 0 | An empty volume is a portal form, and completed-elsewhere is still required. |
-| `__tests__/auto-gate-evidence.test.ts` | 67 | 1 | 0 | The AI-manager stage gate's auto-close decision (B17 + PATTERN_AUDIT HIGH-4). |
-| `__tests__/automation-catalog.test.ts` | 87 | 1 | 0 | The automation dial can never lie (#190 integrity guard). |
-| `__tests__/automation-framework.test.ts` | 93 | 1 | 0 | Admin automation-framework API (#190 Phase D3): admin gate, GET, PATCH validation + update. The "this changes the framework" control plane (RFP-Pipeli |
-| `__tests__/automation-overview.test.ts` | 138 | 1 | 0 | Tenant automation-overview API (UI-gaps T2/T4/T5): auth gate + the coverage / task board / per-portal config roll-up shape, including the guardrail_co |
-| `__tests__/automation-policies.test.ts` | 114 | 1 | 0 | Tenant automation-policies API (#190 Phase D2): auth gates, GET catalog merge, PATCH validation (unknown trigger / bad role / bad channel), and a vali |
-| `__tests__/automation-policy.test.ts` | 107 | 1 | 0 | Unit tests for the automation-policy resolver (#190 Phase B). Covers the four-tier precedence, the framework-hard curation-SLA pin, the nudge-count ca |
-| `__tests__/automation-triggers.test.ts` | 54 | 1 | 0 | — |
-| `__tests__/bounding-box.test.ts` | 109 | 3 | 0 | Bounding-box measurement — the box reports two numbers so it is a check, not a claim. |
-| `__tests__/bucket-affinity.test.ts` | 117 | 1 | 0 | Affinity — the thumb generalised into the attributes behind it. |
-| `__tests__/bucket-authoring-budget.test.ts` | 106 | 2 | 0 | The spotlight-bucket authoring budget (#189). |
-| `__tests__/bucket-ranking-abstention.test.ts` | 183 | 2 | 0 | Abstention, the curated ranking corpus, and the fields that cross the bridge (mig 238 · 239). |
-| `__tests__/bucket-ranking.test.ts` | 141 | 1 | 0 | The canonical spotlight-bucket scorer lock (docs/BUCKET_LOCKDOWN.md T2). `scoreCard` had ZERO direct coverage — correctness rested on comment-discipli |
-| `__tests__/bucket-signal-coverage.test.ts` | 126 | 1 | 0 | Signal coverage — does a lens's criterion reach ANY of this tenant's cards? |
-| `__tests__/build-readiness-undecided.test.ts` | 96 | 1 | 0 | Build-out readiness must count the items still waiting on a person. |
-| `__tests__/canvas-capabilities.test.ts` | 71 | 1 | 0 | — |
-| `__tests__/canvas-html-elements.test.ts` | 86 | 2 | 0 | — |
-| `__tests__/canvas-margin-label.test.ts` | 36 | 1 | 0 | The compliance read-out's margin line. |
-| `__tests__/canvas-scope.test.ts` | 201 | 2 | 0 | The scope ladder — one resolver, two surfaces. |
-| `__tests__/canvas-sections.test.ts` | 210 | 3 | 0 | — |
-| `__tests__/canvas-shape-svg.test.ts` | 45 | 2 | 0 | — |
-| `__tests__/canvas-toolbox.test.ts` | 91 | 1 | 0 | — |
-| `__tests__/canvas-writer-hardening.test.ts` | 60 | 2 | 0 | — |
-| `__tests__/capture-forms-send-session.test.ts` | 99 | 0 | 0 | A PUBLIC CAPTURE FORM MUST SEND THE VISITOR SESSION, OR THE WHOLE FUNNEL IS FED BY NOTHING. |
-| `__tests__/card-date-serialization.test.ts` | 87 | 0 | 0 | A card's dates must be ISO, because the OTHER service has to read them. |
-| `__tests__/card-format.test.ts` | 84 | 2 | 0 | R4 — opportunity card presentation helpers (pure, no React/DB). |
-| `__tests__/cards-card.test.ts` | 54 | 1 | 0 | R0.3 — card read-model normaliser. |
-| `__tests__/client-clock-in-render.test.ts` | 214 | 0 | 0 | A `'use client'` component must not read the clock while it renders. |
-| `__tests__/client-implicit-locale.test.ts` | 71 | 0 | 0 | A client component must not format with the AMBIENT locale or timezone. |
-| `__tests__/client-timezone-in-render.test.ts` | 225 | 0 | 0 | A `'use client'` component must not format a date in the AMBIENT time zone while it renders. |
-| `__tests__/color-team-scope-rollup.test.ts` | 129 | 1 | 0 | The colour-team rollup, once a review can be narrower than a section. |
-| `__tests__/comments-scope.test.ts` | 138 | 1 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/comments — read-scoping |
-| `__tests__/companion-guide-invariants.test.ts` | 70 | 0 | 0 | THE ON-PAGE GUIDE IS READ AS A PROMISE, SO IT MAY NOT QUIETLY BECOME A FEATURE LIST. |
-| `__tests__/compliance-validate.test.ts` | 62 | 1 | 0 | — |
-| `__tests__/content-canvas.test.ts` | 171 | 1 | 0 | content-canvas — the Content Studio ⇄ Canvas bridge (pure). Proves the seed parser (markdown/HTML → nodes) and the public HTML projection. |
-| `__tests__/corpus-verbatim.test.ts` | 75 | 1 | 0 | LIB-HYGIENE — the probe that decides whose words an atom contains. |
-| `__tests__/cron-paths-reachable.test.ts` | 92 | 0 | 0 | A ROUTE THAT AUTHENTICATES BY BEARER TOKEN IS UNREACHABLE UNTIL THE MIDDLEWARE LETS IT THROUGH. |
-| `__tests__/curation-republish.test.ts` | 170 | 1 | 0 | Mid-window propagation lib (lib/curation/republish.ts) — hermetic unit tests. |
-| `__tests__/deployment-migrations.test.ts` | 173 | 0 | 0 | MIGRATIONS RUN INSIDE THE DEPLOYMENT, and these are the properties that make that true. |
-| `__tests__/describe-actor.test.ts` | 68 | 1 | 0 | "Who did this" is a name, never an identifier. |
-| `__tests__/document-furniture.test.ts` | 445 | 3 | 0 | Document furniture — the apparatus pass that turns a drafted volume into a finished one. |
-| `__tests__/docx-elements.test.ts` | 88 | 2 | 0 | — |
-| `__tests__/docx-import-figures.test.ts` | 92 | 2 | 0 | — |
-| `__tests__/drawer-landmark-role.test.ts` | 67 | 2 | 0 | THE NAV RAIL IS NOT A DIALOG. |
-| `__tests__/dsip-deconstruct.test.ts` | 214 | 1 | 0 | DSIP full-proposal deconstruct — segmenter contract (lib/library/dsip-deconstruct.ts). |
-| `__tests__/email-postmark.test.ts` | 249 | 3 | 0 | The Postmark driver and the delivery webhook — the two halves of "did it actually land". |
-| `__tests__/email-seam.test.ts` | 209 | 2 | 0 | What `send()` guarantees, independent of any transport. |
-| `__tests__/email-transport-boundary.test.ts` | 173 | 0 | 0 | THE SEND SEAM IS A BOUNDARY, and this test is what makes it one. |
-| `__tests__/emulator-canvas-coverage.test.ts` | 85 | 0 | 0 | The emulated-Claude drafter must keep exercising the CANVAS, not just prose (#148). |
-| `__tests__/errors.test.ts` | 73 | 1 | 0 | — |
-| `__tests__/event-bracket.test.ts` | 109 | 1 | 0 | `withEventBracket` — the bracket that cannot be dropped. |
-| `__tests__/event-contract.test.ts` | 185 | 1 | 0 | EVENT-CONTRACT INVARIANT — namespace registry · type format · start/end pairing. |
-| `__tests__/event-label-jargon.test.ts` | 180 | 1 | 0 | THE CUSTOMER'S ACTIVITY FEED SHOULD NOT SPEAK THE SYSTEM'S OWN VOCABULARY. |
-| `__tests__/event-labels.test.ts` | 81 | 1 | 0 | Canonical event-label map — the single source of truth for the activity stream, notification bell, notifications API, dashboard, and proposal timeline |
-| `__tests__/event-namespace-registry.test.ts` | 415 | 1 | 0 | ONE REGISTRY, RECONCILED ACROSS EVERYTHING THAT WRITES IT DOWN. |
-| `__tests__/force-advance.test.ts` | 102 | 1 | 0 | forceAdvanceProcess — the shared HITL force-advance core (admin + portal routes). Locks the guards the map found untested: RBAC (own-tenant scope), pa |
-| `__tests__/format-controls.test.ts` | 33 | 1 | 0 | — |
-| `__tests__/full-draft.test.ts` | 259 | 1 | 0 | TEST — portal/[tenantSlug]/proposals/[proposalId]/full-draft route handler |
-| `__tests__/funnel-rate-floor.test.ts` | 56 | 1 | 0 | THE FUNNEL MAY NOT PRINT A RATE IT CANNOT SUPPORT. |
-| `__tests__/guardrail-authoring.test.ts` | 245 | 2 | 0 | Portal build-workflow authoring — recommended defaults + validator (delegated managers). |
-| `__tests__/guardrail-templates.test.ts` | 124 | 1 | 0 | Portal guardrail-templates API (the config-templates capability): auth gate, GET list shape, POST validation (name required, config validated against  |
-| `__tests__/guide-coverage-state.test.ts` | 149 | 1 | 0 | THE STATE MACHINE THE LOOP RUNS ON, AND THE ONE TRANSITION NOBODY WOULD NOTICE. |
-| `__tests__/hitl-role-hierarchy.test.ts` | 29 | 1 | 0 | HITL P2 — the role-hierarchy expectations the ToDo visibility/completion logic depends on (lib/tasks/tasks.ts). Pure (no DB); the live cross-tenant/es |
-| `__tests__/house-docs.test.ts` | 41 | 1 | 0 | — |
-| `__tests__/ingest-assessment.test.ts` | 64 | 1 | 0 | Ingest-assessment reader (#12) — lib/ingest/assessment.ts. |
-| `__tests__/ingest-pattern-extract.test.ts` | 498 | 2 | 0 | The deterministic ingest extractor (`pattern_match`) — lib/ingest/pattern-extract.ts. |
-| `__tests__/ingest-provenance-audit.test.ts` | 126 | 1 | 0 | The ingest provenance audit — lib/ingest/provenance-audit.ts. |
-| `__tests__/ingest-skeleton.test.ts` | 39 | 2 | 0 | — |
-| `__tests__/ingest-studio-stage-land.test.ts` | 82 | 2 | 0 | Ingest Studio — the stage/land contract (docs/INGEST_STUDIO_DESIGN.md). |
-| `__tests__/ingest-topic-files.test.ts` | 156 | 1 | 0 | ingest-topic-files — unit tests for the "N topic files → N topic opportunities" ingest. Hermetic: sql + events mocked, storage injected. |
-| `__tests__/integration/smoke.test.ts` | 711 | 5 | 0 | Pre-launch integration smoke tests — 5 tests exercising critical subsystems without a running server or live database. |
-| `__tests__/invite.test.ts` | 459 | 1 | 0 | TEST-15 — POST /api/invite route handler |
-| `__tests__/jsonb-coerce.test.ts` | 32 | 1 | 0 | coerceJsonb — guards the postgres.js jsonb read nuance (write via JSON.stringify::jsonb reads back as a STRING; sql.json / DDL default reads back pars |
-| `__tests__/land-revisions.test.ts` | 169 | 1 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions |
-| `__tests__/launch-overlay-tenant-scope.test.ts` | 103 | 1 | 0 | A LAUNCH MUST NOT SCOPE AN INSTANCE TO ONE TENANT AND POINT IT AT ANOTHER'S WORK. |
-| `__tests__/library-query.test.ts` | 22 | 1 | 0 | — |
-| `__tests__/lifecycle.test.ts` | 77 | 1 | 0 | — |
-| `__tests__/manager-request-guard.test.ts` | 47 | 1 | 0 | Regression: the generic task completer must NOT close a manager_request (docs/PARTNER_MANAGER_DESIGN §4B). Closing it there only marks the row done +  |
-| `__tests__/managers-revoke.test.ts` | 74 | 1 | 0 | Revoke partner-manager (CAP-2) — DELETE /api/portal/[t]/managers/[membershipId]. |
-| `__tests__/markdown-canvas.test.ts` | 67 | 2 | 0 | — |
-| `__tests__/measure-grid.test.ts` | 210 | 2 | 0 | The measurement grid's geometry — a ruler is worthless if its lines are in the wrong place. |
-| `__tests__/member-scope.test.ts` | 71 | 1 | 0 | tenant_user per-proposal scoping (CAP-3) — PATCH /api/portal/[t]/members/[userId]/scope. |
-| `__tests__/middleware.test.ts` | 527 | 1 | 0 | TEST-11 — middleware.ts role-guard behavior |
-| `__tests__/node-text-extraction.test.ts` | 95 | 1 | 0 | getNodeText must cover every TEXT-BEARING node type. |
-| `__tests__/node-vocabulary-coverage.test.ts` | 175 | 6 | 0 | EVERY node type must come out of EVERY exporter — as text, or as a raster it deliberately became. |
-| `__tests__/observe-discrepancies.test.ts` | 132 | 1 | 0 | THE OBSERVATION WINDOW'S FINDINGS ARE ARITHMETIC, AND ARITHMETIC IS TESTABLE. |
-| `__tests__/opportunity-context.test.ts` | 41 | 1 | 0 | — |
-| `__tests__/opportunity-lifecycle.test.ts` | 136 | 1 | 0 | POST /api/admin/opportunities/[oppId]/lifecycle — C6 opportunity lifecycle. Verifies admin gating, action validation, soft-state transitions (close /  |
-| `__tests__/outcome-todo.test.ts` | 85 | 1 | 0 | Post-submission outcome-nudge ToDo (#13) — lib/proposal/outcome-todo.ts. |
-| `__tests__/page-ruler-calibration.test.ts` | 161 | 1 | 0 | The page ruler must keep agreeing with the printed page. |
-| `__tests__/page-ruler-frame.test.ts` | 183 | 1 | 0 | The page FRAME, and the two node shapes a mold is built out of (bug log B68 · B69 · B70). |
-| `__tests__/paginate-per-node.test.ts` | 156 | 1 | 0 | WHICH PAGE IS THIS NODE ON — the question the ruler could not answer. |
-| `__tests__/partial-canvas-tolerance.test.ts` | 110 | 1 | 0 | A PARTIAL canvas must never crash a reader (bug log B73 · B78). |
-| `__tests__/partner-containment.test.ts` | 79 | 7 | 0 | Partner-containment regression (leak-hunt fix, 2026-08-01). |
-| `__tests__/partner-manager-request.test.ts` | 28 | 1 | 0 | Manager-request guards (docs/PARTNER_MANAGER_DESIGN.md §4 Branch B). The empty-input guards must fail closed BEFORE any DB call. The full create/appro |
-| `__tests__/partner-name-match.test.ts` | 58 | 1 | 0 | Partner add-company name matching (docs/PARTNER_MANAGER_DESIGN.md §4, D6). Pure-logic + guard branches: threshold resolution, normalization, and the e |
-| `__tests__/partner-own-org-gate.test.ts` | 114 | 1 | 0 | The partner console re-provisioned its own org on EVERY render, for months, silently. |
-| `__tests__/partner-precheck.test.ts` | 34 | 1 | 0 | Add-company precheck classifier (docs/PARTNER_MANAGER_DESIGN.md §4). Pure decision logic — the ordering of the hard gates (email → exact → similar → n |
-| `__tests__/partner-registration.test.ts` | 43 | 1 | 0 | Partner registration validation (docs/PARTNER_MANAGER_DESIGN.md §4 Branch A). Pure required-field/email/length checks — the DB insert + dedup re-guard |
-| `__tests__/partner-scope.test.ts` | 63 | 1 | 0 | Partner scope guards (docs/PARTNER_MANAGER_DESIGN.md §3, D2/D5). The empty-input short-circuits must fail closed and NOT touch the DB. The live member |
-| `__tests__/partner-todos.test.ts` | 44 | 1 | 0 | Partner cross-stable to-do feed (#16) — lib/partner/todos.ts. |
-| `__tests__/past-proposal-canvas.test.ts` | 56 | 3 | 0 | — |
-| `__tests__/paywall.test.ts` | 24 | 1 | 0 | — |
-| `__tests__/portal-agents-usage.test.ts` | 123 | 1 | 0 | GET /api/portal/[tenantSlug]/agents/usage — customer AI usage view. |
-| `__tests__/portals-launch-route.test.ts` | 122 | 1 | 0 | Portal launch/release hand-off (adversarial-sweep B2): the discovery-spine → build-spine link. Proves the accept/release handlers PROVISION + LINK the |
-| `__tests__/pptx-elements.test.ts` | 88 | 2 | 0 | — |
-| `__tests__/pptx-entities.test.ts` | 86 | 3 | 0 | A slide that says "Core Technology & IP" must not enter the library as "Core Technology &amp; IP". |
-| `__tests__/process-filter.test.ts` | 43 | 1 | 0 | — |
-| `__tests__/process-health.test.ts` | 52 | 1 | 0 | — |
-| `__tests__/project-collaboration-launch.test.ts` | 95 | 1 | 0 | R3.3 — launchProjectCollaboration, the canonical project-reaction entry point. |
-| `__tests__/projects-assignment-boundary.test.ts` | 174 | 1 | 0 | ASSIGNMENT IS THE HALF RLS CANNOT ENFORCE, so it gets a test of its own. |
-| `__tests__/projects-baseline.test.ts` | 247 | 1 | 0 | The baseline: the only number in this capability that cannot be recomputed after the fact. |
-| `__tests__/projects-cdrl.test.ts` | 247 | 2 | 0 | THE CDRL REGISTER — the obligation, the three states, and the marking. |
-| `__tests__/projects-comments.test.ts` | 288 | 3 | 0 | THE CONVERSATION — the rules that stop a comment from being a diary. |
-| `__tests__/projects-dates.test.ts` | 152 | 1 | 0 | The date bug that every automated lens passed, and only a screenshot caught. |
-| `__tests__/projects-deliverables.test.ts` | 404 | 2 | 0 | UPLOAD AND ACCEPTANCE ARE TWO FACTS — and this file is what keeps them apart. |
-| `__tests__/projects-evidence.test.ts` | 151 | 2 | 0 | EVIDENCING IS NOT ACCEPTING — and a claim about somebody is not their act. |
-| `__tests__/projects-forecast.test.ts` | 148 | 1 | 0 | ESTIMATE AT COMPLETION — and the three ways it can be a lie. |
-| `__tests__/projects-gate-closer.test.ts` | 196 | 3 | 0 | THE AI-MANAGER GATE CLOSER — and the asymmetry that makes it safe. |
-| `__tests__/projects-gate-scoping.test.ts` | 79 | 0 | 0 | Every delivery route runs INSIDE the tenant context — the defect no lens could see. |
-| `__tests__/projects-invoices.test.ts` | 323 | 2 | 0 | INVOICING — where the capability becomes money, and where being wrong costs something. |
-| `__tests__/projects-meetings.test.ts` | 209 | 3 | 0 | MEETINGS — and the one failure that leaves two records disagreeing. |
-| `__tests__/projects-mentions.test.ts` | 97 | 1 | 0 | THE MENTION PARSER — where a silent failure looks exactly like a success. |
-| `__tests__/projects-modifications.test.ts` | 352 | 3 | 0 | CONTRACT MODIFICATIONS — the only write path to a CLIN. |
-| `__tests__/projects-money.test.ts` | 57 | 1 | 0 | The second defect the picture caught and the assertions did not. |
-| `__tests__/projects-narrative-fidelity.test.ts` | 139 | 1 | 0 | DID THE DRAFTED NARRATIVE INVENT A NUMBER? |
-| `__tests__/projects-notify-policy.test.ts` | 165 | 1 | 0 | THE THIRD LEVEL — a project's own reminder policy. |
-| `__tests__/projects-provenance.test.ts` | 161 | 1 | 0 | Provenance: the rule that a value the product did not read from the source must never look like one it did. |
-| `__tests__/projects-reviews.test.ts` | 278 | 4 | 0 | THE REVIEW GATE — and the one thing it must never become. |
-| `__tests__/projects-risks.test.ts` | 222 | 3 | 0 | THE REGISTER — and the history a program review actually asks for. |
-| `__tests__/projects-rollup-measures.test.ts` | 40 | 1 | 0 | NOT MEASURED IS NOT ZERO. |
-| `__tests__/projects-status-report.test.ts` | 213 | 2 | 0 | THE STATUS REPORT — a document whose numbers are read, not typed. |
-| `__tests__/projects-task-spine.test.ts` | 316 | 3 | 0 | TASK SPINE V2 — the rules that are easy to state and easy to get subtly wrong (mig 221). |
-| `__tests__/projects-tenant-transactions.test.ts` | 168 | 0 | 0 | A tenant-scoped transaction must carry the tenant context — `sql.begin` does not. |
-| `__tests__/projects-time.test.ts` | 229 | 2 | 0 | LABOUR ACTUALS — the input the cost measure never had. |
-| `__tests__/projects-workplan-canvas.test.ts` | 165 | 2 | 0 | The `workplan` canvas: a WBS grid projected from rows, and the one exemption it gets from the compliance floor. |
-| `__tests__/promo-codes.test.ts` | 100 | 1 | 0 | Comp-code issuance. A comp code IS the payment — redeeming one opens a proposal portal without a card — so the two things worth pinning are the shape  |
-| `__tests__/proposal-access-scope.test.ts` | 113 | 1 | 0 | resolveUserAccess — CAP-3 per-proposal scoping for an internal tenant_user. |
-| `__tests__/proposal-draft-section.test.ts` | 64 | 1 | 0 | proposal.draft_section — compliance-aware prompt construction (#14). |
-| `__tests__/proposal-strategy.test.ts` | 53 | 1 | 0 | Capture-strategy reader (#1) — lib/proposal/strategy.ts. |
-| `__tests__/proposals-create.test.ts` | 603 | 1 | 0 | TEST-04 — portal/[tenantSlug]/proposals/create route handler |
-| `__tests__/prospect-tables-admin-only.test.ts` | 107 | 0 | 0 | THE PROSPECT TABLES HAVE NO RLS, SO NOTHING BUT THIS TEST STOPS A TENANT SURFACE READING THEM. |
-| `__tests__/provenance-truncation.test.ts` | 108 | 2 | 0 | A document we stopped reading cannot support "not stated in the source" (bug log B40). |
-| `__tests__/purchase-history-surfacing.test.ts` | 91 | 1 | 0 | WHAT A PURCHASE WAS FOR. |
-| `__tests__/rbac.test.ts` | 200 | 1 | 0 | — |
-| `__tests__/scenarios-full-curation-flow.test.ts` | 255 | 10 | 0 | Phase 1 §E24 — cross-tool full-curation-flow integration test. |
-| `__tests__/scoped-findings.test.ts` | 146 | 1 | 0 | WHAT IS STILL OUTSTANDING, AND WHERE — the gate as a live checklist. |
-| `__tests__/scoped-review-plan.test.ts` | 219 | 2 | 0 | What a scoped review actually QUEUES. |
-| `__tests__/scout-classify.test.ts` | 133 | 1 | 0 | Unit tests for the deterministic scout NEW-vs-UPDATE classifier (#176). Pure, DB-free — the exact matcher the candidate queue relies on. |
-| `__tests__/section-budget.test.ts` | 64 | 2 | 0 | — |
-| `__tests__/section-lock.test.ts` | 197 | 1 | 0 | Section accept/lock lifecycle route — POST (accept+lock) / DELETE (unlock). Verifies admin-only gating, section-belongs check, the state transition, a |
-| `__tests__/section-save.test.ts` | 668 | 1 | 0 | TEST-06 — PUT /api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save |
-| `__tests__/section-standards.test.ts` | 96 | 2 | 0 | Section-standards taxonomy (Phase 3, C1): the inferSectionType helper + the RFP-admin standards API (auth gate, validation, create). |
-| `__tests__/seed-job-skip.test.ts` | 102 | 1 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/skip |
-| `__tests__/seeded-credentials.test.ts` | 165 | 0 | 0 | NO MIGRATION MAY LEAVE AN ACCOUNT SIGN-IN-ABLE WITH A PASSWORD THAT IS IN THIS REPOSITORY. |
-| `__tests__/session-policy.test.ts` | 155 | 1 | 0 | THE TWO BOUNDS A SESSION HAS, AND THE FOUR WAYS A BOUND GETS WRITTEN WRONG. |
-| `__tests__/source-text-cap.test.ts` | 114 | 1 | 0 | "We did not find it" must never stand in for "we never looked". |
-| `__tests__/space-presence-invariants.test.ts` | 214 | 0 | 0 | THE ENTER AND THE EXIT MUST COME FROM ONE PLACE. |
-| `__tests__/sql-comment-backtick.test.ts` | 94 | 0 | 0 | A BACKTICK INSIDE A SQL COMMENT INSIDE A TAGGED TEMPLATE ENDS THE TEMPLATE. |
-| `__tests__/sql-comment-backticks.test.ts` | 78 | 0 | 0 | A backtick inside a SQL comment TERMINATES the tagged template it lives in. |
-| `__tests__/starter-set.test.ts` | 91 | 3 | 0 | — |
-| `__tests__/storage-abstraction-boundary.test.ts` | 80 | 0 | 0 | THE STORAGE ABSTRACTION IS A BOUNDARY, and this test is what makes it one. |
-| `__tests__/storage-paths.test.ts` | 235 | 1 | 0 | — |
-| `__tests__/stripe-webhook.test.ts` | 310 | 1 | 0 | TEST-02 — stripe/webhook route handler |
-| `__tests__/studio-voice-payload.test.ts` | 119 | 1 | 0 | THE STUDIO CARRIES THE PROPOSAL'S VOICE — pinned because it silently did not (bug log B84). |
-| `__tests__/studio.test.ts` | 132 | 1 | 0 | Proposal Studio route — POST /api/portal/[t]/proposals/[p]/studio (start / regenerate / approve). Verifies: tenant_admin+ gate; start emits proposal:r |
-| `__tests__/task-catalog-drift.test.ts` | 66 | 1 | 0 | ToDo catalog drift guard (HITL P1). |
-| `__tests__/task-completers.test.ts` | 47 | 1 | 0 | R5.4 (W-M) — typed completer selection + spec parsing (pure). |
-| `__tests__/task-urgency.test.ts` | 54 | 1 | 0 | — |
-| `__tests__/task-workflows.test.ts` | 90 | 2 | 0 | — |
-| `__tests__/tasks-assign-route.test.ts` | 79 | 1 | 0 | R5.1 (J1) — the assign route's guards (auth floor + portal role allowlist + UUID shape). The core createTask is tested separately; here we lock that t |
-| `__tests__/tasks-create.test.ts` | 66 | 1 | 0 | R5.1 (J1) — createTask validation (the early-return branches, no DB). |
-| `__tests__/team-role.test.ts` | 135 | 1 | 0 | PATCH /api/portal/[tenantSlug]/team/[userId] — change a member's role. |
-| `__tests__/template-interpolation.test.ts` | 48 | 2 | 0 | interpolateTemplate — JSON-safety contract (adversarial sweep 2026-08-18, HIGH-1). |
-| `__tests__/template-registry-complete.test.ts` | 102 | 1 | 0 | Every template is reachable (#151 — Launch: integrate templates). |
-| `__tests__/template-skeleton.test.ts` | 81 | 2 | 0 | — |
-| `__tests__/template-stable-selfheal.test.ts` | 53 | 1 | 0 | A new customer must not land with an empty template shelf (bug log B34). |
-| `__tests__/tenant-documents.test.ts` | 189 | 3 | 0 | — |
-| `__tests__/tools-compliance.test.ts` | 300 | 9 | 0 | Phase 1 §E.3 — compliance + annotation tools (E10, E11, E12, E15). |
-| `__tests__/tools-ingest-and-extra.test.ts` | 298 | 10 | 0 | Phase 1 §E.4 — ingest tools + compliance.add_variable + extract. |
-| `__tests__/tools-registry.test.ts` | 395 | 7 | 0 | Tool registry tests — verifies the enforcement chain without a live database by stubbing the events emitter + capacity recorder. |
-| `__tests__/tools-solicitation-read.test.ts` | 281 | 8 | 0 | Phase 1 §E — solicitation + opportunity read tools (E1, E2, E16). |
-| `__tests__/tools-solicitation-review.test.ts` | 415 | 9 | 0 | Phase 1 §E.2b — approval-flow state-machine tools (E6, E7, E8, E9). |
-| `__tests__/tools-solicitation-state.test.ts` | 272 | 8 | 0 | Phase 1 §E.2a — solicitation state-transition tools (E3, E4, E5). |
-| `__tests__/tools-volumes.test.ts` | 248 | 10 | 0 | Phase 1 §E extension: volumes + required items tools. |
-| `__tests__/unit/assemble-proposal.test.ts` | 62 | 1 | 0 | — |
-| `__tests__/unit/atom-enrich.test.ts` | 22 | 1 | 0 | — |
-| `__tests__/unit/atom-review.test.ts` | 64 | 1 | 0 | — |
-| `__tests__/unit/atomize-plan.test.ts` | 54 | 1 | 0 | — |
-| `__tests__/unit/brand.test.ts` | 67 | 2 | 0 | — |
-| `__tests__/unit/canvas-selection.test.ts` | 61 | 2 | 0 | — |
-| `__tests__/unit/character-limits.test.ts` | 201 | 3 | 0 | — |
-| `__tests__/unit/color-team-status.test.ts` | 101 | 1 | 0 | — |
-| `__tests__/unit/completed-elsewhere-requirement.test.ts` | 83 | 1 | 0 | Marking a requirement "completed elsewhere" must not make the proposal permanently unsubmittable. |
-| `__tests__/unit/compliance-typed-mirror.test.ts` | 87 | 0 | 0 | — |
-| `__tests__/unit/cost-forms.test.ts` | 136 | 4 | 0 | — |
-| `__tests__/unit/cost-model-dsip-parity.test.ts` | 132 | 1 | 0 | — |
-| `__tests__/unit/cost-model.test.ts` | 123 | 1 | 0 | — |
-| `__tests__/unit/cost-volume-canvas.test.ts` | 199 | 3 | 0 | — |
-| `__tests__/unit/cost-workbook-item.test.ts` | 109 | 1 | 0 | The cost workbook lands on exactly one item per cost volume, and the mold builder must skip that same item. |
-| `__tests__/unit/cron-bearer-middleware.test.ts` | 103 | 0 | 0 | The middleware must let a headless scheduler reach the two cron endpoints — and nothing else. |
-| `__tests__/unit/defaulted-requirement.test.ts` | 70 | 0 | 0 | A requirement the product ASSUMED must not block submission the way one it READ does. |
-| `__tests__/unit/dsip-only-volumes.test.ts` | 102 | 0 | 0 | — |
-| `__tests__/unit/embeddings.test.ts` | 80 | 1 | 0 | — |
-| `__tests__/unit/foreign-solicitation.test.ts` | 173 | 2 | 0 | A proposal must cite its OWN solicitation and no other. |
-| `__tests__/unit/latex-html.test.ts` | 100 | 1 | 0 | LaTeX → HTML, and the rule that matters more than coverage: never guess. |
-| `__tests__/unit/librarian-catalog.test.ts` | 61 | 1 | 0 | — |
-| `__tests__/unit/molds-gate.test.ts` | 175 | 2 | 0 | — |
-| `__tests__/unit/number-format.test.ts` | 24 | 1 | 0 | — |
-| `__tests__/unit/numeric-cell.test.ts` | 34 | 1 | 0 | — |
-| `__tests__/unit/page-estimate.test.ts` | 69 | 1 | 0 | — |
-| `__tests__/unit/page-furniture.test.ts` | 325 | 1 | 0 | Running page furniture must never reach a library atom. |
-| `__tests__/unit/panel-focus-node-tab.test.ts` | 53 | 1 | 0 | Selecting a node lands the author on formatting — without stealing the tab they chose. |
-| `__tests__/unit/pptx-layer-order.test.ts` | 73 | 2 | 0 | Z-order reaches the exported deck. |
-| `__tests__/unit/pptx-tables.test.ts` | 41 | 1 | 0 | — |
-| `__tests__/unit/pptx-vertical-balance.test.ts` | 121 | 2 | 0 | A short slide is balanced in its frame; a full one is not moved. |
-| `__tests__/unit/pptx-wrapped-height.test.ts` | 139 | 2 | 0 | A slide frame is as tall as the text inside it — otherwise PowerPoint deletes the overflow. |
-| `__tests__/unit/proposal-visibility.test.ts` | 34 | 1 | 0 | hasProposalVisibility — the read gate the per-proposal API routes use to close the CAP-3 leak (a proposal-scoped tenant_user reading a proposal outsid |
-| `__tests__/unit/propose-regions.test.ts` | 36 | 1 | 0 | — |
-| `__tests__/unit/reconstruct-section-doc.test.ts` | 127 | 2 | 0 | reconstructSectionDoc / originalNodeId (fluid-canvas F2 editable surface). |
-| `__tests__/unit/size-rulers.test.ts` | 178 | 1 | 0 | — |
-| `__tests__/unit/slide-frame.test.ts` | 42 | 2 | 0 | — |
-| `__tests__/unit/sttr-work-split.test.ts` | 97 | 1 | 0 | — |
-| `__tests__/unit/table-cell-style.test.ts` | 29 | 2 | 0 | — |
-| `__tests__/unit/unextractable.test.ts` | 43 | 1 | 0 | — |
-| `__tests__/unit/vision.test.ts` | 18 | 1 | 0 | — |
-| `__tests__/validation.test.ts` | 145 | 1 | 0 | — |
-| `__tests__/visual-review-parse.test.ts` | 103 | 1 | 0 | The visual reviewer's reply parser, against recorded model replies (VIS-PROOF). |
-| `__tests__/xlsx-elements.test.ts` | 98 | 2 | 0 | — |
+| `frontend/__tests__/admin-agent-config.test.ts` | 259 | 2 | 0 | Admin AI-config routes: - /api/admin/tenants/[tenantId]/agent-config (per-tenant, rfp_admin+) - /api/admin/agents/platform-config (pipeline-wide, mast |
+| `frontend/__tests__/admin-doorbell.test.ts` | 122 | 1 | 0 | Admin Proposal Auto-Drive "Doorbell" — POST /api/admin/proposals/[proposalId]/full-draft. |
+| `frontend/__tests__/admin-guides-invariants.test.ts` | 166 | 0 | 0 | THE DISCOVERY GUIDES MAY NOT QUIETLY BECOME A FEATURE TOUR. |
+| `frontend/__tests__/admin-templates.test.ts` | 104 | 2 | 0 | E3b — Template Studio CRUD (admin/templates + admin/templates/[templateId]). |
+| `frontend/__tests__/advance.test.ts` | 744 | 1 | 0 | TEST-05 — POST /api/portal/[tenantSlug]/proposals/[proposalId]/advance |
+| `frontend/__tests__/agent-guard.test.ts` | 205 | 1 | 0 | Unified AI spend guard (lib/ai/agent-guard.ts). |
+| `frontend/__tests__/agent-labels.test.ts` | 73 | 1 | 0 | A customer must never read a system identifier where a name belongs. |
+| `frontend/__tests__/agent-roster-complete.test.ts` | 119 | 1 | 0 | AN AGENT MISSING FROM THE ROSTER IS INVISIBLE TO THE PERSON WHOSE WORKFORCE IT IS. |
+| `frontend/__tests__/ai-endpoint-single-source.test.ts` | 93 | 1 | 0 | Where the model lives is answered in ONE file. |
+| `frontend/__tests__/ai-review.test.ts` | 130 | 1 | 0 | Manual AI (color-team) review — POST /api/portal/[t]/proposals/[p]/ai-review. |
+| `frontend/__tests__/amendments.test.ts` | 147 | 3 | 0 | Amendment fan-out engine (M3) — audit contracts across the three routes. |
+| `frontend/__tests__/architecture-live.test.ts` | 85 | 1 | 0 | The live layer classifies tables by what the DATABASE says touched them. These tests exist because the first version of that classification was wrong  |
+| `frontend/__tests__/archive.test.ts` | 116 | 1 | 0 | Archive lifecycle (V1-11) — restore/delete route gating + the restore audit contract. The FK-safe permanent delete transaction is proven by a live DB  |
+| `frontend/__tests__/artifact-canvas.test.ts` | 50 | 1 | 0 | — |
+| `frontend/__tests__/artifact-export.test.ts` | 96 | 2 | 0 | — |
+| `frontend/__tests__/artifact-spec.test.ts` | 206 | 1 | 0 | E2 — artifact-spec builder: TEXT spec parsing + frozen CanvasRules/ComplianceSpec. |
+| `frontend/__tests__/assemble-from-atoms.test.ts` | 139 | 2 | 0 | atoms → groups → section, fitted by the intra-segment ruler. |
+| `frontend/__tests__/assemble-route-gates.test.ts` | 97 | 0 | 0 | THE TWO GATES ON THE LIBRARY ASSEMBLER — pinned in the source, because they were absent once. |
+| `frontend/__tests__/assess-ingest.test.ts` | 96 | 1 | 0 | Assess ingest readiness — POST /api/admin/rfp-curation/[solId]/assess-ingest. |
+| `frontend/__tests__/atom-harvest.test.ts` | 49 | 2 | 0 | — |
+| `frontend/__tests__/atom-review-librarian.test.ts` | 73 | 1 | 0 | Librarian catalog parsing (#5, the librarian half) — lib/atom-review.ts. |
+| `frontend/__tests__/atom-titles.test.ts` | 95 | 2 | 0 | AN ATOM IS NEVER NAMED AFTER A NODE TYPE. |
+| `frontend/__tests__/atoms-upload-auto.test.ts` | 118 | 1 | 0 | Auto-atomize on upload (#6) — POST /api/portal/[t]/atoms/upload?mode=auto. |
+| `frontend/__tests__/atoms.test.ts` | 52 | 2 | 0 | — |
+| `frontend/__tests__/audit-coverage.test.ts` | 190 | 0 | 0 | AUDIT-COVERAGE INVARIANT — "no business write without a domain event." |
+| `frontend/__tests__/audit-log-destination.test.ts` | 98 | 0 | 0 | THERE IS ONE AUDIT TRAIL, AND ONE WAY INTO IT. |
+| `frontend/__tests__/auth-authorize.test.ts` | 296 | 1 | 0 | TEST-03 — auth.ts authorize() logic |
+| `frontend/__tests__/authored-scope.test.ts` | 177 | 1 | 0 | An empty volume is a portal form, and completed-elsewhere is still required. |
+| `frontend/__tests__/auto-gate-evidence.test.ts` | 67 | 1 | 0 | The AI-manager stage gate's auto-close decision (B17 + PATTERN_AUDIT HIGH-4). |
+| `frontend/__tests__/automation-catalog.test.ts` | 87 | 1 | 0 | The automation dial can never lie (#190 integrity guard). |
+| `frontend/__tests__/automation-framework.test.ts` | 93 | 1 | 0 | Admin automation-framework API (#190 Phase D3): admin gate, GET, PATCH validation + update. The "this changes the framework" control plane (RFP-Pipeli |
+| `frontend/__tests__/automation-overview.test.ts` | 138 | 1 | 0 | Tenant automation-overview API (UI-gaps T2/T4/T5): auth gate + the coverage / task board / per-portal config roll-up shape, including the guardrail_co |
+| `frontend/__tests__/automation-policies.test.ts` | 114 | 1 | 0 | Tenant automation-policies API (#190 Phase D2): auth gates, GET catalog merge, PATCH validation (unknown trigger / bad role / bad channel), and a vali |
+| `frontend/__tests__/automation-policy.test.ts` | 107 | 1 | 0 | Unit tests for the automation-policy resolver (#190 Phase B). Covers the four-tier precedence, the framework-hard curation-SLA pin, the nudge-count ca |
+| `frontend/__tests__/automation-triggers.test.ts` | 54 | 1 | 0 | — |
+| `frontend/__tests__/bounding-box.test.ts` | 109 | 3 | 0 | Bounding-box measurement — the box reports two numbers so it is a check, not a claim. |
+| `frontend/__tests__/bucket-affinity.test.ts` | 117 | 1 | 0 | Affinity — the thumb generalised into the attributes behind it. |
+| `frontend/__tests__/bucket-authoring-budget.test.ts` | 106 | 2 | 0 | The spotlight-bucket authoring budget (#189). |
+| `frontend/__tests__/bucket-ranking-abstention.test.ts` | 183 | 2 | 0 | Abstention, the curated ranking corpus, and the fields that cross the bridge (mig 238 · 239). |
+| `frontend/__tests__/bucket-ranking.test.ts` | 141 | 1 | 0 | The canonical spotlight-bucket scorer lock (docs/BUCKET_LOCKDOWN.md T2). `scoreCard` had ZERO direct coverage — correctness rested on comment-discipli |
+| `frontend/__tests__/bucket-signal-coverage.test.ts` | 126 | 1 | 0 | Signal coverage — does a lens's criterion reach ANY of this tenant's cards? |
+| `frontend/__tests__/build-readiness-undecided.test.ts` | 96 | 1 | 0 | Build-out readiness must count the items still waiting on a person. |
+| `frontend/__tests__/canvas-capabilities.test.ts` | 71 | 1 | 0 | — |
+| `frontend/__tests__/canvas-html-elements.test.ts` | 86 | 2 | 0 | — |
+| `frontend/__tests__/canvas-margin-label.test.ts` | 36 | 1 | 0 | The compliance read-out's margin line. |
+| `frontend/__tests__/canvas-scope.test.ts` | 201 | 2 | 0 | The scope ladder — one resolver, two surfaces. |
+| `frontend/__tests__/canvas-sections.test.ts` | 210 | 3 | 0 | — |
+| `frontend/__tests__/canvas-shape-svg.test.ts` | 45 | 2 | 0 | — |
+| `frontend/__tests__/canvas-toolbox.test.ts` | 91 | 1 | 0 | — |
+| `frontend/__tests__/canvas-writer-hardening.test.ts` | 60 | 2 | 0 | — |
+| `frontend/__tests__/capture-forms-send-session.test.ts` | 99 | 0 | 0 | A PUBLIC CAPTURE FORM MUST SEND THE VISITOR SESSION, OR THE WHOLE FUNNEL IS FED BY NOTHING. |
+| `frontend/__tests__/card-date-serialization.test.ts` | 87 | 0 | 0 | A card's dates must be ISO, because the OTHER service has to read them. |
+| `frontend/__tests__/card-format.test.ts` | 84 | 2 | 0 | R4 — opportunity card presentation helpers (pure, no React/DB). |
+| `frontend/__tests__/cards-card.test.ts` | 54 | 1 | 0 | R0.3 — card read-model normaliser. |
+| `frontend/__tests__/client-clock-in-render.test.ts` | 214 | 0 | 0 | A `'use client'` component must not read the clock while it renders. |
+| `frontend/__tests__/client-implicit-locale.test.ts` | 71 | 0 | 0 | A client component must not format with the AMBIENT locale or timezone. |
+| `frontend/__tests__/client-timezone-in-render.test.ts` | 225 | 0 | 0 | A `'use client'` component must not format a date in the AMBIENT time zone while it renders. |
+| `frontend/__tests__/color-team-scope-rollup.test.ts` | 129 | 1 | 0 | The colour-team rollup, once a review can be narrower than a section. |
+| `frontend/__tests__/comments-scope.test.ts` | 138 | 1 | 0 | GET /api/portal/[tenantSlug]/proposals/[proposalId]/comments — read-scoping |
+| `frontend/__tests__/companion-guide-invariants.test.ts` | 70 | 0 | 0 | THE ON-PAGE GUIDE IS READ AS A PROMISE, SO IT MAY NOT QUIETLY BECOME A FEATURE LIST. |
+| `frontend/__tests__/compliance-validate.test.ts` | 62 | 1 | 0 | — |
+| `frontend/__tests__/content-canvas.test.ts` | 171 | 1 | 0 | content-canvas — the Content Studio ⇄ Canvas bridge (pure). Proves the seed parser (markdown/HTML → nodes) and the public HTML projection. |
+| `frontend/__tests__/corpus-verbatim.test.ts` | 75 | 1 | 0 | LIB-HYGIENE — the probe that decides whose words an atom contains. |
+| `frontend/__tests__/cron-paths-reachable.test.ts` | 92 | 0 | 0 | A ROUTE THAT AUTHENTICATES BY BEARER TOKEN IS UNREACHABLE UNTIL THE MIDDLEWARE LETS IT THROUGH. |
+| `frontend/__tests__/curation-republish.test.ts` | 170 | 1 | 0 | Mid-window propagation lib (lib/curation/republish.ts) — hermetic unit tests. |
+| `frontend/__tests__/deployment-migrations.test.ts` | 173 | 0 | 0 | MIGRATIONS RUN INSIDE THE DEPLOYMENT, and these are the properties that make that true. |
+| `frontend/__tests__/describe-actor.test.ts` | 68 | 1 | 0 | "Who did this" is a name, never an identifier. |
+| `frontend/__tests__/document-furniture.test.ts` | 445 | 3 | 0 | Document furniture — the apparatus pass that turns a drafted volume into a finished one. |
+| `frontend/__tests__/docx-elements.test.ts` | 88 | 2 | 0 | — |
+| `frontend/__tests__/docx-import-figures.test.ts` | 92 | 2 | 0 | — |
+| `frontend/__tests__/drawer-landmark-role.test.ts` | 67 | 2 | 0 | THE NAV RAIL IS NOT A DIALOG. |
+| `frontend/__tests__/dsip-deconstruct.test.ts` | 214 | 1 | 0 | DSIP full-proposal deconstruct — segmenter contract (lib/library/dsip-deconstruct.ts). |
+| `frontend/__tests__/email-postmark.test.ts` | 249 | 3 | 0 | The Postmark driver and the delivery webhook — the two halves of "did it actually land". |
+| `frontend/__tests__/email-seam.test.ts` | 209 | 2 | 0 | What `send()` guarantees, independent of any transport. |
+| `frontend/__tests__/email-transport-boundary.test.ts` | 173 | 0 | 0 | THE SEND SEAM IS A BOUNDARY, and this test is what makes it one. |
+| `frontend/__tests__/emulator-canvas-coverage.test.ts` | 85 | 0 | 0 | The emulated-Claude drafter must keep exercising the CANVAS, not just prose (#148). |
+| `frontend/__tests__/errors.test.ts` | 73 | 1 | 0 | — |
+| `frontend/__tests__/event-bracket.test.ts` | 109 | 1 | 0 | `withEventBracket` — the bracket that cannot be dropped. |
+| `frontend/__tests__/event-contract.test.ts` | 185 | 1 | 0 | EVENT-CONTRACT INVARIANT — namespace registry · type format · start/end pairing. |
+| `frontend/__tests__/event-label-jargon.test.ts` | 180 | 1 | 0 | THE CUSTOMER'S ACTIVITY FEED SHOULD NOT SPEAK THE SYSTEM'S OWN VOCABULARY. |
+| `frontend/__tests__/event-labels.test.ts` | 81 | 1 | 0 | Canonical event-label map — the single source of truth for the activity stream, notification bell, notifications API, dashboard, and proposal timeline |
+| `frontend/__tests__/event-namespace-registry.test.ts` | 415 | 1 | 0 | ONE REGISTRY, RECONCILED ACROSS EVERYTHING THAT WRITES IT DOWN. |
+| `frontend/__tests__/force-advance.test.ts` | 102 | 1 | 0 | forceAdvanceProcess — the shared HITL force-advance core (admin + portal routes). Locks the guards the map found untested: RBAC (own-tenant scope), pa |
+| `frontend/__tests__/format-controls.test.ts` | 33 | 1 | 0 | — |
+| `frontend/__tests__/full-draft.test.ts` | 259 | 1 | 0 | TEST — portal/[tenantSlug]/proposals/[proposalId]/full-draft route handler |
+| `frontend/__tests__/funnel-rate-floor.test.ts` | 56 | 1 | 0 | THE FUNNEL MAY NOT PRINT A RATE IT CANNOT SUPPORT. |
+| `frontend/__tests__/guardrail-authoring.test.ts` | 245 | 2 | 0 | Portal build-workflow authoring — recommended defaults + validator (delegated managers). |
+| `frontend/__tests__/guardrail-templates.test.ts` | 124 | 1 | 0 | Portal guardrail-templates API (the config-templates capability): auth gate, GET list shape, POST validation (name required, config validated against  |
+| `frontend/__tests__/guide-coverage-state.test.ts` | 149 | 1 | 0 | THE STATE MACHINE THE LOOP RUNS ON, AND THE ONE TRANSITION NOBODY WOULD NOTICE. |
+| `frontend/__tests__/hitl-role-hierarchy.test.ts` | 29 | 1 | 0 | HITL P2 — the role-hierarchy expectations the ToDo visibility/completion logic depends on (lib/tasks/tasks.ts). Pure (no DB); the live cross-tenant/es |
+| `frontend/__tests__/house-docs.test.ts` | 41 | 1 | 0 | — |
+| `frontend/__tests__/ingest-assessment.test.ts` | 64 | 1 | 0 | Ingest-assessment reader (#12) — lib/ingest/assessment.ts. |
+| `frontend/__tests__/ingest-pattern-extract.test.ts` | 498 | 2 | 0 | The deterministic ingest extractor (`pattern_match`) — lib/ingest/pattern-extract.ts. |
+| `frontend/__tests__/ingest-provenance-audit.test.ts` | 126 | 1 | 0 | The ingest provenance audit — lib/ingest/provenance-audit.ts. |
+| `frontend/__tests__/ingest-skeleton.test.ts` | 39 | 2 | 0 | — |
+| `frontend/__tests__/ingest-studio-stage-land.test.ts` | 82 | 2 | 0 | Ingest Studio — the stage/land contract (docs/INGEST_STUDIO_DESIGN.md). |
+| `frontend/__tests__/ingest-topic-files.test.ts` | 156 | 1 | 0 | ingest-topic-files — unit tests for the "N topic files → N topic opportunities" ingest. Hermetic: sql + events mocked, storage injected. |
+| `frontend/__tests__/integration/smoke.test.ts` | 711 | 5 | 0 | Pre-launch integration smoke tests — 5 tests exercising critical subsystems without a running server or live database. |
+| `frontend/__tests__/invite.test.ts` | 459 | 1 | 0 | TEST-15 — POST /api/invite route handler |
+| `frontend/__tests__/jsonb-coerce.test.ts` | 32 | 1 | 0 | coerceJsonb — guards the postgres.js jsonb read nuance (write via JSON.stringify::jsonb reads back as a STRING; sql.json / DDL default reads back pars |
+| `frontend/__tests__/land-revisions.test.ts` | 169 | 1 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/land-revisions |
+| `frontend/__tests__/launch-overlay-tenant-scope.test.ts` | 103 | 1 | 0 | A LAUNCH MUST NOT SCOPE AN INSTANCE TO ONE TENANT AND POINT IT AT ANOTHER'S WORK. |
+| `frontend/__tests__/library-query.test.ts` | 22 | 1 | 0 | — |
+| `frontend/__tests__/lifecycle.test.ts` | 77 | 1 | 0 | — |
+| `frontend/__tests__/manager-request-guard.test.ts` | 47 | 1 | 0 | Regression: the generic task completer must NOT close a manager_request (docs/PARTNER_MANAGER_DESIGN §4B). Closing it there only marks the row done +  |
+| `frontend/__tests__/managers-revoke.test.ts` | 74 | 1 | 0 | Revoke partner-manager (CAP-2) — DELETE /api/portal/[t]/managers/[membershipId]. |
+| `frontend/__tests__/markdown-canvas.test.ts` | 67 | 2 | 0 | — |
+| `frontend/__tests__/measure-grid.test.ts` | 210 | 2 | 0 | The measurement grid's geometry — a ruler is worthless if its lines are in the wrong place. |
+| `frontend/__tests__/member-scope.test.ts` | 71 | 1 | 0 | tenant_user per-proposal scoping (CAP-3) — PATCH /api/portal/[t]/members/[userId]/scope. |
+| `frontend/__tests__/middleware.test.ts` | 527 | 1 | 0 | TEST-11 — middleware.ts role-guard behavior |
+| `frontend/__tests__/node-text-extraction.test.ts` | 95 | 1 | 0 | getNodeText must cover every TEXT-BEARING node type. |
+| `frontend/__tests__/node-vocabulary-coverage.test.ts` | 175 | 6 | 0 | EVERY node type must come out of EVERY exporter — as text, or as a raster it deliberately became. |
+| `frontend/__tests__/observe-discrepancies.test.ts` | 132 | 1 | 0 | THE OBSERVATION WINDOW'S FINDINGS ARE ARITHMETIC, AND ARITHMETIC IS TESTABLE. |
+| `frontend/__tests__/opportunity-context.test.ts` | 41 | 1 | 0 | — |
+| `frontend/__tests__/opportunity-lifecycle.test.ts` | 136 | 1 | 0 | POST /api/admin/opportunities/[oppId]/lifecycle — C6 opportunity lifecycle. Verifies admin gating, action validation, soft-state transitions (close /  |
+| `frontend/__tests__/outcome-todo.test.ts` | 85 | 1 | 0 | Post-submission outcome-nudge ToDo (#13) — lib/proposal/outcome-todo.ts. |
+| `frontend/__tests__/page-ruler-calibration.test.ts` | 161 | 1 | 0 | The page ruler must keep agreeing with the printed page. |
+| `frontend/__tests__/page-ruler-frame.test.ts` | 183 | 1 | 0 | The page FRAME, and the two node shapes a mold is built out of (bug log B68 · B69 · B70). |
+| `frontend/__tests__/paginate-per-node.test.ts` | 156 | 1 | 0 | WHICH PAGE IS THIS NODE ON — the question the ruler could not answer. |
+| `frontend/__tests__/partial-canvas-tolerance.test.ts` | 110 | 1 | 0 | A PARTIAL canvas must never crash a reader (bug log B73 · B78). |
+| `frontend/__tests__/partner-containment.test.ts` | 79 | 7 | 0 | Partner-containment regression (leak-hunt fix, 2026-08-01). |
+| `frontend/__tests__/partner-manager-request.test.ts` | 28 | 1 | 0 | Manager-request guards (docs/PARTNER_MANAGER_DESIGN.md §4 Branch B). The empty-input guards must fail closed BEFORE any DB call. The full create/appro |
+| `frontend/__tests__/partner-name-match.test.ts` | 58 | 1 | 0 | Partner add-company name matching (docs/PARTNER_MANAGER_DESIGN.md §4, D6). Pure-logic + guard branches: threshold resolution, normalization, and the e |
+| `frontend/__tests__/partner-own-org-gate.test.ts` | 114 | 1 | 0 | The partner console re-provisioned its own org on EVERY render, for months, silently. |
+| `frontend/__tests__/partner-precheck.test.ts` | 34 | 1 | 0 | Add-company precheck classifier (docs/PARTNER_MANAGER_DESIGN.md §4). Pure decision logic — the ordering of the hard gates (email → exact → similar → n |
+| `frontend/__tests__/partner-registration.test.ts` | 43 | 1 | 0 | Partner registration validation (docs/PARTNER_MANAGER_DESIGN.md §4 Branch A). Pure required-field/email/length checks — the DB insert + dedup re-guard |
+| `frontend/__tests__/partner-scope.test.ts` | 63 | 1 | 0 | Partner scope guards (docs/PARTNER_MANAGER_DESIGN.md §3, D2/D5). The empty-input short-circuits must fail closed and NOT touch the DB. The live member |
+| `frontend/__tests__/partner-todos.test.ts` | 44 | 1 | 0 | Partner cross-stable to-do feed (#16) — lib/partner/todos.ts. |
+| `frontend/__tests__/past-proposal-canvas.test.ts` | 56 | 3 | 0 | — |
+| `frontend/__tests__/paywall.test.ts` | 24 | 1 | 0 | — |
+| `frontend/__tests__/portal-agents-usage.test.ts` | 123 | 1 | 0 | GET /api/portal/[tenantSlug]/agents/usage — customer AI usage view. |
+| `frontend/__tests__/portals-launch-route.test.ts` | 122 | 1 | 0 | Portal launch/release hand-off (adversarial-sweep B2): the discovery-spine → build-spine link. Proves the accept/release handlers PROVISION + LINK the |
+| `frontend/__tests__/pptx-elements.test.ts` | 88 | 2 | 0 | — |
+| `frontend/__tests__/pptx-entities.test.ts` | 86 | 3 | 0 | A slide that says "Core Technology & IP" must not enter the library as "Core Technology &amp; IP". |
+| `frontend/__tests__/process-filter.test.ts` | 43 | 1 | 0 | — |
+| `frontend/__tests__/process-health.test.ts` | 52 | 1 | 0 | — |
+| `frontend/__tests__/project-collaboration-launch.test.ts` | 95 | 1 | 0 | R3.3 — launchProjectCollaboration, the canonical project-reaction entry point. |
+| `frontend/__tests__/projects-assignment-boundary.test.ts` | 174 | 1 | 0 | ASSIGNMENT IS THE HALF RLS CANNOT ENFORCE, so it gets a test of its own. |
+| `frontend/__tests__/projects-baseline.test.ts` | 247 | 1 | 0 | The baseline: the only number in this capability that cannot be recomputed after the fact. |
+| `frontend/__tests__/projects-cdrl.test.ts` | 247 | 2 | 0 | THE CDRL REGISTER — the obligation, the three states, and the marking. |
+| `frontend/__tests__/projects-comments.test.ts` | 288 | 3 | 0 | THE CONVERSATION — the rules that stop a comment from being a diary. |
+| `frontend/__tests__/projects-dates.test.ts` | 152 | 1 | 0 | The date bug that every automated lens passed, and only a screenshot caught. |
+| `frontend/__tests__/projects-deliverables.test.ts` | 404 | 2 | 0 | UPLOAD AND ACCEPTANCE ARE TWO FACTS — and this file is what keeps them apart. |
+| `frontend/__tests__/projects-evidence.test.ts` | 151 | 2 | 0 | EVIDENCING IS NOT ACCEPTING — and a claim about somebody is not their act. |
+| `frontend/__tests__/projects-forecast.test.ts` | 148 | 1 | 0 | ESTIMATE AT COMPLETION — and the three ways it can be a lie. |
+| `frontend/__tests__/projects-gate-closer.test.ts` | 196 | 3 | 0 | THE AI-MANAGER GATE CLOSER — and the asymmetry that makes it safe. |
+| `frontend/__tests__/projects-gate-scoping.test.ts` | 79 | 0 | 0 | Every delivery route runs INSIDE the tenant context — the defect no lens could see. |
+| `frontend/__tests__/projects-invoices.test.ts` | 323 | 2 | 0 | INVOICING — where the capability becomes money, and where being wrong costs something. |
+| `frontend/__tests__/projects-meetings.test.ts` | 209 | 3 | 0 | MEETINGS — and the one failure that leaves two records disagreeing. |
+| `frontend/__tests__/projects-mentions.test.ts` | 97 | 1 | 0 | THE MENTION PARSER — where a silent failure looks exactly like a success. |
+| `frontend/__tests__/projects-modifications.test.ts` | 352 | 3 | 0 | CONTRACT MODIFICATIONS — the only write path to a CLIN. |
+| `frontend/__tests__/projects-money.test.ts` | 57 | 1 | 0 | The second defect the picture caught and the assertions did not. |
+| `frontend/__tests__/projects-narrative-fidelity.test.ts` | 139 | 1 | 0 | DID THE DRAFTED NARRATIVE INVENT A NUMBER? |
+| `frontend/__tests__/projects-notify-policy.test.ts` | 165 | 1 | 0 | THE THIRD LEVEL — a project's own reminder policy. |
+| `frontend/__tests__/projects-provenance.test.ts` | 161 | 1 | 0 | Provenance: the rule that a value the product did not read from the source must never look like one it did. |
+| `frontend/__tests__/projects-reviews.test.ts` | 278 | 4 | 0 | THE REVIEW GATE — and the one thing it must never become. |
+| `frontend/__tests__/projects-risks.test.ts` | 222 | 3 | 0 | THE REGISTER — and the history a program review actually asks for. |
+| `frontend/__tests__/projects-rollup-measures.test.ts` | 40 | 1 | 0 | NOT MEASURED IS NOT ZERO. |
+| `frontend/__tests__/projects-status-report.test.ts` | 213 | 2 | 0 | THE STATUS REPORT — a document whose numbers are read, not typed. |
+| `frontend/__tests__/projects-task-spine.test.ts` | 316 | 3 | 0 | TASK SPINE V2 — the rules that are easy to state and easy to get subtly wrong (mig 221). |
+| `frontend/__tests__/projects-tenant-transactions.test.ts` | 168 | 0 | 0 | A tenant-scoped transaction must carry the tenant context — `sql.begin` does not. |
+| `frontend/__tests__/projects-time.test.ts` | 229 | 2 | 0 | LABOUR ACTUALS — the input the cost measure never had. |
+| `frontend/__tests__/projects-workplan-canvas.test.ts` | 165 | 2 | 0 | The `workplan` canvas: a WBS grid projected from rows, and the one exemption it gets from the compliance floor. |
+| `frontend/__tests__/promo-codes.test.ts` | 100 | 1 | 0 | Comp-code issuance. A comp code IS the payment — redeeming one opens a proposal portal without a card — so the two things worth pinning are the shape  |
+| `frontend/__tests__/proposal-access-scope.test.ts` | 113 | 1 | 0 | resolveUserAccess — CAP-3 per-proposal scoping for an internal tenant_user. |
+| `frontend/__tests__/proposal-draft-section.test.ts` | 64 | 1 | 0 | proposal.draft_section — compliance-aware prompt construction (#14). |
+| `frontend/__tests__/proposal-strategy.test.ts` | 53 | 1 | 0 | Capture-strategy reader (#1) — lib/proposal/strategy.ts. |
+| `frontend/__tests__/proposals-create.test.ts` | 603 | 1 | 0 | TEST-04 — portal/[tenantSlug]/proposals/create route handler |
+| `frontend/__tests__/prospect-tables-admin-only.test.ts` | 107 | 0 | 0 | THE PROSPECT TABLES HAVE NO RLS, SO NOTHING BUT THIS TEST STOPS A TENANT SURFACE READING THEM. |
+| `frontend/__tests__/provenance-truncation.test.ts` | 108 | 2 | 0 | A document we stopped reading cannot support "not stated in the source" (bug log B40). |
+| `frontend/__tests__/purchase-history-surfacing.test.ts` | 91 | 1 | 0 | WHAT A PURCHASE WAS FOR. |
+| `frontend/__tests__/rbac.test.ts` | 200 | 1 | 0 | — |
+| `frontend/__tests__/scenarios-full-curation-flow.test.ts` | 255 | 10 | 0 | Phase 1 §E24 — cross-tool full-curation-flow integration test. |
+| `frontend/__tests__/scoped-findings.test.ts` | 146 | 1 | 0 | WHAT IS STILL OUTSTANDING, AND WHERE — the gate as a live checklist. |
+| `frontend/__tests__/scoped-review-plan.test.ts` | 219 | 2 | 0 | What a scoped review actually QUEUES. |
+| `frontend/__tests__/scout-classify.test.ts` | 133 | 1 | 0 | Unit tests for the deterministic scout NEW-vs-UPDATE classifier (#176). Pure, DB-free — the exact matcher the candidate queue relies on. |
+| `frontend/__tests__/section-budget.test.ts` | 64 | 2 | 0 | — |
+| `frontend/__tests__/section-lock.test.ts` | 197 | 1 | 0 | Section accept/lock lifecycle route — POST (accept+lock) / DELETE (unlock). Verifies admin-only gating, section-belongs check, the state transition, a |
+| `frontend/__tests__/section-save.test.ts` | 668 | 1 | 0 | TEST-06 — PUT /api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/save |
+| `frontend/__tests__/section-standards.test.ts` | 96 | 2 | 0 | Section-standards taxonomy (Phase 3, C1): the inferSectionType helper + the RFP-admin standards API (auth gate, validation, create). |
+| `frontend/__tests__/seed-job-skip.test.ts` | 102 | 1 | 0 | POST /api/portal/[tenantSlug]/proposals/[proposalId]/seed-job/skip |
+| `frontend/__tests__/seeded-credentials.test.ts` | 165 | 0 | 0 | NO MIGRATION MAY LEAVE AN ACCOUNT SIGN-IN-ABLE WITH A PASSWORD THAT IS IN THIS REPOSITORY. |
+| `frontend/__tests__/session-policy.test.ts` | 155 | 1 | 0 | THE TWO BOUNDS A SESSION HAS, AND THE FOUR WAYS A BOUND GETS WRITTEN WRONG. |
+| `frontend/__tests__/source-text-cap.test.ts` | 114 | 1 | 0 | "We did not find it" must never stand in for "we never looked". |
+| `frontend/__tests__/space-presence-invariants.test.ts` | 214 | 0 | 0 | THE ENTER AND THE EXIT MUST COME FROM ONE PLACE. |
+| `frontend/__tests__/sql-comment-backtick.test.ts` | 94 | 0 | 0 | A BACKTICK INSIDE A SQL COMMENT INSIDE A TAGGED TEMPLATE ENDS THE TEMPLATE. |
+| `frontend/__tests__/sql-comment-backticks.test.ts` | 78 | 0 | 0 | A backtick inside a SQL comment TERMINATES the tagged template it lives in. |
+| `frontend/__tests__/starter-set.test.ts` | 91 | 3 | 0 | — |
+| `frontend/__tests__/storage-abstraction-boundary.test.ts` | 80 | 0 | 0 | THE STORAGE ABSTRACTION IS A BOUNDARY, and this test is what makes it one. |
+| `frontend/__tests__/storage-paths.test.ts` | 235 | 1 | 0 | — |
+| `frontend/__tests__/stripe-webhook.test.ts` | 310 | 1 | 0 | TEST-02 — stripe/webhook route handler |
+| `frontend/__tests__/studio-voice-payload.test.ts` | 119 | 1 | 0 | THE STUDIO CARRIES THE PROPOSAL'S VOICE — pinned because it silently did not (bug log B84). |
+| `frontend/__tests__/studio.test.ts` | 132 | 1 | 0 | Proposal Studio route — POST /api/portal/[t]/proposals/[p]/studio (start / regenerate / approve). Verifies: tenant_admin+ gate; start emits proposal:r |
+| `frontend/__tests__/task-catalog-drift.test.ts` | 66 | 1 | 0 | ToDo catalog drift guard (HITL P1). |
+| `frontend/__tests__/task-completers.test.ts` | 47 | 1 | 0 | R5.4 (W-M) — typed completer selection + spec parsing (pure). |
+| `frontend/__tests__/task-urgency.test.ts` | 54 | 1 | 0 | — |
+| `frontend/__tests__/task-workflows.test.ts` | 90 | 2 | 0 | — |
+| `frontend/__tests__/tasks-assign-route.test.ts` | 79 | 1 | 0 | R5.1 (J1) — the assign route's guards (auth floor + portal role allowlist + UUID shape). The core createTask is tested separately; here we lock that t |
+| `frontend/__tests__/tasks-create.test.ts` | 66 | 1 | 0 | R5.1 (J1) — createTask validation (the early-return branches, no DB). |
+| `frontend/__tests__/team-role.test.ts` | 135 | 1 | 0 | PATCH /api/portal/[tenantSlug]/team/[userId] — change a member's role. |
+| `frontend/__tests__/template-interpolation.test.ts` | 48 | 2 | 0 | interpolateTemplate — JSON-safety contract (adversarial sweep 2026-08-18, HIGH-1). |
+| `frontend/__tests__/template-registry-complete.test.ts` | 102 | 1 | 0 | Every template is reachable (#151 — Launch: integrate templates). |
+| `frontend/__tests__/template-skeleton.test.ts` | 81 | 2 | 0 | — |
+| `frontend/__tests__/template-stable-selfheal.test.ts` | 53 | 1 | 0 | A new customer must not land with an empty template shelf (bug log B34). |
+| `frontend/__tests__/tenant-documents.test.ts` | 189 | 3 | 0 | — |
+| `frontend/__tests__/tools-compliance.test.ts` | 300 | 9 | 0 | Phase 1 §E.3 — compliance + annotation tools (E10, E11, E12, E15). |
+| `frontend/__tests__/tools-ingest-and-extra.test.ts` | 298 | 10 | 0 | Phase 1 §E.4 — ingest tools + compliance.add_variable + extract. |
+| `frontend/__tests__/tools-registry.test.ts` | 395 | 7 | 0 | Tool registry tests — verifies the enforcement chain without a live database by stubbing the events emitter + capacity recorder. |
+| `frontend/__tests__/tools-solicitation-read.test.ts` | 281 | 8 | 0 | Phase 1 §E — solicitation + opportunity read tools (E1, E2, E16). |
+| `frontend/__tests__/tools-solicitation-review.test.ts` | 415 | 9 | 0 | Phase 1 §E.2b — approval-flow state-machine tools (E6, E7, E8, E9). |
+| `frontend/__tests__/tools-solicitation-state.test.ts` | 272 | 8 | 0 | Phase 1 §E.2a — solicitation state-transition tools (E3, E4, E5). |
+| `frontend/__tests__/tools-volumes.test.ts` | 248 | 10 | 0 | Phase 1 §E extension: volumes + required items tools. |
+| `frontend/__tests__/unit/assemble-proposal.test.ts` | 62 | 1 | 0 | — |
+| `frontend/__tests__/unit/atom-enrich.test.ts` | 22 | 1 | 0 | — |
+| `frontend/__tests__/unit/atom-review.test.ts` | 64 | 1 | 0 | — |
+| `frontend/__tests__/unit/atomize-plan.test.ts` | 54 | 1 | 0 | — |
+| `frontend/__tests__/unit/brand.test.ts` | 67 | 2 | 0 | — |
+| `frontend/__tests__/unit/canvas-selection.test.ts` | 61 | 2 | 0 | — |
+| `frontend/__tests__/unit/character-limits.test.ts` | 201 | 3 | 0 | — |
+| `frontend/__tests__/unit/color-team-status.test.ts` | 101 | 1 | 0 | — |
+| `frontend/__tests__/unit/completed-elsewhere-requirement.test.ts` | 83 | 1 | 0 | Marking a requirement "completed elsewhere" must not make the proposal permanently unsubmittable. |
+| `frontend/__tests__/unit/compliance-typed-mirror.test.ts` | 87 | 0 | 0 | — |
+| `frontend/__tests__/unit/cost-forms.test.ts` | 136 | 4 | 0 | — |
+| `frontend/__tests__/unit/cost-model-dsip-parity.test.ts` | 132 | 1 | 0 | — |
+| `frontend/__tests__/unit/cost-model.test.ts` | 123 | 1 | 0 | — |
+| `frontend/__tests__/unit/cost-volume-canvas.test.ts` | 199 | 3 | 0 | — |
+| `frontend/__tests__/unit/cost-workbook-item.test.ts` | 109 | 1 | 0 | The cost workbook lands on exactly one item per cost volume, and the mold builder must skip that same item. |
+| `frontend/__tests__/unit/cron-bearer-middleware.test.ts` | 103 | 0 | 0 | The middleware must let a headless scheduler reach the two cron endpoints — and nothing else. |
+| `frontend/__tests__/unit/defaulted-requirement.test.ts` | 70 | 0 | 0 | A requirement the product ASSUMED must not block submission the way one it READ does. |
+| `frontend/__tests__/unit/dsip-only-volumes.test.ts` | 102 | 0 | 0 | — |
+| `frontend/__tests__/unit/embeddings.test.ts` | 80 | 1 | 0 | — |
+| `frontend/__tests__/unit/foreign-solicitation.test.ts` | 173 | 2 | 0 | A proposal must cite its OWN solicitation and no other. |
+| `frontend/__tests__/unit/latex-html.test.ts` | 100 | 1 | 0 | LaTeX → HTML, and the rule that matters more than coverage: never guess. |
+| `frontend/__tests__/unit/librarian-catalog.test.ts` | 61 | 1 | 0 | — |
+| `frontend/__tests__/unit/molds-gate.test.ts` | 175 | 2 | 0 | — |
+| `frontend/__tests__/unit/number-format.test.ts` | 24 | 1 | 0 | — |
+| `frontend/__tests__/unit/numeric-cell.test.ts` | 34 | 1 | 0 | — |
+| `frontend/__tests__/unit/page-estimate.test.ts` | 69 | 1 | 0 | — |
+| `frontend/__tests__/unit/page-furniture.test.ts` | 325 | 1 | 0 | Running page furniture must never reach a library atom. |
+| `frontend/__tests__/unit/panel-focus-node-tab.test.ts` | 53 | 1 | 0 | Selecting a node lands the author on formatting — without stealing the tab they chose. |
+| `frontend/__tests__/unit/pptx-layer-order.test.ts` | 73 | 2 | 0 | Z-order reaches the exported deck. |
+| `frontend/__tests__/unit/pptx-tables.test.ts` | 41 | 1 | 0 | — |
+| `frontend/__tests__/unit/pptx-vertical-balance.test.ts` | 121 | 2 | 0 | A short slide is balanced in its frame; a full one is not moved. |
+| `frontend/__tests__/unit/pptx-wrapped-height.test.ts` | 139 | 2 | 0 | A slide frame is as tall as the text inside it — otherwise PowerPoint deletes the overflow. |
+| `frontend/__tests__/unit/proposal-visibility.test.ts` | 34 | 1 | 0 | hasProposalVisibility — the read gate the per-proposal API routes use to close the CAP-3 leak (a proposal-scoped tenant_user reading a proposal outsid |
+| `frontend/__tests__/unit/propose-regions.test.ts` | 36 | 1 | 0 | — |
+| `frontend/__tests__/unit/reconstruct-section-doc.test.ts` | 127 | 2 | 0 | reconstructSectionDoc / originalNodeId (fluid-canvas F2 editable surface). |
+| `frontend/__tests__/unit/size-rulers.test.ts` | 178 | 1 | 0 | — |
+| `frontend/__tests__/unit/slide-frame.test.ts` | 42 | 2 | 0 | — |
+| `frontend/__tests__/unit/sttr-work-split.test.ts` | 97 | 1 | 0 | — |
+| `frontend/__tests__/unit/table-cell-style.test.ts` | 29 | 2 | 0 | — |
+| `frontend/__tests__/unit/unextractable.test.ts` | 43 | 1 | 0 | — |
+| `frontend/__tests__/unit/vision.test.ts` | 18 | 1 | 0 | — |
+| `frontend/__tests__/validation.test.ts` | 145 | 1 | 0 | — |
+| `frontend/__tests__/visual-review-parse.test.ts` | 103 | 1 | 0 | The visual reviewer's reply parser, against recorded model replies (VIS-PROOF). |
+| `frontend/__tests__/xlsx-elements.test.ts` | 98 | 2 | 0 | — |
 
 ### pipeline · 166 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `scripts/check_ai_invoke_contract.py` | 220 | 1 | 0 | THE AI_INVOKE INPUT CONTRACT — does every key a workflow READS actually get WRITTEN? |
-| `scripts/drive_b17_evidence.py` | 166 | 2 | 0 | Live proof (B17): a "reviewed" verdict now follows the evidence, through the real engine. |
-| `scripts/drive_librarian_skeleton.py` | 51 | 1 | 0 | Drive-test P6.3 — LibrarianArchetype._match_section_skeleton against the real DB. |
-| `scripts/drive_overlay_market.py` | 79 | 4 | 0 | Live proof (OVERLAY-2): request_advisory_overlay threads a real market section so market_analyst's pre_augment anchors on it instead of erroring. cd p |
-| `scripts/drive_prove_agents.py` | 68 | 2 | 0 | Prove the already-wired agents FIRE live (onboarding_agent · outcome_analyst · the ingest cohort). Each is producer-wired (accept route → OnApplicatio |
-| `scripts/drive_research_scout.py` | 73 | 2 | 0 | Live proof (AGENTS-LIVE): research_scout fires via the mapped AI_INVOKE step. |
-| `scripts/drive_section_scaffold.py` | 62 | 1 | 0 | Drive-test P6.2 — SectionDrafterArchetype._match_section_grain against the real DB. |
-| `scripts/drive_stage_review_chain.py` | 125 | 3 | 0 | TW-8b live drive — prove the AI-manager portal stage-gate engine chain runs end to end against the real WorkflowManager + sandbox DB (fabric=None → th |
-| `scripts/extract_fabric_facts.py` | 96 | 2 | 0 | Extract ground-truth facts for the agent-fabric narrative — imports every registered archetype and introspects role_name / model / human_gate / tools, |
-| `scripts/extract_golden_text.py` | 62 | 1 | 0 | Regenerate `extracted.md` for every golden fixture from its source PDF. |
-| `scripts/record_golden_output.py` | 169 | 3 | 0 | Record real-Claude outputs for every golden fixture. |
-| `scripts/reshred.py` | 82 | 1 | 0 | Re-run the AI shred on solicitations already in the database. |
-| `scripts/seed_golden_fixtures.py` | 195 | 1 | 0 | Seed 5 real DoD solicitation fixtures into the triage queue. |
-| `src/__init__.py` | 0 | 0 | 0 | — |
-| `src/agents/__init__.py` | 15 | 4 | 2 | Agent system — fabric orchestrator, memory, context assembly, and tools. |
-| `src/agents/archetypes/__init__.py` | 86 | 40 | 1 | Agent archetypes — specialized AI roles for the proposal lifecycle. |
-| `src/agents/archetypes/advisory_manager.py` | 466 | 2 | 2 | advisory_manager — the Advisory / Adversarial Overlay's PLANNER + RECONCILER. |
-| `src/agents/archetypes/amendment_monitor.py` | 148 | 1 | 3 | Amendment Monitor -- Solicitation change → compliance delta (PLATFORM-SCOPE) ========================================================================= |
-| `src/agents/archetypes/base.py` | 74 | 0 | 41 | Base archetype class that all agent roles inherit from. |
-| `src/agents/archetypes/capture_strategist.py` | 581 | 1 | 2 | Capture Strategist -- Go/No-Go Recommendation and Win Theme Development ============================================================================== |
-| `src/agents/archetypes/color_team_reviewer.py` | 332 | 1 | 2 | color_team_reviewer agent archetype — evaluates proposals against criteria. |
-| `src/agents/archetypes/compliance_reviewer.py` | 552 | 1 | 2 | Compliance Reviewer -- Proposal Compliance Verification Agent ================================================================================ |
-| `src/agents/archetypes/content_curator.py` | 141 | 1 | 2 | Content Curator -- Find social/web content to repost (PLATFORM-SCOPE / CMS scout) ==================================================================== |
-| `src/agents/archetypes/content_generator.py` | 156 | 1 | 2 | Content Generator -- New web/social content (PLATFORM-SCOPE / our-org CMS) =========================================================================== |
-| `src/agents/archetypes/continuity_manager.py` | 536 | 2 | 2 | continuity_manager — whole-proposal, cross-artifact QA vs the RFP (phase-gate reviewer). |
-| `src/agents/archetypes/cost_estimator.py` | 419 | 2 | 3 | Cost Estimator -- Cost-volume realism guidance (TENANT-SCOPE) ================================================================================ |
-| `src/agents/archetypes/curation_qa.py` | 350 | 2 | 2 | Curation QA -- Pre-release quality gate (PLATFORM-SCOPE / our-org RFP-admin ops) ===================================================================== |
-| `src/agents/archetypes/formatter.py` | 419 | 1 | 2 | formatter — CanvasDocument v2 scaffold integrity + revectoring (per-section). |
-| `src/agents/archetypes/ingest_analyst.py` | 171 | 2 | 2 | Ingest Analyst -- Raw solicitation → structured curation draft (PLATFORM-SCOPE) ====================================================================== |
-| `src/agents/archetypes/librarian.py` | 388 | 1 | 3 | librarian — Library cataloging, scoring, dedup, and freshness for the atom library. |
-| `src/agents/archetypes/library_seed_mapper.py` | 287 | 1 | 1 | library_seed_mapper — maps atoms from a selected source proposal onto a new build. |
-| `src/agents/archetypes/library_seed_suggester.py` | 271 | 1 | 1 | library_seed_suggester — ranks prior proposals as seed sources for a new build. |
-| `src/agents/archetypes/market_analyst.py` | 363 | 2 | 4 | Market Analyst -- SOTA / market-context web scout for a proposal (TENANT-SCOPE) ====================================================================== |
-| `src/agents/archetypes/matrix_stager.py` | 184 | 2 | 2 | Matrix Stager -- Curated solicitation → master compliance matrix (PLATFORM-SCOPE) ==================================================================== |
-| `src/agents/archetypes/onboarding_agent.py` | 287 | 1 | 2 | Onboarding Concierge -- New-tenant cold-start ================================================================================ |
-| `src/agents/archetypes/opportunity_analyst.py` | 313 | 1 | 2 | opportunity_analyst agent archetype — evaluates opportunity fit for tenants. |
-| `src/agents/archetypes/opportunity_scout.py` | 200 | 1 | 4 | Opportunity Scout -- Judge & prioritize detected opportunities (PLATFORM-SCOPE) ====================================================================== |
-| `src/agents/archetypes/ops_companion.py` | 451 | 1 | 2 | Ops Companion -- the admin's second pair of eyes (PLATFORM-SCOPE / our-org) ========================================================================== |
-| `src/agents/archetypes/ops_digest.py` | 184 | 1 | 2 | Ops Digest -- Scheduled ops health digest (PLATFORM-SCOPE / master_admin) ============================================================================ |
-| `src/agents/archetypes/outcome_analyst.py` | 199 | 1 | 2 | Outcome Analyst -- Win/loss analysis → scoring calibration (TENANT-SCOPE) ============================================================================ |
-| `src/agents/archetypes/packaging_specialist.py` | 677 | 1 | 2 | Packaging Specialist -- Final Submission Package Compilation and Validation ========================================================================== |
-| `src/agents/archetypes/partner_coordinator.py` | 594 | 1 | 2 | Partner Coordinator -- Partner/Subcontractor Communication and Coordination ========================================================================== |
-| `src/agents/archetypes/pp_matcher.py` | 190 | 1 | 2 | Past-Performance Matcher -- PP-volume grounding + teaming gaps (TENANT-SCOPE) ======================================================================== |
-| `src/agents/archetypes/project_manager.py` | 383 | 1 | 2 | project_manager — post-award milestone HEALTH, advisory (A1). |
-| `src/agents/archetypes/proposal_architect.py` | 658 | 1 | 2 | Proposal Architect -- Proposal Structure Design and Requirements Mapping ============================================================================= |
-| `src/agents/archetypes/proposal_manager.py` | 540 | 2 | 2 | proposal_manager — the Proposal Draft Manager's PLANNER (skeleton + matrix + atoms → a draft PLAN). |
-| `src/agents/archetypes/redaction_guard.py` | 425 | 1 | 2 | redaction_guard — cross-boundary / OPSEC leak scanner over assembled content (reviewer). |
-| `src/agents/archetypes/research_scout.py` | 283 | 2 | 3 | Research Scout -- R&D / market-research finder for a proposal (TENANT-SCOPE) ========================================================================= |
-| `src/agents/archetypes/rfp_ingest_manager.py` | 416 | 2 | 2 | RFP Ingest Manager -- ingest-pipeline orchestration (PLATFORM-SCOPE / our-org) ======================================================================= |
-| `src/agents/archetypes/scoring_strategist.py` | 427 | 1 | 2 | Scoring Strategist -- LLM-Based Opportunity Score Adjustment ================================================================================ |
-| `src/agents/archetypes/section_drafter.py` | 692 | 1 | 6 | section_drafter agent archetype — drafts proposal sections using AI. |
-| `src/agents/archetypes/skeleton_architect.py` | 177 | 1 | 2 | Skeleton Architect -- Matrix → master response skeleton (PLATFORM-SCOPE) ============================================================================= |
-| `src/agents/archetypes/social_scheduler.py` | 141 | 1 | 2 | Social Scheduler -- Queue social posts from published content (PLATFORM / CMS) ======================================================================= |
-| `src/agents/archetypes/status_narrator.py` | 249 | 1 | 2 | status_narrator — the paragraph a status report cannot compute (A2). |
-| `src/agents/archetypes/stylist.py` | 367 | 1 | 2 | stylist — CanvasDocument v2 style normalization across atom pedigrees (per-section/artifact). |
-| `src/agents/archetypes/traceability_auditor.py` | 347 | 1 | 2 | traceability_auditor — requirement→coverage mapping across the whole proposal (reviewer). |
-| `src/agents/context.py` | 916 | 1 | 4 | ContextAssembler — Builds Complete Prompt for Agent Invocations ================================================================================ |
-| `src/agents/embeddings.py` | 228 | 0 | 4 | Embedding provider for agent memory and library vector search. |
-| `src/agents/fabric.py` | 1583 | 6 | 43 | AgentFabric — Central Orchestrator for AI Agent Workforce ================================================================================ |
-| `src/agents/guardrails.py` | 165 | 0 | 5 | #120 Agent guardrails — the "guardrail" step of *advisory → guardrail → land-or-review*. |
-| `src/agents/learning/__init__.py` | 20 | 5 | 0 | Learning modules for the agent memory lifecycle. |
-| `src/agents/learning/calibrator.py` | 288 | 1 | 2 | Calibrator — Recalibrates Agent Performance Metrics and Confidence Scores ============================================================================ |
-| `src/agents/learning/diff_analyzer.py` | 295 | 1 | 2 | DiffAnalyzer — Analyzes Human Edits to Agent Output for Learning ================================================================================ |
-| `src/agents/learning/outcome_attributor.py` | 313 | 1 | 2 | OutcomeAttributor — Attributes Proposal Outcomes to Agent Memories and Content ======================================================================= |
-| `src/agents/learning/pattern_promoter.py` | 332 | 1 | 2 | PatternPromoter — Promotes Confirmed Episodic Patterns to Semantic Knowledge ========================================================================= |
-| `src/agents/learning/preference_extractor.py` | 350 | 1 | 2 | PreferenceExtractor — Extracts Tenant Preferences from Episodic Memory Patterns ====================================================================== |
-| `src/agents/lifecycle/__init__.py` | 18 | 4 | 0 | Lifecycle modules for agent memory management. |
-| `src/agents/lifecycle/compactor.py` | 333 | 1 | 2 | MemoryCompactor — Compresses Clusters of Similar Episodic Memories ================================================================================ |
-| `src/agents/lifecycle/contradiction_resolver.py` | 334 | 1 | 2 | ContradictionResolver — Detects and Resolves Contradictory Semantic Memories ========================================================================= |
-| `src/agents/lifecycle/decay.py` | 188 | 1 | 2 | MemoryDecay — Applies Time-Based Decay to Memory Importance Scores ================================================================================ |
-| `src/agents/lifecycle/gc.py` | 213 | 1 | 2 | MemoryGC — Garbage Collects Expired and Archived Memories ================================================================================ |
-| `src/agents/memory.py` | 743 | 2 | 6 | Agent memory operations — store and recall from episodic_memories table. |
-| `src/agents/platform_guard.py` | 94 | 0 | 2 | Platform AI spend guard (G1). |
-| `src/agents/tools.py` | 1100 | 1 | 5 | ToolRegistry — Tenant-Isolated Tool Execution Layer ================================================================================ |
-| `src/agents/web.py` | 157 | 0 | 2 | Controlled web egress for the research_scout agent — the "server-side browser". |
-| `src/config.py` | 36 | 0 | 9 | Pipeline configuration from environment variables. |
-| `src/crypto.py` | 38 | 1 | 2 | AES-256-GCM encryption for API keys stored in database. |
-| `src/db_role_preflight.py` | 144 | 0 | 2 | Refuse to start the worker on a database role that cannot write a tenant workflow. |
-| `src/document/__init__.py` | 27 | 2 | 0 | Document Agent System — format-specific skilled agents that own the full document lifecycle: ingest → atomize → canvas → edit → collaborate → accept → |
-| `src/document/base.py` | 401 | 1 | 6 | Base document agent — the contract every format-specific agent implements. |
-| `src/document/converter.py` | 177 | 0 | 1 | LibreOffice headless wrapper for format conversion and PDF rendering. |
-| `src/document/docx_agent.py` | 665 | 1 | 0 | DOCX Document Agent — full lifecycle for Word documents. |
-| `src/document/markdown_to_canvas.py` | 404 | 0 | 4 | Markdown → CanvasDocument converter (the strawman/draft → canvas landing format). |
-| `src/document/pdf_agent.py` | 549 | 1 | 0 | PDF Document Agent — read-only ingest and atomization of PDF files. |
-| `src/document/pptx_agent.py` | 750 | 1 | 0 | PowerPoint document lifecycle agent. |
-| `src/document/registry.py` | 127 | 1 | 1 | Document agent registry — dispatch by format or file extension. |
-| `src/document/xlsx_agent.py` | 547 | 1 | 0 | Excel Document Agent — handles the full lifecycle for .xlsx / .xls files. |
-| `src/errors.py` | 93 | 0 | 8 | Python error class hierarchy — mirrors frontend/lib/errors.ts. |
-| `src/events.py` | 167 | 0 | 31 | Event emission for the pipeline service. |
-| `src/health.py` | 152 | 2 | 1 | Health check helpers and lightweight HTTP server for the pipeline worker. |
-| `src/ingest/__init__.py` | 0 | 0 | 3 | — |
-| `src/ingest/base.py` | 455 | 1 | 6 | Base ingester class for all opportunity source ingesters. |
-| `src/ingest/dispatcher.py` | 628 | 8 | 6 | Cron dispatcher and job consumer for the ingester framework. |
-| `src/ingest/dsip.py` | 532 | 3 | 3 | DSIP (DoD SBIR/STTR Innovation Portal) Topic Listing Ingester |
-| `src/ingest/grants_gov.py` | 252 | 3 | 3 | Grants.gov NOFO ingester. |
-| `src/ingest/sam_gov.py` | 434 | 4 | 4 | SAM.gov Opportunities API Ingester |
-| `src/ingest/sbir_gov.py` | 539 | 4 | 4 | SBIR.gov Solicitations API Ingester |
-| `src/ingest/topic_expander.py` | 859 | 2 | 3 | On-demand topic expansion for a single solicitation (Scouting Spine M3 / T3.1). |
-| `src/lifecycle_scheduler.py` | 735 | 8 | 3 | Lifecycle Scheduler — Runs Memory Maintenance on Documented Schedules ================================================================================ |
-| `src/main.py` | 361 | 8 | 1 | RFP Pipeline — Main Worker Process (v2.1) |
-| `src/proposal/__init__.py` | 13 | 0 | 0 | Proposal cost/budget domain package. |
-| `src/proposal/budget_model.py` | 527 | 0 | 3 | Budget Model — the deterministic budget / PoP-bucket cost-volume fill engine ========================================================================= |
-| `src/safe_skip.py` | 130 | 0 | 4 | Safe-skip: what a step does when the model fails it. |
-| `src/sdk_compat.py` | 76 | 0 | 2 | What the INSTALLED anthropic SDK will actually accept. |
-| `src/seeds/__init__.py` | 0 | 0 | 0 | — |
-| `src/seeds/master_admin.py` | 105 | 0 | 1 | Seed: master_admin bootstrap ───────────────────────────── Creates the very first master_admin user so the platform has a working login immediately af |
-| `src/shredder/__init__.py` | 8 | 0 | 5 | Shredder module — Phase 1 §D. |
-| `src/shredder/compliance_mapping.py` | 185 | 0 | 4 | Map Claude-extracted compliance variable names to named DB columns. |
-| `src/shredder/extractor.py` | 202 | 1 | 4 | Text extraction — Phase 1 §D1. |
-| `src/shredder/namespace.py` | 170 | 0 | 6 | Memory-namespace key computation — Phase 1 §D6. |
-| `src/shredder/runner.py` | 1023 | 8 | 6 | Shredder orchestrator — Phase 1 §D4. |
-| `src/shredder/section_locate.py` | 368 | 0 | 8 | Find the sections of a large BAA that actually state the rules. |
-| `src/shredder/sync_extract.py` | 109 | 1 | 1 | Synchronous compliance-extract variant — Phase 1 §D8. |
-| `src/storage/__init__.py` | 0 | 0 | 1 | — |
-| `src/storage/paths.py` | 248 | 0 | 2 | Object-storage path helpers — canonical source for S3 keys. |
-| `src/storage/s3_client.py` | 247 | 0 | 5 | Shared S3 client for the pipeline workers. |
-| `src/workers/__init__.py` | 0 | 0 | 0 | — |
-| `src/workers/source_scout.py` | 439 | 1 | 1 | Source Scout pipeline worker. |
-| `src/workflows/__init__.py` | 13 | 0 | 6 | Workflow automation framework. |
-| `src/workflows/actions/__init__.py` | 59 | 6 | 4 | Workflow Actions Package (__init__.py) ================================================================================ |
-| `src/workflows/actions/advisory_actions.py` | 190 | 1 | 4 | Workflow Actions — Advisory / Adversarial overlay elevation + auto-land (P4-D) ======================================================================= |
-| `src/workflows/actions/analyze_section_diff.py` | 111 | 2 | 1 | Action: analyze_section_diff Workflow: OnProposalSectionEdited (PIPE-15) |
-| `src/workflows/actions/attribute_outcome.py` | 100 | 2 | 1 | Action: attribute_outcome Workflow: OnProposalOutcomeRecorded (PIPE-16) |
-| `src/workflows/actions/authorable.py` | 83 | 0 | 3 | Which proposal sections may receive an AI prose draft — the one rule, in one place. |
-| `src/workflows/actions/cms_content.py` | 285 | 3 | 1 | Workflow Actions: CMS content draft + publish (the content vertical) ================================================================================ |
-| `src/workflows/actions/cohort_evidence.py` | 87 | 0 | 3 | Did the cohort actually run? (the third signal — B17) ================================================================================ A workflow that |
-| `src/workflows/actions/create_drafts_from_scout.py` | 296 | 1 | 1 | Workflow Action: create_drafts_from_scout ================================================================================ |
-| `src/workflows/actions/draft_v0.py` | 482 | 6 | 3 | Action: draft_v0 (B5 — the 3-source V0 strawman orchestration) ================================================================================ |
-| `src/workflows/actions/generate_preview.py` | 298 | 3 | 1 | Workflow Action: generate_preview (generate_preview.py) ================================================================================ |
-| `src/workflows/actions/ingest_actions.py` | 237 | 2 | 1 | Ingest Studio — the phase advance ACTION (docs/INGEST_STUDIO_DESIGN.md) ============================================================================== |
-| `src/workflows/actions/portal_stage_actions.py` | 126 | 2 | 0 | Portal stage-review actions (TW-8 — the AI-manager stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ============================================== |
-| `src/workflows/actions/publish_section_draft.py` | 187 | 3 | 2 | Action: publish_section_draft (E5 — the strawman/draft LANDING primitive) ============================================================================ |
-| `src/workflows/actions/rescore.py` | 402 | 1 | 2 | Workflow Action: tenant-side bucket rescore (rescore.py) ================================================================================ |
-| `src/workflows/actions/score_tenants.py` | 190 | 1 | 2 | Workflow Action: match_tenants (score_tenants.py) ================================================================================ |
-| `src/workflows/actions/shred.py` | 550 | 6 | 1 | Workflow Action: shred / extract_compliance ================================================================================ |
-| `src/workflows/actions/studio_actions.py` | 109 | 1 | 1 | Proposal Studio — the phase advance ACTION (docs/PROPOSAL_STUDIO_DESIGN.md) ========================================================================== |
-| `src/workflows/advisory_overlay.py` | 201 | 1 | 4 | Workflow: AdvisoryOverlay (reusable sub-workflow — the Advisory / Adversarial Overlay) =============================================================== |
-| `src/workflows/base.py` | 399 | 2 | 69 | Module: Workflow Base Classes (base.py) ================================================================================ |
-| `src/workflows/manager.py` | 2230 | 3 | 16 | WorkflowManager — Persistent Workflow Orchestration with Crash Recovery ============================================================================== |
-| `src/workflows/on_application_accepted.py` | 119 | 1 | 1 | Workflow: OnApplicationAccepted ================================================================================ |
-| `src/workflows/on_cms_content_requested.py` | 134 | 1 | 2 | Workflow: OnCmsContentRequested (CMS content vertical — keystone proof) ============================================================================== |
-| `src/workflows/on_collaborator_invited.py` | 131 | 1 | 1 | Workflow: OnCollaboratorInvited ================================================================================ |
-| `src/workflows/on_content_resurface_requested.py` | 60 | 1 | 1 | Workflow: OnContentResurfaceRequested (our-org CMS — scheduled content scout) ======================================================================== |
-| `src/workflows/on_contract_started.py` | 130 | 1 | 0 | Workflow: OnContractStarted ================================================================================ |
-| `src/workflows/on_full_draft_requested.py` | 374 | 1 | 2 | Workflow: OnFullDraftRequested (the Proposal Draft Manager orchestration — 3 modes) ================================================================== |
-| `src/workflows/on_ingest_assessment_requested.py` | 85 | 1 | 1 | Workflow: OnIngestAssessmentRequested (Admin-agent Phase 1 — ingest orchestration) =================================================================== |
-| `src/workflows/on_ingest_phase_requested.py` | 184 | 1 | 1 | Workflow: OnIngestPhaseRequested (Ingest Studio — the gated ingest) ================================================================================ |
-| `src/workflows/on_opportunities_detected.py` | 175 | 1 | 2 | Workflow: OnOpportunitiesDetected (Scouting Spine M2 — detection → alert) ============================================================================ |
-| `src/workflows/on_ops_digest_requested.py` | 73 | 1 | 1 | Workflow: OnOpsDigestRequested (POD 4 — first SCHEDULED admin automation) ============================================================================ |
-| `src/workflows/on_portal_stage_review.py` | 83 | 1 | 3 | Workflow: OnPortalStageReviewRequested (TW-8 — the AI-manager portal stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ============================ |
-| `src/workflows/on_project_health_requested.py` | 98 | 1 | 1 | Workflow: OnProjectHealthRequested (A1 — post-award milestone health) ================================================================================ |
-| `src/workflows/on_proposal_advanced.py` | 269 | 1 | 3 | Workflow: OnProposalAdvancedToReview / OnProposalAdvancedToFinal ================================================================================ |
-| `src/workflows/on_proposal_created.py` | 218 | 1 | 5 | Workflow: OnProposalCreated ================================================================================ |
-| `src/workflows/on_proposal_outcome_recorded.py` | 79 | 1 | 2 | Workflow: OnProposalOutcomeRecorded (PIPE-16) ================================================================================ |
-| `src/workflows/on_proposal_section_edited.py` | 67 | 1 | 1 | Workflow: OnProposalSectionEdited (PIPE-15) ================================================================================ |
-| `src/workflows/on_review_phase_requested.py` | 173 | 1 | 1 | Workflow: OnReviewPhaseRequested (Proposal Studio — 3 gated loops) ================================================================================ |
-| `src/workflows/on_rfp_uploaded.py` | 169 | 1 | 2 | Workflow: OnRfpUploaded ================================================================================ |
-| `src/workflows/on_social_schedule_requested.py` | 58 | 1 | 1 | Workflow: OnSocialScheduleRequested (our-org CMS — scheduled social publisher) ======================================================================= |
-| `src/workflows/on_solicitation_pushed.py` | 118 | 1 | 0 | Workflow: OnSolicitationPushed ================================================================================ |
-| `src/workflows/on_solicitation_review_requested.py` | 89 | 1 | 1 | Workflow: OnSolicitationReviewRequested (POD 4 — admin-side automation) ============================================================================== |
-| `src/workflows/on_solicitation_update_scan.py` | 60 | 1 | 1 | Workflow: OnSolicitationUpdateScan (scout expansion — proactive update watcher) ====================================================================== |
-| `src/workflows/on_source_change_detected.py` | 174 | 1 | 4 | Workflow: OnSourceChangeDetected ================================================================================ |
-| `src/workflows/on_status_narrative_requested.py` | 76 | 1 | 1 | Workflow: OnStatusNarrativeRequested (A2 — the paragraph a report cannot compute) ==================================================================== |
-| `src/workflows/on_tenant_rescore.py` | 77 | 1 | 0 | Workflows: OnCardApplied / OnBucketsUpdated (tenant-side bucket scoring) ============================================================================= |
-| `src/workflows/processor.py` | 1026 | 3 | 42 | Module: Workflow Processor (processor.py) ================================================================================ |
-| `src/workflows/project_collaboration.py` | 133 | 1 | 1 | Workflow: ProjectCollaboration (the generic project/opportunity HITL reaction) ======================================================================= |
+| `pipeline/scripts/check_ai_invoke_contract.py` | 220 | 1 | 0 | THE AI_INVOKE INPUT CONTRACT — does every key a workflow READS actually get WRITTEN? |
+| `pipeline/scripts/drive_b17_evidence.py` | 166 | 2 | 0 | Live proof (B17): a "reviewed" verdict now follows the evidence, through the real engine. |
+| `pipeline/scripts/drive_librarian_skeleton.py` | 51 | 1 | 0 | Drive-test P6.3 — LibrarianArchetype._match_section_skeleton against the real DB. |
+| `pipeline/scripts/drive_overlay_market.py` | 79 | 4 | 0 | Live proof (OVERLAY-2): request_advisory_overlay threads a real market section so market_analyst's pre_augment anchors on it instead of erroring. cd p |
+| `pipeline/scripts/drive_prove_agents.py` | 68 | 2 | 0 | Prove the already-wired agents FIRE live (onboarding_agent · outcome_analyst · the ingest cohort). Each is producer-wired (accept route → OnApplicatio |
+| `pipeline/scripts/drive_research_scout.py` | 73 | 2 | 0 | Live proof (AGENTS-LIVE): research_scout fires via the mapped AI_INVOKE step. |
+| `pipeline/scripts/drive_section_scaffold.py` | 62 | 1 | 0 | Drive-test P6.2 — SectionDrafterArchetype._match_section_grain against the real DB. |
+| `pipeline/scripts/drive_stage_review_chain.py` | 125 | 3 | 0 | TW-8b live drive — prove the AI-manager portal stage-gate engine chain runs end to end against the real WorkflowManager + sandbox DB (fabric=None → th |
+| `pipeline/scripts/extract_fabric_facts.py` | 96 | 2 | 0 | Extract ground-truth facts for the agent-fabric narrative — imports every registered archetype and introspects role_name / model / human_gate / tools, |
+| `pipeline/scripts/extract_golden_text.py` | 62 | 1 | 0 | Regenerate `extracted.md` for every golden fixture from its source PDF. |
+| `pipeline/scripts/record_golden_output.py` | 169 | 3 | 0 | Record real-Claude outputs for every golden fixture. |
+| `pipeline/scripts/reshred.py` | 82 | 1 | 0 | Re-run the AI shred on solicitations already in the database. |
+| `pipeline/scripts/seed_golden_fixtures.py` | 195 | 1 | 0 | Seed 5 real DoD solicitation fixtures into the triage queue. |
+| `pipeline/src/__init__.py` | 0 | 0 | 0 | — |
+| `pipeline/src/agents/__init__.py` | 15 | 4 | 2 | Agent system — fabric orchestrator, memory, context assembly, and tools. |
+| `pipeline/src/agents/archetypes/__init__.py` | 86 | 40 | 1 | Agent archetypes — specialized AI roles for the proposal lifecycle. |
+| `pipeline/src/agents/archetypes/advisory_manager.py` | 466 | 2 | 2 | advisory_manager — the Advisory / Adversarial Overlay's PLANNER + RECONCILER. |
+| `pipeline/src/agents/archetypes/amendment_monitor.py` | 148 | 1 | 3 | Amendment Monitor -- Solicitation change → compliance delta (PLATFORM-SCOPE) ========================================================================= |
+| `pipeline/src/agents/archetypes/base.py` | 74 | 0 | 41 | Base archetype class that all agent roles inherit from. |
+| `pipeline/src/agents/archetypes/capture_strategist.py` | 581 | 1 | 2 | Capture Strategist -- Go/No-Go Recommendation and Win Theme Development ============================================================================== |
+| `pipeline/src/agents/archetypes/color_team_reviewer.py` | 332 | 1 | 2 | color_team_reviewer agent archetype — evaluates proposals against criteria. |
+| `pipeline/src/agents/archetypes/compliance_reviewer.py` | 552 | 1 | 2 | Compliance Reviewer -- Proposal Compliance Verification Agent ================================================================================ |
+| `pipeline/src/agents/archetypes/content_curator.py` | 141 | 1 | 2 | Content Curator -- Find social/web content to repost (PLATFORM-SCOPE / CMS scout) ==================================================================== |
+| `pipeline/src/agents/archetypes/content_generator.py` | 156 | 1 | 2 | Content Generator -- New web/social content (PLATFORM-SCOPE / our-org CMS) =========================================================================== |
+| `pipeline/src/agents/archetypes/continuity_manager.py` | 536 | 2 | 2 | continuity_manager — whole-proposal, cross-artifact QA vs the RFP (phase-gate reviewer). |
+| `pipeline/src/agents/archetypes/cost_estimator.py` | 419 | 2 | 3 | Cost Estimator -- Cost-volume realism guidance (TENANT-SCOPE) ================================================================================ |
+| `pipeline/src/agents/archetypes/curation_qa.py` | 350 | 2 | 2 | Curation QA -- Pre-release quality gate (PLATFORM-SCOPE / our-org RFP-admin ops) ===================================================================== |
+| `pipeline/src/agents/archetypes/formatter.py` | 419 | 1 | 2 | formatter — CanvasDocument v2 scaffold integrity + revectoring (per-section). |
+| `pipeline/src/agents/archetypes/ingest_analyst.py` | 171 | 2 | 2 | Ingest Analyst -- Raw solicitation → structured curation draft (PLATFORM-SCOPE) ====================================================================== |
+| `pipeline/src/agents/archetypes/librarian.py` | 388 | 1 | 3 | librarian — Library cataloging, scoring, dedup, and freshness for the atom library. |
+| `pipeline/src/agents/archetypes/library_seed_mapper.py` | 287 | 1 | 1 | library_seed_mapper — maps atoms from a selected source proposal onto a new build. |
+| `pipeline/src/agents/archetypes/library_seed_suggester.py` | 271 | 1 | 1 | library_seed_suggester — ranks prior proposals as seed sources for a new build. |
+| `pipeline/src/agents/archetypes/market_analyst.py` | 363 | 2 | 4 | Market Analyst -- SOTA / market-context web scout for a proposal (TENANT-SCOPE) ====================================================================== |
+| `pipeline/src/agents/archetypes/matrix_stager.py` | 184 | 2 | 2 | Matrix Stager -- Curated solicitation → master compliance matrix (PLATFORM-SCOPE) ==================================================================== |
+| `pipeline/src/agents/archetypes/onboarding_agent.py` | 287 | 1 | 2 | Onboarding Concierge -- New-tenant cold-start ================================================================================ |
+| `pipeline/src/agents/archetypes/opportunity_analyst.py` | 313 | 1 | 2 | opportunity_analyst agent archetype — evaluates opportunity fit for tenants. |
+| `pipeline/src/agents/archetypes/opportunity_scout.py` | 200 | 1 | 4 | Opportunity Scout -- Judge & prioritize detected opportunities (PLATFORM-SCOPE) ====================================================================== |
+| `pipeline/src/agents/archetypes/ops_companion.py` | 451 | 1 | 2 | Ops Companion -- the admin's second pair of eyes (PLATFORM-SCOPE / our-org) ========================================================================== |
+| `pipeline/src/agents/archetypes/ops_digest.py` | 184 | 1 | 2 | Ops Digest -- Scheduled ops health digest (PLATFORM-SCOPE / master_admin) ============================================================================ |
+| `pipeline/src/agents/archetypes/outcome_analyst.py` | 199 | 1 | 2 | Outcome Analyst -- Win/loss analysis → scoring calibration (TENANT-SCOPE) ============================================================================ |
+| `pipeline/src/agents/archetypes/packaging_specialist.py` | 677 | 1 | 2 | Packaging Specialist -- Final Submission Package Compilation and Validation ========================================================================== |
+| `pipeline/src/agents/archetypes/partner_coordinator.py` | 594 | 1 | 2 | Partner Coordinator -- Partner/Subcontractor Communication and Coordination ========================================================================== |
+| `pipeline/src/agents/archetypes/pp_matcher.py` | 190 | 1 | 2 | Past-Performance Matcher -- PP-volume grounding + teaming gaps (TENANT-SCOPE) ======================================================================== |
+| `pipeline/src/agents/archetypes/project_manager.py` | 383 | 1 | 2 | project_manager — post-award milestone HEALTH, advisory (A1). |
+| `pipeline/src/agents/archetypes/proposal_architect.py` | 658 | 1 | 2 | Proposal Architect -- Proposal Structure Design and Requirements Mapping ============================================================================= |
+| `pipeline/src/agents/archetypes/proposal_manager.py` | 540 | 2 | 2 | proposal_manager — the Proposal Draft Manager's PLANNER (skeleton + matrix + atoms → a draft PLAN). |
+| `pipeline/src/agents/archetypes/redaction_guard.py` | 425 | 1 | 2 | redaction_guard — cross-boundary / OPSEC leak scanner over assembled content (reviewer). |
+| `pipeline/src/agents/archetypes/research_scout.py` | 283 | 2 | 3 | Research Scout -- R&D / market-research finder for a proposal (TENANT-SCOPE) ========================================================================= |
+| `pipeline/src/agents/archetypes/rfp_ingest_manager.py` | 416 | 2 | 2 | RFP Ingest Manager -- ingest-pipeline orchestration (PLATFORM-SCOPE / our-org) ======================================================================= |
+| `pipeline/src/agents/archetypes/scoring_strategist.py` | 427 | 1 | 2 | Scoring Strategist -- LLM-Based Opportunity Score Adjustment ================================================================================ |
+| `pipeline/src/agents/archetypes/section_drafter.py` | 692 | 1 | 6 | section_drafter agent archetype — drafts proposal sections using AI. |
+| `pipeline/src/agents/archetypes/skeleton_architect.py` | 177 | 1 | 2 | Skeleton Architect -- Matrix → master response skeleton (PLATFORM-SCOPE) ============================================================================= |
+| `pipeline/src/agents/archetypes/social_scheduler.py` | 141 | 1 | 2 | Social Scheduler -- Queue social posts from published content (PLATFORM / CMS) ======================================================================= |
+| `pipeline/src/agents/archetypes/status_narrator.py` | 249 | 1 | 2 | status_narrator — the paragraph a status report cannot compute (A2). |
+| `pipeline/src/agents/archetypes/stylist.py` | 367 | 1 | 2 | stylist — CanvasDocument v2 style normalization across atom pedigrees (per-section/artifact). |
+| `pipeline/src/agents/archetypes/traceability_auditor.py` | 347 | 1 | 2 | traceability_auditor — requirement→coverage mapping across the whole proposal (reviewer). |
+| `pipeline/src/agents/context.py` | 916 | 1 | 4 | ContextAssembler — Builds Complete Prompt for Agent Invocations ================================================================================ |
+| `pipeline/src/agents/embeddings.py` | 228 | 0 | 4 | Embedding provider for agent memory and library vector search. |
+| `pipeline/src/agents/fabric.py` | 1583 | 6 | 43 | AgentFabric — Central Orchestrator for AI Agent Workforce ================================================================================ |
+| `pipeline/src/agents/guardrails.py` | 165 | 0 | 5 | #120 Agent guardrails — the "guardrail" step of *advisory → guardrail → land-or-review*. |
+| `pipeline/src/agents/learning/__init__.py` | 20 | 5 | 0 | Learning modules for the agent memory lifecycle. |
+| `pipeline/src/agents/learning/calibrator.py` | 288 | 1 | 2 | Calibrator — Recalibrates Agent Performance Metrics and Confidence Scores ============================================================================ |
+| `pipeline/src/agents/learning/diff_analyzer.py` | 295 | 1 | 2 | DiffAnalyzer — Analyzes Human Edits to Agent Output for Learning ================================================================================ |
+| `pipeline/src/agents/learning/outcome_attributor.py` | 313 | 1 | 2 | OutcomeAttributor — Attributes Proposal Outcomes to Agent Memories and Content ======================================================================= |
+| `pipeline/src/agents/learning/pattern_promoter.py` | 332 | 1 | 2 | PatternPromoter — Promotes Confirmed Episodic Patterns to Semantic Knowledge ========================================================================= |
+| `pipeline/src/agents/learning/preference_extractor.py` | 350 | 1 | 2 | PreferenceExtractor — Extracts Tenant Preferences from Episodic Memory Patterns ====================================================================== |
+| `pipeline/src/agents/lifecycle/__init__.py` | 18 | 4 | 0 | Lifecycle modules for agent memory management. |
+| `pipeline/src/agents/lifecycle/compactor.py` | 333 | 1 | 2 | MemoryCompactor — Compresses Clusters of Similar Episodic Memories ================================================================================ |
+| `pipeline/src/agents/lifecycle/contradiction_resolver.py` | 334 | 1 | 2 | ContradictionResolver — Detects and Resolves Contradictory Semantic Memories ========================================================================= |
+| `pipeline/src/agents/lifecycle/decay.py` | 188 | 1 | 2 | MemoryDecay — Applies Time-Based Decay to Memory Importance Scores ================================================================================ |
+| `pipeline/src/agents/lifecycle/gc.py` | 213 | 1 | 2 | MemoryGC — Garbage Collects Expired and Archived Memories ================================================================================ |
+| `pipeline/src/agents/memory.py` | 743 | 2 | 6 | Agent memory operations — store and recall from episodic_memories table. |
+| `pipeline/src/agents/platform_guard.py` | 94 | 0 | 2 | Platform AI spend guard (G1). |
+| `pipeline/src/agents/tools.py` | 1100 | 1 | 5 | ToolRegistry — Tenant-Isolated Tool Execution Layer ================================================================================ |
+| `pipeline/src/agents/web.py` | 157 | 0 | 2 | Controlled web egress for the research_scout agent — the "server-side browser". |
+| `pipeline/src/config.py` | 36 | 0 | 9 | Pipeline configuration from environment variables. |
+| `pipeline/src/crypto.py` | 38 | 1 | 2 | AES-256-GCM encryption for API keys stored in database. |
+| `pipeline/src/db_role_preflight.py` | 144 | 0 | 2 | Refuse to start the worker on a database role that cannot write a tenant workflow. |
+| `pipeline/src/document/__init__.py` | 27 | 2 | 0 | Document Agent System — format-specific skilled agents that own the full document lifecycle: ingest → atomize → canvas → edit → collaborate → accept → |
+| `pipeline/src/document/base.py` | 401 | 1 | 6 | Base document agent — the contract every format-specific agent implements. |
+| `pipeline/src/document/converter.py` | 177 | 0 | 1 | LibreOffice headless wrapper for format conversion and PDF rendering. |
+| `pipeline/src/document/docx_agent.py` | 665 | 1 | 0 | DOCX Document Agent — full lifecycle for Word documents. |
+| `pipeline/src/document/markdown_to_canvas.py` | 404 | 0 | 4 | Markdown → CanvasDocument converter (the strawman/draft → canvas landing format). |
+| `pipeline/src/document/pdf_agent.py` | 549 | 1 | 0 | PDF Document Agent — read-only ingest and atomization of PDF files. |
+| `pipeline/src/document/pptx_agent.py` | 750 | 1 | 0 | PowerPoint document lifecycle agent. |
+| `pipeline/src/document/registry.py` | 127 | 1 | 1 | Document agent registry — dispatch by format or file extension. |
+| `pipeline/src/document/xlsx_agent.py` | 547 | 1 | 0 | Excel Document Agent — handles the full lifecycle for .xlsx / .xls files. |
+| `pipeline/src/errors.py` | 93 | 0 | 8 | Python error class hierarchy — mirrors frontend/lib/errors.ts. |
+| `pipeline/src/events.py` | 167 | 0 | 31 | Event emission for the pipeline service. |
+| `pipeline/src/health.py` | 152 | 2 | 1 | Health check helpers and lightweight HTTP server for the pipeline worker. |
+| `pipeline/src/ingest/__init__.py` | 0 | 0 | 3 | — |
+| `pipeline/src/ingest/base.py` | 455 | 1 | 6 | Base ingester class for all opportunity source ingesters. |
+| `pipeline/src/ingest/dispatcher.py` | 628 | 8 | 6 | Cron dispatcher and job consumer for the ingester framework. |
+| `pipeline/src/ingest/dsip.py` | 532 | 3 | 3 | DSIP (DoD SBIR/STTR Innovation Portal) Topic Listing Ingester |
+| `pipeline/src/ingest/grants_gov.py` | 252 | 3 | 3 | Grants.gov NOFO ingester. |
+| `pipeline/src/ingest/sam_gov.py` | 434 | 4 | 4 | SAM.gov Opportunities API Ingester |
+| `pipeline/src/ingest/sbir_gov.py` | 539 | 4 | 4 | SBIR.gov Solicitations API Ingester |
+| `pipeline/src/ingest/topic_expander.py` | 859 | 2 | 3 | On-demand topic expansion for a single solicitation (Scouting Spine M3 / T3.1). |
+| `pipeline/src/lifecycle_scheduler.py` | 735 | 8 | 3 | Lifecycle Scheduler — Runs Memory Maintenance on Documented Schedules ================================================================================ |
+| `pipeline/src/main.py` | 361 | 8 | 1 | RFP Pipeline — Main Worker Process (v2.1) |
+| `pipeline/src/proposal/__init__.py` | 13 | 0 | 0 | Proposal cost/budget domain package. |
+| `pipeline/src/proposal/budget_model.py` | 527 | 0 | 3 | Budget Model — the deterministic budget / PoP-bucket cost-volume fill engine ========================================================================= |
+| `pipeline/src/safe_skip.py` | 130 | 0 | 4 | Safe-skip: what a step does when the model fails it. |
+| `pipeline/src/sdk_compat.py` | 76 | 0 | 2 | What the INSTALLED anthropic SDK will actually accept. |
+| `pipeline/src/seeds/__init__.py` | 0 | 0 | 0 | — |
+| `pipeline/src/seeds/master_admin.py` | 105 | 0 | 1 | Seed: master_admin bootstrap ───────────────────────────── Creates the very first master_admin user so the platform has a working login immediately af |
+| `pipeline/src/shredder/__init__.py` | 8 | 0 | 5 | Shredder module — Phase 1 §D. |
+| `pipeline/src/shredder/compliance_mapping.py` | 185 | 0 | 4 | Map Claude-extracted compliance variable names to named DB columns. |
+| `pipeline/src/shredder/extractor.py` | 202 | 1 | 4 | Text extraction — Phase 1 §D1. |
+| `pipeline/src/shredder/namespace.py` | 170 | 0 | 6 | Memory-namespace key computation — Phase 1 §D6. |
+| `pipeline/src/shredder/runner.py` | 1023 | 8 | 6 | Shredder orchestrator — Phase 1 §D4. |
+| `pipeline/src/shredder/section_locate.py` | 368 | 0 | 8 | Find the sections of a large BAA that actually state the rules. |
+| `pipeline/src/shredder/sync_extract.py` | 109 | 1 | 1 | Synchronous compliance-extract variant — Phase 1 §D8. |
+| `pipeline/src/storage/__init__.py` | 0 | 0 | 1 | — |
+| `pipeline/src/storage/paths.py` | 248 | 0 | 2 | Object-storage path helpers — canonical source for S3 keys. |
+| `pipeline/src/storage/s3_client.py` | 247 | 0 | 5 | Shared S3 client for the pipeline workers. |
+| `pipeline/src/workers/__init__.py` | 0 | 0 | 0 | — |
+| `pipeline/src/workers/source_scout.py` | 439 | 1 | 1 | Source Scout pipeline worker. |
+| `pipeline/src/workflows/__init__.py` | 13 | 0 | 6 | Workflow automation framework. |
+| `pipeline/src/workflows/actions/__init__.py` | 59 | 6 | 4 | Workflow Actions Package (__init__.py) ================================================================================ |
+| `pipeline/src/workflows/actions/advisory_actions.py` | 190 | 1 | 4 | Workflow Actions — Advisory / Adversarial overlay elevation + auto-land (P4-D) ======================================================================= |
+| `pipeline/src/workflows/actions/analyze_section_diff.py` | 111 | 2 | 1 | Action: analyze_section_diff Workflow: OnProposalSectionEdited (PIPE-15) |
+| `pipeline/src/workflows/actions/attribute_outcome.py` | 100 | 2 | 1 | Action: attribute_outcome Workflow: OnProposalOutcomeRecorded (PIPE-16) |
+| `pipeline/src/workflows/actions/authorable.py` | 83 | 0 | 3 | Which proposal sections may receive an AI prose draft — the one rule, in one place. |
+| `pipeline/src/workflows/actions/cms_content.py` | 285 | 3 | 1 | Workflow Actions: CMS content draft + publish (the content vertical) ================================================================================ |
+| `pipeline/src/workflows/actions/cohort_evidence.py` | 87 | 0 | 3 | Did the cohort actually run? (the third signal — B17) ================================================================================ A workflow that |
+| `pipeline/src/workflows/actions/create_drafts_from_scout.py` | 296 | 1 | 1 | Workflow Action: create_drafts_from_scout ================================================================================ |
+| `pipeline/src/workflows/actions/draft_v0.py` | 482 | 6 | 3 | Action: draft_v0 (B5 — the 3-source V0 strawman orchestration) ================================================================================ |
+| `pipeline/src/workflows/actions/generate_preview.py` | 298 | 3 | 1 | Workflow Action: generate_preview (generate_preview.py) ================================================================================ |
+| `pipeline/src/workflows/actions/ingest_actions.py` | 237 | 2 | 1 | Ingest Studio — the phase advance ACTION (docs/INGEST_STUDIO_DESIGN.md) ============================================================================== |
+| `pipeline/src/workflows/actions/portal_stage_actions.py` | 126 | 2 | 0 | Portal stage-review actions (TW-8 — the AI-manager stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ============================================== |
+| `pipeline/src/workflows/actions/publish_section_draft.py` | 187 | 3 | 2 | Action: publish_section_draft (E5 — the strawman/draft LANDING primitive) ============================================================================ |
+| `pipeline/src/workflows/actions/rescore.py` | 402 | 1 | 2 | Workflow Action: tenant-side bucket rescore (rescore.py) ================================================================================ |
+| `pipeline/src/workflows/actions/score_tenants.py` | 190 | 1 | 2 | Workflow Action: match_tenants (score_tenants.py) ================================================================================ |
+| `pipeline/src/workflows/actions/shred.py` | 550 | 6 | 1 | Workflow Action: shred / extract_compliance ================================================================================ |
+| `pipeline/src/workflows/actions/studio_actions.py` | 109 | 1 | 1 | Proposal Studio — the phase advance ACTION (docs/PROPOSAL_STUDIO_DESIGN.md) ========================================================================== |
+| `pipeline/src/workflows/advisory_overlay.py` | 201 | 1 | 4 | Workflow: AdvisoryOverlay (reusable sub-workflow — the Advisory / Adversarial Overlay) =============================================================== |
+| `pipeline/src/workflows/base.py` | 399 | 2 | 69 | Module: Workflow Base Classes (base.py) ================================================================================ |
+| `pipeline/src/workflows/manager.py` | 2230 | 3 | 16 | WorkflowManager — Persistent Workflow Orchestration with Crash Recovery ============================================================================== |
+| `pipeline/src/workflows/on_application_accepted.py` | 119 | 1 | 1 | Workflow: OnApplicationAccepted ================================================================================ |
+| `pipeline/src/workflows/on_cms_content_requested.py` | 134 | 1 | 2 | Workflow: OnCmsContentRequested (CMS content vertical — keystone proof) ============================================================================== |
+| `pipeline/src/workflows/on_collaborator_invited.py` | 131 | 1 | 1 | Workflow: OnCollaboratorInvited ================================================================================ |
+| `pipeline/src/workflows/on_content_resurface_requested.py` | 60 | 1 | 1 | Workflow: OnContentResurfaceRequested (our-org CMS — scheduled content scout) ======================================================================== |
+| `pipeline/src/workflows/on_contract_started.py` | 130 | 1 | 0 | Workflow: OnContractStarted ================================================================================ |
+| `pipeline/src/workflows/on_full_draft_requested.py` | 374 | 1 | 2 | Workflow: OnFullDraftRequested (the Proposal Draft Manager orchestration — 3 modes) ================================================================== |
+| `pipeline/src/workflows/on_ingest_assessment_requested.py` | 85 | 1 | 1 | Workflow: OnIngestAssessmentRequested (Admin-agent Phase 1 — ingest orchestration) =================================================================== |
+| `pipeline/src/workflows/on_ingest_phase_requested.py` | 184 | 1 | 1 | Workflow: OnIngestPhaseRequested (Ingest Studio — the gated ingest) ================================================================================ |
+| `pipeline/src/workflows/on_opportunities_detected.py` | 175 | 1 | 2 | Workflow: OnOpportunitiesDetected (Scouting Spine M2 — detection → alert) ============================================================================ |
+| `pipeline/src/workflows/on_ops_digest_requested.py` | 73 | 1 | 1 | Workflow: OnOpsDigestRequested (POD 4 — first SCHEDULED admin automation) ============================================================================ |
+| `pipeline/src/workflows/on_portal_stage_review.py` | 83 | 1 | 3 | Workflow: OnPortalStageReviewRequested (TW-8 — the AI-manager portal stage gate) docs/TENANT_WORKFLOW_SETUP_DESIGN.md §3½ ============================ |
+| `pipeline/src/workflows/on_project_health_requested.py` | 98 | 1 | 1 | Workflow: OnProjectHealthRequested (A1 — post-award milestone health) ================================================================================ |
+| `pipeline/src/workflows/on_proposal_advanced.py` | 269 | 1 | 3 | Workflow: OnProposalAdvancedToReview / OnProposalAdvancedToFinal ================================================================================ |
+| `pipeline/src/workflows/on_proposal_created.py` | 218 | 1 | 5 | Workflow: OnProposalCreated ================================================================================ |
+| `pipeline/src/workflows/on_proposal_outcome_recorded.py` | 79 | 1 | 2 | Workflow: OnProposalOutcomeRecorded (PIPE-16) ================================================================================ |
+| `pipeline/src/workflows/on_proposal_section_edited.py` | 67 | 1 | 1 | Workflow: OnProposalSectionEdited (PIPE-15) ================================================================================ |
+| `pipeline/src/workflows/on_review_phase_requested.py` | 173 | 1 | 1 | Workflow: OnReviewPhaseRequested (Proposal Studio — 3 gated loops) ================================================================================ |
+| `pipeline/src/workflows/on_rfp_uploaded.py` | 169 | 1 | 2 | Workflow: OnRfpUploaded ================================================================================ |
+| `pipeline/src/workflows/on_social_schedule_requested.py` | 58 | 1 | 1 | Workflow: OnSocialScheduleRequested (our-org CMS — scheduled social publisher) ======================================================================= |
+| `pipeline/src/workflows/on_solicitation_pushed.py` | 118 | 1 | 0 | Workflow: OnSolicitationPushed ================================================================================ |
+| `pipeline/src/workflows/on_solicitation_review_requested.py` | 89 | 1 | 1 | Workflow: OnSolicitationReviewRequested (POD 4 — admin-side automation) ============================================================================== |
+| `pipeline/src/workflows/on_solicitation_update_scan.py` | 60 | 1 | 1 | Workflow: OnSolicitationUpdateScan (scout expansion — proactive update watcher) ====================================================================== |
+| `pipeline/src/workflows/on_source_change_detected.py` | 174 | 1 | 4 | Workflow: OnSourceChangeDetected ================================================================================ |
+| `pipeline/src/workflows/on_status_narrative_requested.py` | 76 | 1 | 1 | Workflow: OnStatusNarrativeRequested (A2 — the paragraph a report cannot compute) ==================================================================== |
+| `pipeline/src/workflows/on_tenant_rescore.py` | 77 | 1 | 0 | Workflows: OnCardApplied / OnBucketsUpdated (tenant-side bucket scoring) ============================================================================= |
+| `pipeline/src/workflows/processor.py` | 1026 | 3 | 42 | Module: Workflow Processor (processor.py) ================================================================================ |
+| `pipeline/src/workflows/project_collaboration.py` | 133 | 1 | 1 | Workflow: ProjectCollaboration (the generic project/opportunity HITL reaction) ======================================================================= |
 
 ### pipeline · tests · 118 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `tests/__init__.py` | 0 | 0 | 0 | — |
-| `tests/conftest.py` | 88 | 0 | 0 | Shared pytest fixtures + async config. |
-| `tests/parity_score_py.py` | 38 | 1 | 0 | Python half of the scorer parity check. |
-| `tests/test_advisory_gate.py` | 144 | 3 | 0 | Adversarial-gate (P4-D) — the AdvisoryOverlay applied with policy=auto, plus the Mode C elevation seam. Verifies: - request_advisory_overlay GATES on  |
-| `tests/test_advisory_manager_wiring.py` | 132 | 3 | 0 | advisory_manager (Advisory Overlay cohort, P1.5) wiring + security. Greenfielded onto the current spine as the reconciler/planner of the reusable Advi |
-| `tests/test_advisory_overlay.py` | 109 | 3 | 0 | AdvisoryOverlay (P2) — the reusable advisory/adversarial overlay sub-workflow. Verifies it REGISTERS + VALIDATES, is TRIGGER-GATED + INERT (nothing em |
-| `tests/test_agent_event_dispatch.py` | 107 | 2 | 0 | Wiring: the workflow processor dispatches unclaimed events to the agent fabric. |
-| `tests/test_agent_memory_rls.py` | 48 | 0 | 0 | P1-1 (launch-readiness): agent-memory RLS reconcile (mig 119). |
-| `tests/test_agents_security.py` | 1055 | 3 | 0 | Security tests for agents: context-binding, injection defense, tenant isolation. |
-| `tests/test_agents.py` | 455 | 3 | 0 | Unit tests for AgentFabric and archetype registration. |
-| `tests/test_amendment_monitor_wiring.py` | 115 | 5 | 0 | amendment_monitor wiring + safety — the platform-scope compliance-delta monitor. |
-| `tests/test_authorable_guard.py` | 88 | 1 | 0 | A model must not write a federal form. |
-| `tests/test_batch_c_wiring.py` | 82 | 10 | 0 | #129 Batch C — additional agents. outcome_analyst (tenant; learning loop), amendment_monitor (platform; compliance delta), cost_estimator + pp_matcher |
-| `tests/test_budget_model.py` | 269 | 1 | 0 | Budget model (P4) — the deterministic cost-volume fill engine. Pure math, no DB / LLM. |
-| `tests/test_capture_strategist_wiring.py` | 57 | 5 | 0 | #117 capture_strategist wiring + security. Greenfielded (library_atoms; tenant-discretion; injection-fenced). Placed as a declarative AI_INVOKE STEP a |
-| `tests/test_cms_agents_wiring.py` | 81 | 9 | 0 | Our-org CMS content agents (NOT CRM). content_generator (new web/social content), content_curator (the social/web content SCOUT — reads crawler findin |
-| `tests/test_cms_content_integration.py` | 146 | 1 | 0 | Real-DB integration test for the pipeline CMS content vertical actions (V8). |
-| `tests/test_cms_content_vertical.py` | 281 | 4 | 0 | CMS content vertical (keystone proof) — OnCmsContentRequested + its actions. |
-| `tests/test_cohort_evidence.py` | 251 | 8 | 0 | B17 — "reviewed" must be DERIVED from evidence the cohort ran, never asserted. |
-| `tests/test_color_team_landing.py` | 89 | 2 | 0 | The color team's review must reach the builder, and its verdict must be its own. |
-| `tests/test_compliance_reviewer_summarize.py` | 41 | 1 | 0 | Regression: compliance_reviewer.summarize_result must never crash on a `summary` that arrives as a STRING instead of the structured object. |
-| `tests/test_content_pages_integration.py` | 109 | 0 | 0 | Real-DB integration test for the V8 content_pages store (page-versioned content). |
-| `tests/test_continuity_manager_wiring.py` | 97 | 3 | 0 | continuity_manager (production-integrity cohort, G1) wiring + security. Greenfielded onto the current spine (all section canvases + proposal_artifacts |
-| `tests/test_cost_estimator_budget.py` | 86 | 1 | 0 | cost_estimator × budget_model (P4) — proves the agent's compute_budget tool is wired to the deterministic engine and returns EXACT, audit-grade number |
-| `tests/test_create_drafts_from_scout.py` | 107 | 0 | 0 | INC-2 — SCOUT field-name break (EVENT_CONTRACT_V3 gap 3; CLIFFNOTES 19). |
-| `tests/test_cron_event_bridge.py` | 74 | 2 | 0 | Regression for the shared cron→event→workflow bridge (launch-readiness audit findings). |
-| `tests/test_cron_next_run.py` | 67 | 1 | 0 | compute_next_run — the dispatcher advances pipeline_schedules from the real cron_expression (daily / weekly / every-N-hours), with a warned fallback t |
-| `tests/test_crypto.py` | 206 | 1 | 0 | Unit tests for pipeline.src.crypto — AES-256-GCM encrypt/decrypt. |
-| `tests/test_db_role_preflight.py` | 135 | 1 | 0 | The startup check that says whether tenant workflows can be written at all. |
-| `tests/test_discovery_digest.py` | 91 | 1 | 0 | Weekly discovery-digest job (lifecycle_scheduler._run_discovery_digest). |
-| `tests/test_dispatcher.py` | 341 | 8 | 0 | Unit tests for pipeline.src.ingest.dispatcher. |
-| `tests/test_draft_v0_prose_gate.py` | 85 | 1 | 0 | A mold is scaffolding, not a draft. |
-| `tests/test_embeddings.py` | 770 | 5 | 0 | Tests for the embeddings provider layer (pipeline/src/agents/embeddings.py). |
-| `tests/test_engine_single_path.py` | 87 | 2 | 0 | Single execution path — "No fire-and-forget ever" (escalation of INC-5 gap 5). |
-| `tests/test_error_gating.py` | 25 | 1 | 0 | Fix 3 — failed operations must not trigger automation (Launch Review #3). |
-| `tests/test_fabric_observability.py` | 75 | 1 | 0 | #149 (cross-board audit) — agent-fabric observability lifecycle. |
-| `tests/test_failure_flagging.py` | 146 | 4 | 0 | Failure-flagging invariants (launch-critical): a failed py-function execution must NEVER be silent — it is flagged in the AUDIT (process_instances + t |
-| `tests/test_force_advance.py` | 104 | 1 | 0 | Force-advance HITL — manual operator override of a paused process. |
-| `tests/test_formatter_wiring.py` | 85 | 3 | 0 | formatter (production-integrity cohort, G1) wiring + security. Greenfielded onto the current spine (CanvasDocument v2 in proposal_sections.content; pr |
-| `tests/test_full_draft_workflow.py` | 179 | 3 | 0 | OnFullDraftRequested (P2) — the Proposal Draft Manager orchestration, 3 modes (a/b/c). Verifies the three mode workflows REGISTER + VALIDATE, share th |
-| `tests/test_guardrails.py` | 80 | 1 | 0 | #120 Agent guardrails — the 'guardrail' step of advisory → guardrail → land-or-review. |
-| `tests/test_has_prose_mold_detection.py` | 130 | 1 | 0 | `_has_prose` — the gate that decides whether a section still needs writing. |
-| `tests/test_hitl_lifecycle.py` | 184 | 2 | 0 | INC-1 — HITL park-and-wait lifecycle (EVENT_CONTRACT_V3 §6; CLIFFNOTES 17, 18). |
-| `tests/test_hitl_wait_alignment.py` | 63 | 2 | 0 | Fix 1 — HITL wait_for aligns with the real producer (Launch Review #1/#1b). |
-| `tests/test_ingest_actions.py` | 312 | 1 | 0 | Ingest Studio phase-advance ACTION — the chain semantics (docs/INGEST_STUDIO_DESIGN.md). |
-| `tests/test_ingest_e2e.py` | 363 | 3 | 0 | End-to-end dispatcher test for Phase 1 §C. |
-| `tests/test_ingest_framework.py` | 290 | 5 | 0 | Unit tests for the ingester framework (Phase 1 §C). |
-| `tests/test_ingest_phase_monotonic.py` | 114 | 1 | 0 | The phase guard's SQL, against Postgres. |
-| `tests/test_injection_fences.py` | 142 | 3 | 0 | Injection-fence coverage for the untrusted text that reaches a model prompt. |
-| `tests/test_librarian_wiring.py` | 102 | 2 | 0 | #117 wiring — the greenfielded librarian is registered, handles its current triggers, and declares modern tools against library_atoms (not the retired |
-| `tests/test_markdown_to_canvas_directives.py` | 125 | 1 | 0 | markdown_to_canvas — the three node types the shipped MOLDS use and markdown could not say. |
-| `tests/test_markdown_to_canvas_rich.py` | 170 | 1 | 0 | markdown → canvas: the RICH block + inline vocabulary. |
-| `tests/test_markdown_to_canvas.py` | 91 | 1 | 0 | Unit tests for the markdown → CanvasDocument converter (the strawman landing format). |
-| `tests/test_market_analyst_wiring.py` | 98 | 3 | 0 | market_analyst (Proposal Draft Manager cohort, P1) wiring + security. Greenfielded onto the current spine (proposal_sections + opportunities for secti |
-| `tests/test_master_pipeline_wiring.py` | 87 | 9 | 0 | #128 Batch A — master-side pipeline (PLATFORM-SCOPE). Four platform agents that run at our authority on master data BEFORE the bridge fan-out: opportu |
-| `tests/test_memory.py` | 223 | 1 | 0 | Unit tests for MemoryStore (pipeline/src/agents/memory.py). |
-| `tests/test_notify_templates_exist.py` | 107 | 1 | 0 | Every workflow NOTIFY step names a template the CRM can actually render. |
-| `tests/test_nudge_verdict.py` | 168 | 1 | 0 | The nudge sweeps, after the verdict/transfer split (mig 240). |
-| `tests/test_observability_contract.py` | 104 | 2 | 0 | #149 — the cross-board "stateless-but-observable" contract, enforced as one test. |
-| `tests/test_on_timeout_escalation.py` | 106 | 2 | 0 | INC-6 — on_timeout / on_failure are live bindings (EVENT_CONTRACT_V3 gap 6). |
-| `tests/test_onboarding_agent_wiring.py` | 58 | 5 | 0 | #127 onboarding_agent (Batch B) wiring + security. New tenant-bound archetype that cold-starts a tenant. Placed as an AI_INVOKE step in OnApplicationA |
-| `tests/test_onboarding_correlation.py` | 40 | 1 | 0 | OnApplicationAccepted onboarding gate — a `user.logged_in` event must resume ONLY the parked onboarding instance for THAT user. |
-| `tests/test_opportunity_analyst_wiring.py` | 39 | 3 | 0 | #117 opportunity_analyst wiring + security. Greenfielded onto the current spine (tenant profile via library_atoms; tenant-discretion; injection-fenced |
-| `tests/test_opportunity_scout_wiring.py` | 99 | 5 | 0 | opportunity_scout wiring + safety — the platform-scope triage prioritizer, now WOKEN. |
-| `tests/test_ops_companion_scope.py` | 203 | 1 | 0 | THE COMPANION READS OUR TELEMETRY, NOT OUR CUSTOMERS. |
-| `tests/test_overlay_section_thread.py` | 80 | 4 | 0 | OVERLAY-2: request_advisory_overlay threads a market-relevant section_id into the overlay payload, so market_analyst's pre_augment (get_section_contex |
-| `tests/test_p5_scenario_proof.py` | 151 | 5 | 0 | P5 scenario proof — the Proposal Draft Manager program, proven at the deterministic + structural level (a live LLM+DB Playwright drive is the deferred |
-| `tests/test_packaging_specialist_wiring.py` | 28 | 5 | 0 | #117 packaging_specialist wiring + security. Tenant-discretion (no tenant_id in schemas); placed as an AI_INVOKE step actor in OnProposalAdvancedToFin |
-| `tests/test_partner_coordinator_wiring.py` | 63 | 5 | 0 | #117 partner_coordinator wiring + security. Greenfielded (tenant-discretion; injection-fenced). Placed as a declarative AI_INVOKE STEP actor in the ne |
-| `tests/test_pipe12_16_wiring.py` | 646 | 7 | 0 | Tests for PIPE-12 through PIPE-16: fabric threading, AI_INVOKE wiring, agent task queue consumer, and the two new learning workflows. |
-| `tests/test_platform_guard.py` | 82 | 1 | 0 | G1 — platform AI spend guard (pipeline/src/agents/platform_guard.py). |
-| `tests/test_pod4_wiring.py` | 87 | 8 | 0 | POD 4 — our-org RFP-admin ops agents + NEW admin-side automation workflows. |
-| `tests/test_portal_stage_review_workflow.py` | 86 | 3 | 0 | OnPortalStageReviewRequested (TW-8b) — the AI-manager portal stage gate engine chain. Verifies the workflow REGISTERS + VALIDATES, triggers on capture |
-| `tests/test_processor_dedup.py` | 105 | 2 | 0 | The dedup record is the only thing between an inclusive poll bound and a duplicate workflow. |
-| `tests/test_project_collaboration.py` | 186 | 3 | 0 | R3.1 — the generic ProjectCollaboration reaction template. |
-| `tests/test_project_manager_wiring.py` | 225 | 6 | 0 | A1 — project_manager wiring + safety (docs/AGENT_WORKFORCE.md §invariants). |
-| `tests/test_proposal_architect_wiring.py` | 37 | 5 | 0 | #117 proposal_architect wiring + security. Greenfielded (library_atoms; tenant-discretion; injection-fenced). Placed as a declarative AI_INVOKE STEP a |
-| `tests/test_proposal_manager_wiring.py` | 96 | 3 | 0 | proposal_manager (Proposal Draft Manager cohort, P1) wiring + security. Greenfielded onto the current spine (proposal_sections skeleton + proposal_com |
-| `tests/test_rate_limit_backoff.py` | 96 | 0 | 0 | EVERY INGESTER RAISES THE TYPED RATE-LIMIT ERROR, AND SOMETHING CATCHES IT. |
-| `tests/test_redaction_guard_wiring.py` | 87 | 3 | 0 | redaction_guard (Proposal Draft Manager cohort, P1) wiring + security. Greenfielded onto the current spine (proposal_artifacts + all proposal_sections |
-| `tests/test_rescore.py` | 291 | 2 | 0 | #144a: the Python score_card is a faithful port of frontend/lib/bucket-ranking.ts scoreCard — same signals, same default weights, JS Math.round semant |
-| `tests/test_research_scout_wiring.py` | 87 | 5 | 0 | research_scout wiring + safety — mapped as a declarative AI_INVOKE step (AGENTS-LIVE). |
-| `tests/test_review_phase_wiring.py` | 130 | 3 | 0 | Proposal Studio — the 3-phase (Draft→Refine→Compliance) gated workflow (docs/PROPOSAL_STUDIO_DESIGN.md). |
-| `tests/test_rfp_ingest_manager_wiring.py` | 127 | 6 | 0 | Admin-agent Phase 1 — rfp_ingest_manager wiring + safety (docs/ADMIN_AGENT_DESIGN.md). |
-| `tests/test_safe_skip.py` | 173 | 2 | 0 | Never fabricate into a table that carries citations; always label what you fabricate elsewhere. |
-| `tests/test_sam_gov.py` | 306 | 1 | 0 | Unit tests for SamGovIngester and its helper functions. |
-| `tests/test_sbir_baa_grouping.py` | 170 | 1 | 0 | SBIR.gov BAA multi-topic grouping (regression for the NOT-NULL umbrella bug). |
-| `tests/test_scope_anchor.py` | 95 | 1 | 0 | Where a SCOPED colour-team finding lands. |
-| `tests/test_scoring_strategist_wiring.py` | 58 | 3 | 0 | #117 agent 2 (scoring_strategist) wiring + security. Greenfielded onto the current spine (library_atoms vol distribution; DB memory). Tenant-bound: th |
-| `tests/test_scoring.py` | 143 | 1 | 0 | P0-3 scoring cutover: match_tenants reads the CANONICAL spine, not retired tables. |
-| `tests/test_scout_expansion_wiring.py` | 38 | 3 | 0 | Scout expansion. (1) opportunity_scout now analyzes BOTH the ingested queue and the crawler's opportunity findings, and flags possible UPDATES/amendme |
-| `tests/test_scout_schedule.py` | 51 | 1 | 0 | Web Source Scout cron wiring (ingest.dispatcher.tick_schedules + mig 172 schedule row). |
-| `tests/test_section_drafter_retrieval.py` | 165 | 1 | 0 | The drafter's library retrieval must hand the model the passage it MATCHED. |
-| `tests/test_section_drafter_voice.py` | 70 | 1 | 0 | Voice of Proposal (mig 139 proposals.voice) threading into section_drafter.build_messages. |
-| `tests/test_section_drafter_wiring.py` | 53 | 2 | 0 | P6.2 wiring — section_drafter grounds on the starter scaffold. Locks: the new search_starter_scaffold tool is declared, tenant-discretion holds (no to |
-| `tests/test_section_locate.py` | 141 | 1 | 0 | An agent reading a 1.3M-char BAA must not be handed its cover page. |
-| `tests/test_shred_consolidation.py` | 34 | 0 | 0 | INC-7 — SHRED consolidated to one canonical Job (EVENT_CONTRACT_V3 gap 7). |
-| `tests/test_shredder_compliance_mapping.py` | 158 | 1 | 0 | Unit tests for Phase 1 §D — compliance-mapping logic. |
-| `tests/test_shredder_extractor.py` | 117 | 1 | 0 | Unit tests for Phase 1 §D1 — PDF text extraction. |
-| `tests/test_shredder_namespace.py` | 121 | 1 | 0 | Table-driven tests for Phase 1 §D6 — memory-namespace key computation. |
-| `tests/test_shredder_regression.py` | 314 | 1 | 0 | Golden-fixture regression tests — Phase 1 §D7. |
-| `tests/test_shredder_runner.py` | 449 | 4 | 0 | E2E dispatcher-free tests for the shredder runner — Phase 1 §D4. |
-| `tests/test_shredder_sync_extract.py` | 123 | 1 | 0 | Unit tests for Phase 1 §D8 — sync compliance extract. |
-| `tests/test_source_text_cap.py` | 83 | 1 | 0 | The shredder must not quietly read a fifth of a solicitation. |
-| `tests/test_status_narrator_wiring.py` | 157 | 6 | 0 | A2 — status_narrator wiring + safety. |
-| `tests/test_storage_helpers.py` | 105 | 1 | 0 | Unit tests for pipeline S3 storage helpers. |
-| `tests/test_storage_local_driver.py` | 149 | 1 | 0 | The pipeline's local storage driver — the counterpart the frontend has had since STORAGE-LOCAL. |
-| `tests/test_storage_paths.py` | 242 | 0 | 0 | Unit tests for pipeline.src.storage.paths. |
-| `tests/test_stylist_wiring.py` | 80 | 3 | 0 | stylist (production-integrity cohort, G1) wiring + security. Greenfielded onto the current spine (CanvasDocument v2 in proposal_sections.content; prop |
-| `tests/test_tasks_ledger.py` | 505 | 2 | 0 | Tasks epic keystone — StepType.TODO + the unified `tasks` ledger. |
-| `tests/test_template_catalog.py` | 180 | 2 | 0 | Process Template Catalog (migration 054) — activation + audit over code templates. |
-| `tests/test_todo_producers.py` | 45 | 3 | 0 | Producer wiring — real templates emit TODO steps that populate the queues. |
-| `tests/test_topic_expander.py` | 179 | 1 | 0 | Unit tests for pipeline.src.ingest.topic_expander pure helpers. |
-| `tests/test_traceability_auditor_wiring.py` | 77 | 3 | 0 | traceability_auditor (Proposal Draft Manager cohort, P1) wiring + security. Greenfielded onto the current spine (proposal_compliance_matrix + all prop |
-| `tests/test_workflow_hardening.py` | 292 | 5 | 0 | P1-workflow (#140, launch-readiness): workflow-engine hardening. |
-| `tests/test_workflow_no_deadend_emission.py` | 151 | 3 | 0 | Launch guard: EVERY registered workflow is visualizable, non-blocking, fully-emitting. |
-| `tests/verify_spend_guardrails.py` | 174 | 1 | 0 | Do the spend guardrails actually ENGAGE? — red-first, against the emulator. |
-| `tests/verify_stale_task_reaper.py` | 236 | 1 | 0 | Does an abandoned agent task ever come back? — verify_stale_task_reaper.py |
+| `pipeline/tests/__init__.py` | 0 | 0 | 0 | — |
+| `pipeline/tests/conftest.py` | 88 | 0 | 0 | Shared pytest fixtures + async config. |
+| `pipeline/tests/parity_score_py.py` | 38 | 1 | 0 | Python half of the scorer parity check. |
+| `pipeline/tests/test_advisory_gate.py` | 144 | 3 | 0 | Adversarial-gate (P4-D) — the AdvisoryOverlay applied with policy=auto, plus the Mode C elevation seam. Verifies: - request_advisory_overlay GATES on  |
+| `pipeline/tests/test_advisory_manager_wiring.py` | 132 | 3 | 0 | advisory_manager (Advisory Overlay cohort, P1.5) wiring + security. Greenfielded onto the current spine as the reconciler/planner of the reusable Advi |
+| `pipeline/tests/test_advisory_overlay.py` | 109 | 3 | 0 | AdvisoryOverlay (P2) — the reusable advisory/adversarial overlay sub-workflow. Verifies it REGISTERS + VALIDATES, is TRIGGER-GATED + INERT (nothing em |
+| `pipeline/tests/test_agent_event_dispatch.py` | 107 | 2 | 0 | Wiring: the workflow processor dispatches unclaimed events to the agent fabric. |
+| `pipeline/tests/test_agent_memory_rls.py` | 48 | 0 | 0 | P1-1 (launch-readiness): agent-memory RLS reconcile (mig 119). |
+| `pipeline/tests/test_agents_security.py` | 1055 | 3 | 0 | Security tests for agents: context-binding, injection defense, tenant isolation. |
+| `pipeline/tests/test_agents.py` | 455 | 3 | 0 | Unit tests for AgentFabric and archetype registration. |
+| `pipeline/tests/test_amendment_monitor_wiring.py` | 115 | 5 | 0 | amendment_monitor wiring + safety — the platform-scope compliance-delta monitor. |
+| `pipeline/tests/test_authorable_guard.py` | 88 | 1 | 0 | A model must not write a federal form. |
+| `pipeline/tests/test_batch_c_wiring.py` | 82 | 10 | 0 | #129 Batch C — additional agents. outcome_analyst (tenant; learning loop), amendment_monitor (platform; compliance delta), cost_estimator + pp_matcher |
+| `pipeline/tests/test_budget_model.py` | 269 | 1 | 0 | Budget model (P4) — the deterministic cost-volume fill engine. Pure math, no DB / LLM. |
+| `pipeline/tests/test_capture_strategist_wiring.py` | 57 | 5 | 0 | #117 capture_strategist wiring + security. Greenfielded (library_atoms; tenant-discretion; injection-fenced). Placed as a declarative AI_INVOKE STEP a |
+| `pipeline/tests/test_cms_agents_wiring.py` | 81 | 9 | 0 | Our-org CMS content agents (NOT CRM). content_generator (new web/social content), content_curator (the social/web content SCOUT — reads crawler findin |
+| `pipeline/tests/test_cms_content_integration.py` | 146 | 1 | 0 | Real-DB integration test for the pipeline CMS content vertical actions (V8). |
+| `pipeline/tests/test_cms_content_vertical.py` | 281 | 4 | 0 | CMS content vertical (keystone proof) — OnCmsContentRequested + its actions. |
+| `pipeline/tests/test_cohort_evidence.py` | 251 | 8 | 0 | B17 — "reviewed" must be DERIVED from evidence the cohort ran, never asserted. |
+| `pipeline/tests/test_color_team_landing.py` | 89 | 2 | 0 | The color team's review must reach the builder, and its verdict must be its own. |
+| `pipeline/tests/test_compliance_reviewer_summarize.py` | 41 | 1 | 0 | Regression: compliance_reviewer.summarize_result must never crash on a `summary` that arrives as a STRING instead of the structured object. |
+| `pipeline/tests/test_content_pages_integration.py` | 109 | 0 | 0 | Real-DB integration test for the V8 content_pages store (page-versioned content). |
+| `pipeline/tests/test_continuity_manager_wiring.py` | 97 | 3 | 0 | continuity_manager (production-integrity cohort, G1) wiring + security. Greenfielded onto the current spine (all section canvases + proposal_artifacts |
+| `pipeline/tests/test_cost_estimator_budget.py` | 86 | 1 | 0 | cost_estimator × budget_model (P4) — proves the agent's compute_budget tool is wired to the deterministic engine and returns EXACT, audit-grade number |
+| `pipeline/tests/test_create_drafts_from_scout.py` | 107 | 0 | 0 | INC-2 — SCOUT field-name break (EVENT_CONTRACT_V3 gap 3; CLIFFNOTES 19). |
+| `pipeline/tests/test_cron_event_bridge.py` | 74 | 2 | 0 | Regression for the shared cron→event→workflow bridge (launch-readiness audit findings). |
+| `pipeline/tests/test_cron_next_run.py` | 67 | 1 | 0 | compute_next_run — the dispatcher advances pipeline_schedules from the real cron_expression (daily / weekly / every-N-hours), with a warned fallback t |
+| `pipeline/tests/test_crypto.py` | 206 | 1 | 0 | Unit tests for pipeline.src.crypto — AES-256-GCM encrypt/decrypt. |
+| `pipeline/tests/test_db_role_preflight.py` | 135 | 1 | 0 | The startup check that says whether tenant workflows can be written at all. |
+| `pipeline/tests/test_discovery_digest.py` | 91 | 1 | 0 | Weekly discovery-digest job (lifecycle_scheduler._run_discovery_digest). |
+| `pipeline/tests/test_dispatcher.py` | 341 | 8 | 0 | Unit tests for pipeline.src.ingest.dispatcher. |
+| `pipeline/tests/test_draft_v0_prose_gate.py` | 85 | 1 | 0 | A mold is scaffolding, not a draft. |
+| `pipeline/tests/test_embeddings.py` | 770 | 5 | 0 | Tests for the embeddings provider layer (pipeline/src/agents/embeddings.py). |
+| `pipeline/tests/test_engine_single_path.py` | 87 | 2 | 0 | Single execution path — "No fire-and-forget ever" (escalation of INC-5 gap 5). |
+| `pipeline/tests/test_error_gating.py` | 25 | 1 | 0 | Fix 3 — failed operations must not trigger automation (Launch Review #3). |
+| `pipeline/tests/test_fabric_observability.py` | 75 | 1 | 0 | #149 (cross-board audit) — agent-fabric observability lifecycle. |
+| `pipeline/tests/test_failure_flagging.py` | 146 | 4 | 0 | Failure-flagging invariants (launch-critical): a failed py-function execution must NEVER be silent — it is flagged in the AUDIT (process_instances + t |
+| `pipeline/tests/test_force_advance.py` | 104 | 1 | 0 | Force-advance HITL — manual operator override of a paused process. |
+| `pipeline/tests/test_formatter_wiring.py` | 85 | 3 | 0 | formatter (production-integrity cohort, G1) wiring + security. Greenfielded onto the current spine (CanvasDocument v2 in proposal_sections.content; pr |
+| `pipeline/tests/test_full_draft_workflow.py` | 179 | 3 | 0 | OnFullDraftRequested (P2) — the Proposal Draft Manager orchestration, 3 modes (a/b/c). Verifies the three mode workflows REGISTER + VALIDATE, share th |
+| `pipeline/tests/test_guardrails.py` | 80 | 1 | 0 | #120 Agent guardrails — the 'guardrail' step of advisory → guardrail → land-or-review. |
+| `pipeline/tests/test_has_prose_mold_detection.py` | 130 | 1 | 0 | `_has_prose` — the gate that decides whether a section still needs writing. |
+| `pipeline/tests/test_hitl_lifecycle.py` | 184 | 2 | 0 | INC-1 — HITL park-and-wait lifecycle (EVENT_CONTRACT_V3 §6; CLIFFNOTES 17, 18). |
+| `pipeline/tests/test_hitl_wait_alignment.py` | 63 | 2 | 0 | Fix 1 — HITL wait_for aligns with the real producer (Launch Review #1/#1b). |
+| `pipeline/tests/test_ingest_actions.py` | 312 | 1 | 0 | Ingest Studio phase-advance ACTION — the chain semantics (docs/INGEST_STUDIO_DESIGN.md). |
+| `pipeline/tests/test_ingest_e2e.py` | 363 | 3 | 0 | End-to-end dispatcher test for Phase 1 §C. |
+| `pipeline/tests/test_ingest_framework.py` | 290 | 5 | 0 | Unit tests for the ingester framework (Phase 1 §C). |
+| `pipeline/tests/test_ingest_phase_monotonic.py` | 114 | 1 | 0 | The phase guard's SQL, against Postgres. |
+| `pipeline/tests/test_injection_fences.py` | 142 | 3 | 0 | Injection-fence coverage for the untrusted text that reaches a model prompt. |
+| `pipeline/tests/test_librarian_wiring.py` | 102 | 2 | 0 | #117 wiring — the greenfielded librarian is registered, handles its current triggers, and declares modern tools against library_atoms (not the retired |
+| `pipeline/tests/test_markdown_to_canvas_directives.py` | 125 | 1 | 0 | markdown_to_canvas — the three node types the shipped MOLDS use and markdown could not say. |
+| `pipeline/tests/test_markdown_to_canvas_rich.py` | 170 | 1 | 0 | markdown → canvas: the RICH block + inline vocabulary. |
+| `pipeline/tests/test_markdown_to_canvas.py` | 91 | 1 | 0 | Unit tests for the markdown → CanvasDocument converter (the strawman landing format). |
+| `pipeline/tests/test_market_analyst_wiring.py` | 98 | 3 | 0 | market_analyst (Proposal Draft Manager cohort, P1) wiring + security. Greenfielded onto the current spine (proposal_sections + opportunities for secti |
+| `pipeline/tests/test_master_pipeline_wiring.py` | 87 | 9 | 0 | #128 Batch A — master-side pipeline (PLATFORM-SCOPE). Four platform agents that run at our authority on master data BEFORE the bridge fan-out: opportu |
+| `pipeline/tests/test_memory.py` | 223 | 1 | 0 | Unit tests for MemoryStore (pipeline/src/agents/memory.py). |
+| `pipeline/tests/test_notify_templates_exist.py` | 107 | 1 | 0 | Every workflow NOTIFY step names a template the CRM can actually render. |
+| `pipeline/tests/test_nudge_verdict.py` | 168 | 1 | 0 | The nudge sweeps, after the verdict/transfer split (mig 240). |
+| `pipeline/tests/test_observability_contract.py` | 104 | 2 | 0 | #149 — the cross-board "stateless-but-observable" contract, enforced as one test. |
+| `pipeline/tests/test_on_timeout_escalation.py` | 106 | 2 | 0 | INC-6 — on_timeout / on_failure are live bindings (EVENT_CONTRACT_V3 gap 6). |
+| `pipeline/tests/test_onboarding_agent_wiring.py` | 58 | 5 | 0 | #127 onboarding_agent (Batch B) wiring + security. New tenant-bound archetype that cold-starts a tenant. Placed as an AI_INVOKE step in OnApplicationA |
+| `pipeline/tests/test_onboarding_correlation.py` | 40 | 1 | 0 | OnApplicationAccepted onboarding gate — a `user.logged_in` event must resume ONLY the parked onboarding instance for THAT user. |
+| `pipeline/tests/test_opportunity_analyst_wiring.py` | 39 | 3 | 0 | #117 opportunity_analyst wiring + security. Greenfielded onto the current spine (tenant profile via library_atoms; tenant-discretion; injection-fenced |
+| `pipeline/tests/test_opportunity_scout_wiring.py` | 99 | 5 | 0 | opportunity_scout wiring + safety — the platform-scope triage prioritizer, now WOKEN. |
+| `pipeline/tests/test_ops_companion_scope.py` | 203 | 1 | 0 | THE COMPANION READS OUR TELEMETRY, NOT OUR CUSTOMERS. |
+| `pipeline/tests/test_overlay_section_thread.py` | 80 | 4 | 0 | OVERLAY-2: request_advisory_overlay threads a market-relevant section_id into the overlay payload, so market_analyst's pre_augment (get_section_contex |
+| `pipeline/tests/test_p5_scenario_proof.py` | 151 | 5 | 0 | P5 scenario proof — the Proposal Draft Manager program, proven at the deterministic + structural level (a live LLM+DB Playwright drive is the deferred |
+| `pipeline/tests/test_packaging_specialist_wiring.py` | 28 | 5 | 0 | #117 packaging_specialist wiring + security. Tenant-discretion (no tenant_id in schemas); placed as an AI_INVOKE step actor in OnProposalAdvancedToFin |
+| `pipeline/tests/test_partner_coordinator_wiring.py` | 63 | 5 | 0 | #117 partner_coordinator wiring + security. Greenfielded (tenant-discretion; injection-fenced). Placed as a declarative AI_INVOKE STEP actor in the ne |
+| `pipeline/tests/test_pipe12_16_wiring.py` | 646 | 7 | 0 | Tests for PIPE-12 through PIPE-16: fabric threading, AI_INVOKE wiring, agent task queue consumer, and the two new learning workflows. |
+| `pipeline/tests/test_platform_guard.py` | 82 | 1 | 0 | G1 — platform AI spend guard (pipeline/src/agents/platform_guard.py). |
+| `pipeline/tests/test_pod4_wiring.py` | 87 | 8 | 0 | POD 4 — our-org RFP-admin ops agents + NEW admin-side automation workflows. |
+| `pipeline/tests/test_portal_stage_review_workflow.py` | 86 | 3 | 0 | OnPortalStageReviewRequested (TW-8b) — the AI-manager portal stage gate engine chain. Verifies the workflow REGISTERS + VALIDATES, triggers on capture |
+| `pipeline/tests/test_processor_dedup.py` | 105 | 2 | 0 | The dedup record is the only thing between an inclusive poll bound and a duplicate workflow. |
+| `pipeline/tests/test_project_collaboration.py` | 186 | 3 | 0 | R3.1 — the generic ProjectCollaboration reaction template. |
+| `pipeline/tests/test_project_manager_wiring.py` | 225 | 6 | 0 | A1 — project_manager wiring + safety (docs/AGENT_WORKFORCE.md §invariants). |
+| `pipeline/tests/test_proposal_architect_wiring.py` | 37 | 5 | 0 | #117 proposal_architect wiring + security. Greenfielded (library_atoms; tenant-discretion; injection-fenced). Placed as a declarative AI_INVOKE STEP a |
+| `pipeline/tests/test_proposal_manager_wiring.py` | 96 | 3 | 0 | proposal_manager (Proposal Draft Manager cohort, P1) wiring + security. Greenfielded onto the current spine (proposal_sections skeleton + proposal_com |
+| `pipeline/tests/test_rate_limit_backoff.py` | 96 | 0 | 0 | EVERY INGESTER RAISES THE TYPED RATE-LIMIT ERROR, AND SOMETHING CATCHES IT. |
+| `pipeline/tests/test_redaction_guard_wiring.py` | 87 | 3 | 0 | redaction_guard (Proposal Draft Manager cohort, P1) wiring + security. Greenfielded onto the current spine (proposal_artifacts + all proposal_sections |
+| `pipeline/tests/test_rescore.py` | 291 | 2 | 0 | #144a: the Python score_card is a faithful port of frontend/lib/bucket-ranking.ts scoreCard — same signals, same default weights, JS Math.round semant |
+| `pipeline/tests/test_research_scout_wiring.py` | 87 | 5 | 0 | research_scout wiring + safety — mapped as a declarative AI_INVOKE step (AGENTS-LIVE). |
+| `pipeline/tests/test_review_phase_wiring.py` | 130 | 3 | 0 | Proposal Studio — the 3-phase (Draft→Refine→Compliance) gated workflow (docs/PROPOSAL_STUDIO_DESIGN.md). |
+| `pipeline/tests/test_rfp_ingest_manager_wiring.py` | 127 | 6 | 0 | Admin-agent Phase 1 — rfp_ingest_manager wiring + safety (docs/ADMIN_AGENT_DESIGN.md). |
+| `pipeline/tests/test_safe_skip.py` | 173 | 2 | 0 | Never fabricate into a table that carries citations; always label what you fabricate elsewhere. |
+| `pipeline/tests/test_sam_gov.py` | 306 | 1 | 0 | Unit tests for SamGovIngester and its helper functions. |
+| `pipeline/tests/test_sbir_baa_grouping.py` | 170 | 1 | 0 | SBIR.gov BAA multi-topic grouping (regression for the NOT-NULL umbrella bug). |
+| `pipeline/tests/test_scope_anchor.py` | 95 | 1 | 0 | Where a SCOPED colour-team finding lands. |
+| `pipeline/tests/test_scoring_strategist_wiring.py` | 58 | 3 | 0 | #117 agent 2 (scoring_strategist) wiring + security. Greenfielded onto the current spine (library_atoms vol distribution; DB memory). Tenant-bound: th |
+| `pipeline/tests/test_scoring.py` | 143 | 1 | 0 | P0-3 scoring cutover: match_tenants reads the CANONICAL spine, not retired tables. |
+| `pipeline/tests/test_scout_expansion_wiring.py` | 38 | 3 | 0 | Scout expansion. (1) opportunity_scout now analyzes BOTH the ingested queue and the crawler's opportunity findings, and flags possible UPDATES/amendme |
+| `pipeline/tests/test_scout_schedule.py` | 51 | 1 | 0 | Web Source Scout cron wiring (ingest.dispatcher.tick_schedules + mig 172 schedule row). |
+| `pipeline/tests/test_section_drafter_retrieval.py` | 165 | 1 | 0 | The drafter's library retrieval must hand the model the passage it MATCHED. |
+| `pipeline/tests/test_section_drafter_voice.py` | 70 | 1 | 0 | Voice of Proposal (mig 139 proposals.voice) threading into section_drafter.build_messages. |
+| `pipeline/tests/test_section_drafter_wiring.py` | 53 | 2 | 0 | P6.2 wiring — section_drafter grounds on the starter scaffold. Locks: the new search_starter_scaffold tool is declared, tenant-discretion holds (no to |
+| `pipeline/tests/test_section_locate.py` | 141 | 1 | 0 | An agent reading a 1.3M-char BAA must not be handed its cover page. |
+| `pipeline/tests/test_shred_consolidation.py` | 34 | 0 | 0 | INC-7 — SHRED consolidated to one canonical Job (EVENT_CONTRACT_V3 gap 7). |
+| `pipeline/tests/test_shredder_compliance_mapping.py` | 158 | 1 | 0 | Unit tests for Phase 1 §D — compliance-mapping logic. |
+| `pipeline/tests/test_shredder_extractor.py` | 117 | 1 | 0 | Unit tests for Phase 1 §D1 — PDF text extraction. |
+| `pipeline/tests/test_shredder_namespace.py` | 121 | 1 | 0 | Table-driven tests for Phase 1 §D6 — memory-namespace key computation. |
+| `pipeline/tests/test_shredder_regression.py` | 314 | 1 | 0 | Golden-fixture regression tests — Phase 1 §D7. |
+| `pipeline/tests/test_shredder_runner.py` | 449 | 4 | 0 | E2E dispatcher-free tests for the shredder runner — Phase 1 §D4. |
+| `pipeline/tests/test_shredder_sync_extract.py` | 123 | 1 | 0 | Unit tests for Phase 1 §D8 — sync compliance extract. |
+| `pipeline/tests/test_source_text_cap.py` | 83 | 1 | 0 | The shredder must not quietly read a fifth of a solicitation. |
+| `pipeline/tests/test_status_narrator_wiring.py` | 157 | 6 | 0 | A2 — status_narrator wiring + safety. |
+| `pipeline/tests/test_storage_helpers.py` | 105 | 1 | 0 | Unit tests for pipeline S3 storage helpers. |
+| `pipeline/tests/test_storage_local_driver.py` | 149 | 1 | 0 | The pipeline's local storage driver — the counterpart the frontend has had since STORAGE-LOCAL. |
+| `pipeline/tests/test_storage_paths.py` | 242 | 0 | 0 | Unit tests for pipeline.src.storage.paths. |
+| `pipeline/tests/test_stylist_wiring.py` | 80 | 3 | 0 | stylist (production-integrity cohort, G1) wiring + security. Greenfielded onto the current spine (CanvasDocument v2 in proposal_sections.content; prop |
+| `pipeline/tests/test_tasks_ledger.py` | 505 | 2 | 0 | Tasks epic keystone — StepType.TODO + the unified `tasks` ledger. |
+| `pipeline/tests/test_template_catalog.py` | 180 | 2 | 0 | Process Template Catalog (migration 054) — activation + audit over code templates. |
+| `pipeline/tests/test_todo_producers.py` | 45 | 3 | 0 | Producer wiring — real templates emit TODO steps that populate the queues. |
+| `pipeline/tests/test_topic_expander.py` | 179 | 1 | 0 | Unit tests for pipeline.src.ingest.topic_expander pure helpers. |
+| `pipeline/tests/test_traceability_auditor_wiring.py` | 77 | 3 | 0 | traceability_auditor (Proposal Draft Manager cohort, P1) wiring + security. Greenfielded onto the current spine (proposal_compliance_matrix + all prop |
+| `pipeline/tests/test_workflow_hardening.py` | 292 | 5 | 0 | P1-workflow (#140, launch-readiness): workflow-engine hardening. |
+| `pipeline/tests/test_workflow_no_deadend_emission.py` | 151 | 3 | 0 | Launch guard: EVERY registered workflow is visualizable, non-blocking, fully-emitting. |
+| `pipeline/tests/verify_spend_guardrails.py` | 174 | 1 | 0 | Do the spend guardrails actually ENGAGE? — red-first, against the emulator. |
+| `pipeline/tests/verify_stale_task_reaper.py` | 236 | 1 | 0 | Does an abandoned agent task ever come back? — verify_stale_task_reaper.py |
 
 ### repo · scripts · 46 file(s)
 
@@ -2596,103 +2605,103 @@ which carries the per-edge reasons in full.
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
-| `cms/db/001_cms_schema.sql` | 237 | 0 | 0 | CMS Database Schema — Separate database for content management This runs against the CMS-specific PostgreSQL instance, NOT the main app DB. Fully isol |
-| `cms/db/002_email_engine.sql` | 322 | 0 | 0 | CMS Database Migration 002 — Email Automation Engine Subsystem for campaign management, template drafting (Claude), Gmail sending via delegated worksp |
-| `cms/db/003_hitl_approval_queue.sql` | 114 | 0 | 0 | CMS Database Migration 003 — HITL Email Approval Queue All outgoing emails must pass through human review before sending. Admins see a shared outbox,  |
-| `cms/db/004_environment_marker.sql` | 15 | 0 | 0 | 004_environment_marker.sql Adds deploy_environment tracking to the CRM database. Purely additive. Idempotent. |
-| `cms/db/005_drip_campaigns.sql` | 68 | 0 | 0 | CMS Database Migration 005 — Drip Campaign Sequences and Enrollments Adds drip-campaign support to the email engine: drip_sequences — ordered steps wi |
-| `cms/db/006_crm_tables.sql` | 97 | 0 | 0 | CMS Database Migration 006 — CRM operational tables Moves admin_todos, social_accounts, social_posts from Main Postgres into the CMS database. Foreign |
-| `cms/db/007_template_triggers.sql` | 167 | 0 | 0 | CMS Database Migration 007 — Template Trigger Flag System Enables closed-loop email automation: outgoing emails embed machine-readable context (trigge |
-| `cms/db/008_generation_sources.sql` | 20 | 0 | 0 | 008 — Generation Sources: multi-input content generation support Adds source tracking columns to cms_generations to support generation from: prompt (d |
-| `cms/db/009_sender_identities.sql` | 55 | 0 | 0 | 009 — Sender Identities: DB-backed "From" addresses for outbound email The CMS sends from named identities (src/sender_identity.py::resolve_sender): a |
-| `cms/db/010_page_blocks_in_cms_posts.sql` | 32 | 0 | 0 | Migration 010: Page blocks live in cms_posts (CRM-CMS staging + version store) ----------------------------------------------------------------------- |
-| `cms/db/011_deploy_baseline.sql` | 18 | 0 | 0 | CRM Migration 011: deploy baseline marker (CRM DB) — no-op, idempotent ----------------------------------------------------------------------------- H |
-| `cms/db/012_deploy_baseline_checkpoint.sql` | 33 | 0 | 0 | CRM Migration 012: full redeploy checkpoint (CRM DB) — schema check + baseline marker ---------------------------------------------------------------- |
-| `cms/db/run.sh` | 92 | 0 | 0 | CRM Service — Database Migration Runner --------------------------------------------------------------------------- Runs all SQL migrations in order a |
-| `cms/frontend/eslint.config.js` | 23 | 0 | 0 | — |
-| `cms/frontend/src/App.tsx` | 95 | 15 | 1 | — |
-| `cms/frontend/src/components/AIRevisionPanel.tsx` | 108 | 1 | 1 | — |
-| `cms/frontend/src/components/Layout.tsx` | 95 | 0 | 1 | — |
-| `cms/frontend/src/components/MetadataEditor.tsx` | 691 | 0 | 1 | — |
-| `cms/frontend/src/components/RichTextEditor.tsx` | 213 | 0 | 1 | — |
-| `cms/frontend/src/components/StageIndicator.tsx` | 112 | 0 | 1 | — |
-| `cms/frontend/src/lib/api.ts` | 38 | 0 | 13 | — |
-| `cms/frontend/src/main.tsx` | 11 | 1 | 0 | — |
-| `cms/frontend/src/pages/ContentEditor.tsx` | 438 | 4 | 1 | — |
-| `cms/frontend/src/pages/ContentGenerations.tsx` | 226 | 1 | 1 | — |
-| `cms/frontend/src/pages/ContentPipeline.tsx` | 129 | 1 | 1 | — |
-| `cms/frontend/src/pages/ContentPreview.tsx` | 126 | 1 | 1 | — |
-| `cms/frontend/src/pages/Dashboard.tsx` | 100 | 1 | 1 | — |
-| `cms/frontend/src/pages/DripCampaigns.tsx` | 136 | 1 | 1 | — |
-| `cms/frontend/src/pages/EmailAccounts.tsx` | 74 | 1 | 1 | — |
-| `cms/frontend/src/pages/EmailCampaigns.tsx` | 91 | 1 | 1 | — |
-| `cms/frontend/src/pages/EmailOutbox.tsx` | 129 | 1 | 1 | — |
-| `cms/frontend/src/pages/Login.tsx` | 107 | 0 | 1 | — |
-| `cms/frontend/src/pages/PageEditor.tsx` | 1113 | 1 | 1 | — |
-| `cms/frontend/src/pages/SocialAccounts.tsx` | 78 | 1 | 1 | — |
-| `cms/frontend/src/pages/SocialPosts.tsx` | 87 | 1 | 1 | — |
-| `cms/frontend/src/pages/Todos.tsx` | 146 | 1 | 1 | — |
-| `cms/frontend/vite.config.ts` | 18 | 0 | 0 | — |
-| `cms/scripts/backfill_page_blocks.py` | 109 | 0 | 0 | One-time backfill: copy existing page_block rows from Main Postgres cms_content (the public reference) into CMS Postgres cms_posts (the editing + vers |
-| `cms/src/__init__.py` | 0 | 0 | 0 | — |
-| `cms/src/event_listener.py` | 1253 | 6 | 1 | Event listener — polls the shared DB system_events table and triggers automated actions based on automation_rules. |
-| `cms/src/mailer/__init__.py` | 234 | 3 | 1 | `send()` — the one seam every outbound message from the CRM goes through. |
-| `cms/src/mailer/drivers/__init__.py` | 6 | 0 | 1 | Mail transports. THE ONLY PLACE A PROVIDER SDK OR ENDPOINT MAY BE REACHED. |
-| `cms/src/mailer/drivers/gmail.py` | 44 | 2 | 0 | The Gmail transport, behind the seam. |
-| `cms/src/mailer/drivers/postmark.py` | 112 | 1 | 0 | The Postmark transport, CRM side. |
-| `cms/src/mailer/ledger.py` | 243 | 1 | 2 | The `email_send_ledger` ledger and suppression list, from the CRM. |
-| `cms/src/mailer/types.py` | 152 | 0 | 4 | The outbound-mail contract, CRM side. |
-| `cms/src/main.py` | 127 | 16 | 0 | CMS-CRM Service — email automation, content management, event-driven actions. |
-| `cms/src/middleware/__init__.py` | 0 | 0 | 0 | — |
-| `cms/src/middleware/auth.py` | 150 | 1 | 1 | API key authentication middleware for CMS service. |
-| `cms/src/models/__init__.py` | 0 | 0 | 0 | — |
-| `cms/src/models/database.py` | 163 | 0 | 19 | Database connection for the CRM service. |
-| `cms/src/models/email_schemas.py` | 178 | 0 | 1 | Pydantic models for email engine request/response validation. |
-| `cms/src/models/events.py` | 129 | 1 | 15 | Event emission for CMS service. |
-| `cms/src/models/schemas.py` | 97 | 0 | 2 | Pydantic models for request/response validation. |
-| `cms/src/routers/__init__.py` | 0 | 0 | 1 | — |
-| `cms/src/routers/auth.py` | 237 | 2 | 3 | Authentication routes for CMS SPA. |
-| `cms/src/routers/content.py` | 617 | 3 | 0 | Content pipeline API routes. |
-| `cms/src/routers/drip.py` | 423 | 2 | 1 | Drip campaign management API routes. |
-| `cms/src/routers/email.py` | 1468 | 7 | 0 | Email automation engine API routes. |
-| `cms/src/routers/health.py` | 48 | 1 | 0 | Health check endpoint for Railway. |
-| `cms/src/routers/media.py` | 265 | 4 | 1 | Media upload, listing, and serving endpoints. |
-| `cms/src/routers/page_blocks.py` | 912 | 3 | 1 | Page Block management API routes — PUBLISH IS RETIRED. |
-| `cms/src/routers/social.py` | 406 | 2 | 1 | Social media management API routes. |
-| `cms/src/routers/todos.py` | 223 | 2 | 1 | Admin TODOs management API routes. |
-| `cms/src/sender_identity.py` | 142 | 0 | 2 | Email sender identity — which "From" address a given message goes out as. |
-| `cms/src/storage/__init__.py` | 0 | 0 | 0 | — |
-| `cms/src/storage/volume.py` | 155 | 0 | 1 | Media storage module — Railway persistent volume. |
-| `cms/src/templates.py` | 935 | 0 | 4 | Email template renderer with Jinja2 and trigger flag system. |
-| `cms/src/workers/__init__.py` | 0 | 0 | 0 | — |
-| `cms/src/workers/campaign_executor.py` | 486 | 2 | 1 | Campaign execution engine — polls active campaigns and creates email sends. |
-| `cms/src/workers/content_generator.py` | 415 | 2 | 1 | AI Content Generation Worker. |
-| `cms/src/workers/drip_engine.py` | 307 | 2 | 1 | Drip campaign sequence processor — advances enrollments through drip steps. |
-| `cms/src/workers/email_queue.py` | 311 | 5 | 1 | Email queue worker — dequeues pending sends and delivers via Gmail API. |
-| `cms/src/workers/email_sweep.py` | 629 | 5 | 1 | Email sweep worker — monitors Gmail inbox for replies and engagement. |
-| `cms/src/workers/gmail_client.py` | 287 | 0 | 4 | Gmail API client for sending and sweeping emails. |
-| `cms/src/workers/social_poster.py` | 251 | 2 | 1 | Social media posting worker — publishes scheduled posts to platform APIs. |
-| `cms/src/workers/template_drafter.py` | 163 | 0 | 2 | Template drafter — uses Claude to generate email templates. |
-| `cms/tests/__init__.py` | 0 | 0 | 0 | — |
-| `cms/tests/conftest.py` | 102 | 0 | 0 | Shared fixtures for CMS service tests. |
-| `cms/tests/test_automation_pref_gate.py` | 172 | 0 | 0 | C3 Increment 3 — tenant automation-preference gating in the event_listener. |
-| `cms/tests/test_cms01_social_poster.py` | 315 | 0 | 0 | CMS-01 regression tests — social_poster NotImplementedError handling. |
-| `cms/tests/test_cms02_auth.py` | 537 | 0 | 0 | CMS-02 — Auth flow tests (JWT/cookie issuance, bcrypt check, last_login_at, wrong password). |
-| `cms/tests/test_cms03_event_listener_actions.py` | 489 | 0 | 0 | CMS-03 — Event listener action handler tests. |
-| `cms/tests/test_collaborator_fanout.py` | 98 | 0 | 0 | C3 follow-on — collaborator "get ready" email fan-out. |
-| `cms/tests/test_crm_database_var.py` | 137 | 0 | 0 | THE CRM DATABASE VARIABLE HAS ONE RESOLVER, and this is what keeps it that way. |
-| `cms/tests/test_email_transport_boundary.py` | 155 | 0 | 0 | THE SEND SEAM IS A BOUNDARY, and this is what makes it one on the CRM side. |
-| `cms/tests/test_error_gating.py` | 16 | 0 | 0 | Fix 3 (CMS side) — the automation listener skips errored events. |
-| `cms/tests/test_health.py` | 34 | 0 | 0 | Tests for CMS health check endpoint. |
-| `cms/tests/test_mailer_seam.py` | 262 | 0 | 0 | What `mailer.send()` guarantees, independent of any transport. |
-| `cms/tests/test_multi_tenant_notification.py` | 155 | 0 | 0 | C3 follow-on — multi-tenant notification fan-out (spotlight "new priority opportunity" digest). |
-| `cms/tests/test_no_phantom_executors.py` | 63 | 0 | 0 | INC-8 — no phantom executors / silent no-ops (EVENT_CONTRACT_V3 gap 8; CLAUDE_CLIFFNOTES Mistake 21). |
-| `cms/tests/test_notification_nudge_path.py` | 120 | 0 | 0 | Regression guard for the task-nudge notification path (the loop the pipeline 72h-curation nudge rides on): to_role → ADMIN_NOTIFICATION_EMAIL, senderN |
-| `cms/tests/test_notify_templates.py` | 53 | 0 | 0 | Fix 2 — workflow NOTIFY templates render (Launch Review #2). |
-| `cms/tests/test_page_blocks_integration.py` | 133 | 0 | 0 | Real-DB integration test for the page-block publish bridge (cms_posts -> cms_content). |
-| `cms/tests/test_page_blocks_router.py` | 152 | 0 | 0 | Tests for the page-blocks router (Phase 2: cms_posts staging + cms_content bridge). |
-| `cms/tests/test_rule_matching_phase.py` | 66 | 0 | 0 | INC-3 — phase-aware rule matching (EVENT_CONTRACT_V3 gap 4; CLIFFNOTES 20). |
-| `cms/tests/test_sender_identity.py` | 138 | 0 | 0 | Email sender identity resolution — abstraction + config (no provisioning). |
-| `cms/tests/test_templates.py` | 126 | 0 | 0 | Tests for template rendering and trigger flag system. |
-| `cms/tests/test_todos_router.py` | 64 | 0 | 0 | Tests for the admin TODOs router. |
+| `services/cms/db/001_cms_schema.sql` | 237 | 0 | 0 | CMS Database Schema — Separate database for content management This runs against the CMS-specific PostgreSQL instance, NOT the main app DB. Fully isol |
+| `services/cms/db/002_email_engine.sql` | 322 | 0 | 0 | CMS Database Migration 002 — Email Automation Engine Subsystem for campaign management, template drafting (Claude), Gmail sending via delegated worksp |
+| `services/cms/db/003_hitl_approval_queue.sql` | 114 | 0 | 0 | CMS Database Migration 003 — HITL Email Approval Queue All outgoing emails must pass through human review before sending. Admins see a shared outbox,  |
+| `services/cms/db/004_environment_marker.sql` | 15 | 0 | 0 | 004_environment_marker.sql Adds deploy_environment tracking to the CRM database. Purely additive. Idempotent. |
+| `services/cms/db/005_drip_campaigns.sql` | 68 | 0 | 0 | CMS Database Migration 005 — Drip Campaign Sequences and Enrollments Adds drip-campaign support to the email engine: drip_sequences — ordered steps wi |
+| `services/cms/db/006_crm_tables.sql` | 97 | 0 | 0 | CMS Database Migration 006 — CRM operational tables Moves admin_todos, social_accounts, social_posts from Main Postgres into the CMS database. Foreign |
+| `services/cms/db/007_template_triggers.sql` | 167 | 0 | 0 | CMS Database Migration 007 — Template Trigger Flag System Enables closed-loop email automation: outgoing emails embed machine-readable context (trigge |
+| `services/cms/db/008_generation_sources.sql` | 20 | 0 | 0 | 008 — Generation Sources: multi-input content generation support Adds source tracking columns to cms_generations to support generation from: prompt (d |
+| `services/cms/db/009_sender_identities.sql` | 55 | 0 | 0 | 009 — Sender Identities: DB-backed "From" addresses for outbound email The CMS sends from named identities (src/sender_identity.py::resolve_sender): a |
+| `services/cms/db/010_page_blocks_in_cms_posts.sql` | 32 | 0 | 0 | Migration 010: Page blocks live in cms_posts (CRM-CMS staging + version store) ----------------------------------------------------------------------- |
+| `services/cms/db/011_deploy_baseline.sql` | 18 | 0 | 0 | CRM Migration 011: deploy baseline marker (CRM DB) — no-op, idempotent ----------------------------------------------------------------------------- H |
+| `services/cms/db/012_deploy_baseline_checkpoint.sql` | 33 | 0 | 0 | CRM Migration 012: full redeploy checkpoint (CRM DB) — schema check + baseline marker ---------------------------------------------------------------- |
+| `services/cms/db/run.sh` | 92 | 0 | 0 | CRM Service — Database Migration Runner --------------------------------------------------------------------------- Runs all SQL migrations in order a |
+| `services/cms/frontend/eslint.config.js` | 23 | 0 | 0 | — |
+| `services/cms/frontend/src/App.tsx` | 95 | 15 | 1 | — |
+| `services/cms/frontend/src/components/AIRevisionPanel.tsx` | 108 | 1 | 1 | — |
+| `services/cms/frontend/src/components/Layout.tsx` | 95 | 0 | 1 | — |
+| `services/cms/frontend/src/components/MetadataEditor.tsx` | 691 | 0 | 1 | — |
+| `services/cms/frontend/src/components/RichTextEditor.tsx` | 213 | 0 | 1 | — |
+| `services/cms/frontend/src/components/StageIndicator.tsx` | 112 | 0 | 1 | — |
+| `services/cms/frontend/src/lib/api.ts` | 38 | 0 | 13 | — |
+| `services/cms/frontend/src/main.tsx` | 11 | 1 | 0 | — |
+| `services/cms/frontend/src/pages/ContentEditor.tsx` | 438 | 4 | 1 | — |
+| `services/cms/frontend/src/pages/ContentGenerations.tsx` | 226 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/ContentPipeline.tsx` | 129 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/ContentPreview.tsx` | 126 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/Dashboard.tsx` | 100 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/DripCampaigns.tsx` | 136 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/EmailAccounts.tsx` | 74 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/EmailCampaigns.tsx` | 91 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/EmailOutbox.tsx` | 129 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/Login.tsx` | 107 | 0 | 1 | — |
+| `services/cms/frontend/src/pages/PageEditor.tsx` | 1113 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/SocialAccounts.tsx` | 78 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/SocialPosts.tsx` | 87 | 1 | 1 | — |
+| `services/cms/frontend/src/pages/Todos.tsx` | 146 | 1 | 1 | — |
+| `services/cms/frontend/vite.config.ts` | 18 | 0 | 0 | — |
+| `services/cms/scripts/backfill_page_blocks.py` | 109 | 0 | 0 | One-time backfill: copy existing page_block rows from Main Postgres cms_content (the public reference) into CMS Postgres cms_posts (the editing + vers |
+| `services/cms/src/__init__.py` | 0 | 0 | 0 | — |
+| `services/cms/src/event_listener.py` | 1253 | 6 | 1 | Event listener — polls the shared DB system_events table and triggers automated actions based on automation_rules. |
+| `services/cms/src/mailer/__init__.py` | 234 | 3 | 1 | `send()` — the one seam every outbound message from the CRM goes through. |
+| `services/cms/src/mailer/drivers/__init__.py` | 6 | 0 | 1 | Mail transports. THE ONLY PLACE A PROVIDER SDK OR ENDPOINT MAY BE REACHED. |
+| `services/cms/src/mailer/drivers/gmail.py` | 44 | 2 | 0 | The Gmail transport, behind the seam. |
+| `services/cms/src/mailer/drivers/postmark.py` | 112 | 1 | 0 | The Postmark transport, CRM side. |
+| `services/cms/src/mailer/ledger.py` | 243 | 1 | 2 | The `email_send_ledger` ledger and suppression list, from the CRM. |
+| `services/cms/src/mailer/types.py` | 152 | 0 | 4 | The outbound-mail contract, CRM side. |
+| `services/cms/src/main.py` | 127 | 16 | 0 | CMS-CRM Service — email automation, content management, event-driven actions. |
+| `services/cms/src/middleware/__init__.py` | 0 | 0 | 0 | — |
+| `services/cms/src/middleware/auth.py` | 150 | 1 | 1 | API key authentication middleware for CMS service. |
+| `services/cms/src/models/__init__.py` | 0 | 0 | 0 | — |
+| `services/cms/src/models/database.py` | 163 | 0 | 19 | Database connection for the CRM service. |
+| `services/cms/src/models/email_schemas.py` | 178 | 0 | 1 | Pydantic models for email engine request/response validation. |
+| `services/cms/src/models/events.py` | 129 | 1 | 15 | Event emission for CMS service. |
+| `services/cms/src/models/schemas.py` | 97 | 0 | 2 | Pydantic models for request/response validation. |
+| `services/cms/src/routers/__init__.py` | 0 | 0 | 1 | — |
+| `services/cms/src/routers/auth.py` | 237 | 2 | 3 | Authentication routes for CMS SPA. |
+| `services/cms/src/routers/content.py` | 617 | 3 | 0 | Content pipeline API routes. |
+| `services/cms/src/routers/drip.py` | 423 | 2 | 1 | Drip campaign management API routes. |
+| `services/cms/src/routers/email.py` | 1468 | 7 | 0 | Email automation engine API routes. |
+| `services/cms/src/routers/health.py` | 48 | 1 | 0 | Health check endpoint for Railway. |
+| `services/cms/src/routers/media.py` | 265 | 4 | 1 | Media upload, listing, and serving endpoints. |
+| `services/cms/src/routers/page_blocks.py` | 912 | 3 | 1 | Page Block management API routes — PUBLISH IS RETIRED. |
+| `services/cms/src/routers/social.py` | 406 | 2 | 1 | Social media management API routes. |
+| `services/cms/src/routers/todos.py` | 223 | 2 | 1 | Admin TODOs management API routes. |
+| `services/cms/src/sender_identity.py` | 142 | 0 | 2 | Email sender identity — which "From" address a given message goes out as. |
+| `services/cms/src/storage/__init__.py` | 0 | 0 | 0 | — |
+| `services/cms/src/storage/volume.py` | 155 | 0 | 1 | Media storage module — Railway persistent volume. |
+| `services/cms/src/templates.py` | 935 | 0 | 4 | Email template renderer with Jinja2 and trigger flag system. |
+| `services/cms/src/workers/__init__.py` | 0 | 0 | 0 | — |
+| `services/cms/src/workers/campaign_executor.py` | 486 | 2 | 1 | Campaign execution engine — polls active campaigns and creates email sends. |
+| `services/cms/src/workers/content_generator.py` | 415 | 2 | 1 | AI Content Generation Worker. |
+| `services/cms/src/workers/drip_engine.py` | 307 | 2 | 1 | Drip campaign sequence processor — advances enrollments through drip steps. |
+| `services/cms/src/workers/email_queue.py` | 311 | 5 | 1 | Email queue worker — dequeues pending sends and delivers via Gmail API. |
+| `services/cms/src/workers/email_sweep.py` | 629 | 5 | 1 | Email sweep worker — monitors Gmail inbox for replies and engagement. |
+| `services/cms/src/workers/gmail_client.py` | 287 | 0 | 4 | Gmail API client for sending and sweeping emails. |
+| `services/cms/src/workers/social_poster.py` | 251 | 2 | 1 | Social media posting worker — publishes scheduled posts to platform APIs. |
+| `services/cms/src/workers/template_drafter.py` | 163 | 0 | 2 | Template drafter — uses Claude to generate email templates. |
+| `services/cms/tests/__init__.py` | 0 | 0 | 0 | — |
+| `services/cms/tests/conftest.py` | 102 | 0 | 0 | Shared fixtures for CMS service tests. |
+| `services/cms/tests/test_automation_pref_gate.py` | 172 | 0 | 0 | C3 Increment 3 — tenant automation-preference gating in the event_listener. |
+| `services/cms/tests/test_cms01_social_poster.py` | 315 | 0 | 0 | CMS-01 regression tests — social_poster NotImplementedError handling. |
+| `services/cms/tests/test_cms02_auth.py` | 537 | 0 | 0 | CMS-02 — Auth flow tests (JWT/cookie issuance, bcrypt check, last_login_at, wrong password). |
+| `services/cms/tests/test_cms03_event_listener_actions.py` | 489 | 0 | 0 | CMS-03 — Event listener action handler tests. |
+| `services/cms/tests/test_collaborator_fanout.py` | 98 | 0 | 0 | C3 follow-on — collaborator "get ready" email fan-out. |
+| `services/cms/tests/test_crm_database_var.py` | 137 | 0 | 0 | THE CRM DATABASE VARIABLE HAS ONE RESOLVER, and this is what keeps it that way. |
+| `services/cms/tests/test_email_transport_boundary.py` | 155 | 0 | 0 | THE SEND SEAM IS A BOUNDARY, and this is what makes it one on the CRM side. |
+| `services/cms/tests/test_error_gating.py` | 16 | 0 | 0 | Fix 3 (CMS side) — the automation listener skips errored events. |
+| `services/cms/tests/test_health.py` | 34 | 0 | 0 | Tests for CMS health check endpoint. |
+| `services/cms/tests/test_mailer_seam.py` | 262 | 0 | 0 | What `mailer.send()` guarantees, independent of any transport. |
+| `services/cms/tests/test_multi_tenant_notification.py` | 155 | 0 | 0 | C3 follow-on — multi-tenant notification fan-out (spotlight "new priority opportunity" digest). |
+| `services/cms/tests/test_no_phantom_executors.py` | 63 | 0 | 0 | INC-8 — no phantom executors / silent no-ops (EVENT_CONTRACT_V3 gap 8; CLAUDE_CLIFFNOTES Mistake 21). |
+| `services/cms/tests/test_notification_nudge_path.py` | 120 | 0 | 0 | Regression guard for the task-nudge notification path (the loop the pipeline 72h-curation nudge rides on): to_role → ADMIN_NOTIFICATION_EMAIL, senderN |
+| `services/cms/tests/test_notify_templates.py` | 53 | 0 | 0 | Fix 2 — workflow NOTIFY templates render (Launch Review #2). |
+| `services/cms/tests/test_page_blocks_integration.py` | 133 | 0 | 0 | Real-DB integration test for the page-block publish bridge (cms_posts -> cms_content). |
+| `services/cms/tests/test_page_blocks_router.py` | 152 | 0 | 0 | Tests for the page-blocks router (Phase 2: cms_posts staging + cms_content bridge). |
+| `services/cms/tests/test_rule_matching_phase.py` | 66 | 0 | 0 | INC-3 — phase-aware rule matching (EVENT_CONTRACT_V3 gap 4; CLIFFNOTES 20). |
+| `services/cms/tests/test_sender_identity.py` | 138 | 0 | 0 | Email sender identity resolution — abstraction + config (no provisioning). |
+| `services/cms/tests/test_templates.py` | 126 | 0 | 0 | Tests for template rendering and trigger flag system. |
+| `services/cms/tests/test_todos_router.py` | 64 | 0 | 0 | Tests for the admin TODOs router. |
 

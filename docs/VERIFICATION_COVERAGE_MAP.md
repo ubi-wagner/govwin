@@ -373,6 +373,7 @@ Ranked by what a gap would cost if the thing behind it were wrong.
 | **G13** | `CLAUDE.md` states migration head 247; the live head is **254**. | doc currency | open |
 | **G14** | The crawler's live network behaviour is exercised only against fixtures; nothing measures a source changing shape. | drive | open, by design |
 | **G15** | Semantic retrieval *quality* is unmeasured — the production embedder is absent from this box; only the inert-by-default equivalence is proven. | drive | open |
+| **G16** | **47 paths cited by documentation do not exist.** About half sit in historical documents (ARCHITECTURE_V9, CHANGELOG, the deprecation logs) where citing a removed file is correct — the rest are LIVE design and convention docs: `API_CONVENTIONS`, `MEMORY_MANAGEMENT`, `DECISIONS`, `RATE_MONITORING`, `TOOL_CONVENTIONS`, `CLAUDE_CLIFFNOTES`. Each names a route or module that has since moved or been removed. | doc currency | open, enumerated by `audit-doc-currency` |
 
 ### The three that are decisions, not work
 
@@ -387,6 +388,17 @@ defensible design and an unstated scope; it is now stated, in `docs/FRONTEND_INV
 
 **G11** — cannot be closed on this box at all. The only honest options are the unit guard that
 already exists and running `capture-hydration-diff` with a non-UTC browser before a release.
+
+**G16 is stated at its real size, after a first pass got it wrong.** It was reported here as "all
+in historical documents" — from a check that filtered on four filenames (`CLAUDE.md`,
+`ARCHITECTURE_V10.md`, `DATA_FLOW.md`, `CONTINUATION.md`) and therefore could not see a live design
+doc by construction. Several live ones do cite missing paths. A convention document pointing at a
+route that no longer exists is worse than one that says nothing: it sends a reader to a file, the
+file is absent, and the reader concludes the convention lapsed.
+
+It is deliberately NOT exempted. The temptation with a standing finding is to excuse it so the
+audit goes green — and an audit that always reports one known-benign finding does teach people to
+skip the line — but the fix for that is to close the finding, not to redefine it.
 
 ---
 
