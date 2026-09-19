@@ -340,11 +340,11 @@ already exists and running `capture-hydration-diff` with a non-UTC browser befor
 
 Four defects, each found by an instrument rather than by reading:
 
-1. **B164** — the first refusal events reached a customer's notification bell as `Risk.refused`,
+1. **B168** — the first refusal events reached a customer's notification bell as `Risk.refused`,
    `Cdrl.refused`. Labelled from the payload's own reason; excluded from the bell, because a
    refusal leaves the world unchanged and the 5xx half would otherwise ring every teammate with an
    operator's error string. Red-proven with six new guards.
-2. **B165** — `drive-project-lifecycle` failing one run in forty on an ISO millisecond field, with
+2. **B169** — `drive-project-lifecycle` failing one run in forty on an ISO millisecond field, with
    a literal that had stopped testing its own property some fixture ago.
 3. **The automation spine could not see the refusal seam** — and its pre-filter hid sixty of
    sixty-five call sites even after the parser was right.

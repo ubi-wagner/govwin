@@ -1772,7 +1772,7 @@ async function main() {
   /**
    * THE WORDS A PERSON WILL SEE — not the JSON around them.
    *
-   * ── WHY THIS IS NOT `JSON.stringify(canvas)` ANY MORE (B165) ─────────────────────────────
+   * ── WHY THIS IS NOT `JSON.stringify(canvas)` ANY MORE (B169) ─────────────────────────────
    * It was, and the blended-figure check below searched it for the literal `44.4`. Every node
    * carries provenance, provenance carries an ISO timestamp, and an ISO timestamp spends one
    * second in six hundred looking like `…T05:06:44.481Z`. With fifteen nodes that is a failure

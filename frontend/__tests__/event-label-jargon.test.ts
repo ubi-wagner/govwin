@@ -124,7 +124,7 @@ describe('events a customer sees carry a written label', () => {
   });
 
   /**
-   * ── REFUSALS (B164) ──────────────────────────────────────────────────────────────────────────
+   * ── REFUSALS (B168) ──────────────────────────────────────────────────────────────────────────
    *
    * `refuse()` gave every declined request an event, and the first eleven types it emitted reached
    * a customer's notification bell reading `Risk.refused`, `Cdrl.refused`, `Invoice.refused` — the
