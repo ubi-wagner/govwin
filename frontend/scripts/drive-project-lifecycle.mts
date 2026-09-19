@@ -1769,12 +1769,69 @@ async function main() {
     'the document is NOT a blank page — the G3 failure, which a magic-number check cannot see',
     `${srDoc?.nodeCount} node(s)`);
 
-  // Read the words back out of the stored canvas: what a person will actually see.
-  const srText = JSON.stringify(srDoc?.canvas ?? {});
+  /**
+   * THE WORDS A PERSON WILL SEE — not the JSON around them.
+   *
+   * ── WHY THIS IS NOT `JSON.stringify(canvas)` ANY MORE (B165) ─────────────────────────────
+   * It was, and the blended-figure check below searched it for the literal `44.4`. Every node
+   * carries provenance, provenance carries an ISO timestamp, and an ISO timestamp spends one
+   * second in six hundred looking like `…T05:06:44.481Z`. With fifteen nodes that is a failure
+   * roughly one run in forty: this drive passed in the suite, FAILED an hour later with no code
+   * change, and passed twice more. The document it failed on is still on the box, and the match
+   * is in a millisecond field.
+   *
+   * An intermittent is worse than a red, because the next person re-runs it and believes the
+   * green. Read the CONTENT — headings, paragraphs, table headers and cells — and nothing else.
+   */
+  const visibleText = (canvas: unknown): string => {
+    const out: string[] = [];
+    const walk = (n: Json) => {
+      const c = (n?.content ?? {}) as Json;
+      if (typeof c.text === 'string') out.push(c.text);
+      if (Array.isArray(c.headers)) out.push(...c.headers.map(String));
+      if (Array.isArray(c.rows)) for (const r of c.rows as unknown[]) out.push(...(r as unknown[]).map(String));
+      if (Array.isArray(n?.children)) for (const k of n.children as Json[]) walk(k);
+    };
+    for (const n of (((canvas as Json)?.nodes ?? []) as Json[])) walk(n);
+    return out.join('\n');
+  };
+  const srText = visibleText(srDoc?.canvas);
   A(/Cost/.test(srText) && /Schedule/.test(srText) && /Deliverables/.test(srText),
     'and it carries all THREE measures, side by side');
-  A(!/44\.4|percent complete|overall progress/i.test(srText),
-    'with no blended figure — the number that looks most like an answer and is worth least');
+
+  /**
+   * THE PROPERTY, COMPUTED — never a literal.
+   *
+   * The old check hard-coded `44.4`, which was the mean of the three measures on the fixture the
+   * day it was written. That is checking the FIXTURE: it cannot tell a blend from a real measure
+   * that happens to equal it, and it silently stops meaning anything the moment the fixture moves.
+   * So: read the three measures the report was built from, compute the average the report must not
+   * contain, and look for THAT.
+   *
+   * A label-based arm is not available here and the reason is worth recording — the report's own
+   * prose explains why it does not blend ("an average would destroy it while still looking like an
+   * answer"), so `/average|combined/` matches the sentence that proves the point. Same shape as
+   * the rule about scanning for a bug pattern and finding its changelog.
+   */
+  const srRoll = await api(req, 'get', P + '/rollup');
+  const srM = (((srRoll.json.data as Json)?.project ?? {}) as Json);
+  // The three measures BY NAME, from the same route the report was built from — `pct()` rounds to
+  // one decimal, which is why the comparison below is made at one decimal too.
+  const pcts = [srM.costPct, srM.schedulePct, srM.deliverablesPct]
+    .filter((v): v is number => typeof v === 'number');
+  const blend = pcts.length ? pcts.reduce((a, b) => a + b, 0) / pcts.length : null;
+  // Only assert when the blend is DISTINGUISHABLE from every real measure. If they coincide the
+  // check cannot separate them, and a check that cannot separate them must abstain rather than
+  // manufacture a finding — the same rule the roll-up itself follows when a measure has no
+  // denominator.
+  const distinguishable = blend !== null && pcts.every((p) => Math.abs(p - blend) > 0.05);
+  const blendStr = blend === null ? null : blend.toFixed(1);
+  A(!distinguishable || !srText.includes(blendStr!),
+    'with no blended figure — the number that looks most like an answer and is worth least',
+    blend === null ? 'no measures to blend'
+      : distinguishable ? `the average of ${pcts.map((p) => p.toFixed(1)).join('/')} is ${blendStr} and is absent`
+      : `ABSTAINED — the average ${blendStr} is indistinguishable from a real measure`);
+
   A(/snapshot and do not update/.test(srText),
     'it says the figures are a snapshot, so a June report keeps saying June');
 

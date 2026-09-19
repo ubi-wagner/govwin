@@ -13,21 +13,21 @@
 
 | kind | files | lines |
 |---|---:|---:|
-| api-route | 294 | 44,131 |
+| api-route | 294 | 44,554 |
 | app-boundary | 5 | 132 |
-| app-component | 34 | 9,983 |
+| app-component | 34 | 10,010 |
 | auth | 2 | 320 |
-| component | 188 | 47,017 |
+| component | 188 | 47,079 |
 | e2e | 81 | 9,864 |
 | layout | 6 | 560 |
-| lib | 341 | 71,843 |
+| lib | 342 | 72,007 |
 | middleware | 1 | 349 |
 | other | 4 | 157 |
 | page | 126 | 20,563 |
-| script | 187 | 33,056 |
+| script | 189 | 33,642 |
 | server-action | 1 | 45 |
-| test | 256 | 35,530 |
-| **total** | **1526** | **273,550** |
+| test | 256 | 35,747 |
+| **total** | **1529** | **275,029** |
 
 ## 2. Pages — every addressable customer/admin surface
 
@@ -655,7 +655,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | components/ui/modal.tsx | client | Modal | — | n/a |
 | components/ui/nav-shell.tsx | client | NavShell | — | n/a |
 | components/ui/tabs.tsx | client | Tabs | — | n/a |
-| components/ui/time-ago.tsx | client | useClientNow, relativeFrom, elapsedFrom, useMounted, localFrom, LocalTime +2 | — | n/a |
+| components/ui/time-ago.tsx | client | useClientNow, relativeFrom, deltaMsFrom, elapsedFrom, useMounted, localFrom +3 | — | n/a |
 
 ## 5. Colocated app components — 34 files
 
@@ -696,7 +696,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | app/portal/[tenantSlug]/proposals/[proposalId]/proposal-ai-actions.tsx | client | ProposalAiActions | — | n/a |
 | app/sitemap.ts | server | sitemap | 1 | n/a |
 
-## 6. Library modules — 341 files
+## 6. Library modules — 342 files
 
 | file | client | exports | sql | unit-tested |
 |---|---|---|---:|---|
@@ -711,6 +711,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/amendments.ts | server | logAmendment, confirmAmendment, replayConfirmedAmendments, dismissAmendment, acknowledgeAmendmentFlag | 6 | **none** |
 | lib/analytics-admin.ts | server | getSiteAnalytics, getPageViewCounts, pageKeyToPath, getRecentSessions | 5 | **none** |
 | lib/api-helpers.ts | server | ok, err, withHandler | — | **none** |
+| lib/api-refusal.ts | server | shouldEmit, refuse | — | **none** |
 | lib/architecture-live.ts | server | classifyActivity, architectureLive | 2 | vitest |
 | lib/artifact-spec.ts | server | parseFontPt, parseMarginsToPt, parseLineSpacing, buildArtifactSpecs | — | vitest |
 | lib/atom-embed.ts | server | atomEmbedText, upsertAtomEmbedding | — | **none** |
@@ -809,7 +810,7 @@ and only `verifyTenantAccess` decides whether this actor belongs to *that* tenan
 | lib/library/corpus-verbatim.ts | server | normalizeForCorpusMatch, corpusProbe, isCorpusVerbatim | 1 | vitest |
 | lib/library/dsip-deconstruct.ts | server | matchVolumeMarker, detectDsipFromBlocks, volumeOfBlock, detectDsipProposal, volumeOfOffset, splitReaderPages +3 | — | vitest |
 | lib/library/foundation.ts | server | nodeLabel, decomposeAndIngest, redecomposeFoundation, SYSTEM_COLLECTION, listSystemFoundations, isSystemFoundation +2 | 14 | vitest |
-| lib/library/house-docs.ts | server | splitMarkdownSections, DocSection, HOUSE_COLLECTION, ingestHouseDoc, clearHouseDocs | 1 | **none** |
+| lib/library/house-docs.ts | server | splitMarkdownSections, DocSection, HOUSE_COLLECTION, ingestHouseDoc, clearHouseDocs | — | **none** |
 | lib/library/library-query.ts | server | buildLibraryQuery | — | vitest |
 | lib/library/markdown-sections.ts | server | splitMarkdownSections | — | vitest |
 | lib/library/page-furniture.ts | server | detectRunningFurniture, stripFurniture, stripDocumentFurniture | — | vitest |
@@ -1073,15 +1074,23 @@ statement is per-layer, not one number.
 |---|---:|---|---:|
 | pages | 126 | verify-surfaces (admin + portal trees) | 35 |
 | API routes (GET) | 157 | verify-api-contract | see that lens's own accounting |
-| API routes (write verbs) | 231 | verify-db-crud (a chosen subset, not a walk) | not enumerated |
-| lib modules | 341 | vitest 196 · sweep-mold-quality 39 | 106 |
+| API routes (write verbs) | 231 | verify-write-contract (envelope, all of them) · verify-db-crud (effects, a chosen subset) | 0 ungraded for envelope; effects not enumerated |
+| lib modules | 342 | vitest 196 · sweep-mold-quality 39 | 107 |
 | components | 222 | only transitively, via a page that renders them | not measured |
 
-**The write verbs are the real gap.** 231 routes expose a POST/PATCH/PUT/DELETE and no lens
-walks them: `verify-api-contract` is GET-only by construction (calling every write verb would
-mutate the box it is measuring), and `verify-db-crud` proves a hand-picked set of invariants
-rather than enumerating routes. That is a defensible design and an unstated scope — written
-down here so the next reader does not mistake three green lenses for a walked API.
+**The write verbs are graded for SHAPE, not for EFFECT, and the distinction is the gap.** 231 routes expose a
+POST/PATCH/PUT/DELETE. `verify-api-contract` cannot touch them — it is GET-only by
+construction, because calling every write verb would mutate the box it is measuring — so
+`verify-write-contract` exists to walk them, binding every `[param]` to a uuid owning nothing
+and asserting the one property that needs no successful write: a client error answers 4xx
+with both `error` and `code`, never 500. That is every write verb covered for its REFUSAL
+path and none of them covered for what a SUCCESSFUL call does; `verify-db-crud` proves that
+half for a hand-picked set of invariants rather than by enumeration. Written down here so the
+next reader does not read a walked API off five green lenses.
+
+The same split applies one level down, and is the wider of the two: an `{error, code}` at the
+right status says the caller was told. Whether anything but the caller was told is a separate
+question, measured by `audit-refusal-observability` and `drive-failure-observability`.
 
 ### lib modules no harness loads
 
@@ -1145,13 +1154,14 @@ down here so the next reader does not mistake three green lenses for a walked AP
 - `lib/types/source-anchor.ts` — 126 lines
 - `lib/geoip.ts` — 125 lines
 - `lib/page-content/homepage.ts` — 123 lines
+- `lib/api-refusal.ts` — 118 lines
+- `lib/library/house-docs.ts` — 118 lines
 - `lib/tools/index.ts` — 116 lines
 - `lib/google-calendar.ts` — 112 lines
 - `lib/partner/create-partner-org.ts` — 111 lines
 - `lib/proposal-full-draft.ts` — 108 lines
 - `lib/tasks/update-task.ts` — 108 lines
 - `lib/portal-workflow-recommend.ts` — 104 lines
-- `lib/library/house-docs.ts` — 97 lines
 - `lib/provisioning/complete.ts` — 97 lines
 - `lib/toast.tsx` — 95 lines
 - `lib/page-content/features.ts` — 93 lines

@@ -284,6 +284,10 @@ const unbound = [];
 const RED_CONTROLS = [
   ['/admin/tenants/00000000-0000-4000-8000-000000000000', 'admin'],
   ['/portal/foundation/library/foundation/00000000-0000-4000-8000-000000000000', 'tenant'],
+  // The public tree's own known-broken page: a resource slug nothing publishes. Measured before
+  // it was wired — it renders the "not found" surface in 480 characters of body, which is inside
+  // the CONTENT_CHARS_FLOOR the detector uses, so this control can actually fail.
+  ['/resources/zz-no-such-slug-red-control', 'public'],
 ];
 
 async function preflight(page, who) {
@@ -305,15 +309,53 @@ async function preflight(page, who) {
   return checked;
 }
 
+/**
+ * ── THE PUBLIC LANE, AND WHY IT WAS MISSING ──────────────────────────────────────────────────
+ *
+ * This lens enumerated `app/admin` and `app/portal/[tenantSlug]` and nothing else, so 35 of the
+ * product's 126 pages were outside its scope — including all 23 marketing pages and all 4 auth
+ * pages. That is the PRODUCT'S FRONT DOOR: every page a prospect sees before they are a customer,
+ * plus the login and password-reset flow that every customer uses. Nothing rendered them under a
+ * gate. `verify-public-links` reads their links STATICALLY and clears 26 of them, while 35 more
+ * are built from an expression it cannot follow — and a resolving link says nothing about whether
+ * the page it points at renders.
+ *
+ * They are driven ANONYMOUSLY, which is the actor they are for, and `(marketing)`/`(auth)` is the
+ * right enumeration boundary because a route group is a structural statement about who a page is
+ * for — not a list anyone maintains.
+ *
+ * The remaining eight routes get no lane and are REPORTED below rather than quietly dropped. They
+ * are authenticated pages outside the two portal trees, and driving them anonymously would land on
+ * /login and render clean — a page that never rendered, reported as a pass. That is the one
+ * outcome this lens exists to prevent, so it declines instead.
+ */
+const LANED = /^\/(admin|portal)(\/|$)/;
+const publicRoutes = [
+  ...routesUnder(path.join(APP, '(marketing)'), ''),
+  ...routesUnder(path.join(APP, '(auth)'), ''),
+].sort();
+const unlaned = routesUnder(APP, '')
+  .filter((r) => !LANED.test(r) && !publicRoutes.includes(r));
+
 try {
   for (const [label, email, pw, root, prefix] of [
     ['admin · master_admin', 'eric@rfppipeline.com', ADMIN_PW, path.join(APP, 'admin'), '/admin'],
     ['tenant · tenant_admin', 'kate.ulepic@foundation3dp.com', 'DemoPass123!', path.join(APP, 'portal/[tenantSlug]'), '/portal/[tenantSlug]'],
+    ['public · anonymous', null, null, null, null],
   ]) {
     console.log(`\n── ${label} ──`);
     const ctx = await browser.newContext({ viewport: V });
-    const p = await login(ctx, email, pw);
-    await preflight(p, label.startsWith('admin') ? 'admin' : 'tenant');
+    // The public lane has no actor to log in as — that IS the actor.
+    const p = email ? await login(ctx, email, pw) : await ctx.newPage();
+    await preflight(p, label.startsWith('admin') ? 'admin' : label.startsWith('tenant') ? 'tenant' : 'public');
+    if (!email) {
+      for (const r of publicRoutes) {
+        if (!addressable(r)) { unbound.push(r); continue; }
+        await drive(p, bind(r));
+      }
+      await ctx.close();
+      continue;
+    }
     for (const r of routesUnder(root, prefix)) {
       if (!addressable(r)) { unbound.push(r); continue; }
       await drive(p, bind(r));
@@ -332,6 +374,13 @@ if (unbound.length) {
   // difference between "all clean" and "all clean, of the ones I could reach".
   console.log(`\n${unbound.length} route(s) NOT driven:`);
   console.log(unbound.map((r) => `  · ${r} — ${reasonFor(r)}`).join('\n'));
+}
+if (unlaned.length) {
+  // Named, not dropped. These are authenticated pages that belong to no lane this lens has an
+  // actor for; see the note above the public lane for why driving them anonymously would be worse
+  // than not driving them.
+  console.log(`\n${unlaned.length} route(s) have NO LANE — authenticated, outside both portal trees:`);
+  console.log(unlaned.map((r) => `  · ${r}`).join('\n'));
 }
 if (bad.length) {
   console.log('\n✗ broken surfaces:');

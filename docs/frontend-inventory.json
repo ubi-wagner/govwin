@@ -5,7 +5,7 @@
   {
    "kind": "api-route",
    "files": 294,
-   "lines": 44131
+   "lines": 44554
   },
   {
    "kind": "app-boundary",
@@ -15,7 +15,7 @@
   {
    "kind": "app-component",
    "files": 34,
-   "lines": 9983
+   "lines": 10010
   },
   {
    "kind": "auth",
@@ -25,7 +25,7 @@
   {
    "kind": "component",
    "files": 188,
-   "lines": 47017
+   "lines": 47079
   },
   {
    "kind": "e2e",
@@ -39,8 +39,8 @@
   },
   {
    "kind": "lib",
-   "files": 341,
-   "lines": 71843
+   "files": 342,
+   "lines": 72007
   },
   {
    "kind": "middleware",
@@ -59,8 +59,8 @@
   },
   {
    "kind": "script",
-   "files": 187,
-   "lines": 33056
+   "files": 189,
+   "lines": 33642
   },
   {
    "kind": "server-action",
@@ -70,7 +70,7 @@
   {
    "kind": "test",
    "files": 256,
-   "lines": 35530
+   "lines": 35747
   }
  ],
  "records": [
@@ -3857,8 +3857,8 @@
   {
    "file": "__tests__/client-clock-in-render.test.ts",
    "kind": "test",
-   "lines": 95,
-   "bytes": 4931,
+   "lines": 214,
+   "bytes": 12099,
    "client": false,
    "exports": [],
    "imports": [
@@ -3886,7 +3886,7 @@
      ]
     }
    ],
-   "tryCount": 1,
+   "tryCount": 3,
    "sqlTags": [],
    "calls": [
     "join",
@@ -3916,7 +3916,28 @@
     "expect",
     "detect",
     "expect(detect(safe), 'the detector must leave a now-parameterised helper alone').toBe",
-    "expect(offenders, 'use <TimeAgo iso={x}/> or relativeFrom(x, useClientNow()) from components/ui/time-ago').toEqual"
+    "expect(offenders, 'use <TimeAgo iso={x}/> or relativeFrom(x, useClientNow()) from components/ui/time-ago').toEqual",
+    "SAFE_BECAUSE.map",
+    "src\n      .replace(/\\/\\*[\\s\\S]*?\\*\\//g, (c) => c.replace(/[^\\n]/g, ' ')).replace",
+    "src.replace",
+    "c.replace",
+    "' '.repeat",
+    "out.indexOf",
+    "out.slice",
+    "out.slice(open, j + 1).replace",
+    "CLOCK.test",
+    "blankHookBodies",
+    "blankKeepingLines",
+    "expect(reachable(`'use client';\\nexport default function C(){ const now = Date.now(); return <p>{now}</p>; }`),\n      'must flag a clock read in a component body').toBe",
+    "reachable",
+    "expect(reachable(`'use client';\\nexport default () => <p>{Date.now() > x ? 'a' : 'b'}</p>;`),\n      'must flag a bare clock read inline in JSX').toBe",
+    "expect(reachable(`'use client';\\nexport default function C(){ useEffect(() => { const n = Date.now(); }, []); return <p/>; }`),\n      'must not flag a useEffect body').toBe",
+    "EXEMPT_FILES.has",
+    "expect(\n      offenders,\n      'a clock read reachable from render makes the output a function of WHEN it rendered. Thread '\n        + '`useClientNow()` (null until mounted) — or, if the value cannot reach the server render, '\n        + 'add the file to SAFE_BECAUSE above WITH the reason',\n    ).toEqual",
+    "stale.push",
+    "/\\bDate\\.now\\s*\\(\\s*\\)|\\bnew Date\\s*\\(\\s*\\)/.test",
+    "why.trim",
+    "expect(stale, 'prune SAFE_BECAUSE').toEqual"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -5818,8 +5839,8 @@
   {
    "file": "__tests__/event-label-jargon.test.ts",
    "kind": "test",
-   "lines": 132,
-   "bytes": 6107,
+   "lines": 180,
+   "bytes": 8563,
    "client": false,
    "exports": [],
    "imports": [
@@ -5858,6 +5879,8 @@
     "expect(label.toLowerCase()).not.toContain",
     "label.toLowerCase",
     "expect(label.toLowerCase()).toContain",
+    "expect(fault).toContain",
+    "expect(fault).not.toContain",
     "expect(label).toBe"
    ],
    "jsx": [],
@@ -11947,8 +11970,8 @@
   {
    "file": "__tests__/projects-tenant-transactions.test.ts",
    "kind": "test",
-   "lines": 118,
-   "bytes": 6031,
+   "lines": 168,
+   "bytes": 8878,
    "client": false,
    "exports": [],
    "imports": [
@@ -11963,6 +11986,7 @@
     {
      "spec": "node:fs",
      "names": [
+      "existsSync",
       "readdirSync",
       "readFileSync",
       "statSync"
@@ -12015,7 +12039,18 @@
     "expect(NESTED.test(strip('metrics = ${sql.json(m)},'))).toBe",
     "ROOTS.flatMap((r) => walk(join(ROOT, r)))\n      .filter((f) => NESTED.test(strip(readFileSync(f, 'utf8')))).map",
     "ROOTS.flatMap((r) => walk(join(ROOT, r))).filter",
-    "expect(offenders, 'compute the value in JS — a nested sql`` is a Promise, not a fragment').toEqual"
+    "expect(offenders, 'compute the value in JS — a nested sql`` is a Promise, not a fragment').toEqual",
+    "expect(existsSync(HOUSE), 'lib/library/house-docs.ts moved — repoint this guard').toBe",
+    "existsSync",
+    "readFileSync(HOUSE, 'utf8')\n      .replace(/\\/\\*[\\s\\S]*?\\*\\//g, ' ').replace",
+    "readFileSync(HOUSE, 'utf8').replace",
+    "/\\bawait\\s+sql\\s*(<[^`]*>)?\\s*`[\\s\\S]{0,80}?\\b(INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b/i.test",
+    "expect(mutatesUnscoped(unsafeFixture), 'must flag a bare mutating sql template').toBe",
+    "mutatesUnscoped",
+    "expect(mutatesUnscoped(safeFixture), 'must leave a withTenant-wrapped one alone').toBe",
+    "expect(\n      mutatesUnscoped(src),\n      'a mutating statement on a FORCE-RLS table through the context-aware `sql` matches zero rows '\n        + 'and returns success when no tenant context is set — wrap it in withTenant(tenantId, tx => …)',\n    ).toBe",
+    "expect(src.includes('withTenant'), 'the module must import and use withTenant').toBe",
+    "src.includes"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -26666,8 +26701,8 @@
   {
    "file": "app/admin/system-state/system-state-client.tsx",
    "kind": "app-component",
-   "lines": 1312,
-   "bytes": 52754,
+   "lines": 1339,
+   "bytes": 54393,
    "client": true,
    "exports": [
     {
@@ -26688,7 +26723,8 @@
      "names": [
       "TimeAgo",
       "Elapsed",
-      "LocalTime"
+      "LocalTime",
+      "useClientNow"
      ]
     },
     {
@@ -26782,7 +26818,7 @@
     "data.blocksByStatus.map",
     "data.pendingByPage.map",
     "data.recentEvents.map",
-    "Date.now",
+    "useClientNow",
     "data.automationLogs.filter",
     "new Date(l.executedAt).getTime",
     "data.emailEvents.filter",
@@ -26792,6 +26828,7 @@
     "data.emailEvents.map",
     "useRouter",
     "useState",
+    "emailAutomation.automationLogs.filter",
     "useEffect",
     "setInterval",
     "router.refresh",
@@ -26807,7 +26844,6 @@
     "TABS.map",
     "setActiveTab",
     "contentPipeline.pendingByPage.reduce",
-    "emailAutomation.automationLogs.filter",
     "activeWorkflows.slice(0, 5).map",
     "activeWorkflows.slice",
     "Boolean",
@@ -32451,8 +32487,8 @@
   {
    "file": "app/api/admin/partners/route.ts",
    "kind": "api-route",
-   "lines": 43,
-   "bytes": 2092,
+   "lines": 49,
+   "bytes": 2219,
    "client": false,
    "exports": [
     {
@@ -32466,6 +32502,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -32500,6 +32542,7 @@
     "createPartnerOrg",
     "str",
     "optStr",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -32509,32 +32552,27 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 16
+     "line": 17
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 17
+     "line": 18
     },
     {
      "arg": "{ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 21
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 34
+     "line": 22
     },
     {
      "arg": "{\n      data: { userId: result.userId, tenantId: result.tenantId, slug: result.slug, tempPassword: result.tempPassword },\n    }",
      "opts": "{ status: 201 }",
-     "line": 35
+     "line": 41
     },
     {
      "arg": "{ error: 'Internal error', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 40
+     "line": 46
     }
    ],
    "route": "/api/admin/partners",
@@ -40800,8 +40838,8 @@
   {
    "file": "app/api/admin/tasks/route.ts",
    "kind": "api-route",
-   "lines": 80,
-   "bytes": 3346,
+   "lines": 84,
+   "bytes": 3432,
    "client": false,
    "exports": [
     {
@@ -40820,6 +40858,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -40863,7 +40907,8 @@
     "console.error",
     "request.json",
     "UUID_RE.test",
-    "completeTask"
+    "completeTask",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -40872,52 +40917,47 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 22
+     "line": 23
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 27
+     "line": 28
     },
     {
      "arg": "{ error: 'Admin access required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 30
+     "line": 31
     },
     {
      "arg": "{ data: { tasks } }",
      "opts": "",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'Failed to load tasks', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 46
+     "line": 47
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 60
+     "line": 61
     },
     {
      "arg": "{ error: 'Invalid taskId', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 64
-    },
-    {
-     "arg": "{ error: out.error, code: out.code }",
-     "opts": "{ status: out.status }",
-     "line": 72
+     "line": 65
     },
     {
      "arg": "{ data: out.data }",
      "opts": "",
-     "line": 74
+     "line": 78
     },
     {
      "arg": "{ error: 'Failed to complete task', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 77
+     "line": 81
     }
    ],
    "route": "/api/admin/tasks",
@@ -42928,8 +42968,8 @@
   {
    "file": "app/api/admin/workflows/[instanceId]/advance/route.ts",
    "kind": "api-route",
-   "lines": 110,
-   "bytes": 3726,
+   "lines": 111,
+   "bytes": 3859,
    "client": false,
    "exports": [
     {
@@ -42943,6 +42983,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -42984,6 +43030,7 @@
     "body.note.slice",
     "enterBypass",
     "forceAdvanceProcess",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -42993,37 +43040,32 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 32
+     "line": 33
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 46
+     "line": 47
     },
     {
      "arg": "{ error: 'Admin access required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 52
+     "line": 53
     },
     {
      "arg": "{ error: 'Invalid instanceId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 61
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 96
+     "line": 62
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 101
+     "line": 102
     },
     {
      "arg": "{ error: 'Force-advance failed', code: 'ADVANCE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 104
+     "line": 105
     }
    ],
    "route": "/api/admin/workflows/[instanceId]/advance",
@@ -43372,8 +43414,8 @@
   {
    "file": "app/api/admin/workflows/launch-collaboration/route.ts",
    "kind": "api-route",
-   "lines": 121,
-   "bytes": 5171,
+   "lines": 127,
+   "bytes": 5320,
    "client": false,
    "exports": [
     {
@@ -43387,6 +43429,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -43434,6 +43482,7 @@
     "Math.floor",
     "isValidUUID",
     "launchProjectCollaboration",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -43443,52 +43492,47 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 42
+     "line": 43
     },
     {
      "arg": "{ error: 'Admin access required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 50
+     "line": 51
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 53
+     "line": 54
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 61
+     "line": 62
     },
     {
      "arg": "{ error: `scope must be one of: ${SCOPES.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 67
+     "line": 68
     },
     {
      "arg": "{ error: 'assigneeRole is required and must be a valid role', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 74
+     "line": 75
     },
     {
      "arg": "{ error: 'Invalid tenantId', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 88
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 113
+     "line": 89
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 115
+     "line": 121
     },
     {
      "arg": "{ error: 'Launch failed', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 118
+     "line": 124
     }
    ],
    "route": "/api/admin/workflows/launch-collaboration",
@@ -43501,8 +43545,8 @@
   {
    "file": "app/api/admin/workflows/route.ts",
    "kind": "api-route",
-   "lines": 275,
-   "bytes": 10007,
+   "lines": 276,
+   "bytes": 10121,
    "client": false,
    "exports": [
     {
@@ -43521,6 +43565,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -43555,19 +43605,19 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 67
+     "line": 68
     },
     {
      "tag": "sql",
-     "line": 97
+     "line": 98
     },
     {
      "tag": "sql",
-     "line": 120
+     "line": 121
     },
     {
      "tag": "sql",
-     "line": 145
+     "line": 146
     }
    ],
    "calls": [
@@ -43587,7 +43637,8 @@
     "request.json",
     "b.workflowName.trim",
     "Array.isArray",
-    "launchTemplate"
+    "launchTemplate",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -43596,67 +43647,62 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: 'Admin access required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 35
+     "line": 36
     },
     {
      "arg": "{ error: `Invalid status filter. Must be one of: ${VALID_STATUSES.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 57
+     "line": 58
     },
     {
      "arg": "{ data: { active: [], recent: archived } }",
      "opts": "",
-     "line": 92
+     "line": 93
     },
     {
      "arg": "{\n      data: { active, recent },\n    }",
      "opts": "",
-     "line": 172
+     "line": 173
     },
     {
      "arg": "{ error: 'Workflow query failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 177
+     "line": 178
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 201
+     "line": 202
     },
     {
      "arg": "{ error: 'Admin access required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 215
+     "line": 216
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 228
+     "line": 229
     },
     {
      "arg": "{ error: 'workflowName is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 236
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 261
+     "line": 237
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 266
+     "line": 267
     },
     {
      "arg": "{ error: 'Launch failed', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 269
+     "line": 270
     }
    ],
    "route": "/api/admin/workflows",
@@ -45791,8 +45837,8 @@
   {
    "file": "app/api/partner/manager-requests/route.ts",
    "kind": "api-route",
-   "lines": 45,
-   "bytes": 2478,
+   "lines": 51,
+   "bytes": 2600,
    "client": false,
    "exports": [
     {
@@ -45806,6 +45852,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -45853,6 +45905,7 @@
     "isValidUUID",
     "partnerOwnOrg",
     "createManagerRequest",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -45862,37 +45915,32 @@
     {
      "arg": "{ error: 'EconDev partner access required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 23
+     "line": 24
     },
     {
      "arg": "{ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 27
+     "line": 28
     },
     {
      "arg": "{ error: 'A company is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 30
+     "line": 31
     },
     {
      "arg": "{ error: 'Invalid company id', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 31
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 38
+     "line": 32
     },
     {
      "arg": "{ data: { taskId: result.taskId, assignedTo: result.assignedTo } }",
      "opts": "{ status: 201 }",
-     "line": 39
+     "line": 45
     },
     {
      "arg": "{ error: 'Internal error', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 42
+     "line": 48
     }
    ],
    "route": "/api/partner/manager-requests",
@@ -45905,8 +45953,8 @@
   {
    "file": "app/api/partner/registrations/route.ts",
    "kind": "api-route",
-   "lines": 53,
-   "bytes": 2413,
+   "lines": 57,
+   "bytes": 2536,
    "client": false,
    "exports": [
     {
@@ -45920,6 +45968,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -45955,6 +46009,7 @@
     "submitPartnerRegistration",
     "str",
     "optStr",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -45964,27 +46019,22 @@
     {
      "arg": "{ error: 'EconDev partner access required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 22
+     "line": 23
     },
     {
      "arg": "{ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 26
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 45
+     "line": 27
     },
     {
      "arg": "{ data: { applicationId: result.applicationId } }",
      "opts": "{ status: 201 }",
-     "line": 47
+     "line": 51
     },
     {
      "arg": "{ error: 'Internal error', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 50
+     "line": 54
     }
    ],
    "route": "/api/partner/registrations",
@@ -51509,8 +51559,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/manager-requests/[taskId]/route.ts",
    "kind": "api-route",
-   "lines": 53,
-   "bytes": 2837,
+   "lines": 59,
+   "bytes": 2976,
    "client": false,
    "exports": [
     {
@@ -51524,6 +51574,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -51571,6 +51627,7 @@
     "verifyTenantAccess",
     "request.json",
     "resolveManagerRequest",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -51580,52 +51637,47 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 21
+     "line": 22
     },
     {
      "arg": "{ error: 'Admin role required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ error: 'Invalid request id', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 28
+     "line": 29
     },
     {
      "arg": "{ error: 'Company not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 30
+     "line": 31
     },
     {
      "arg": "{ error: 'Company access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 33
+     "line": 34
     },
     {
      "arg": "{ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 38
+     "line": 39
     },
     {
      "arg": "{ error: 'action must be approve or decline', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 41
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 46
+     "line": 42
     },
     {
      "arg": "{ data: { granted: result.granted } }",
      "opts": "",
-     "line": 47
+     "line": 53
     },
     {
      "arg": "{ error: 'Internal error', code: 'INTERNAL_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 50
+     "line": 56
     }
    ],
    "route": "/api/portal/[tenantSlug]/manager-requests/[taskId]",
@@ -51931,8 +51983,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/notifications/route.ts",
    "kind": "api-route",
-   "lines": 280,
-   "bytes": 13159,
+   "lines": 302,
+   "bytes": 14816,
    "client": false,
    "exports": [
     {
@@ -51995,23 +52047,23 @@
     },
     {
      "tag": "sql",
-     "line": 129
+     "line": 133
     },
     {
      "tag": "sql",
-     "line": 146
+     "line": 168
     },
     {
      "tag": "sql",
-     "line": 165
+     "line": 187
     },
     {
      "tag": "sql",
-     "line": 173
+     "line": 195
     },
     {
      "tag": "sql",
-     "line": 264
+     "line": 286
     }
    ],
    "calls": [
@@ -52079,57 +52131,57 @@
     {
      "arg": "{ data: { notifications: items } }",
      "opts": "",
-     "line": 214
+     "line": 236
     },
     {
      "arg": "{ error: 'Failed to query notifications', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 217
+     "line": 239
     },
     {
      "arg": "{ error: 'Failed to query notifications', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 224
+     "line": 246
     },
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 242
+     "line": 264
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 247
+     "line": 269
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 251
+     "line": 273
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 255
+     "line": 277
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 260
+     "line": 282
     },
     {
      "arg": "{ error: 'Failed to mark read', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 272
+     "line": 294
     },
     {
      "arg": "{ data: { ok: true } }",
      "opts": "",
-     "line": 274
+     "line": 296
     },
     {
      "arg": "{ error: 'Failed to mark read', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 277
+     "line": 299
     }
    ],
    "route": "/api/portal/[tenantSlug]/notifications",
@@ -52143,8 +52195,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/portals/[portalId]/route.ts",
    "kind": "api-route",
-   "lines": 210,
-   "bytes": 13365,
+   "lines": 216,
+   "bytes": 13523,
    "client": false,
    "exports": [
     {
@@ -52168,6 +52220,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -52260,6 +52318,7 @@
     "acceptGuardrails",
     "instantiateTodosBestEffort",
     "provisionAndReleasePortal",
+    "refuse",
     "advancePortalStage",
     "revokeShadowAdmin",
     "CUSTOMER_ADVANCE_STATUSES.includes",
@@ -52273,137 +52332,132 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 82
+     "line": 83
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 85
+     "line": 86
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 86
+     "line": 87
     },
     {
      "arg": "{ error: 'Invalid portal id', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 87
+     "line": 88
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 89
+     "line": 90
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 91
+     "line": 92
     },
     {
      "arg": "{ error: 'Portal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 109
+     "line": 110
     },
     {
      "arg": "{ data }",
      "opts": "",
-     "line": 110
+     "line": 111
     },
     {
      "arg": "{ error: 'Failed to load portal', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 113
+     "line": 114
     },
     {
      "arg": "{ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 127
+     "line": 128
     },
     {
      "arg": "{ error: v.errors.join('; '), code: 'GUARDRAIL_LIMIT' }",
      "opts": "{ status: 422 }",
-     "line": 132
+     "line": 133
     },
     {
      "arg": "{ error: `Could not provision the build (please retry): ${prov.error}`, code: 'PROVISION_FAILED' }",
      "opts": "{ status: 500 }",
-     "line": 137
+     "line": 138
     },
     {
      "arg": "{ error: 'Portal not pending (already launched?)', code: 'CONFLICT' }",
      "opts": "{ status: 409 }",
-     "line": 142
+     "line": 143
     },
     {
      "arg": "{ data: { launched: true, tasksCreated, proposalId: prov.proposalId } }",
      "opts": "",
-     "line": 145
+     "line": 146
     },
     {
      "arg": "{ error: 'Only an RFP expert can release a workspace from curation', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 156
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 165
+     "line": 157
     },
     {
      "arg": "{ data: { released: true, proposalId: result.proposalId, tasksCreated: result.tasksCreated } }",
      "opts": "",
-     "line": 166
+     "line": 172
     },
     {
      "arg": "{ error: `Cannot advance: ${result.reason}`, code: 'STAGE_GATE' }",
      "opts": "{ status }",
-     "line": 175
+     "line": 181
     },
     {
      "arg": "{ data: result }",
      "opts": "",
-     "line": 177
+     "line": 183
     },
     {
      "arg": "{ data: { revoked } }",
      "opts": "",
-     "line": 181
+     "line": 187
     },
     {
      "arg": "{ error: 'Unknown action', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 183
+     "line": 189
     },
     {
      "arg": "{ error: 'Action failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 186
+     "line": 192
     },
     {
      "arg": "{ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 196
+     "line": 202
     },
     {
      "arg": "{ error: `status must be one of: ${CUSTOMER_ADVANCE_STATUSES.join(', ')} (pre-launch states are set by purchase/release/accept)`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 198
+     "line": 204
     },
     {
      "arg": "{ error: 'Portal is not in an advanceable state (must be launched, executing, or closeout)', code: 'CONFLICT' }",
      "opts": "{ status: 409 }",
-     "line": 202
+     "line": 208
     },
     {
      "arg": "{ data: { status: body.status } }",
      "opts": "",
-     "line": 204
+     "line": 210
     },
     {
      "arg": "{ error: 'Update failed', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 207
+     "line": 213
     }
    ],
    "route": "/api/portal/[tenantSlug]/portals/[portalId]",
@@ -52851,8 +52905,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/processes/[instanceId]/advance/route.ts",
    "kind": "api-route",
-   "lines": 113,
-   "bytes": 3705,
+   "lines": 114,
+   "bytes": 3818,
    "client": false,
    "exports": [
     {
@@ -52866,6 +52920,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -52911,6 +52971,7 @@
     "request.json",
     "body.note.slice",
     "forceAdvanceProcess",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -52920,47 +52981,42 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 31
+     "line": 32
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 39
+     "line": 40
     },
     {
      "arg": "{ error: 'Tenant admin access required', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 46
+     "line": 47
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 54
+     "line": 55
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 63
+     "line": 64
     },
     {
      "arg": "{ error: 'Invalid instanceId format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 71
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 99
+     "line": 72
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 104
+     "line": 105
     },
     {
      "arg": "{ error: 'Force-advance failed', code: 'ADVANCE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 107
+     "line": 108
     }
    ],
    "route": "/api/portal/[tenantSlug]/processes/[instanceId]/advance",
@@ -53373,8 +53429,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/assignees/route.ts",
    "kind": "api-route",
-   "lines": 75,
-   "bytes": 3878,
+   "lines": 86,
+   "bytes": 4134,
    "client": false,
    "exports": [
     {
@@ -53398,6 +53454,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -53431,6 +53493,7 @@
     "console.error",
     "request.json",
     "assignMember",
+    "refuse",
     "new URL(request.url).searchParams.get",
     "unassignMember"
    ],
@@ -53441,62 +53504,52 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 28
+     "line": 29
     },
     {
      "arg": "{ data: { assignees: await listAssignees(gate.actor.tenantId, projectId) } }",
      "opts": "",
-     "line": 30
+     "line": 31
     },
     {
      "arg": "{ error: 'Failed to load the roster', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 34
+     "line": 35
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 44
+     "line": 45
     },
     {
      "arg": "{ error: 'userId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 46
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
-     "line": 49
+     "line": 47
     },
     {
      "arg": "{ data: { assignee: r.data } }",
      "opts": "{ status: 201 }",
-     "line": 50
+     "line": 56
     },
     {
      "arg": "{ error: 'Failed to staff the project', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 54
+     "line": 60
     },
     {
      "arg": "{ error: 'userId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 64
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
-     "line": 67
+     "line": 70
     },
     {
      "arg": "{ data: r.data }",
      "opts": "",
-     "line": 68
+     "line": 79
     },
     {
      "arg": "{ error: 'Failed to change the roster', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 72
+     "line": 83
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/assignees",
@@ -53511,8 +53564,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/baseline/route.ts",
    "kind": "api-route",
-   "lines": 69,
-   "bytes": 3205,
+   "lines": 85,
+   "bytes": 3911,
    "client": false,
    "exports": [
     {
@@ -53536,6 +53589,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -53572,6 +53631,7 @@
     "milestoneVariance",
     "console.error",
     "setBaseline",
+    "refuse",
     "request.json",
     "rebaseline"
    ],
@@ -53582,52 +53642,42 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 20
+     "line": 21
     },
     {
      "arg": "{\n        data: { baselinedAt: project.baselinedAt, readiness: ready, variance },\n      }",
      "opts": "",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: 'Failed to read the baseline', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 32
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 42
+     "line": 33
     },
     {
      "arg": "{ data: { baseline: result.data } }",
      "opts": "",
-     "line": 43
+     "line": 52
     },
     {
      "arg": "{ error: 'Failed to set the baseline', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 47
+     "line": 56
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 58
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 61
+     "line": 67
     },
     {
      "arg": "{ data: { rebaseline: result.data } }",
      "opts": "",
-     "line": 62
+     "line": 78
     },
     {
      "arg": "{ error: 'Failed to rebaseline', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 66
+     "line": 82
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/baseline",
@@ -53642,8 +53692,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/cdrl/route.ts",
    "kind": "api-route",
-   "lines": 97,
-   "bytes": 4322,
+   "lines": 108,
+   "bytes": 4552,
    "client": false,
    "exports": [
     {
@@ -53667,6 +53717,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -53706,6 +53762,7 @@
     "console.error",
     "request.json",
     "addCdrlItem",
+    "refuse",
     "String",
     "isValidUUID",
     "markSubmitted"
@@ -53717,67 +53774,57 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ data: { items: await listCdrlItems(gate.actor.tenantId, projectId) } }",
      "opts": "",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: 'Failed to load the CDRL register', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 30
+     "line": 31
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 40
+     "line": 41
     },
     {
      "arg": "{ data: { item: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 57
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 58
+     "line": 64
     },
     {
      "arg": "{ error: 'Failed to add the CDRL item', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 62
+     "line": 68
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 72
+     "line": 78
     },
     {
      "arg": "{ error: \"action must be 'submitted', with a deliverableId and a submittedAt date\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 75
+     "line": 81
     },
     {
      "arg": "{ error: 'deliverableId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 82
+     "line": 88
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 89
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 90
+     "line": 101
     },
     {
      "arg": "{ error: 'Failed to record the delivery', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 94
+     "line": 105
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/cdrl",
@@ -53792,8 +53839,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/clins/route.ts",
    "kind": "api-route",
-   "lines": 58,
-   "bytes": 2610,
+   "lines": 69,
+   "bytes": 2761,
    "client": false,
    "exports": [
     {
@@ -53812,6 +53859,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -53851,7 +53904,8 @@
     "provenanceFor",
     "console.error",
     "request.json",
-    "createClin"
+    "createClin",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -53860,37 +53914,32 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 22
+     "line": 23
     },
     {
      "arg": "{ data: { clins, provenance } }",
      "opts": "",
-     "line": 30
+     "line": 31
     },
     {
      "arg": "{ error: 'Failed to list CLINs', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 34
+     "line": 35
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 45
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 49
+     "line": 46
     },
     {
      "arg": "{ data: { clin: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 51
+     "line": 62
     },
     {
      "arg": "{ error: 'Failed to create the CLIN', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 55
+     "line": 66
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/clins",
@@ -53904,8 +53953,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]/route.ts",
    "kind": "api-route",
-   "lines": 49,
-   "bytes": 2475,
+   "lines": 60,
+   "bytes": 2709,
    "client": false,
    "exports": [
     {
@@ -53919,6 +53968,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -53942,6 +53997,7 @@
     "request.json",
     "NextResponse.json",
     "setCommentResolved",
+    "refuse",
     "editComment",
     "console.error"
    ],
@@ -53952,37 +54008,27 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 25
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 29
+     "line": 26
     },
     {
      "arg": "{ data: { comment: result.data } }",
      "opts": "",
-     "line": 30
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 35
+     "line": 36
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 36
+     "line": 47
     },
     {
      "arg": "{ error: \"Send action:'resolve' | 'reopen', or a new body\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 39
+     "line": 50
     },
     {
      "arg": "{ error: 'Failed to update the comment', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 46
+     "line": 57
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/comments/[commentId]",
@@ -53995,8 +54041,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/comments/route.ts",
    "kind": "api-route",
-   "lines": 62,
-   "bytes": 2961,
+   "lines": 68,
+   "bytes": 3100,
    "client": false,
    "exports": [
     {
@@ -54015,6 +54061,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -54046,7 +54098,8 @@
     "listProjectComments",
     "console.error",
     "request.json",
-    "postComment"
+    "postComment",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -54055,37 +54108,32 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ data: { comments } }",
      "opts": "",
-     "line": 29
+     "line": 30
     },
     {
      "arg": "{ error: 'Failed to load the conversation', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 33
+     "line": 34
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 43
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 51
+     "line": 44
     },
     {
      "arg": "{ data: result.data }",
      "opts": "{ status: 201 }",
-     "line": 55
+     "line": 61
     },
     {
      "arg": "{ error: 'Failed to post the comment', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 59
+     "line": 65
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/comments",
@@ -54099,8 +54147,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence/route.ts",
    "kind": "api-route",
-   "lines": 66,
-   "bytes": 2970,
+   "lines": 72,
+   "bytes": 3122,
    "client": false,
    "exports": [
     {
@@ -54119,6 +54167,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -54148,7 +54202,8 @@
     "fileAcceptanceEvidence",
     "str",
     "Buffer.from",
-    "file.arrayBuffer"
+    "file.arrayBuffer",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -54157,37 +54212,32 @@
     {
      "arg": "{ data: { evidence } }",
      "opts": "",
-     "line": 23
+     "line": 24
     },
     {
      "arg": "{ error: 'Failed to load the evidence', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 27
+     "line": 28
     },
     {
      "arg": "{ error: 'A multipart upload is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 37
+     "line": 38
     },
     {
      "arg": "{ error: 'A file is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 41
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 58
+     "line": 42
     },
     {
      "arg": "{ data: { evidence: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 59
+     "line": 65
     },
     {
      "arg": "{ error: 'Failed to file the evidence', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 63
+     "line": 69
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/evidence",
@@ -54201,8 +54251,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]/route.ts",
    "kind": "api-route",
-   "lines": 74,
-   "bytes": 3647,
+   "lines": 95,
+   "bytes": 4007,
    "client": false,
    "exports": [
     {
@@ -54221,6 +54271,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -54248,6 +54304,7 @@
     "uploadDeliverable",
     "Buffer.from",
     "file.arrayBuffer",
+    "refuse",
     "console.error",
     "request.json",
     "authorDeliverable",
@@ -54260,62 +54317,47 @@
     {
      "arg": "{ error: 'A multipart upload is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 19
+     "line": 20
     },
     {
      "arg": "{ error: 'A file is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 23
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 29
+     "line": 24
     },
     {
      "arg": "{ data: { deliverable: result.data } }",
      "opts": "",
-     "line": 30
+     "line": 36
     },
     {
      "arg": "{ error: 'Failed to upload the deliverable', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 34
+     "line": 40
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 45
-    },
-    {
-     "arg": "{ error: made.error, code: made.code }",
-     "opts": "{ status: made.status }",
-     "line": 54
+     "line": 51
     },
     {
      "arg": "{ data: { document: made.data } }",
      "opts": "{ status: 201 }",
-     "line": 55
+     "line": 71
     },
     {
      "arg": "{ error: \"action must be 'accept' or 'author'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 59
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 66
+     "line": 75
     },
     {
      "arg": "{ data: { deliverable: result.data } }",
      "opts": "",
-     "line": 67
+     "line": 88
     },
     {
      "arg": "{ error: 'Failed to accept the deliverable', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 71
+     "line": 92
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables/[deliverableId]",
@@ -54329,8 +54371,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/deliverables/route.ts",
    "kind": "api-route",
-   "lines": 53,
-   "bytes": 2509,
+   "lines": 59,
+   "bytes": 2652,
    "client": false,
    "exports": [
     {
@@ -54349,6 +54391,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -54380,7 +54428,8 @@
     "listDeliverables",
     "console.error",
     "request.json",
-    "createDeliverable"
+    "createDeliverable",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -54389,42 +54438,37 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 19
+     "line": 20
     },
     {
      "arg": "{ data: { deliverables: await listDeliverables(gate.actor.tenantId, projectId) } }",
      "opts": "",
-     "line": 21
+     "line": 22
     },
     {
      "arg": "{ error: 'Failed to load deliverables', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 25
+     "line": 26
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 36
+     "line": 37
     },
     {
      "arg": "{ error: 'milestoneId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 39
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 45
+     "line": 40
     },
     {
      "arg": "{ data: { deliverable: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 46
+     "line": 52
     },
     {
      "arg": "{ error: 'Failed to add the deliverable', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 50
+     "line": 56
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/deliverables",
@@ -54438,8 +54482,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/documents/route.ts",
    "kind": "api-route",
-   "lines": 71,
-   "bytes": 3333,
+   "lines": 82,
+   "bytes": 3488,
    "client": false,
    "exports": [
     {
@@ -54458,6 +54502,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -54490,7 +54540,8 @@
     "Math.round",
     "Buffer.from",
     "file.arrayBuffer",
-    "addSourceDocument"
+    "addSourceDocument",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -54499,47 +54550,42 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 25
+     "line": 26
     },
     {
      "arg": "{ data: { documents } }",
      "opts": "",
-     "line": 28
+     "line": 29
     },
     {
      "arg": "{ error: 'Failed to list documents', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 32
+     "line": 33
     },
     {
      "arg": "{ error: 'A multipart upload is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'A file is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 48
+     "line": 49
     },
     {
      "arg": "{ error: `That file is ${Math.round(file.size / 1e6)} MB; the limit is 40 MB`, code: 'PAYLOAD_TOO_LARGE' }",
      "opts": "{ status: 413 }",
-     "line": 51
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 62
+     "line": 52
     },
     {
      "arg": "{ data: { document: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 64
+     "line": 75
     },
     {
      "arg": "{ error: 'Failed to upload the document', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 68
+     "line": 79
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/documents",
@@ -54670,8 +54716,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/gate-closer/route.ts",
    "kind": "api-route",
-   "lines": 74,
-   "bytes": 3207,
+   "lines": 80,
+   "bytes": 3351,
    "client": false,
    "exports": [
     {
@@ -54685,6 +54731,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -54733,6 +54785,7 @@
     "String",
     "isValidUUID",
     "setGateCloser",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -54742,47 +54795,42 @@
     {
      "arg": "{ error: 'Only a tenant admin can change who closes a gate', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 32
+     "line": 33
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 37
+     "line": 38
     },
     {
      "arg": "{\n          data: {\n            outcomes,\n            closed: outcomes.filter((o) => o.closed).length,\n            // Reported, not hidden. A sweep that returned only its successes would make \"nothing\n            // happened\" and \"three phases were blocked\" look identical.\n            declined: outcomes.filter((o) => !o.closed).length,\n          },\n        }",
      "opts": "",
-     "line": 41
+     "line": 42
     },
     {
      "arg": "{ error: \"action must be 'set' or 'sweep'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 53
+     "line": 54
     },
     {
      "arg": "{ error: 'milestoneId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 60
+     "line": 61
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 66
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 67
+     "line": 73
     },
     {
      "arg": "{ error: 'Failed to update the gate closer', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 71
+     "line": 77
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/gate-closer",
@@ -54795,8 +54843,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/invoices/route.ts",
    "kind": "api-route",
-   "lines": 104,
-   "bytes": 4588,
+   "lines": 115,
+   "bytes": 4824,
    "client": false,
    "exports": [
     {
@@ -54820,6 +54868,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -54868,6 +54922,7 @@
     "request.json",
     "draftInvoice",
     "Array.isArray",
+    "refuse",
     "String",
     "isValidUUID",
     "submitInvoice",
@@ -54881,67 +54936,57 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 29
+     "line": 30
     },
     {
      "arg": "{ data: { invoices, billing, unbilled } }",
      "opts": "",
-     "line": 36
+     "line": 37
     },
     {
      "arg": "{ error: 'Failed to load the invoices', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 40
+     "line": 41
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 50
+     "line": 51
     },
     {
      "arg": "{ data: { invoice: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 60
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 61
+     "line": 67
     },
     {
      "arg": "{ error: 'Failed to raise the invoice', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 65
+     "line": 71
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 75
+     "line": 81
     },
     {
      "arg": "{ error: 'invoiceId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 79
+     "line": 85
     },
     {
      "arg": "{ error: \"action must be 'submit', 'pay' or 'void'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 90
+     "line": 96
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 96
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 97
+     "line": 108
     },
     {
      "arg": "{ error: 'Failed to update the invoice', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 101
+     "line": 112
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/invoices",
@@ -54956,8 +55001,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]/route.ts",
    "kind": "api-route",
-   "lines": 63,
-   "bytes": 3012,
+   "lines": 69,
+   "bytes": 3151,
    "client": false,
    "exports": [
     {
@@ -54976,6 +55021,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -55001,7 +55052,8 @@
     "console.error",
     "request.json",
     "Array.isArray",
-    "raiseActionItems"
+    "raiseActionItems",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -55010,37 +55062,32 @@
     {
      "arg": "{ data: { actions } }",
      "opts": "",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: 'Failed to load the action items', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 30
+     "line": 31
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 40
+     "line": 41
     },
     {
      "arg": "{ error: \"action must be 'raise_actions', with an items array\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 43
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 53
+     "line": 44
     },
     {
      "arg": "{ data: result.data }",
      "opts": "{ status: 201 }",
-     "line": 56
+     "line": 62
     },
     {
      "arg": "{ error: 'Failed to raise the action items', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 60
+     "line": 66
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/meetings/[meetingId]",
@@ -55054,8 +55101,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/meetings/route.ts",
    "kind": "api-route",
-   "lines": 52,
-   "bytes": 2458,
+   "lines": 58,
+   "bytes": 2597,
    "client": false,
    "exports": [
     {
@@ -55074,6 +55121,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -55105,7 +55158,8 @@
     "listProjectMeetings",
     "console.error",
     "request.json",
-    "recordMeeting"
+    "recordMeeting",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -55114,37 +55168,32 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 25
+     "line": 26
     },
     {
      "arg": "{ data: { meetings: await listProjectMeetings(gate.actor.tenantId, projectId) } }",
      "opts": "",
-     "line": 27
+     "line": 28
     },
     {
      "arg": "{ error: 'Failed to load the meetings', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 31
+     "line": 32
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 41
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 44
+     "line": 42
     },
     {
      "arg": "{ data: { meeting: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 45
+     "line": 51
     },
     {
      "arg": "{ error: 'Failed to record the meeting', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 49
+     "line": 55
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/meetings",
@@ -55158,8 +55207,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/milestones/route.ts",
    "kind": "api-route",
-   "lines": 132,
-   "bytes": 6827,
+   "lines": 173,
+   "bytes": 7415,
    "client": false,
    "exports": [
     {
@@ -55183,6 +55232,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -55229,6 +55284,7 @@
     "console.error",
     "request.json",
     "createMilestone",
+    "refuse",
     "resequence",
     "setMilestoneDependency",
     "rescheduleMilestone",
@@ -55241,107 +55297,82 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 31
+     "line": 32
     },
     {
      "arg": "{ data: { milestones, deliverables, tasks } }",
      "opts": "",
-     "line": 38
+     "line": 39
     },
     {
      "arg": "{ error: 'Failed to load milestones', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 42
+     "line": 43
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 53
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 56
+     "line": 54
     },
     {
      "arg": "{ data: { milestone: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 57
+     "line": 63
     },
     {
      "arg": "{ error: 'Failed to add the milestone', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 61
+     "line": 67
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 77
-    },
-    {
-     "arg": "{ error: seq.error, code: seq.code }",
-     "opts": "{ status: seq.status }",
-     "line": 81
+     "line": 83
     },
     {
      "arg": "{ data: seq.data }",
      "opts": "",
-     "line": 82
+     "line": 98
     },
     {
      "arg": "{ error: \"Provide milestoneId and one of action:'met' | 'reschedule' | 'depends_on' | 'resequence'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 86
+     "line": 102
     },
     {
      "arg": "{ error: 'dependsOnId is required (null to clear it)', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 96
-    },
-    {
-     "arg": "{ error: dep.error, code: dep.code }",
-     "opts": "{ status: dep.status }",
-     "line": 102
+     "line": 112
     },
     {
      "arg": "{ data: dep.data }",
      "opts": "",
-     "line": 103
+     "line": 129
     },
     {
      "arg": "{ error: 'forecastDate is required to reschedule', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 108
-    },
-    {
-     "arg": "{ error: moved.error, code: moved.code }",
-     "opts": "{ status: moved.status }",
-     "line": 111
+     "line": 134
     },
     {
      "arg": "{ data: moved.data }",
      "opts": "",
-     "line": 112
+     "line": 148
     },
     {
      "arg": "{ error: \"action must be 'met', 'reschedule', 'depends_on' or 'resequence'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 116
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 124
+     "line": 152
     },
     {
      "arg": "{ data: { milestone: result.data } }",
      "opts": "",
-     "line": 125
+     "line": 166
     },
     {
      "arg": "{ error: 'Failed to close the milestone', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 129
+     "line": 170
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/milestones",
@@ -55356,8 +55387,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/modifications/route.ts",
    "kind": "api-route",
-   "lines": 116,
-   "bytes": 5388,
+   "lines": 132,
+   "bytes": 5735,
    "client": false,
    "exports": [
     {
@@ -55386,6 +55417,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -55428,6 +55465,7 @@
     "request.json",
     "draftModification",
     "Array.isArray",
+    "refuse",
     "String",
     "isValidUUID",
     "executeModification",
@@ -55441,87 +55479,72 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 29
+     "line": 30
     },
     {
      "arg": "{ data: { modifications } }",
      "opts": "",
-     "line": 32
+     "line": 33
     },
     {
      "arg": "{ error: 'Failed to load the modifications', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 36
+     "line": 37
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 46
+     "line": 47
     },
     {
      "arg": "{ data: { modification: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 57
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 58
+     "line": 64
     },
     {
      "arg": "{ error: 'Failed to record the modification', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 62
+     "line": 68
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 72
+     "line": 78
     },
     {
      "arg": "{ error: \"action must be 'execute', with a modificationId and an executedOn date\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 75
+     "line": 81
     },
     {
      "arg": "{ error: 'modificationId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 82
+     "line": 88
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 89
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 90
+     "line": 101
     },
     {
      "arg": "{ error: 'Failed to execute the modification', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 94
+     "line": 105
     },
     {
      "arg": "{ error: 'modificationId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 104
+     "line": 115
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 108
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 109
+     "line": 125
     },
     {
      "arg": "{ error: 'Failed to discard the modification', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 113
+     "line": 129
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/modifications",
@@ -55679,8 +55702,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]/route.ts",
    "kind": "api-route",
-   "lines": 45,
-   "bytes": 2077,
+   "lines": 51,
+   "bytes": 2215,
    "client": false,
    "exports": [
     {
@@ -55694,6 +55717,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -55716,6 +55745,7 @@
     "request.json",
     "NextResponse.json",
     "decideReview",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -55725,27 +55755,22 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: \"decision must be 'approved', 'rejected' or 'withdrawn'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 30
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 37
+     "line": 31
     },
     {
      "arg": "{ data: { review: result.data } }",
      "opts": "",
-     "line": 38
+     "line": 44
     },
     {
      "arg": "{ error: 'Failed to record the decision', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 42
+     "line": 48
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/reviews/[reviewId]",
@@ -55758,8 +55783,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/reviews/route.ts",
    "kind": "api-route",
-   "lines": 56,
-   "bytes": 2548,
+   "lines": 62,
+   "bytes": 2686,
    "client": false,
    "exports": [
     {
@@ -55778,6 +55803,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -55809,7 +55840,8 @@
     "listProjectReviews",
     "console.error",
     "request.json",
-    "requestReview"
+    "requestReview",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -55818,37 +55850,32 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ data: { reviews } }",
      "opts": "",
-     "line": 27
+     "line": 28
     },
     {
      "arg": "{ error: 'Failed to load the reviews', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 31
+     "line": 32
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 45
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 48
+     "line": 46
     },
     {
      "arg": "{ data: { review: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 49
+     "line": 55
     },
     {
      "arg": "{ error: 'Failed to request the review', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 53
+     "line": 59
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/reviews",
@@ -55862,8 +55889,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]/route.ts",
    "kind": "api-route",
-   "lines": 69,
-   "bytes": 3510,
+   "lines": 90,
+   "bytes": 3962,
    "client": false,
    "exports": [
     {
@@ -55877,6 +55904,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -55902,6 +55935,7 @@
     "request.json",
     "NextResponse.json",
     "raiseAsIssue",
+    "refuse",
     "closeRisk",
     "mitigationTask",
     "EDITABLE.filter",
@@ -55916,57 +55950,37 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 28
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
-     "line": 32
+     "line": 29
     },
     {
      "arg": "{ data: { risk: r.data } }",
      "opts": "",
-     "line": 33
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
-     "line": 37
+     "line": 39
     },
     {
      "arg": "{ data: { risk: r.data } }",
      "opts": "",
-     "line": 38
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
-     "line": 46
+     "line": 49
     },
     {
      "arg": "{ data: r.data }",
      "opts": "{ status: 201 }",
-     "line": 47
+     "line": 63
     },
     {
      "arg": "{\n          error: `Send action:'raise_issue' | 'close' | 'mitigate', or one of: ${EDITABLE.join(', ')}`,\n          code: 'VALIDATION_ERROR',\n        }",
      "opts": "{ status: 400 }",
-     "line": 53
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
-     "line": 61
+     "line": 69
     },
     {
      "arg": "{ data: { risk: r.data } }",
      "opts": "",
-     "line": 62
+     "line": 83
     },
     {
      "arg": "{ error: 'Failed to update it', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 66
+     "line": 87
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/risks/[riskId]",
@@ -55979,8 +55993,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/risks/route.ts",
    "kind": "api-route",
-   "lines": 60,
-   "bytes": 2741,
+   "lines": 66,
+   "bytes": 2877,
    "client": false,
    "exports": [
     {
@@ -55999,6 +56013,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -56030,7 +56050,8 @@
     "listProjectRisks",
     "console.error",
     "request.json",
-    "raiseRisk"
+    "raiseRisk",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -56039,37 +56060,32 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 22
+     "line": 23
     },
     {
      "arg": "{ data: { risks: await listProjectRisks(gate.actor.tenantId, projectId) } }",
      "opts": "",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ error: 'Failed to load the register', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 28
+     "line": 29
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 38
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 52
+     "line": 39
     },
     {
      "arg": "{ data: { risk: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 53
+     "line": 59
     },
     {
      "arg": "{ error: 'Failed to raise it', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 57
+     "line": 63
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/risks",
@@ -56168,8 +56184,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/route.ts",
    "kind": "api-route",
-   "lines": 84,
-   "bytes": 4296,
+   "lines": 97,
+   "bytes": 4739,
    "client": false,
    "exports": [
     {
@@ -56188,6 +56204,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -56245,6 +56267,7 @@
     "console.error",
     "request.json",
     "reopenProject",
+    "refuse",
     "closeProject"
    ],
    "jsx": [],
@@ -56254,52 +56277,42 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ data: { project, documents, clins, assignees, readiness: ready, provenance } }",
      "opts": "",
-     "line": 39
+     "line": 40
     },
     {
      "arg": "{ error: 'Failed to load the project', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 62
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
-     "line": 66
+     "line": 63
     },
     {
      "arg": "{ data: { project: r.data } }",
      "opts": "",
-     "line": 67
+     "line": 73
     },
     {
      "arg": "{ error: \"action must be 'close' or 'reopen'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 70
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
      "line": 76
     },
     {
      "arg": "{ data: { project: r.data } }",
      "opts": "",
-     "line": 77
+     "line": 90
     },
     {
      "arg": "{ error: 'Failed to update the project', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 81
+     "line": 94
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]",
@@ -56313,8 +56326,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments/route.ts",
    "kind": "api-route",
-   "lines": 72,
-   "bytes": 3380,
+   "lines": 83,
+   "bytes": 3630,
    "client": false,
    "exports": [
     {
@@ -56338,6 +56351,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -56373,6 +56392,7 @@
     "attachToTask",
     "Buffer.from",
     "file.arrayBuffer",
+    "refuse",
     "new URL(request.url).searchParams.get",
     "isValidUUID",
     "detachFromTask"
@@ -56384,57 +56404,47 @@
     {
      "arg": "{ data: { attachments } }",
      "opts": "",
-     "line": 22
+     "line": 23
     },
     {
      "arg": "{ error: 'Failed to list attachments', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: 'A multipart upload is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 36
+     "line": 37
     },
     {
      "arg": "{ error: 'A file is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 40
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 46
+     "line": 41
     },
     {
      "arg": "{ data: { attachment: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 47
+     "line": 53
     },
     {
      "arg": "{ error: 'Failed to attach the file', code: 'STORAGE_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 51
+     "line": 57
     },
     {
      "arg": "{ error: 'attachmentId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 61
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 64
+     "line": 67
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 65
+     "line": 76
     },
     {
      "arg": "{ error: 'Failed to remove the attachment', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 69
+     "line": 80
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/attachments",
@@ -56449,8 +56459,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]/route.ts",
    "kind": "api-route",
-   "lines": 87,
-   "bytes": 4002,
+   "lines": 98,
+   "bytes": 4230,
    "client": false,
    "exports": [
     {
@@ -56464,6 +56474,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -56488,6 +56504,7 @@
     "NextResponse.json",
     "EDITABLE.filter",
     "setTaskStatus",
+    "refuse",
     "EDITABLE.join",
     "Object.assign",
     "updateTask",
@@ -56500,47 +56517,37 @@
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 42
+     "line": 43
     },
     {
      "arg": "{\n            error: 'Send either a status change or an edit, not both — a note save must not be able '\n              + 'to reopen finished work.',\n            code: 'VALIDATION_ERROR',\n          }",
      "opts": "{ status: 400 }",
-     "line": 51
+     "line": 52
     },
     {
      "arg": "{ error: \"status must be 'open', 'done' or 'blocked'\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 59
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 65
+     "line": 60
     },
     {
      "arg": "{ data: { task: result.data } }",
      "opts": "",
-     "line": 66
+     "line": 72
     },
     {
      "arg": "{\n          error: `Send a status, or one of: ${EDITABLE.join(', ')}`,\n          code: 'VALIDATION_ERROR',\n        }",
      "opts": "{ status: 400 }",
-     "line": 70
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 79
+     "line": 76
     },
     {
      "arg": "{ data: { task: result.data } }",
      "opts": "",
-     "line": 80
+     "line": 91
     },
     {
      "arg": "{ error: 'Failed to update the task', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 84
+     "line": 95
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks/[taskId]",
@@ -56553,8 +56560,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/tasks/route.ts",
    "kind": "api-route",
-   "lines": 68,
-   "bytes": 3444,
+   "lines": 74,
+   "bytes": 3580,
    "client": false,
    "exports": [
     {
@@ -56573,6 +56580,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -56604,7 +56617,8 @@
     "listMilestoneTasks",
     "console.error",
     "request.json",
-    "createMilestoneTask"
+    "createMilestoneTask",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -56613,37 +56627,32 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ data: { tasks: await listMilestoneTasks(gate.actor.tenantId, projectId) } }",
      "opts": "",
-     "line": 28
+     "line": 29
     },
     {
      "arg": "{ error: 'Failed to load the task list', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 32
+     "line": 33
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 46
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 60
+     "line": 47
     },
     {
      "arg": "{ data: { task: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 61
+     "line": 67
     },
     {
      "arg": "{ error: 'Failed to add the task', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 65
+     "line": 71
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/tasks",
@@ -56657,8 +56666,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/time/route.ts",
    "kind": "api-route",
-   "lines": 107,
-   "bytes": 5090,
+   "lines": 123,
+   "bytes": 5410,
    "client": false,
    "exports": [
     {
@@ -56687,6 +56696,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -56727,6 +56742,7 @@
     "console.error",
     "request.json",
     "logTime",
+    "refuse",
     "Array.isArray",
     "(body.entryIds as string[]).filter",
     "approveTime",
@@ -56741,82 +56757,67 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 29
+     "line": 30
     },
     {
      "arg": "{ data: { entries: await listTimeEntries(gate.actor.tenantId, projectId) } }",
      "opts": "",
-     "line": 31
+     "line": 32
     },
     {
      "arg": "{ error: 'Failed to load the time entries', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 35
+     "line": 36
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 45
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 56
+     "line": 46
     },
     {
      "arg": "{ data: { entry: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 57
+     "line": 63
     },
     {
      "arg": "{ error: 'Failed to log the time', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 61
+     "line": 67
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 71
+     "line": 77
     },
     {
      "arg": "{ error: \"action must be 'approve', with an entryIds array\", code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 74
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 81
+     "line": 80
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 82
+     "line": 93
     },
     {
      "arg": "{ error: 'Failed to approve the time', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 86
+     "line": 97
     },
     {
      "arg": "{ error: 'entryId is required', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 96
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 99
+     "line": 107
     },
     {
      "arg": "{ data: result.data }",
      "opts": "",
-     "line": 100
+     "line": 116
     },
     {
      "arg": "{ error: 'Failed to remove the entry', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 104
+     "line": 120
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/time",
@@ -56907,8 +56908,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/[projectId]/wbs/route.ts",
    "kind": "api-route",
-   "lines": 59,
-   "bytes": 2518,
+   "lines": 70,
+   "bytes": 2667,
    "client": false,
    "exports": [
     {
@@ -56927,6 +56928,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -56969,7 +56976,8 @@
     "toWorkplanCanvas",
     "console.error",
     "request.json",
-    "createWbsNode"
+    "createWbsNode",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -56978,37 +56986,32 @@
     {
      "arg": "{ error: 'Project not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 23
+     "line": 24
     },
     {
      "arg": "{ data: { nodes, canvas } }",
      "opts": "",
-     "line": 31
+     "line": 32
     },
     {
      "arg": "{ error: 'Failed to load the work breakdown', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 35
+     "line": 36
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 46
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 50
+     "line": 47
     },
     {
      "arg": "{ data: { node: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 52
+     "line": 63
     },
     {
      "arg": "{ error: 'Failed to add the task', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 56
+     "line": 67
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects/[projectId]/wbs",
@@ -57022,8 +57025,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/projects/route.ts",
    "kind": "api-route",
-   "lines": 48,
-   "bytes": 2083,
+   "lines": 59,
+   "bytes": 2232,
    "client": false,
    "exports": [
     {
@@ -57042,6 +57045,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -57071,7 +57080,8 @@
     "NextResponse.json",
     "console.error",
     "request.json",
-    "createProject"
+    "createProject",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -57080,32 +57090,27 @@
     {
      "arg": "{ data: { projects } }",
      "opts": "",
-     "line": 20
+     "line": 21
     },
     {
      "arg": "{ error: 'Failed to list projects', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 35
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 39
+     "line": 36
     },
     {
      "arg": "{ data: { project: result.data } }",
      "opts": "{ status: 201 }",
-     "line": 41
+     "line": 52
     },
     {
      "arg": "{ error: 'Failed to create the project', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 45
+     "line": 56
     }
    ],
    "route": "/api/portal/[tenantSlug]/projects",
@@ -62509,8 +62514,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/outcome/route.ts",
    "kind": "api-route",
-   "lines": 421,
-   "bytes": 16320,
+   "lines": 428,
+   "bytes": 16994,
    "client": false,
    "exports": [
     {
@@ -62524,6 +62529,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -62604,19 +62615,19 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 128
+     "line": 129
     },
     {
      "tag": "sql",
-     "line": 314
+     "line": 317
     },
     {
      "tag": "sql",
-     "line": 324
+     "line": 327
     },
     {
      "tag": "sql",
-     "line": 382
+     "line": 385
     }
    ],
    "calls": [
@@ -62633,6 +62644,7 @@
     "VALID_OUTCOMES.join",
     "body.notes.slice",
     "console.error",
+    "refuse",
     "['submitted', 'final'].includes",
     "emitEventStart",
     "userActor",
@@ -62654,87 +62666,77 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 46
+     "line": 47
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 61
+     "line": 62
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 69
+     "line": 70
     },
     {
      "arg": "{ error: 'Invalid proposal ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 78
+     "line": 79
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 85
+     "line": 86
     },
     {
      "arg": "{ error: 'Tenant access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 94
+     "line": 95
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'INVALID_BODY' }",
      "opts": "{ status: 400 }",
-     "line": 107
+     "line": 108
     },
     {
      "arg": "{ error: `outcome must be one of: ${VALID_OUTCOMES.join(', ')}`, code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 422 }",
-     "line": 115
+     "line": 116
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 144
+     "line": 145
     },
     {
      "arg": "{ error: 'Proposal not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 151
-    },
-    {
-     "arg": "{ error: 'Outcome already recorded', code: 'ALREADY_ARCHIVED' }",
-     "opts": "{ status: 409 }",
-     "line": 159
+     "line": 152
     },
     {
      "arg": "{ error: 'Outcome can only be recorded for submitted or final proposals', code: 'INVALID_STAGE' }",
      "opts": "{ status: 422 }",
-     "line": 166
-    },
-    {
-     "arg": "{ error: 'Proposal was modified by another user', code: 'CONFLICT' }",
-     "opts": "{ status: 409 }",
-     "line": 276
+     "line": 168
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 283
+     "line": 286
     },
     {
      "arg": "{\n      data: {\n        proposalId,\n        outcome,\n        atomsUpdated,\n        stage: 'archived',\n        contractStarted,\n      },\n    }",
      "opts": "",
-     "line": 395
+     "line": 398
     },
     {
      "arg": "{ error: 'Proposal was modified by another user', code: 'CONFLICT' }",
      "opts": "{ status: 409 }",
-     "line": 409
+     "line": 416
     },
     {
      "arg": "{ error: 'Internal server error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 415
+     "line": 422
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/outcome",
@@ -64205,8 +64207,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assign/route.ts",
    "kind": "api-route",
-   "lines": 81,
-   "bytes": 5029,
+   "lines": 87,
+   "bytes": 5158,
    "client": false,
    "exports": [
     {
@@ -64225,6 +64227,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -64273,7 +64281,7 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 67
+     "line": 68
     }
    ],
    "calls": [
@@ -64289,7 +64297,8 @@
     "enterTenant",
     "request.json",
     "isPortalManager",
-    "assignSection"
+    "assignSection",
+    "refuse"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -64298,62 +64307,57 @@
     {
      "arg": "{ error: 'Unauthenticated', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 20
+     "line": 21
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 23
+     "line": 24
     },
     {
      "arg": "{ error: 'Invalid ID format', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 24
+     "line": 25
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 26
+     "line": 27
     },
     {
      "arg": "{ error: 'Proposal access denied', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 29
+     "line": 30
     },
     {
      "arg": "{ data: { assignees } }",
      "opts": "",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'Failed to load assignees', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 46
+     "line": 47
     },
     {
      "arg": "{ error: 'Invalid JSON', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 58
+     "line": 59
     },
     {
      "arg": "{ error: 'Invalid assignee id', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 61
-    },
-    {
-     "arg": "{ error: result.error, code: result.code }",
-     "opts": "{ status: result.status }",
-     "line": 74
+     "line": 62
     },
     {
      "arg": "{ data: result }",
      "opts": "",
-     "line": 75
+     "line": 81
     },
     {
      "arg": "{ error: 'Failed to assign section', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 78
+     "line": 84
     }
    ],
    "route": "/api/portal/[tenantSlug]/proposals/[proposalId]/sections/[sectionId]/assign",
@@ -68804,8 +68808,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/tasks/[taskId]/claim/route.ts",
    "kind": "api-route",
-   "lines": 93,
-   "bytes": 4556,
+   "lines": 118,
+   "bytes": 5830,
    "client": false,
    "exports": [
     {
@@ -68824,6 +68828,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -68872,6 +68882,7 @@
     "gate",
     "runInTenant",
     "claimTask",
+    "refuse",
     "console.error",
     "releaseTask"
    ],
@@ -68882,52 +68893,32 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 47
+     "line": 48
     },
     {
      "arg": "{ error: 'Invalid task id', code: 'INVALID_INPUT' }",
      "opts": "{ status: 400 }",
-     "line": 50
+     "line": 51
     },
     {
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 56
+     "line": 57
     },
     {
      "arg": "{ error: 'Workspace not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 59
+     "line": 60
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 63
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
-     "line": 73
-    },
-    {
-     "arg": "{ data: r.data }",
-     "opts": "",
-     "line": 74
-    },
-    {
-     "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
-     "opts": "{ status: 500 }",
-     "line": 77
-    },
-    {
-     "arg": "{ error: r.error, code: r.code }",
-     "opts": "{ status: r.status }",
-     "line": 86
+     "line": 64
     },
     {
      "arg": "{ data: r.data }",
@@ -68938,6 +68929,16 @@
      "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
      "line": 90
+    },
+    {
+     "arg": "{ data: r.data }",
+     "opts": "",
+     "line": 112
+    },
+    {
+     "arg": "{ error: 'Internal error', code: 'DB_ERROR' }",
+     "opts": "{ status: 500 }",
+     "line": 115
     }
    ],
    "route": "/api/portal/[tenantSlug]/tasks/[taskId]/claim",
@@ -69102,8 +69103,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/tasks/assign/route.ts",
    "kind": "api-route",
-   "lines": 106,
-   "bytes": 5092,
+   "lines": 110,
+   "bytes": 5214,
    "client": false,
    "exports": [
     {
@@ -69117,6 +69118,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -69165,6 +69172,7 @@
     "UUID_RE.test",
     "createTask",
     "Array.isArray",
+    "refuse",
     "console.error"
    ],
    "jsx": [],
@@ -69174,62 +69182,57 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 27
+     "line": 28
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 32
+     "line": 33
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 35
+     "line": 36
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 39
+     "line": 40
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 43
+     "line": 44
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 52
+     "line": 53
     },
     {
      "arg": "{ error: 'Cannot assign to that role', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 64
+     "line": 65
     },
     {
      "arg": "{ error: 'Invalid assigneeUserId', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 70
+     "line": 71
     },
     {
      "arg": "{ error: 'Invalid entityId', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 73
-    },
-    {
-     "arg": "{ error: out.error, code: out.code }",
-     "opts": "{ status: out.status }",
-     "line": 98
+     "line": 74
     },
     {
      "arg": "{ data: out.data }",
      "opts": "{ status: 201 }",
-     "line": 100
+     "line": 104
     },
     {
      "arg": "{ error: 'Failed to assign task', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 103
+     "line": 107
     }
    ],
    "route": "/api/portal/[tenantSlug]/tasks/assign",
@@ -69242,8 +69245,8 @@
   {
    "file": "app/api/portal/[tenantSlug]/tasks/route.ts",
    "kind": "api-route",
-   "lines": 116,
-   "bytes": 5630,
+   "lines": 120,
+   "bytes": 5728,
    "client": false,
    "exports": [
     {
@@ -69262,6 +69265,12 @@
      "spec": "next/server",
      "names": [
       "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/api-refusal",
+     "names": [
+      "refuse"
      ]
     },
     {
@@ -69305,7 +69314,7 @@
    "sqlTags": [
     {
      "tag": "sql",
-     "line": 101
+     "line": 105
     }
    ],
    "calls": [
@@ -69322,6 +69331,7 @@
     "request.json",
     "UUID_RE.test",
     "completeTask",
+    "refuse",
     "advancePortalStage"
    ],
    "jsx": [],
@@ -69331,62 +69341,57 @@
     {
      "arg": "{ error: 'Authentication required', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 25
+     "line": 26
     },
     {
      "arg": "{ error: 'Invalid session', code: 'UNAUTHENTICATED' }",
      "opts": "{ status: 401 }",
-     "line": 30
+     "line": 31
     },
     {
      "arg": "{ error: 'Insufficient permissions', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 36
+     "line": 37
     },
     {
      "arg": "{ error: 'Tenant not found', code: 'NOT_FOUND' }",
      "opts": "{ status: 404 }",
-     "line": 40
+     "line": 41
     },
     {
      "arg": "{ error: 'Forbidden', code: 'FORBIDDEN' }",
      "opts": "{ status: 403 }",
-     "line": 45
+     "line": 46
     },
     {
      "arg": "{ data: { tasks, viewerId: r.actor.id } }",
      "opts": "",
-     "line": 63
+     "line": 64
     },
     {
      "arg": "{ error: 'Failed to load tasks', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 66
+     "line": 67
     },
     {
      "arg": "{ error: 'Invalid JSON body', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 81
+     "line": 82
     },
     {
      "arg": "{ error: 'Invalid taskId', code: 'VALIDATION_ERROR' }",
      "opts": "{ status: 400 }",
-     "line": 85
-    },
-    {
-     "arg": "{ error: out.error, code: out.code }",
-     "opts": "{ status: out.status }",
-     "line": 93
+     "line": 86
     },
     {
      "arg": "{ data: out.data }",
      "opts": "",
-     "line": 110
+     "line": 114
     },
     {
      "arg": "{ error: 'Failed to complete task', code: 'DB_ERROR' }",
      "opts": "{ status: 500 }",
-     "line": 113
+     "line": 117
     }
    ],
    "route": "/api/portal/[tenantSlug]/tasks",
@@ -85235,8 +85240,8 @@
   {
    "file": "components/portal/archived-proposals.tsx",
    "kind": "component",
-   "lines": 155,
-   "bytes": 5472,
+   "lines": 163,
+   "bytes": 6127,
    "client": true,
    "exports": [
     {
@@ -85257,6 +85262,13 @@
      ]
     },
     {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "useClientNow",
+      "deltaMsFrom"
+     ]
+    },
+    {
      "spec": "next/link",
      "names": [
       "Link"
@@ -85272,12 +85284,11 @@
    "tryCount": 2,
    "sqlTags": [],
    "calls": [
-    "new Date(iso).getTime",
-    "isNaN",
+    "deltaMsFrom",
     "Math.floor",
-    "Date.now",
     "useState",
     "useRouter",
+    "useClientNow",
     "setBusy",
     "setErr",
     "fetch",
@@ -88513,8 +88524,8 @@
   {
    "file": "components/portal/stage-control.tsx",
    "kind": "component",
-   "lines": 451,
-   "bytes": 17966,
+   "lines": 459,
+   "bytes": 18626,
    "client": true,
    "exports": [
     {
@@ -88528,7 +88539,9 @@
      "spec": "@/components/ui/time-ago",
      "names": [
       "localFrom",
-      "useMounted"
+      "useMounted",
+      "useClientNow",
+      "deltaMsFrom"
      ]
     },
     {
@@ -88569,10 +88582,10 @@
     "requirements.filter",
     "gateConfig.indexOf",
     "useMounted",
+    "useClientNow",
     "localFrom",
+    "deltaMsFrom",
     "Math.ceil",
-    "new Date(closeDate).getTime",
-    "Date.now",
     "setAdvancing",
     "setError",
     "setBlockedSections",
@@ -92023,8 +92036,8 @@
   {
    "file": "components/rfp-curation/triage-queue.tsx",
    "kind": "component",
-   "lines": 308,
-   "bytes": 11924,
+   "lines": 327,
+   "bytes": 12997,
    "client": true,
    "exports": [
     {
@@ -92063,15 +92076,23 @@
      "names": [
       "fmtDate"
      ]
+    },
+    {
+     "spec": "@/components/ui/time-ago",
+     "names": [
+      "useClientNow",
+      "deltaMsFrom"
+     ]
     }
    ],
    "tryCount": 4,
    "sqlTags": [],
    "calls": [
     "status.replace",
-    "Date.now",
-    "new Date(item.claimedAt).getTime",
+    "deltaMsFrom",
+    "Math.floor",
     "useState",
+    "useClientNow",
     "useTool",
     "useRouter",
     "items.filter",
@@ -92103,8 +92124,7 @@
     "s.replace",
     "router.refresh",
     "filteredItems.map",
-    "Math.floor",
-    "new Date(item.claimedAt!).getTime",
+    "claimedHours",
     "fmtDate",
     "rowActions"
    ],
@@ -92910,8 +92930,8 @@
   {
    "file": "components/ui/time-ago.tsx",
    "kind": "component",
-   "lines": 128,
-   "bytes": 5988,
+   "lines": 155,
+   "bytes": 7630,
    "client": true,
    "exports": [
     {
@@ -92921,6 +92941,11 @@
     },
     {
      "name": "relativeFrom",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "deltaMsFrom",
      "form": "function",
      "async": false
     },
@@ -100108,6 +100133,66 @@
    ]
   },
   {
+   "file": "lib/api-refusal.ts",
+   "kind": "lib",
+   "lines": 118,
+   "bytes": 5785,
+   "client": false,
+   "exports": [
+    {
+     "name": "Refusal",
+     "form": "type"
+    },
+    {
+     "name": "RefuseContext",
+     "form": "type"
+    },
+    {
+     "name": "shouldEmit",
+     "form": "function",
+     "async": false
+    },
+    {
+     "name": "refuse",
+     "form": "function",
+     "async": true
+    }
+   ],
+   "imports": [
+    {
+     "spec": "next/server",
+     "names": [
+      "NextResponse"
+     ]
+    },
+    {
+     "spec": "@/lib/events",
+     "names": [
+      "emitEventSingle",
+      "EventNamespace"
+     ]
+    }
+   ],
+   "tryCount": 1,
+   "sqlTags": [],
+   "calls": [
+    "shouldEmit",
+    "emitEventSingle",
+    "console.error",
+    "NextResponse.json"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": [
+    {
+     "arg": "{ error: r.error ?? r.code, code: r.code }",
+     "opts": "{ status: r.status }",
+     "line": 116
+    }
+   ]
+  },
+  {
    "file": "lib/architecture-live.ts",
    "kind": "lib",
    "lines": 158,
@@ -105055,8 +105140,8 @@
   {
    "file": "lib/event-labels.ts",
    "kind": "lib",
-   "lines": 895,
-   "bytes": 50617,
+   "lines": 920,
+   "bytes": 52295,
    "client": false,
    "exports": [
     {
@@ -105116,6 +105201,7 @@
     "String(p.workflow_name).replace",
     "humanizeType",
     "(ms / 1000).toFixed",
+    "/\\.refused$/.test",
     "`CLIN ${str(payload.clinNumber) ?? ''} added${str(payload.title) ? ` — ${str(payload.title)}` : ''}`.trim",
     "Array.isArray",
     "String(payload.frequency).replace",
@@ -109495,8 +109581,8 @@
   {
    "file": "lib/library/house-docs.ts",
    "kind": "lib",
-   "lines": 97,
-   "bytes": 3762,
+   "lines": 118,
+   "bytes": 5038,
    "client": false,
    "exports": [
     {
@@ -109535,6 +109621,12 @@
      ]
     },
     {
+     "spec": "@/lib/rls",
+     "names": [
+      "withTenant"
+     ]
+    },
+    {
      "spec": "@/lib/atoms",
      "names": [
       "createAtom"
@@ -109555,12 +109647,7 @@
     }
    ],
    "tryCount": 0,
-   "sqlTags": [
-    {
-     "tag": "sql",
-     "line": 87
-    }
-   ],
+   "sqlTags": [],
    "calls": [
     "crypto.randomUUID",
     "splitMarkdownSections",
@@ -109568,7 +109655,8 @@
     "nodes.push",
     "createAtom",
     "sectionAtomIds.push",
-    "docNodes.push"
+    "docNodes.push",
+    "withTenant"
    ],
    "jsx": [],
    "snakeRowTypes": [],
@@ -133919,6 +134007,84 @@
    "jsonResponses": []
   },
   {
+   "file": "scripts/drive-failure-observability.mts",
+   "kind": "script",
+   "lines": 177,
+   "bytes": 10773,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "APIRequestContext"
+     ]
+    },
+    {
+     "spec": "@/lib/db",
+     "names": [
+      "sqlBypass"
+     ]
+    }
+   ],
+   "tryCount": 2,
+   "sqlTags": [
+    {
+     "tag": "sqlBypass",
+     "line": 75
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 114
+    },
+    {
+     "tag": "sqlBypass",
+     "line": 137
+    }
+   ],
+   "calls": [
+    "console.error",
+    "process.exit",
+    "PROBES.push",
+    "console.log",
+    "realProject.id.slice",
+    "chromium.launch",
+    "br.newContext",
+    "ctx.newPage",
+    "page.goto",
+    "page.fill",
+    "page.click",
+    "page.waitForLoadState('networkidle').catch",
+    "page.waitForLoadState",
+    "page.url().includes",
+    "page.url",
+    "br.close",
+    "page.waitForTimeout",
+    "api.get",
+    "api.fetch",
+    "res.status",
+    "(await res.text()).slice",
+    "res.text",
+    "String(e).slice",
+    "String",
+    "JSON.parse",
+    "rows.push",
+    "s.slice",
+    "s.padEnd",
+    "pad",
+    "'─'.repeat",
+    "rows.filter",
+    "realRows.filter",
+    "effects.filter",
+    "sqlBypass.end"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
    "file": "scripts/drive-force-ascend.mts",
    "kind": "script",
    "lines": 195,
@@ -136655,8 +136821,8 @@
   {
    "file": "scripts/drive-project-lifecycle.mts",
    "kind": "script",
-   "lines": 2449,
-   "bytes": 147630,
+   "lines": 2506,
+   "bytes": 151087,
    "client": false,
    "exports": [],
    "imports": [
@@ -136986,95 +137152,87 @@
     },
     {
      "tag": "sql",
-     "line": 1829
+     "line": 1886
     },
     {
      "tag": "sql",
-     "line": 1851
+     "line": 1908
     },
     {
      "tag": "sql",
-     "line": 1884
+     "line": 1941
     },
     {
      "tag": "sql",
-     "line": 1900
+     "line": 1957
     },
     {
      "tag": "sql",
-     "line": 1985
+     "line": 2042
     },
     {
      "tag": "sql",
-     "line": 1993
+     "line": 2050
     },
     {
      "tag": "sql",
-     "line": 1997
+     "line": 2054
     },
     {
      "tag": "sql",
-     "line": 2025
+     "line": 2082
     },
     {
      "tag": "sql",
-     "line": 2039
+     "line": 2096
     },
     {
      "tag": "sql",
-     "line": 2052
+     "line": 2109
     },
     {
      "tag": "sql",
-     "line": 2064
+     "line": 2121
     },
     {
      "tag": "sql",
-     "line": 2095
+     "line": 2152
     },
     {
      "tag": "sql",
-     "line": 2104
+     "line": 2161
     },
     {
      "tag": "sql",
-     "line": 2181
+     "line": 2238
     },
     {
      "tag": "sql",
-     "line": 2203
+     "line": 2260
     },
     {
      "tag": "sql",
-     "line": 2216
+     "line": 2273
     },
     {
      "tag": "sql",
-     "line": 2225
+     "line": 2282
     },
     {
      "tag": "sql",
-     "line": 2228
+     "line": 2285
     },
     {
      "tag": "sql",
-     "line": 2231
+     "line": 2288
     },
     {
      "tag": "sql",
-     "line": 2233
+     "line": 2290
     },
     {
      "tag": "sql",
-     "line": 2264
-    },
-    {
-     "tag": "sql",
-     "line": 2269
-    },
-    {
-     "tag": "sql",
-     "line": 2314
+     "line": 2321
     },
     {
      "tag": "sql",
@@ -137082,15 +137240,7 @@
     },
     {
      "tag": "sql",
-     "line": 2341
-    },
-    {
-     "tag": "sql",
-     "line": 2375
-    },
-    {
-     "tag": "sql",
-     "line": 2379
+     "line": 2371
     },
     {
      "tag": "sql",
@@ -137098,23 +137248,39 @@
     },
     {
      "tag": "sql",
-     "line": 2389
+     "line": 2398
     },
     {
      "tag": "sql",
-     "line": 2392
+     "line": 2432
     },
     {
      "tag": "sql",
-     "line": 2396
+     "line": 2436
     },
     {
      "tag": "sql",
-     "line": 2405
+     "line": 2440
     },
     {
      "tag": "sql",
-     "line": 2419
+     "line": 2446
+    },
+    {
+     "tag": "sql",
+     "line": 2449
+    },
+    {
+     "tag": "sql",
+     "line": 2453
+    },
+    {
+     "tag": "sql",
+     "line": 2462
+    },
+    {
+     "tag": "sql",
+     "line": 2476
     }
    ],
    "calls": [
@@ -137281,10 +137447,24 @@
     "sched.includes",
     "JSON.stringify(rowAfter?.pol ?? {}).includes",
     "JSON.stringify(rowAfter?.pol ?? {}).slice",
+    "out.push",
+    "c.headers.map",
+    "(r as unknown[]).map",
+    "walk",
+    "out.join",
+    "visibleText",
     "/Cost/.test",
     "/Schedule/.test",
     "/Deliverables/.test",
-    "/44\\.4|percent complete|overall progress/i.test",
+    "[srM.costPct, srM.schedulePct, srM.deliverablesPct].filter",
+    "pcts.reduce",
+    "pcts.every",
+    "Math.abs",
+    "blend.toFixed",
+    "srText.includes",
+    "pcts.map((p) => p.toFixed(1)).join",
+    "pcts.map",
+    "p.toFixed",
     "/snapshot and do not update/.test",
     "srPdf.status",
     "srPdf.body",
@@ -137828,6 +138008,161 @@
    "jsx": [],
    "snakeRowTypes": [],
    "ownClientSql": 0,
+   "jsonResponses": []
+  },
+  {
+   "file": "scripts/drive-rfp-admin-role.mts",
+   "kind": "script",
+   "lines": 352,
+   "bytes": 19919,
+   "client": false,
+   "exports": [],
+   "imports": [
+    {
+     "spec": "playwright",
+     "names": [
+      "chromium",
+      "Browser",
+      "Page"
+     ]
+    },
+    {
+     "spec": "postgres",
+     "names": [
+      "postgres"
+     ]
+    },
+    {
+     "spec": "./lib/error-surface.mjs",
+     "names": [
+      "countErrorSurfaces"
+     ]
+    },
+    {
+     "spec": "./lib/drive-actor.mjs",
+     "names": [
+      "harnessDbUrl",
+      "passwordFor",
+      "CannotRun",
+      "dieWell"
+     ]
+    }
+   ],
+   "tryCount": 3,
+   "sqlTags": [
+    {
+     "tag": "sql",
+     "line": 91
+    },
+    {
+     "tag": "sql",
+     "line": 97
+    },
+    {
+     "tag": "sql",
+     "line": 100
+    },
+    {
+     "tag": "sql",
+     "line": 107
+    },
+    {
+     "tag": "sql",
+     "line": 108
+    },
+    {
+     "tag": "sql",
+     "line": 160
+    },
+    {
+     "tag": "sql",
+     "line": 174
+    },
+    {
+     "tag": "sql",
+     "line": 256
+    },
+    {
+     "tag": "sql",
+     "line": 276
+    },
+    {
+     "tag": "sql",
+     "line": 338
+    },
+    {
+     "tag": "sql",
+     "line": 339
+    },
+    {
+     "tag": "sql",
+     "line": 345
+    },
+    {
+     "tag": "sql",
+     "line": 346
+    }
+   ],
+   "calls": [
+    "postgres",
+    "harnessDbUrl",
+    "console.log",
+    "'═'.repeat",
+    "Math.max",
+    "(await br.newContext({ viewport: { width: 1440, height: 900 } })).newPage",
+    "br.newContext",
+    "p.goto",
+    "p.waitForSelector",
+    "p.fill",
+    "p.click",
+    "p.waitForURL((u) => !u.pathname.endsWith('/login'), { timeout: 20000 }).catch",
+    "p.waitForURL",
+    "u.pathname.endsWith",
+    "p.waitForTimeout",
+    "p.url().includes",
+    "p.url",
+    "p.evaluate",
+    "fetch",
+    "(await r.text()).slice",
+    "r.text",
+    "A",
+    "chromium.launch",
+    "passwordFor",
+    "signIn",
+    "phase",
+    "/\\/admin/.test",
+    "page.url",
+    "page.once",
+    "errs.push",
+    "String(e.message).slice",
+    "String",
+    "page.goto(`${BASE}${route}`, { waitUntil: 'domcontentloaded' }).catch",
+    "page.goto",
+    "page.waitForTimeout",
+    "landed.startsWith",
+    "countErrorSurfaces",
+    "resp.status",
+    "hit",
+    "String(e).slice",
+    "JSON.stringify",
+    "JSON.parse",
+    "r.body.slice",
+    "page.evaluate",
+    "/kill switch/i.test",
+    "presenceIn",
+    "Math.abs",
+    "browser.close().catch",
+    "browser.close",
+    "sql`DELETE FROM users WHERE id = ${tempId}::uuid`.catch",
+    "sql`DELETE FROM applications WHERE id = ${appId}::uuid`.catch",
+    "sql.end().catch",
+    "sql.end",
+    "dieWell",
+    "process.exit"
+   ],
+   "jsx": [],
+   "snakeRowTypes": [],
+   "ownClientSql": 13,
    "jsonResponses": []
   },
   {

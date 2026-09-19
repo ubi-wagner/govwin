@@ -3732,7 +3732,7 @@
   },
   {
    "file": "app/admin/system-state/system-state-client.tsx",
-   "lines": 1312,
+   "lines": 1339,
    "client": true,
    "kind": "app-component",
    "exports": [
@@ -3769,49 +3769,49 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1091
+     "line": 1113
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1142
+     "line": 1169
     },
     {
      "on": "onToggle",
      "element": "WorkflowCard",
      "binds": false,
-     "line": 1160
-    },
-    {
-     "on": "onClick",
-     "element": "button",
-     "binds": true,
      "line": 1187
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1202
+     "line": 1214
+    },
+    {
+     "on": "onClick",
+     "element": "button",
+     "binds": true,
+     "line": 1229
     },
     {
      "on": "onToggle",
      "element": "WorkflowCard",
      "binds": false,
-     "line": 1230
+     "line": 1257
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1271
+     "line": 1298
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 1277
+     "line": 1304
     }
    ],
    "fetches": [],
@@ -14204,7 +14204,7 @@
   },
   {
    "file": "components/portal/archived-proposals.tsx",
-   "lines": 155,
+   "lines": 163,
    "client": true,
    "kind": "component",
    "exports": [
@@ -14218,19 +14218,19 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 103
+     "line": 111
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 132
+     "line": 140
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 141
+     "line": 149
     }
    ],
    "fetches": [
@@ -14247,7 +14247,9 @@
    "inputs": 0,
    "buttons": 3,
    "links": 1,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/portal/[tenantSlug]/proposals/page.tsx"
    ],
@@ -17861,7 +17863,7 @@
   },
   {
    "file": "components/portal/stage-control.tsx",
-   "lines": 451,
+   "lines": 459,
    "client": true,
    "kind": "component",
    "exports": [
@@ -17873,43 +17875,43 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 263
+     "line": 271
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 276
+     "line": 284
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 286
+     "line": 294
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 296
+     "line": 304
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 362
+     "line": 370
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 388
+     "line": 396
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 432
+     "line": 440
     }
    ],
    "fetches": [
@@ -21979,7 +21981,7 @@
   },
   {
    "file": "components/rfp-curation/triage-queue.tsx",
-   "lines": 308,
+   "lines": 327,
    "client": true,
    "kind": "component",
    "exports": [
@@ -21993,61 +21995,61 @@
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 169
+     "line": 188
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 173
+     "line": 192
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 174
+     "line": 193
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 178
+     "line": 197
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 181
+     "line": 200
     },
     {
      "on": "onChange",
      "element": "select",
      "binds": true,
-     "line": 198
+     "line": 217
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 209
+     "line": 228
     },
     {
      "on": "onClick",
      "element": "tr",
      "binds": true,
-     "line": 242
+     "line": 261
     },
     {
      "on": "onClick",
      "element": "td",
      "binds": true,
-     "line": 272
+     "line": 291
     },
     {
      "on": "onClick",
      "element": "button",
      "binds": true,
-     "line": 288
+     "line": 307
     }
    ],
    "fetches": [
@@ -22060,7 +22062,9 @@
    "inputs": 1,
    "buttons": 7,
    "links": 0,
-   "localImports": [],
+   "localImports": [
+    "@/components/ui/time-ago"
+   ],
    "renderedBy": [
     "app/admin/rfp-curation/page.tsx"
    ],
@@ -23140,12 +23144,13 @@
   },
   {
    "file": "components/ui/time-ago.tsx",
-   "lines": 128,
+   "lines": 155,
    "client": true,
    "kind": "component",
    "exports": [
     "useClientNow",
     "relativeFrom",
+    "deltaMsFrom",
     "elapsedFrom",
     "useMounted",
     "localFrom",

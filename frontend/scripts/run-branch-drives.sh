@@ -445,6 +445,12 @@ DRIVES=(
   # work simply never finished. Python, dispatched by extension like `spend-guardrails`.
   "stale-agent-tasks|../pipeline/tests/verify_stale_task_reaper.py"
   "shadow-tenant-admin|scripts/drive-shadow-tenant-admin.mts"
+  # THE ROLE NOTHING HAD EVER SIGNED IN AS. This box holds 28 accounts and no `rfp_admin` — the
+  # role that gates /admin and that CLAUDE.md specifies curation and onboarding for — so every
+  # admin lane in this suite drives as a master_admin, who outranks it at every gate. Both
+  # directions were therefore unmeasurable: a surface that wrongly refuses an rfp_admin, and the
+  # four master_admin walls, which had never once been asked to refuse anybody.
+  "rfp-admin-role|scripts/drive-rfp-admin-role.mts"
   "rls-app|scripts/drive-rls-app.mjs"
   "rls-admin|scripts/drive-rls-admin.mjs"
   "rls-portal|scripts/drive-rls-portal.mjs"

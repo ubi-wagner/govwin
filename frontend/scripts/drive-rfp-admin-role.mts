@@ -82,6 +82,7 @@ const hit = (p: Page, path: string, init?: Record<string, unknown>): Promise<Pro
 
 let browser: Browser | null = null;
 let tempId = '';
+let appId = '';
 
 try {
   // ── fixture ────────────────────────────────────────────────────────────────────────────────
@@ -158,8 +159,29 @@ try {
 
   const [sol] = await sql<Array<{ id: string }>>`
     SELECT id FROM curated_solicitations ORDER BY created_at DESC LIMIT 1`;
-  const [app] = await sql<Array<{ id: string }>>`
-    SELECT id FROM applications ORDER BY created_at DESC LIMIT 1`;
+
+  /**
+   * The application wall needs an application, and this box has none.
+   *
+   * Leaving it UNMEASURED would be honest and also permanent — a drive that can never pass for a
+   * fixture reason is one people learn to ignore, which is how a wall stops being watched. So the
+   * drive MAKES one, in `pending`, removes it in the same run, and only skips if the insert fails.
+   * A fabricated fixture is the right call here precisely because the assertion is a REFUSAL: the
+   * row's content cannot influence a 403, so nothing about it can flatter the result.
+   */
+  let app: { id: string } | undefined;
+  try {
+    [app] = await sql<Array<{ id: string }>>`
+      INSERT INTO applications
+        (contact_email, contact_name, company_name, tech_summary, status, source, terms_accepted_at)
+      VALUES ('zz.rfp.admin.drive@example.test', 'ZZ Drive Fixture', 'ZZ Drive Fixture Co',
+              'Fixture row for the rfp_admin wall probe. Removed by the same run.', 'pending', 'public',
+              now())
+      RETURNING id`;
+    appId = app?.id ?? '';
+  } catch (e) {
+    console.log(`  ⚠ could not seed an application fixture — ${String(e).slice(0, 90)}`);
+  }
 
   const WALLS: Array<{ name: string; path: string; init: Record<string, unknown>; skip?: string }> = [
     {
@@ -174,10 +196,14 @@ try {
       skip: sol ? undefined : 'no curated solicitation on this box',
     },
     {
+      // `approved` is DELIBERATELY not in the column's CHECK vocabulary (pending · under_review ·
+      // accepted · rejected · onboarded · withdrawn). The role gate runs before validation, so an
+      // rfp_admin still gets 403 and a master_admin gets 400 — which is what lane D needs — while
+      // the probe cannot actually decide an application or start an onboarding as a side effect.
       name: 'deciding a customer application',
       path: app ? `/api/admin/applications/${app.id}/status` : '',
       init: { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'approved' }) },
-      skip: app ? undefined : 'no application on this box',
+      skip: app ? undefined : 'could not seed an application to probe with',
     },
   ];
 
@@ -203,19 +229,89 @@ try {
   A('the platform AI controls are not rendered for an rfp_admin',
     !/kill switch/i.test(agentsBody), /kill switch/i.test(agentsBody) ? 'the control is on the page' : 'absent');
 
-  // ── LANE C · no ambient tenant reach ───────────────────────────────────────────────────────
-  phase('C · platform authority is not tenant authority');
+  /**
+   * ── LANE C · the customer's own record of a vendor operator in their account ─────────────────
+   *
+   * THIS LANE ASSERTED THE WRONG CONTRACT FIRST, and the correction is the point of writing it
+   * down. It required a tenant portal route to REFUSE an rfp_admin — reasoning that platform
+   * authority should have to be descended into rather than carried. It answered 200, which looked
+   * exactly like a cross-tenant leak.
+   *
+   * It is not one. `verifyTenantAccess` (lib/db.ts) grants master_admin and rfp_admin a DERIVED
+   * shadow membership — tenant_admin in every tenant — deliberately, so that an RFP administrator
+   * can do customer service without being invited to each company first. Asserting a refusal there
+   * was a harness bug, not a finding: assert the contract the system HAS.
+   *
+   * What the system actually guarantees is the thing worth checking, and it is stronger: the read
+   * is not silent. `lib/space-presence.ts` (migs 246/247) brackets an outside actor's presence
+   * inside a customer's space with a `shadow.descended` and a matching `shadow.ascended` written
+   * under THAT CUSTOMER'S tenant_id — their only notice that somebody from the vendor was in
+   * their account. An unbracketed read is the real defect, and nothing was checking for it.
+   */
+  phase('C · a vendor operator inside a customer space leaves a bracket');
 
+  // `tenants` has no `is_active` — it carries `status` + `archived_at`, and `kind` separates a
+  // customer from a partner org. A partner_org would answer differently here for its own reasons,
+  // so the probe is pinned to a `standard` customer.
   const [ten] = await sql<Array<{ slug: string; id: string }>>`
-    SELECT slug, id FROM tenants WHERE is_active ORDER BY created_at LIMIT 1`;
+    SELECT slug, id FROM tenants
+     WHERE status = 'active' AND archived_at IS NULL AND kind = 'standard'
+     ORDER BY created_at LIMIT 1`;
   if (!ten) {
-    A('a tenant portal refuses an un-descended rfp_admin — UNMEASURED', false, 'no tenant on this box');
+    A('the shadow bracket is written — UNMEASURED', false, 'no standard tenant on this box');
   } else {
+    /**
+     * TWO BOUNDARIES, MEASURED SEPARATELY, because they are not the same event and the first run
+     * of this lane could not tell them apart. `syncPortalPresence` is called from
+     * `app/portal/[tenantSlug]/layout.tsx` — a PAGE boundary. `/api/portal/<slug>/…` is a DATA
+     * boundary and calls nothing. Counting both against one window would have attributed the
+     * page's bracket to the API read, or (as it first did) reported a bare zero with no way to
+     * tell which half was missing.
+     *
+     * The counter is also scoped to THIS customer's tenant_id. An admin's own /admin navigation
+     * brackets under the house tenant `rfp-pipeline`, which is a different customer's trail and
+     * must never be counted as this one's.
+     */
+    const presenceIn = async (since: Date) => {
+      const [p] = await sql<Array<{ down: number; up: number }>>`
+        SELECT count(*) FILTER (WHERE type = 'shadow.descended')::int AS down,
+               count(*) FILTER (WHERE type = 'shadow.ascended')::int  AS up
+          FROM system_events
+         WHERE created_at > ${since}
+           AND tenant_id = ${ten.id}::uuid
+           AND actor_email = ${TEMP_EMAIL}`;
+      return { down: p?.down ?? 0, up: p?.up ?? 0 };
+    };
+
+    // ── the PAGE boundary — the one the bracket was built for ───────────────────────────────
+    const beforePage = new Date();
+    await page.goto(`${BASE}/portal/${ten.slug}/dashboard`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1800);
+    const pagePresence = await presenceIn(beforePage);
+    A(`opening a customer's portal page writes a descent into THEIR trail (${ten.slug})`,
+      pagePresence.down > 0, `${pagePresence.down} descended`);
+
+    // ── the DATA boundary — the same rows, no page ──────────────────────────────────────────
+    const beforeApi = new Date();
     const r = await hit(page, `/api/portal/${ten.slug}/proposals`);
-    // The contract is that authority must be DESCENDED INTO, not carried. 200 here would mean an
-    // rfp_admin reads a customer's workspace with no shadow event in that customer's audit trail.
-    A(`a customer's workspace is not readable without descending (${ten.slug})`,
-      r.status === 401 || r.status === 403 || r.status === 404, `${r.status}`);
+    A('an rfp_admin reads a customer\'s workspace by derived membership — by design, not a leak',
+      r.status === 200, `${r.status}`);
+    await page.waitForTimeout(1800);
+    const apiPresence = await presenceIn(beforeApi);
+    // ⚠️ MEASURED, NOT ASSERTED. Whether a data-boundary read SHOULD bracket is a design decision
+    // with a real cost — 294 API routes bracketing every request would bury the one signal a
+    // customer reads this trail for. So this drive REPORTS the boundary rather than failing on it,
+    // and the number is printed either way so the decision is made against a measurement.
+    console.log(`  ▸ the same rows read through the API alone: ${apiPresence.down} descent(s) in `
+      + `${ten.slug}'s trail. Presence is bracketed at the PAGE boundary, not the DATA boundary — `
+      + 'see docs/VERIFICATION_COVERAGE_MAP.md, gap G3.');
+
+    // Both ends, because the whole point of migs 246/247 is that an ENTER with no reliable EXIT
+    // leaves a customer's record saying somebody is still in their account. A difference of one is
+    // legal: the last bracket may not have closed by the time this reads.
+    const total = await presenceIn(beforePage);
+    A('…and every descent has its ascent, so no bracket is left open',
+      Math.abs(total.down - total.up) <= 1, `${total.down} down · ${total.up} up`);
   }
 
   // ── LANE D · THE CONTROL — the same walls must OPEN for a master_admin ──────────────────────
@@ -233,19 +329,21 @@ try {
   }
 
   phase('verdict');
-  console.log(`  MUTATED: 1 throwaway rfp_admin (${TEMP_EMAIL}), removed below.`);
+  console.log(`  MUTATED: 1 throwaway rfp_admin (${TEMP_EMAIL})${appId ? ' + 1 fixture application' : ''}, both removed below.`);
   console.log('  The three wall probes are POSTs that were REFUSED for the rfp_admin; lane D issued');
   console.log('  them as master_admin, so a force-release or an application decision MAY have landed.');
   console.log('  Both ids are the newest rows and the effects are reversible. Sandbox only.');
 } catch (err) {
   if (browser) await browser.close().catch(() => {});
   if (tempId) await sql`DELETE FROM users WHERE id = ${tempId}::uuid`.catch(() => {});
+  if (appId) await sql`DELETE FROM applications WHERE id = ${appId}::uuid`.catch(() => {});
   await sql.end().catch(() => {});
   dieWell(err);
 }
 
 if (browser) await browser.close().catch(() => {});
 if (tempId) await sql`DELETE FROM users WHERE id = ${tempId}::uuid`;
+if (appId) await sql`DELETE FROM applications WHERE id = ${appId}::uuid`;
 await sql.end();
 
 console.log(ok ? '\n✅ the rfp_admin boundary holds in both directions.'
