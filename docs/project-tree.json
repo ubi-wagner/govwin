@@ -8,15 +8,15 @@
  ],
  "selfTestPassed": true,
  "summary": {
-  "files": 2365,
-  "lines": 454733,
-  "edges": 4739,
+  "files": 2371,
+  "lines": 455770,
+  "edges": 4747,
   "tables": 139,
   "noDescription": 555,
-  "orphans": 654,
+  "orphans": 655,
   "unresolved": 0,
   "unparsed": 0,
-  "rejectedTableNames": 265,
+  "rejectedTableNames": 267,
   "schemaJoinedAgainst": 139
  },
  "rejectedTableNames": [
@@ -43,6 +43,7 @@
   "automatic",
   "awarding",
   "beach",
+  "between",
   "binocular",
   "blocks",
   "both",
@@ -218,6 +219,7 @@
   "sbcs",
   "sbir",
   "scarce",
+  "scout_finding_documents",
   "scratch",
   "send",
   "sender_identities",
@@ -6209,6 +6211,26 @@
    "parseError": null
   },
   {
+   "path": "db/migrations/255_scout_harvested_documents.sql",
+   "name": "255_scout_harvested_documents.sql",
+   "area": "db · migrations",
+   "plane": "migration",
+   "lines": 110,
+   "bytes": 7111,
+   "sha256": "9559324576a4b490",
+   "description": "255 · The documents a scout finding actually carries ── WHAT IS MISSING TODAY ───────────────────────────────────────────────────────────────────── A scout finding records a title, a URL and a snippet. Classification (`lib/scout/classify.ts`) then decides NEW vs UPDATE by comparing source id → solicitation number → …",
+   "exports": [],
+   "uses": [],
+   "usedBy": [],
+   "tables": {
+    "read": [],
+    "write": []
+   },
+   "external": [],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
    "path": "db/migrations/migrate.mjs",
    "name": "migrate.mjs",
    "area": "db · migrations",
@@ -9123,6 +9145,36 @@
     "node:child_process",
     "node:fs",
     "node:path",
+    "vitest"
+   ],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
+   "path": "frontend/__tests__/harvest-extract-links.test.ts",
+   "name": "harvest-extract-links.test.ts",
+   "area": "frontend · unit tests",
+   "plane": "test",
+   "lines": 158,
+   "bytes": 6947,
+   "sha256": "524bb3ba0c6bc39e",
+   "description": "THE EXTRACTOR'S JOB IS PRECISION, AND THIS TESTS FOR THE NOISE.",
+   "exports": [],
+   "uses": [
+    {
+     "path": "frontend/lib/harvest/extract-links.ts",
+     "why": [
+      "documentFilename",
+      "extractDocumentLinks"
+     ]
+    }
+   ],
+   "usedBy": [],
+   "tables": {
+    "read": [],
+    "write": []
+   },
+   "external": [
     "vitest"
    ],
    "unresolved": [],
@@ -62174,6 +62226,12 @@
      ]
     },
     {
+     "path": "frontend/lib/harvest/harvest.ts",
+     "why": [
+      "sqlBypass"
+     ]
+    },
+    {
      "path": "frontend/lib/ingest/ingest-topic-files.ts",
      "why": [
       "sql"
@@ -62949,6 +63007,12 @@
      "path": "frontend/scripts/drive-copy-starter.mts",
      "why": [
       "sql",
+      "sqlBypass"
+     ]
+    },
+    {
+     "path": "frontend/scripts/drive-document-harvest.mts",
+     "why": [
       "sqlBypass"
      ]
     },
@@ -68319,6 +68383,153 @@
    "external": [
     "node:fs",
     "node:path"
+   ],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
+   "path": "frontend/lib/harvest/extract-links.ts",
+   "name": "extract-links.ts",
+   "area": "frontend · lib",
+   "plane": "03 Domain",
+   "lines": 196,
+   "bytes": 9111,
+   "sha256": "0de71c7ceaef8345",
+   "description": "WHICH LINKS ON THIS PAGE ARE THE SOLICITATION'S DOCUMENTS?",
+   "exports": [
+    "ExtractedLink",
+    "documentFilename",
+    "extractDocumentLinks"
+   ],
+   "uses": [],
+   "usedBy": [
+    {
+     "path": "frontend/__tests__/harvest-extract-links.test.ts",
+     "why": [
+      "documentFilename",
+      "extractDocumentLinks"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/harvest.ts",
+     "why": [
+      "documentFilename",
+      "extractDocumentLinks"
+     ]
+    },
+    {
+     "path": "frontend/scripts/drive-document-harvest.mts",
+     "why": [
+      "extractDocumentLinks"
+     ]
+    }
+   ],
+   "tables": {
+    "read": [],
+    "write": []
+   },
+   "external": [],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
+   "path": "frontend/lib/harvest/fetch.ts",
+   "name": "fetch.ts",
+   "area": "frontend · lib",
+   "plane": "03 Domain",
+   "lines": 198,
+   "bytes": 9250,
+   "sha256": "0ad1d5b197f92082",
+   "description": "THE ONE PLACE HARVESTING REACHES THE OUTSIDE WORLD.",
+   "exports": [
+    "FetchOptions",
+    "FetchResult",
+    "HarvestDriver",
+    "fixturePathFor",
+    "fixtureRoot",
+    "harvestDriver",
+    "harvestFetch"
+   ],
+   "uses": [],
+   "usedBy": [
+    {
+     "path": "frontend/lib/harvest/harvest.ts",
+     "why": [
+      "HarvestDriver",
+      "harvestDriver",
+      "harvestFetch"
+     ]
+    }
+   ],
+   "tables": {
+    "read": [],
+    "write": []
+   },
+   "external": [
+    "node:fs",
+    "node:path"
+   ],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
+   "path": "frontend/lib/harvest/harvest.ts",
+   "name": "harvest.ts",
+   "area": "frontend · lib",
+   "plane": "03 Domain",
+   "lines": 201,
+   "bytes": 8606,
+   "sha256": "8d043f05d2a11082",
+   "description": "HARVEST THE DOCUMENTS BEHIND A SCOUT FINDING.",
+   "exports": [
+    "HarvestLimits",
+    "HarvestResult",
+    "HarvestedDoc",
+    "harvestFinding"
+   ],
+   "uses": [
+    {
+     "path": "frontend/lib/db.ts",
+     "why": [
+      "sqlBypass"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/extract-links.ts",
+     "why": [
+      "documentFilename",
+      "extractDocumentLinks"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/fetch.ts",
+     "why": [
+      "HarvestDriver",
+      "harvestDriver",
+      "harvestFetch"
+     ]
+    },
+    {
+     "path": "frontend/lib/storage/s3-client.ts",
+     "why": [
+      "putObject"
+     ]
+    }
+   ],
+   "usedBy": [
+    {
+     "path": "frontend/scripts/drive-document-harvest.mts",
+     "why": [
+      "harvestFinding"
+     ]
+    }
+   ],
+   "tables": {
+    "read": [],
+    "write": []
+   },
+   "external": [
+    "node:crypto"
    ],
    "unresolved": [],
    "parseError": null
@@ -84199,6 +84410,12 @@
      ]
     },
     {
+     "path": "frontend/lib/harvest/harvest.ts",
+     "why": [
+      "putObject"
+     ]
+    },
+    {
      "path": "frontend/lib/ingest/ingest-topic-files.ts",
      "why": [
       "putObject"
@@ -97017,6 +97234,49 @@
    "parseError": null
   },
   {
+   "path": "frontend/scripts/drive-document-harvest.mts",
+   "name": "drive-document-harvest.mts",
+   "area": "frontend · harnesses",
+   "plane": "harness",
+   "lines": 167,
+   "bytes": 9846,
+   "sha256": "c39e1404578e56c0",
+   "description": "THE SAME SOLICITATION, ON TWO SITES, UNDER TWO NAMES — CAN THE PRODUCT TELL?",
+   "exports": [],
+   "uses": [
+    {
+     "path": "frontend/lib/db.ts",
+     "why": [
+      "sqlBypass"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/extract-links.ts",
+     "why": [
+      "extractDocumentLinks"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/harvest.ts",
+     "why": [
+      "harvestFinding"
+     ]
+    }
+   ],
+   "usedBy": [],
+   "tables": {
+    "read": [],
+    "write": [
+     "scout_findings"
+    ]
+   },
+   "external": [
+    "node:fs"
+   ],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
    "path": "frontend/scripts/drive-dormant-surface.mjs",
    "name": "drive-dormant-surface.mjs",
    "area": "frontend · harnesses",
@@ -103342,9 +103602,9 @@
    "name": "run-branch-drives.sh",
    "area": "frontend · harnesses",
    "plane": "harness",
-   "lines": 725,
-   "bytes": 53148,
-   "sha256": "1200362b4fa28ffe",
+   "lines": 732,
+   "bytes": 53771,
+   "sha256": "3be6d55400f051ca",
    "description": "Run every BRANCH drive against the live rig and print one table. `drive-end-to-end.mjs` proves the happy spine on one artifact: ingest → curate → push → buy → provision → author → lock → package. It deliberately does not fork. The branches — award, amendment, archive, collaborator, partner, the HITL gates — each hav…",
    "exports": [],
    "uses": [],
@@ -131842,6 +132102,7 @@
     "db/migrations/118_scout_crawl_and_schedules.sql",
     "db/migrations/175_scout_candidate_classification.sql",
     "frontend/lib/scout/candidates.ts",
+    "frontend/scripts/drive-document-harvest.mts",
     "frontend/scripts/drive-full-journey.mts",
     "frontend/scripts/drive-scout-intake.mts",
     "frontend/scripts/drive-scout.mjs"

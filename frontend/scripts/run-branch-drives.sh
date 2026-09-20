@@ -368,6 +368,13 @@ DRIVES=(
   "provisioning-cockpit|scripts/drive-provisioning-cockpit.mts"
   "tenant-workflow-setup|scripts/drive-tenant-workflow-setup.mts"
   "scout-intake|scripts/drive-scout-intake.mts"
+  # DOCUMENT HARVESTING (mig 255). Until this existed, classification compared titles and
+  # solicitation numbers and nothing else — nothing had ever fetched the DOCUMENTS behind a
+  # finding, so the one signal that settles "same opportunity, two sites" was never collected.
+  # Runs against the committed fixture corpus: this box cannot reach sam.gov or dodsbirsttr.mil
+  # (both answer 000), so the corpus stands in for the internet exactly as the :8787 emulator
+  # stands in for the Claude API — and every row it writes is stamped harvest_driver='fixture'.
+  "document-harvest|scripts/drive-document-harvest.mts"
   "opp-scout|scripts/drive-opp-scout.mts"
   # mig 238 — the solicitation copied inward, on the REAL DoW 2026 SBIR set (433 pages, 1.32M
   # chars). Red first: it refuses a verdict (exit 2) if the corpus already exists, because a green

@@ -31,12 +31,12 @@
 
 | | |
 |---|---:|
-| files | **2365** |
-| total lines | 454,733 |
-| dependency edges (file → file) | 4,739 |
+| files | **2371** |
+| total lines | 455,770 |
+| dependency edges (file → file) | 4,747 |
 | distinct tables touched | 139 |
 | files with no header of their own | 555 |
-| files with no edge either way | 654 |
+| files with no edge either way | 655 |
 | files with an UNRESOLVED import | 0 |
 | files the parser could not read | 0 |
 
@@ -46,14 +46,14 @@
 |---|---:|---:|---:|---:|
 | 01 UI | 364 | 78,769 | 881 | 375 |
 | 02 API | 293 | 44,837 | 1449 | 45 |
-| 03 Domain | 413 | 87,557 | 1002 | 2481 |
-| 04 Data | 3 | 330 | 3 | 586 |
+| 03 Domain | 416 | 88,152 | 1006 | 2487 |
+| 04 Data | 3 | 330 | 3 | 588 |
 | 05 Events | 4 | 1,618 | 4 | 292 |
 | 06 Engine | 104 | 25,270 | 162 | 330 |
 | 07 Agents | 61 | 21,809 | 121 | 221 |
-| migration | 256 | 46,692 | 0 | 0 |
-| harness | 458 | 79,851 | 415 | 82 |
-| test | 396 | 57,471 | 696 | 0 |
+| migration | 257 | 46,802 | 0 | 0 |
+| harness | 459 | 80,025 | 418 | 82 |
+| test | 397 | 57,629 | 697 | 0 |
 | config | 12 | 746 | 6 | 327 |
 | other | 1 | 9,783 | 0 | 0 |
 
@@ -61,11 +61,11 @@
 
 | area | files | lines |
 |---|---:|---:|
-| frontend · lib | 342 | 72,007 |
-| frontend · harnesses | 331 | 64,124 |
+| frontend · lib | 345 | 72,602 |
+| frontend · harnesses | 332 | 64,298 |
 | frontend · api routes | 292 | 44,488 |
-| db · migrations | 256 | 46,692 |
-| frontend · unit tests | 256 | 35,917 |
+| db · migrations | 257 | 46,802 |
+| frontend · unit tests | 257 | 36,075 |
 | frontend · components | 188 | 47,141 |
 | pipeline | 166 | 47,246 |
 | pipeline · tests | 118 | 18,167 |
@@ -87,7 +87,7 @@ before a refactor, and the reason each dependent is there is in the JSON.
 
 | file | used by | plane | what it is |
 |---|---:|---|---|
-| `frontend/lib/db.ts` | 486 | 04 Data | — |
+| `frontend/lib/db.ts` | 488 | 04 Data | — |
 | `frontend/auth.ts` | 325 | config | NextAuth v5 configuration — full Node-runtime version. |
 | `frontend/lib/rbac.ts` | 298 | 03 Domain | Role-based access control helpers — the single source of truth for role hierarchy checks. Middleware and API r |
 | `frontend/lib/events.ts` | 244 | 05 Events | Structured event emitter for the RFP Pipeline platform. |
@@ -106,8 +106,8 @@ before a refactor, and the reason each dependent is there is in the JSON.
 | `frontend/lib/errors.ts` | 39 | 03 Domain | Canonical error class hierarchy for the RFP Pipeline frontend. |
 | `frontend/lib/fmt.ts` | 37 | 03 Domain | Deterministic formatting for anything a CLIENT component renders — a zero-import leaf. |
 | `frontend/lib/tasks/tasks.ts` | 35 | 03 Domain | Task ledger — shared query + completion core for the unified `tasks` table. |
+| `frontend/lib/storage/s3-client.ts` | 33 | 03 Domain | Shared S3 client for the frontend (Next.js server routes + server components). The AWS SDK auto-reads AWS_ACCE |
 | `frontend/lib/projects/gate.ts` | 32 | 03 Domain | The gate every project route runs first. |
-| `frontend/lib/storage/s3-client.ts` | 32 | 03 Domain | Shared S3 client for the frontend (Next.js server routes + server components). The AWS SDK auto-reads AWS_ACCE |
 | `frontend/lib/projects/access.ts` | 31 | 03 Domain | Who may see a project — the layer RLS cannot express. |
 | `pipeline/src/events.py` | 31 | 05 Events | Event emission for the pipeline service. |
 | `frontend/lib/proposal-access.ts` | 30 | 03 Domain | Proposal workspace access resolver. |
@@ -199,7 +199,7 @@ files is one whose invariants live in the application rather than in the schema.
 _139 tables in total — `--table <name>` lists the files for any one of them._
 
 Every name above is a real table: the extraction is joined against the 139 tables in
-`docs/SCHEMA_MAP.md`, which is itself generated from the live database. **265 extracted names were rejected** as CTEs, subquery aliases or prose that
+`docs/SCHEMA_MAP.md`, which is itself generated from the live database. **267 extracted names were rejected** as CTEs, subquery aliases or prose that
 survived the filter — a number worth watching, because a large one means this extractor has
 drifted and is a finding about the TOOL. (The first run reported 486 "tables" against a
 schema of 139, by reading every Python docstring as a SQL body.)
@@ -217,7 +217,7 @@ exists, just nowhere near the code.)
 
 | file | used by | lines |
 |---|---:|---:|
-| `frontend/lib/db.ts` | 486 | 281 |
+| `frontend/lib/db.ts` | 488 | 281 |
 | `frontend/lib/rls.ts` | 50 | 23 |
 | `frontend/lib/toast.tsx` | 47 | 95 |
 | `frontend/components/ui/time-ago.tsx` | 26 | 155 |
@@ -243,7 +243,7 @@ exists, just nowhere near the code.)
 | `frontend/components/portal/pipeline-cards.tsx` | 3 | 613 |
 | `frontend/components/portal/section-compliance-chip.tsx` | 3 | 113 |
 
-**654 files have no edge in either direction.** Most are configuration, migrations
+**655 files have no edge in either direction.** Most are configuration, migrations
 and standalone harnesses, which legitimately import nothing and are imported by nothing —
 a file being here is a question, not a verdict.
 
@@ -252,7 +252,7 @@ a file being here is a question, not a verdict.
 Every file, by area. `→` is what it uses, `←` is who uses it; the counts link to the JSON,
 which carries the per-edge reasons in full.
 
-### db · migrations · 256 file(s)
+### db · migrations · 257 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
@@ -510,6 +510,7 @@ which carries the per-edge reasons in full.
 | `db/migrations/252_atom_titles_repair_redo.sql` | 59 | 0 | 0 | 252 · Redo 245's repair, which was applied as a role that could not see the rows ── WHAT HAPPENED ──────────────────────────────────────────────────── |
 | `db/migrations/253_doc_tag_slugs.sql` | 56 | 0 | 0 | 253 · A `doc` tag a person can read ── WHAT A CUSTOMER SAW ──────────────────────────────────────────────────────────────────────── The library shelf  |
 | `db/migrations/254_govtech_app_can_login.sql` | 73 | 0 | 0 | 254 · `govtech_app` can LOGIN — the half of the RLS cutover that lived only in a runbook ── WHAT THIS FIXES ────────────────────────────────────────── |
+| `db/migrations/255_scout_harvested_documents.sql` | 110 | 0 | 0 | 255 · The documents a scout finding actually carries ── WHAT IS MISSING TODAY ───────────────────────────────────────────────────────────────────── A  |
 | `db/migrations/migrate.mjs` | 280 | 0 | 0 | Lightweight migration runner for production startup. Uses the postgres.js driver already bundled in the Next.js standalone image. No psql or shell dep |
 | `db/migrations/run.sh` | 248 | 0 | 0 | GovWin — Database Migration & Seed Runner --------------------------------------------------------------------------- Runs all SQL migrations in order |
 
@@ -1209,7 +1210,7 @@ which carries the per-edge reasons in full.
 | `frontend/e2e/zzscreens.admin.spec.ts` | 46 | 0 | 0 | Screenshot capture — RFP-ADMIN persona (admin.json storageState via the `admin` project). Drives every key admin surface (esp. the ones shipped this s |
 | `frontend/e2e/zzscreens.tenant.spec.ts` | 40 | 0 | 0 | Screenshot capture — CUSTOMER-ADMIN persona (lighthouse.json via the `tenant` project). Drives the customer portal (cards spine, buckets/scoring, atom |
 
-### frontend · harnesses · 331 file(s)
+### frontend · harnesses · 332 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
@@ -1300,6 +1301,7 @@ which carries the per-edge reasons in full.
 | `frontend/scripts/drive-curate-baa.mts` | 251 | 3 | 0 | drive-curate-baa — do the rfp_admin's actual job on a real BAA, and produce the OPP cards. |
 | `frontend/scripts/drive-curated-ranking.mts` | 166 | 3 | 0 | drive-curated-ranking — an admin marks a passage, and a tenant's lens finds the opportunity. |
 | `frontend/scripts/drive-descent-timeout.mts` | 239 | 0 | 0 | — |
+| `frontend/scripts/drive-document-harvest.mts` | 167 | 3 | 0 | THE SAME SOLICITATION, ON TWO SITES, UNDER TWO NAMES — CAN THE PRODUCT TELL? |
 | `frontend/scripts/drive-dormant-surface.mjs` | 274 | 0 | 0 | — |
 | `frontend/scripts/drive-email-spine.mts` | 266 | 2 | 0 | The email spine, driven end to end against the emulator — send → ledger → webhook → suppression. |
 | `frontend/scripts/drive-end-to-end.mjs` | 449 | 0 | 0 | The whole arc, on one artifact: a government PDF nobody wrote for us → a file on disk you could submit. Ingest · curate · push · discover · buy · prov |
@@ -1451,7 +1453,7 @@ which carries the per-edge reasons in full.
 | `frontend/scripts/repair-card-dates.mts` | 73 | 1 | 0 | Rewrite card dates that were stored as Date.prototype.toString(), then rescore. |
 | `frontend/scripts/repair-section-page-caps.mts` | 82 | 1 | 0 | Repair `canvas.max_pages` on drafted sections so it carries the VOLUME's page cap. |
 | `frontend/scripts/repair-truncated-source-text.mts` | 105 | 3 | 0 | Re-extract solicitation documents that the old 500,000-char cap cut short. |
-| `frontend/scripts/run-branch-drives.sh` | 725 | 0 | 0 | Run every BRANCH drive against the live rig and print one table. `drive-end-to-end.mjs` proves the happy spine on one artifact: ingest → curate → push |
+| `frontend/scripts/run-branch-drives.sh` | 732 | 0 | 0 | Run every BRANCH drive against the live rig and print one table. `drive-end-to-end.mjs` proves the happy spine on one artifact: ingest → curate → push |
 | `frontend/scripts/sandbox-heartbeat.sh` | 269 | 0 | 0 | sandbox-heartbeat — SOP keep-alive manager for the demo/test sandbox. ⭐ SOP: launch this as a BACKGROUND task at the START of every working session, a |
 | `frontend/scripts/seed-cuas-immobileyes.mts` | 191 | 6 | 0 | Seed the Immobileyes CUAS OPP end-to-end from the uploaded solicitation. |
 | `frontend/scripts/seed-demo-automation.mts` | 28 | 2 | 0 | Seed a few clean automation firings (#107) so the admin Automation surface shows real recent executions and the created ToDos land in the admin queue. |
@@ -1545,7 +1547,7 @@ which carries the per-edge reasons in full.
 | `frontend/scripts/verify-write-contract.mjs` | 287 | 0 | 0 | Lens 5 — the WRITE surface. Does every POST/PATCH/PUT/DELETE refuse bad input in the SOP shape? |
 | `frontend/scripts/write-ui-docs.mjs` | 279 | 0 | 0 | — |
 
-### frontend · lib · 342 file(s)
+### frontend · lib · 345 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
@@ -1599,7 +1601,7 @@ which carries the per-edge reasons in full.
 | `frontend/lib/content-canvas.ts` | 335 | 1 | 6 | Content Studio ⇄ Canvas bridge (pure, IO-free, unit-testable). |
 | `frontend/lib/crypto.ts` | 68 | 0 | 0 | AES-256-GCM for stored third-party API keys — the WRITER half of a cross-language pair. |
 | `frontend/lib/curation/republish.ts` | 217 | 4 | 19 | Mid-window propagation — the missing half of "edit the master after push". |
-| `frontend/lib/db.ts` | 281 | 2 | 486 | — |
+| `frontend/lib/db.ts` | 281 | 2 | 488 | — |
 | `frontend/lib/documents/atomize-on-export.ts` | 92 | 5 | 1 | Atomize-on-download for standalone tenant documents (template bridge Phase 2, docs/TEMPLATE_BRIDGE_DESIGN.md). |
 | `frontend/lib/documents/duplicate-past-proposal.ts` | 75 | 3 | 1 | #18 branch-and-promote — the DUPLICATE leg. |
 | `frontend/lib/documents/lock-document.ts` | 34 | 1 | 1 | #18 branch-and-promote — the PROMOTE leg. |
@@ -1632,6 +1634,9 @@ which carries the per-edge reasons in full.
 | `frontend/lib/google-calendar.ts` | 112 | 0 | 0 | Google Calendar events, via the same Workspace OAuth credentials the Gmail driver uses. |
 | `frontend/lib/guardrail-defaults.ts` | 51 | 0 | 3 | Recommended default portal build-workflow (pure — safe to import from client components; no DB/server deps, unlike lib/portal-workflow.ts). The Guardr |
 | `frontend/lib/guides/coverage.ts` | 113 | 1 | 2 | Guide coverage — the two halves, joined. |
+| `frontend/lib/harvest/extract-links.ts` | 196 | 0 | 3 | WHICH LINKS ON THIS PAGE ARE THE SOLICITATION'S DOCUMENTS? |
+| `frontend/lib/harvest/fetch.ts` | 198 | 0 | 1 | THE ONE PLACE HARVESTING REACHES THE OUTSIDE WORLD. |
+| `frontend/lib/harvest/harvest.ts` | 201 | 4 | 1 | HARVEST THE DOCUMENTS BEHIND A SCOUT FINDING. |
 | `frontend/lib/hooks/use-container-scale.ts` | 36 | 0 | 1 | — |
 | `frontend/lib/hooks/use-tool.ts` | 60 | 0 | 5 | — |
 | `frontend/lib/humanize.ts` | 50 | 0 | 3 | Turn a system identifier into something a person reads. A zero-import leaf. |
@@ -1794,7 +1799,7 @@ which carries the per-edge reasons in full.
 | `frontend/lib/space-presence.ts` | 454 | 3 | 10 | SPACE PRESENCE — one writer owns both ends of "somebody from outside is in your workspace". |
 | `frontend/lib/spotlight/default-buckets.ts` | 82 | 1 | 2 | Starter spotlight buckets — a FIXTURE catalog, no longer a production path (#104, then #189). |
 | `frontend/lib/storage/paths.ts` | 304 | 0 | 14 | Object-storage path helpers — canonical source for S3 keys. |
-| `frontend/lib/storage/s3-client.ts` | 368 | 0 | 32 | Shared S3 client for the frontend (Next.js server routes + server components). The AWS SDK auto-reads AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DE |
+| `frontend/lib/storage/s3-client.ts` | 368 | 0 | 33 | Shared S3 client for the frontend (Next.js server routes + server components). The AWS SDK auto-reads AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DE |
 | `frontend/lib/stripe.ts` | 174 | 1 | 3 | Stripe SDK client and billing helpers. |
 | `frontend/lib/tasks/completers.ts` | 150 | 0 | 7 | Typed task completers (W-M/J3). A task's `params.kind` selects how it is completed in the queue: a plain review (approve/dismiss), an upload (go do it |
 | `frontend/lib/tasks/tasks.ts` | 823 | 5 | 35 | Task ledger — shared query + completion core for the unified `tasks` table. |
@@ -1997,7 +2002,7 @@ which carries the per-edge reasons in full.
 | `frontend/app/portal/[tenantSlug]/vaults/page.tsx` | 24 | 4 | 0 | — |
 | `frontend/app/portal/page.tsx` | 155 | 6 | 0 | — |
 
-### frontend · unit tests · 256 file(s)
+### frontend · unit tests · 257 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
@@ -2090,6 +2095,7 @@ which carries the per-edge reasons in full.
 | `frontend/__tests__/guardrail-authoring.test.ts` | 245 | 2 | 0 | Portal build-workflow authoring — recommended defaults + validator (delegated managers). |
 | `frontend/__tests__/guardrail-templates.test.ts` | 124 | 1 | 0 | Portal guardrail-templates API (the config-templates capability): auth gate, GET list shape, POST validation (name required, config validated against  |
 | `frontend/__tests__/guide-coverage-state.test.ts` | 149 | 1 | 0 | THE STATE MACHINE THE LOOP RUNS ON, AND THE ONE TRANSITION NOBODY WOULD NOTICE. |
+| `frontend/__tests__/harvest-extract-links.test.ts` | 158 | 1 | 0 | THE EXTRACTOR'S JOB IS PRECISION, AND THIS TESTS FOR THE NOISE. |
 | `frontend/__tests__/hitl-role-hierarchy.test.ts` | 29 | 1 | 0 | HITL P2 — the role-hierarchy expectations the ToDo visibility/completion logic depends on (lib/tasks/tasks.ts). Pure (no DB); the live cross-tenant/es |
 | `frontend/__tests__/house-docs.test.ts` | 41 | 1 | 0 | — |
 | `frontend/__tests__/ingest-assessment.test.ts` | 64 | 1 | 0 | Ingest-assessment reader (#12) — lib/ingest/assessment.ts. |
