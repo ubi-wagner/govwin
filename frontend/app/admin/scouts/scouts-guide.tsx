@@ -47,7 +47,34 @@ export default function ScoutsGuide() {
         </P>
       </Step>
 
-      <Step id="decide" route={R} title="2 · The decision — and it is one-way">
+      <Step id="documents" route={R} title="2 · What the DOCUMENTS said — a second opinion">
+        <P>
+          The badge is the classification. Under it, on most candidates, is what the attached files
+          said about the same question — fetched from the page when the candidate arrived, and
+          compared against every document the platform already holds.
+        </P>
+        <Ul>
+          <li><strong>identical file found</strong> — the same bytes. Against a solicitation we
+            already carry, this is the strongest evidence there is and the call above has already
+            been moved to <em>update</em>. Against another candidate in this queue, nothing moves:
+            the two are duplicates of each other, so release one and dismiss the other.</li>
+          <li><strong>worth a look</strong> — a close filename and a close size, different bytes.
+            This changes nothing on its own and is not meant to: it is the cheapest pair of
+            signals on the two most-repeated attributes in government document naming.</li>
+          <li><strong>shared attachment</strong> — the same bytes, but that file hangs off many
+            opportunities. An umbrella BAA is attached to every topic beneath it, so it cannot say
+            which one this is, and it was not used to decide anything.</li>
+          <li><strong>no match</strong> — documents were harvested and compared, and none of them
+            appears anywhere else.</li>
+        </Ul>
+        <Careful>
+          <strong>&ldquo;not checked&rdquo; is not &ldquo;no match&rdquo;.</strong> A candidate
+          whose page could not be read — a portal that refused us, a link that has moved — says so
+          in those words. Read it as a question still open, not as an answer.
+        </Careful>
+      </Step>
+
+      <Step id="decide" route={R} title="3 · The decision — and it is one-way">
         <Ul>
           <li><Ctl>Release as new</Ctl> — stages a fresh opportunity and a curated solicitation in the triage queue</li>
           <li><Ctl>Release as update</Ctl> — logs an amendment against the matched opportunity instead</li>
@@ -65,7 +92,7 @@ export default function ScoutsGuide() {
         </P>
       </Step>
 
-      <Step id="trust" route={R} title="3 · What the text on this screen is, and is not">
+      <Step id="trust" route={R} title="4 · What the text on this screen is, and is not">
         <P>
           Candidate titles, snippets and URLs come from pages nobody here wrote. The product treats
           them as <strong>data</strong>: normalised and compared, never interpreted, never followed as
@@ -74,7 +101,7 @@ export default function ScoutsGuide() {
         </P>
       </Step>
 
-      <Step id="after" route={R} title="4 · Where it goes next">
+      <Step id="after" route={R} title="5 · Where it goes next">
         <Ul>
           <li><strong>Released as new</strong> → RFP triage queue, where curation happens and where the push to customers is decided</li>
           <li><strong>Released as update</strong> → amendment review, where a human confirms before it fans out to built proposals</li>
@@ -84,12 +111,13 @@ export default function ScoutsGuide() {
           second person agreed to it first.
         </P>
         <Unwritten>
-          how often the <em>unknown</em> band is actually right, and which signal you end up trusting
-          when title and number disagree.
+          how often the <em>unknown</em> band is actually right. When title and number disagree the
+          documents now settle it — see step 2 — but how often that happens, and what you do on the
+          candidates where even the files are silent, needs a season of real queues.
         </Unwritten>
       </Step>
 
-      <Step id="stuck" route={R} title="5 · When the queue looks wrong">
+      <Step id="stuck" route={R} title="6 · When the queue looks wrong">
         <P>
           An empty queue usually means no source has run, not that nothing was found — run a source
           from <Code>/admin/sources</Code>. <Ctl>Refresh</Ctl> here re-reads the queue without

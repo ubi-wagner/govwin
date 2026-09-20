@@ -19,6 +19,8 @@ import { coerceJsonb } from '@/lib/jsonb';
 import { emitEventSingle, emitEventStart, emitEventEnd, userActor } from '@/lib/events';
 import { stageIntake } from '@/lib/intake';
 import { logAmendment, type AmendmentSeverity } from '@/lib/amendments';
+import { harvestFinding } from '@/lib/harvest/harvest';
+import { judgeFindingByDocuments, type DocumentEvidence } from '@/lib/harvest/judge';
 import {
   classifyCandidateAgainst,
   type CandidateInput,
@@ -49,6 +51,11 @@ export interface CandidateRow {
   releasedRef: string | null;
   reviewedAt: string | null;
   raw: Record<string, unknown>;
+  /**
+   * The second opinion, from this finding's harvested documents (migs 255/256).
+   * NULL = never checked. `{verdict:'none'}` = checked, and the documents said nothing.
+   */
+  documentEvidence: DocumentEvidence | null;
 }
 
 interface Actor {
@@ -98,7 +105,7 @@ export async function listCandidates(opts?: { status?: string; includeResolved?:
            f.discovered_at, f.status, f.outcome, f.classification, f.match_opportunity_id,
            o.title AS match_title, o.is_active AS match_is_active,
            f.similarity_score, f.match_reason, f.classified_at,
-           f.released_kind, f.released_ref, f.reviewed_at, f.raw
+           f.released_kind, f.released_ref, f.reviewed_at, f.raw, f.document_evidence
     FROM scout_findings f
     LEFT JOIN scout_sources s ON s.id = f.source_id
     LEFT JOIN opportunities o ON o.id = f.match_opportunity_id
@@ -312,6 +319,23 @@ export async function materializeExtractedOpportunities(
       created++;
       // Classify immediately (best-effort; a failure here must not break the scout run).
       try { await classifyFinding(rows[0].id, actor); } catch { /* best-effort */ }
+      // ── THEN THE DOCUMENTS, IN THIS ORDER ────────────────────────────────────────────────
+      //
+      // Title first, documents second, because the document verdict ANNOTATES the title call
+      // rather than replacing it — and it can only do that if the call already exists.
+      //
+      // ON ARRIVAL, not on release: a curator's decision is exactly what this evidence is for, so
+      // evidence gathered after they decide is evidence nobody used. A finding should reach the
+      // queue already carrying it.
+      //
+      // Best-effort in the same sense as the classify above, and for a sharper reason: this one
+      // reaches the NETWORK. An agency portal that is slow, down, or refusing us must not be able
+      // to stop candidates reaching the review queue — a curator can always harvest by hand, and
+      // cannot review a finding that was never created.
+      try {
+        const h = await harvestFinding(rows[0].id);
+        if (h.ok && h.documents.some((d) => d.hash)) await judgeFindingByDocuments(rows[0].id);
+      } catch { /* best-effort — see above */ }
     }
   }
   await emitEventEnd(startId, { result: { created, examined: extracted.length } });

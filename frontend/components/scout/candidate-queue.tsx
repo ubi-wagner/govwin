@@ -27,6 +27,110 @@ interface Candidate {
   similarityScore: number | null;
   matchReason: string | null;
   raw: Record<string, unknown>;
+  /**
+   * The second opinion, from this finding's harvested documents (migs 255/256).
+   * `null` = never checked — which is NOT the same as checked-and-found-nothing, and the row
+   * below says so rather than rendering an empty reassurance.
+   */
+  documentEvidence: {
+    verdict: 'certain' | 'flag' | 'boilerplate' | 'none';
+    documents: number;
+    matches: Array<{ verdict: string; ownerKind: string; filename: string; reason: string }>;
+  } | null;
+}
+
+/**
+ * WHAT THE DOCUMENTS SAID — a second opinion, never a second verdict.
+ *
+ * The badge above this row is the classification. This is the evidence that either agrees with it,
+ * argues with it, or explains why it cannot help. It is deliberately rendered as PROSE in a quiet
+ * box rather than as another badge: two badges side by side invite a reader to pick one, and only
+ * one of them is the decision.
+ *
+ * ── THE FOUR STATES ARE FOUR DIFFERENT SENTENCES ─────────────────────────────────────────────
+ * `null` and `none` are the pair that matters. Never checked and checked-but-found-nothing look
+ * identical if both render as silence, and they are opposite facts: one is work still to do, the
+ * other is a result. A curator who reads "no document match" when nothing was ever fetched has
+ * been told something false by omission.
+ */
+function DocumentEvidenceRow({ evidence }: { evidence: Candidate['documentEvidence'] }) {
+  if (!evidence) {
+    return (
+      <div className="text-xs text-gray-400 mt-2">
+        Documents: not checked — nothing has been harvested from this page yet.
+      </div>
+    );
+  }
+
+  const n = evidence.documents;
+  const docs = `${n} document${n === 1 ? '' : 's'}`;
+
+  if (evidence.verdict === 'none') {
+    return (
+      <div className="text-xs text-gray-500 mt-2">
+        Documents: <b>no match</b> — {docs} harvested and compared, none of them appears elsewhere.
+      </div>
+    );
+  }
+
+  const top = evidence.matches[0];
+
+  if (evidence.verdict === 'certain') {
+    /**
+     * ── WHICH KIND OF COUNTERPART, BECAUSE THEY LEAD TO DIFFERENT ACTIONS ──────────────────
+     *
+     * `judgeFindingByDocuments` only moves the classification when the identical file belongs to
+     * a CURATED SOLICITATION — there is an opportunity to point at. A certain match against
+     * another CANDIDATE in this same queue is just as certain and cannot move anything, because
+     * neither row is an opportunity yet.
+     *
+     * Both states are reachable, and the second one renders beside a badge still reading NEW. A
+     * screenshot of the queue is what showed that: the badge and the sentence appeared to
+     * contradict each other, because the sentence said "the same opportunity" without saying
+     * whether an opportunity was even involved. Telling a curator WHICH is the difference between
+     * "release this as an update to that" and "these two candidates are duplicates of each other".
+     */
+    const againstSolicitation = top?.ownerKind === 'solicitation';
+    return (
+      <div className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 mt-2">
+        Documents: <b>identical file found</b> — {top?.reason ?? 'an exact match'}
+        {top?.filename && <> · <span className="font-mono break-all">{top.filename}</span></>}
+        <div className="text-emerald-700 mt-0.5">
+          {againstSolicitation
+            ? 'The same bytes as a solicitation we already carry, and that file belongs to exactly '
+              + 'one — the strongest evidence available that this is the same opportunity.'
+            : 'The same bytes as ANOTHER CANDIDATE in this queue — not one we have curated yet, so '
+              + 'the classification above is unchanged. These two are almost certainly duplicates: '
+              + 'release one and dismiss the other.'}
+        </div>
+      </div>
+    );
+  }
+
+  if (evidence.verdict === 'flag') {
+    return (
+      <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2">
+        Documents: <b>worth a look</b> — {top?.reason ?? 'a close filename and size'}
+        {top?.filename && <> · <span className="font-mono break-all">{top.filename}</span></>}
+        <div className="text-amber-700 mt-0.5">
+          This did <b>not</b> change the call above. A close name and size is a reason to check,
+          not a reason to act.
+        </div>
+      </div>
+    );
+  }
+
+  // boilerplate
+  return (
+    <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded px-2 py-1 mt-2">
+      Documents: <b>shared attachment</b> — {top?.reason ?? 'this file is attached to several opportunities'}
+      {top?.filename && <> · <span className="font-mono break-all">{top.filename}</span></>}
+      <div className="text-gray-500 mt-0.5">
+        An identical file that hangs off many opportunities cannot say which one this is, so it was
+        not used to decide anything.
+      </div>
+    </div>
+  );
 }
 
 const CLASS_BADGE: Record<string, string> = {
@@ -133,6 +237,7 @@ export default function ScoutCandidateQueue() {
                         {c.matchReason && <> · {c.matchReason}</>}
                       </div>
                     )}
+                    <DocumentEvidenceRow evidence={c.documentEvidence} />
                   </div>
                 </div>
 

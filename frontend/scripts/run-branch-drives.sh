@@ -375,6 +375,11 @@ DRIVES=(
   # (both answer 000), so the corpus stands in for the internet exactly as the :8787 emulator
   # stands in for the Claude API — and every row it writes is stamped harvest_driver='fixture'.
   "document-harvest|scripts/drive-document-harvest.mts"
+  # AND WHETHER A CURATOR CAN READ ANY OF IT. The evidence being written and the component being
+  # written are two facts; neither means a person sees it. Seeds all five states on the real queue
+  # and reads the rendered DOM back — including the pair that matters, "not checked" versus
+  # "no match", which are opposite facts and render identically if both are silence.
+  "scout-evidence-ui|scripts/probe-scout-evidence-ui.mts"
   "opp-scout|scripts/drive-opp-scout.mts"
   # mig 238 — the solicitation copied inward, on the REAL DoW 2026 SBIR set (433 pages, 1.32M
   # chars). Red first: it refuses a verdict (exit 2) if the corpus already exists, because a green

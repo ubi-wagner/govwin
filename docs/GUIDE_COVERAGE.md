@@ -30,7 +30,7 @@ Uncovered is not passing. The `none` rows are the queue.
 | `open` | admin | `/admin/provisioning/[portalId]` | `provisioning-guide.tsx` | 4 | 1 | `docs/PROVISIONING_WORKSPACE_DESIGN.md` |
 | `open` | admin | `/admin/rfp-curation` | `curation-queue-guide.tsx` | 3 | 1 | `docs/RFP_ADMIN_OPERATIONS_GUIDE.md` |
 | `open` | admin | `/admin/rfp-curation/[solId]` | `curation-guide.tsx` | 6 | 2 | `docs/INGEST_PROVENANCE.md` |
-| `open` | admin | `/admin/scouts` | `scouts-guide.tsx` | 5 | 2 | `docs/SCOUT_INTAKE_QUEUE.md` |
+| `open` | admin | `/admin/scouts` | `scouts-guide.tsx` | 6 | 2 | `docs/SCOUT_INTAKE_QUEUE.md` |
 | `open` | admin | `/admin/sources` | `sources-guide.tsx` | 5 | 2 | `docs/SCOUT_INTAKE_QUEUE.md` |
 | `open` | tenant | `/portal/[tenantSlug]/buckets` | `buckets-guide.tsx` | 6 | 1 | `docs/RANKING_SPINE.md` |
 | `ready` | admin | `/admin/observe` | `companion-guide.tsx` |  |  |  |

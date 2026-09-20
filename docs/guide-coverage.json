@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-09-19T17:17:47.651Z",
+ "generatedAt": "2026-09-20T04:49:01.780Z",
  "summary": {
   "surfaces": 91,
   "none": 82,
@@ -583,20 +583,24 @@
      "title": "1 · Read the classification before the title"
     },
     {
+     "id": "documents",
+     "title": "2 · What the DOCUMENTS said — a second opinion"
+    },
+    {
      "id": "decide",
-     "title": "2 · The decision — and it is one-way"
+     "title": "3 · The decision — and it is one-way"
     },
     {
      "id": "trust",
-     "title": "3 · What the text on this screen is, and is not"
+     "title": "4 · What the text on this screen is, and is not"
     },
     {
      "id": "after",
-     "title": "4 · Where it goes next"
+     "title": "5 · Where it goes next"
     },
     {
      "id": "stuck",
-     "title": "5 · When the queue looks wrong"
+     "title": "6 · When the queue looks wrong"
     }
    ],
    "controls": [

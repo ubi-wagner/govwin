@@ -8,9 +8,9 @@
  ],
  "selfTestPassed": true,
  "summary": {
-  "files": 2375,
-  "lines": 456392,
-  "edges": 4752,
+  "files": 2376,
+  "lines": 456735,
+  "edges": 4755,
   "tables": 140,
   "noDescription": 555,
   "orphans": 656,
@@ -19047,9 +19047,9 @@
    "name": "scouts-guide.tsx",
    "area": "frontend · admin pages",
    "plane": "01 UI",
-   "lines": 107,
-   "bytes": 5573,
-   "sha256": "a5320fbfbda322f5",
+   "lines": 135,
+   "bytes": 7547,
+   "sha256": "f0dbeb896d4463c4",
    "description": "The in-page guide for the scout candidate queue.",
    "exports": [
     "ScoutsGuide"
@@ -52727,9 +52727,9 @@
    "name": "candidate-queue.tsx",
    "area": "frontend · components",
    "plane": "01 UI",
-   "lines": 193,
-   "bytes": 9275,
-   "sha256": "f0ef6ee098a1829f",
+   "lines": 298,
+   "bytes": 14451,
+   "sha256": "6dd14eac9f6b8c21",
    "description": null,
    "exports": [
     "ScoutCandidateQueue"
@@ -63328,6 +63328,12 @@
      ]
     },
     {
+     "path": "frontend/scripts/probe-scout-evidence-ui.mts",
+     "why": [
+      "sqlBypass"
+     ]
+    },
+    {
      "path": "frontend/scripts/repair-card-dates.mts",
      "why": [
       "sqlBypass"
@@ -68580,6 +68586,12 @@
    ],
    "usedBy": [
     {
+     "path": "frontend/lib/scout/candidates.ts",
+     "why": [
+      "harvestFinding"
+     ]
+    },
+    {
      "path": "frontend/scripts/drive-document-harvest.mts",
      "why": [
       "harvestFinding"
@@ -68639,6 +68651,13 @@
     }
    ],
    "usedBy": [
+    {
+     "path": "frontend/lib/scout/candidates.ts",
+     "why": [
+      "DocumentEvidence",
+      "judgeFindingByDocuments"
+     ]
+    },
     {
      "path": "frontend/scripts/drive-document-harvest.mts",
      "why": [
@@ -83665,9 +83684,9 @@
    "name": "candidates.ts",
    "area": "frontend · lib",
    "plane": "03 Domain",
-   "lines": 320,
-   "bytes": 14214,
-   "sha256": "b0ba97c0c56b2af9",
+   "lines": 344,
+   "bytes": 15805,
+   "sha256": "e3568d7db164dc81",
    "description": "Scout candidate queue — the DB layer for the \"potential NEW or UPDATED OPP\" review→release queue (#176). One reviewable surface (`scout_findings`, purpose in opportunity/both) that an rfp_admin works: classify → release-as-new | release-as-update | dismiss.",
    "exports": [
     "CandidateRow",
@@ -83700,6 +83719,19 @@
       "emitEventSingle",
       "emitEventStart",
       "userActor"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/harvest.ts",
+     "why": [
+      "harvestFinding"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/judge.ts",
+     "why": [
+      "DocumentEvidence",
+      "judgeFindingByDocuments"
      ]
     },
     {
@@ -103390,6 +103422,37 @@
    "parseError": null
   },
   {
+   "path": "frontend/scripts/probe-scout-evidence-ui.mts",
+   "name": "probe-scout-evidence-ui.mts",
+   "area": "frontend · harnesses",
+   "plane": "harness",
+   "lines": 181,
+   "bytes": 9991,
+   "sha256": "a524d3c5a8ddddcf",
+   "description": "DOES A CURATOR ACTUALLY SEE WHAT THE DOCUMENTS SAID?",
+   "exports": [],
+   "uses": [
+    {
+     "path": "frontend/lib/db.ts",
+     "why": [
+      "sqlBypass"
+     ]
+    }
+   ],
+   "usedBy": [],
+   "tables": {
+    "read": [],
+    "write": [
+     "scout_findings"
+    ]
+   },
+   "external": [
+    "playwright"
+   ],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
    "path": "frontend/scripts/probe-session-lifecycle.mts",
    "name": "probe-session-lifecycle.mts",
    "area": "frontend · harnesses",
@@ -103789,9 +103852,9 @@
    "name": "run-branch-drives.sh",
    "area": "frontend · harnesses",
    "plane": "harness",
-   "lines": 732,
-   "bytes": 53771,
-   "sha256": "3be6d55400f051ca",
+   "lines": 737,
+   "bytes": 54204,
+   "sha256": "9607443128b8c17b",
    "description": "Run every BRANCH drive against the live rig and print one table. `drive-end-to-end.mjs` proves the happy spine on one artifact: ingest → curate → push → buy → provision → author → lock → package. It deliberately does not fork. The branches — award, amendment, archive, collaborator, partner, the HITL gates — each hav…",
    "exports": [],
    "uses": [],
@@ -132302,7 +132365,8 @@
     "frontend/scripts/drive-document-harvest.mts",
     "frontend/scripts/drive-full-journey.mts",
     "frontend/scripts/drive-scout-intake.mts",
-    "frontend/scripts/drive-scout.mjs"
+    "frontend/scripts/drive-scout.mjs",
+    "frontend/scripts/probe-scout-evidence-ui.mts"
    ]
   },
   "scout_runs": {

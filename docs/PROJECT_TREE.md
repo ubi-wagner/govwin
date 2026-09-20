@@ -31,9 +31,9 @@
 
 | | |
 |---|---:|
-| files | **2375** |
-| total lines | 456,392 |
-| dependency edges (file → file) | 4,752 |
+| files | **2376** |
+| total lines | 456,735 |
+| dependency edges (file → file) | 4,755 |
 | distinct tables touched | 140 |
 | files with no header of their own | 555 |
 | files with no edge either way | 656 |
@@ -44,15 +44,15 @@
 
 | plane | files | lines | uses | used by |
 |---|---:|---:|---:|---:|
-| 01 UI | 364 | 78,769 | 881 | 375 |
+| 01 UI | 364 | 78,902 | 881 | 375 |
 | 02 API | 293 | 44,837 | 1449 | 45 |
-| 03 Domain | 418 | 88,543 | 1009 | 2490 |
-| 04 Data | 3 | 330 | 3 | 590 |
+| 03 Domain | 418 | 88,567 | 1011 | 2492 |
+| 04 Data | 3 | 330 | 3 | 591 |
 | 05 Events | 4 | 1,618 | 4 | 292 |
 | 06 Engine | 104 | 25,270 | 162 | 330 |
 | 07 Agents | 61 | 21,809 | 121 | 221 |
 | migration | 258 | 46,853 | 0 | 0 |
-| harness | 459 | 80,081 | 419 | 82 |
+| harness | 460 | 80,267 | 420 | 82 |
 | test | 398 | 57,753 | 698 | 0 |
 | config | 12 | 746 | 6 | 327 |
 | other | 1 | 9,783 | 0 | 0 |
@@ -61,16 +61,16 @@
 
 | area | files | lines |
 |---|---:|---:|
-| frontend · lib | 347 | 72,993 |
-| frontend · harnesses | 332 | 64,354 |
+| frontend · lib | 347 | 73,017 |
+| frontend · harnesses | 333 | 64,540 |
 | frontend · api routes | 292 | 44,488 |
 | db · migrations | 258 | 46,853 |
 | frontend · unit tests | 258 | 36,199 |
-| frontend · components | 188 | 47,141 |
+| frontend · components | 188 | 47,246 |
 | pipeline | 166 | 47,246 |
 | pipeline · tests | 118 | 18,167 |
 | services · rfp-crm | 99 | 20,718 |
-| frontend · admin pages | 82 | 17,926 |
+| frontend · admin pages | 82 | 17,954 |
 | frontend · e2e | 81 | 9,864 |
 | frontend · portal pages | 49 | 8,809 |
 | repo · scripts | 46 | 5,863 |
@@ -87,7 +87,7 @@ before a refactor, and the reason each dependent is there is in the JSON.
 
 | file | used by | plane | what it is |
 |---|---:|---|---|
-| `frontend/lib/db.ts` | 489 | 04 Data | — |
+| `frontend/lib/db.ts` | 490 | 04 Data | — |
 | `frontend/auth.ts` | 325 | config | NextAuth v5 configuration — full Node-runtime version. |
 | `frontend/lib/rbac.ts` | 298 | 03 Domain | Role-based access control helpers — the single source of truth for role hierarchy checks. Middleware and API r |
 | `frontend/lib/events.ts` | 244 | 05 Events | Structured event emitter for the RFP Pipeline platform. |
@@ -185,10 +185,10 @@ files is one whose invariants live in the application rather than in the schema.
 | `tenant_profiles` | 7 | 6 |
 | `cms_content` | 9 | 4 |
 | `contracts` | 5 | 8 |
+| `scout_findings` | 10 | 3 |
 | `pipeline_schedules` | 10 | 2 |
 | `process_instance_transitions` | 11 | 1 |
 | `opportunity_bridge` | 12 | 0 |
-| `scout_findings` | 9 | 3 |
 | `library_seed_jobs` | 11 | 1 |
 | `procedural_memories` | 8 | 3 |
 | `source_diffs` | 7 | 4 |
@@ -217,7 +217,7 @@ exists, just nowhere near the code.)
 
 | file | used by | lines |
 |---|---:|---:|
-| `frontend/lib/db.ts` | 489 | 281 |
+| `frontend/lib/db.ts` | 490 | 281 |
 | `frontend/lib/rls.ts` | 50 | 23 |
 | `frontend/lib/toast.tsx` | 47 | 95 |
 | `frontend/components/ui/time-ago.tsx` | 26 | 155 |
@@ -577,7 +577,7 @@ which carries the per-edge reasons in full.
 | `frontend/app/admin/rfp-curation/triage-todos.tsx` | 19 | 1 | 1 | Admin triage ToDos panel (Scouting Spine M2 / C2.b) — the SINGLE completable admin inbox. |
 | `frontend/app/admin/rfp-curation/upload/page.tsx` | 38 | 2 | 0 | — |
 | `frontend/app/admin/scouts/page.tsx` | 296 | 6 | 0 | /admin/scouts — Scout worker-pool monitor (#103). |
-| `frontend/app/admin/scouts/scouts-guide.tsx` | 107 | 1 | 1 | The in-page guide for the scout candidate queue. |
+| `frontend/app/admin/scouts/scouts-guide.tsx` | 135 | 1 | 1 | The in-page guide for the scout candidate queue. |
 | `frontend/app/admin/site/[pageKey]/editor-client.tsx` | 424 | 5 | 1 | — |
 | `frontend/app/admin/site/[pageKey]/page.tsx` | 33 | 3 | 0 | — |
 | `frontend/app/admin/site/content/[id]/route.ts` | 31 | 2 | 0 | GET /admin/site/content/[id] — resolve a content_pages row id to its Content Studio editor URL and redirect. This is the deep-link target for the `con |
@@ -1093,7 +1093,7 @@ which carries the per-edge reasons in full.
 | `frontend/components/rfp-curation/topic-detail.tsx` | 223 | 1 | 1 | — |
 | `frontend/components/rfp-curation/triage-queue.tsx` | 327 | 4 | 1 | — |
 | `frontend/components/rfp-curation/upload-form.tsx` | 549 | 2 | 1 | — |
-| `frontend/components/scout/candidate-queue.tsx` | 193 | 2 | 1 | — |
+| `frontend/components/scout/candidate-queue.tsx` | 298 | 2 | 1 | — |
 | `frontend/components/tasks/assign-task-form.tsx` | 221 | 0 | 3 | — |
 | `frontend/components/tasks/task-claim.tsx` | 116 | 2 | 1 | — |
 | `frontend/components/tasks/task-queue.tsx` | 577 | 4 | 5 | — |
@@ -1211,7 +1211,7 @@ which carries the per-edge reasons in full.
 | `frontend/e2e/zzscreens.admin.spec.ts` | 46 | 0 | 0 | Screenshot capture — RFP-ADMIN persona (admin.json storageState via the `admin` project). Drives every key admin surface (esp. the ones shipped this s |
 | `frontend/e2e/zzscreens.tenant.spec.ts` | 40 | 0 | 0 | Screenshot capture — CUSTOMER-ADMIN persona (lighthouse.json via the `tenant` project). Drives the customer portal (cards spine, buckets/scoring, atom |
 
-### frontend · harnesses · 332 file(s)
+### frontend · harnesses · 333 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
@@ -1442,6 +1442,7 @@ which carries the per-edge reasons in full.
 | `frontend/scripts/probe-project-mobile.mts` | 131 | 1 | 0 | The project workspace on a phone — with its dense states OPEN. |
 | `frontend/scripts/probe-provision-elsewhere.mts` | 141 | 4 | 0 | Provision a real build off a real master and count what the buyer is actually shown. |
 | `frontend/scripts/probe-review-and-land.mjs` | 193 | 0 | 0 | Drive the rfp_admin REVIEW-AND-LAND path on a matrix the machine refused to publish. |
+| `frontend/scripts/probe-scout-evidence-ui.mts` | 181 | 1 | 0 | DOES A CURATOR ACTUALLY SEE WHAT THE DOCUMENTS SAID? |
 | `frontend/scripts/probe-session-lifecycle.mts` | 253 | 0 | 0 | — |
 | `frontend/scripts/probe-structural-nodes.mts` | 126 | 4 | 0 | The four STRUCTURAL canvas primitives, each measured by the effect it actually has. |
 | `frontend/scripts/probe-style-matrix.mts` | 360 | 5 | 0 | Which STYLE actually survives which exporter — the ribbon's equivalent of the node-type survey. |
@@ -1454,7 +1455,7 @@ which carries the per-edge reasons in full.
 | `frontend/scripts/repair-card-dates.mts` | 73 | 1 | 0 | Rewrite card dates that were stored as Date.prototype.toString(), then rescore. |
 | `frontend/scripts/repair-section-page-caps.mts` | 82 | 1 | 0 | Repair `canvas.max_pages` on drafted sections so it carries the VOLUME's page cap. |
 | `frontend/scripts/repair-truncated-source-text.mts` | 105 | 3 | 0 | Re-extract solicitation documents that the old 500,000-char cap cut short. |
-| `frontend/scripts/run-branch-drives.sh` | 732 | 0 | 0 | Run every BRANCH drive against the live rig and print one table. `drive-end-to-end.mjs` proves the happy spine on one artifact: ingest → curate → push |
+| `frontend/scripts/run-branch-drives.sh` | 737 | 0 | 0 | Run every BRANCH drive against the live rig and print one table. `drive-end-to-end.mjs` proves the happy spine on one artifact: ingest → curate → push |
 | `frontend/scripts/sandbox-heartbeat.sh` | 269 | 0 | 0 | sandbox-heartbeat — SOP keep-alive manager for the demo/test sandbox. ⭐ SOP: launch this as a BACKGROUND task at the START of every working session, a |
 | `frontend/scripts/seed-cuas-immobileyes.mts` | 191 | 6 | 0 | Seed the Immobileyes CUAS OPP end-to-end from the uploaded solicitation. |
 | `frontend/scripts/seed-demo-automation.mts` | 28 | 2 | 0 | Seed a few clean automation firings (#107) so the admin Automation surface shows real recent executions and the created ToDos land in the admin queue. |
@@ -1602,7 +1603,7 @@ which carries the per-edge reasons in full.
 | `frontend/lib/content-canvas.ts` | 335 | 1 | 6 | Content Studio ⇄ Canvas bridge (pure, IO-free, unit-testable). |
 | `frontend/lib/crypto.ts` | 68 | 0 | 0 | AES-256-GCM for stored third-party API keys — the WRITER half of a cross-language pair. |
 | `frontend/lib/curation/republish.ts` | 217 | 4 | 19 | Mid-window propagation — the missing half of "edit the master after push". |
-| `frontend/lib/db.ts` | 281 | 2 | 489 | — |
+| `frontend/lib/db.ts` | 281 | 2 | 490 | — |
 | `frontend/lib/documents/atomize-on-export.ts` | 92 | 5 | 1 | Atomize-on-download for standalone tenant documents (template bridge Phase 2, docs/TEMPLATE_BRIDGE_DESIGN.md). |
 | `frontend/lib/documents/duplicate-past-proposal.ts` | 75 | 3 | 1 | #18 branch-and-promote — the DUPLICATE leg. |
 | `frontend/lib/documents/lock-document.ts` | 34 | 1 | 1 | #18 branch-and-promote — the PROMOTE leg. |
@@ -1637,8 +1638,8 @@ which carries the per-edge reasons in full.
 | `frontend/lib/guides/coverage.ts` | 113 | 1 | 2 | Guide coverage — the two halves, joined. |
 | `frontend/lib/harvest/extract-links.ts` | 196 | 0 | 3 | WHICH LINKS ON THIS PAGE ARE THE SOLICITATION'S DOCUMENTS? |
 | `frontend/lib/harvest/fetch.ts` | 198 | 0 | 1 | THE ONE PLACE HARVESTING REACHES THE OUTSIDE WORLD. |
-| `frontend/lib/harvest/harvest.ts` | 201 | 4 | 1 | HARVEST THE DOCUMENTS BEHIND A SCOUT FINDING. |
-| `frontend/lib/harvest/judge.ts` | 219 | 3 | 1 | ASK THE DOCUMENTS, THEN ANNOTATE THE CALL. |
+| `frontend/lib/harvest/harvest.ts` | 201 | 4 | 2 | HARVEST THE DOCUMENTS BEHIND A SCOUT FINDING. |
+| `frontend/lib/harvest/judge.ts` | 219 | 3 | 2 | ASK THE DOCUMENTS, THEN ANNOTATE THE CALL. |
 | `frontend/lib/harvest/match.ts` | 172 | 0 | 2 | IS THIS THE SAME OPPORTUNITY WE ALREADY HAVE — JUDGED BY ITS DOCUMENTS? |
 | `frontend/lib/hooks/use-container-scale.ts` | 36 | 0 | 1 | — |
 | `frontend/lib/hooks/use-tool.ts` | 60 | 0 | 5 | — |
@@ -1792,7 +1793,7 @@ which carries the per-edge reasons in full.
 | `frontend/lib/rfp-filename-parser.ts` | 137 | 0 | 1 | Best-effort parser for solicitation filename / first-line text. |
 | `frontend/lib/rls.ts` | 23 | 1 | 50 | — |
 | `frontend/lib/sbir-ingest.ts` | 307 | 1 | 1 | — |
-| `frontend/lib/scout/candidates.ts` | 320 | 6 | 4 | Scout candidate queue — the DB layer for the "potential NEW or UPDATED OPP" review→release queue (#176). One reviewable surface (`scout_findings`, pur |
+| `frontend/lib/scout/candidates.ts` | 344 | 8 | 4 | Scout candidate queue — the DB layer for the "potential NEW or UPDATED OPP" review→release queue (#176). One reviewable surface (`scout_findings`, pur |
 | `frontend/lib/scout/classify.ts` | 189 | 0 | 2 | Scout candidate classification — deterministic NEW-vs-UPDATE matcher (#176). |
 | `frontend/lib/section-budget.ts` | 107 | 1 | 4 | Section budget — the "mold" side of the atoms⟷canvas loop. |
 | `frontend/lib/section-standards.ts` | 44 | 0 | 3 | Section-standards taxonomy helpers (Phase 3, C1). |
