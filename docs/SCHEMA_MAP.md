@@ -11,7 +11,7 @@
 > becomes wrong silently — which is exactly what happened to CLAUDE_CLIFFNOTES §1, frozen at
 > migration 067 while the body grew to 202.
 
-**Generated against** migration head `255_scout_harvested_documents.sql` · **140 tables** · 1926 columns · 315 foreign keys
+**Generated against** migration head `256_scout_document_evidence.sql` · **140 tables** · 1927 columns · 315 foreign keys
 
 ## How to use this before writing SQL
 
@@ -42,7 +42,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 ## 2. Tables
 
-### `_migration_history`  · 1 rows
+### `_migration_history`  · 2 rows
 
 | column | type | null | default |
 |---|---|---|---|
@@ -656,7 +656,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 - CHECK `email_suppressions_reason_check`: `CHECK ((reason = ANY (ARRAY['hard_bounce'::text, 'spam_complaint'::text, 'manual'::text])))`
 - CHECK `email_suppressions_source_check`: `CHECK ((source = ANY (ARRAY['postmark_webhook'::text, 'operator'::text])))`
 
-### `episodic_memories`  · 463 rows · _RLS FORCED · tenant-scoped_
+### `episodic_memories`  · 461 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -995,7 +995,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 | `namespace` | text | yes |  |
 
-### `process_instance_transitions`  · 11,767 rows · _RLS FORCED_
+### `process_instance_transitions`  · 11,770 rows · _RLS FORCED_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1013,7 +1013,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `content_version_before` | integer | yes |  |
 | `content_version_after` | integer | yes |  |
 
-### `process_instances`  · 3,895 rows · _RLS on · tenant-scoped · archivable_
+### `process_instances`  · 3,896 rows · _RLS on · tenant-scoped · archivable_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -1983,6 +1983,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `released_ref` | uuid | yes |  |
 | `reviewed_by` | uuid | yes |  |
 | `reviewed_at` | timestamp with time zone | yes |  |
+| `document_evidence` | jsonb | yes |  |
 
 - CHECK `scout_findings_classification_check`: `CHECK ((classification = ANY (ARRAY['new'::text, 'update'::text, 'unknown'::text])))`
 - CHECK `scout_findings_purpose_check`: `CHECK ((purpose = ANY (ARRAY['content'::text, 'opportunity'::text, 'both'::text])))`
@@ -2049,7 +2050,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 | `created_at` | timestamp with time zone | **no** | `now()` |
 | `updated_at` | timestamp with time zone | **no** | `now()` |
 
-### `semantic_memories`  · 0 rows · _RLS FORCED · tenant-scoped_
+### `semantic_memories`  · 18 rows · _RLS FORCED · tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2430,7 +2431,7 @@ Only two are "column does not exist" — which is why a plain column list is not
 
 - CHECK `stage_gate_requirements_requirement_type_check`: `CHECK ((requirement_type = ANY (ARRAY['all_sections_complete'::text, 'compliance_check_passed'::text, 'min_sections_approved'::text, 'admin_review_complete'::te`
 
-### `system_events`  · 64,996 rows · _tenant-scoped_
+### `system_events`  · 65,014 rows · _tenant-scoped_
 
 | column | type | null | default |
 |---|---|---|---|
@@ -2993,11 +2994,11 @@ because `locked` is not a member — the lock is `locked_at IS NOT NULL`.
 | `pipeline_jobs.run_type` | `full(32)` |
 | `pipeline_jobs.source` | `dsip(9)` · `sam_gov(9)` · `scout_source(8)` · `sbir_gov(4)` · `scout(2)` |
 | `pipeline_jobs.status` | `completed(30)` · `failed(2)` |
-| `process_instance_transitions.from_status` | `running(3919)` · `pending(3895)` · `paused(34)` · `retrying(24)` |
-| `process_instance_transitions.to_status` | `running(3919)` · `pending(3895)` · `completed(3840)` · `paused(79)` · `retrying(24)` · `failed(10)` |
+| `process_instance_transitions.from_status` | `running(3920)` · `pending(3896)` · `paused(34)` · `retrying(24)` |
+| `process_instance_transitions.to_status` | `running(3920)` · `pending(3896)` · `completed(3841)` · `paused(79)` · `retrying(24)` · `failed(10)` |
 | `process_instances.scope` | `contract(14)` · `opp(1)` |
-| `process_instances.source` | `pipeline(3895)` |
-| `process_instances.status` | `completed(3840)` · `paused(45)` · `failed(10)` |
+| `process_instances.source` | `pipeline(3896)` |
+| `process_instances.status` | `completed(3841)` · `paused(45)` · `failed(10)` |
 | `project_milestones.status` | `pending(2)` · `met(1)` |
 | `projects.status` | `active(1)` |
 | `promo_codes.kind` | `comp(14)` |
@@ -3027,9 +3028,9 @@ because `locked` is not a member — the lock is `locked_at IS NOT NULL`.
 | `solicitation_documents.document_type` | `source(10)` |
 | `space_presence.kind` | `shadow(54)` · `partner(44)` |
 | `stage_completion_snapshots.stage` | `draft(1)` |
-| `system_events.actor_type` | `system(55522)` · `user(6665)` · `pipeline(1893)` · `agent(916)` |
-| `system_events.namespace` | `system(51234)` · `capture(5081)` · `identity(2211)` · `tool(1786)` · `finder(1384)` · `project(1281)` · `library(1099)` · `proposal(920)` |
-| `system_events.phase` | `single(61898)` · `start(1551)` · `end(1547)` |
+| `system_events.actor_type` | `system(55535)` · `user(6665)` · `pipeline(1898)` · `agent(916)` |
+| `system_events.namespace` | `system(51243)` · `capture(5083)` · `identity(2211)` · `tool(1786)` · `finder(1389)` · `project(1283)` · `library(1099)` · `proposal(920)` |
+| `system_events.phase` | `single(61910)` · `start(1554)` · `end(1550)` |
 | `tasks.assignee_role` | `tenant_admin(57)` · `rfp_admin(56)` · `tenant_user(11)` |
 | `tasks.entity_type` | `project_milestone_task(110)` · `proposal(44)` · `project_review(22)` · `solicitation(18)` · `contract(12)` · `project_comment(11)` · `project_modification(11)` · `content_pages(10)` · `source_profile(8)` · `application(6)` · `portal(2)` |
 | `tasks.status` | `completed(161)` · `open(98)` · `expired(8)` |
@@ -3157,9 +3158,9 @@ NULL, so a join on the back-link found nothing and two separate drive scripts re
 | `opportunity_lifecycle_actions.actor_id` | `users.id` | — |
 | `opportunity_lifecycle_actions.opportunity_id` | `opportunities.id` | — |
 | `procedural_memories.tenant_id` | `tenants.id` | — |
-| `process_instance_transitions.instance_id` | `process_instances.id` | 100% (11767/11767) |
-| `process_instances.tenant_id` | `tenants.id` | 98% (3803/3895) |
-| `process_instances.trigger_event_id` | `system_events.id` | 100% (3895/3895) |
+| `process_instance_transitions.instance_id` | `process_instances.id` | 100% (11770/11770) |
+| `process_instances.tenant_id` | `tenants.id` | 98% (3804/3896) |
+| `process_instances.trigger_event_id` | `system_events.id` | 100% (3896/3896) |
 | `project_acceptance_evidence.deliverable_id` | `project_deliverables.id` | — |
 | `project_acceptance_evidence.project_id` | `projects.id` | — |
 | `project_acceptance_evidence.tenant_id` | `tenants.id` | — |
@@ -3304,8 +3305,8 @@ NULL, so a join on the back-link found nothing and two separate drive scripts re
 | `scout_runs.source_id` | `scout_sources.id` | — |
 | `section_standards.created_by` | `users.id` | — |
 | `section_standards.parent_key` | `section_standards.key` | — |
-| `semantic_memories.previous_version` | `semantic_memories.id` | — |
-| `semantic_memories.tenant_id` | `tenants.id` | — |
+| `semantic_memories.previous_version` | `semantic_memories.id` | 0% (0/35) ⚠️ |
+| `semantic_memories.tenant_id` | `tenants.id` | 100% (35/35) |
 | `sessions.user_id` | `users.id` | — |
 | `shadow_admin_grants.admin_user_id` | `users.id` | — |
 | `shadow_admin_grants.granted_by` | `users.id` | — |
@@ -3349,8 +3350,8 @@ NULL, so a join on the back-link found nothing and two separate drive scripts re
 | `stage_completion_snapshots.proposal_id` | `proposals.id` | 100% (1/1) |
 | `stage_gate_requirements.met_by` | `users.id` | — |
 | `stage_gate_requirements.proposal_id` | `proposals.id` | — |
-| `system_events.parent_event_id` | `system_events.id` | 2% (1590/64996) ⚠️ |
-| `system_events.tenant_id` | `tenants.id` | 23% (14802/64996) ⚠️ |
+| `system_events.parent_event_id` | `system_events.id` | 2% (1594/65014) ⚠️ |
+| `system_events.tenant_id` | `tenants.id` | 23% (14808/65014) ⚠️ |
 | `tasks.claimed_by` | `users.id` | 0% (0/267) ⚠️ |
 | `tasks.process_instance_id` | `process_instances.id` | 20% (53/267) ⚠️ |
 | `tasks.tenant_id` | `tenants.id` | 81% (215/267) ⚠️ |

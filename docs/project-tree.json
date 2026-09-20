@@ -8,16 +8,16 @@
  ],
  "selfTestPassed": true,
  "summary": {
-  "files": 2371,
-  "lines": 455770,
-  "edges": 4747,
-  "tables": 139,
+  "files": 2375,
+  "lines": 456392,
+  "edges": 4752,
+  "tables": 140,
   "noDescription": 555,
-  "orphans": 655,
+  "orphans": 656,
   "unresolved": 0,
   "unparsed": 0,
-  "rejectedTableNames": 267,
-  "schemaJoinedAgainst": 139
+  "rejectedTableNames": 266,
+  "schemaJoinedAgainst": 140
  },
  "rejectedTableNames": [
   "_create_task",
@@ -219,7 +219,6 @@
   "sbcs",
   "sbir",
   "scarce",
-  "scout_finding_documents",
   "scratch",
   "send",
   "sender_identities",
@@ -6224,7 +6223,31 @@
    "usedBy": [],
    "tables": {
     "read": [],
-    "write": []
+    "write": [
+     "scout_finding_documents"
+    ]
+   },
+   "external": [],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
+   "path": "db/migrations/256_scout_document_evidence.sql",
+   "name": "256_scout_document_evidence.sql",
+   "area": "db · migrations",
+   "plane": "migration",
+   "lines": 51,
+   "bytes": 3141,
+   "sha256": "80cec235516fc815",
+   "description": "256 · What the DOCUMENTS said about a finding's classification ── ANNOTATE THE EXISTING CALL, DO NOT ADD A STATE ──────────────────────────────────────────── `scout_findings` already carries a classification — `new` / `update` / `unknown` — with `match_opportunity_id`, `similarity_score` and `match_reason` behind it…",
+   "exports": [],
+   "uses": [],
+   "usedBy": [],
+   "tables": {
+    "read": [],
+    "write": [
+     "scout_findings"
+    ]
    },
    "external": [],
    "unresolved": [],
@@ -9166,6 +9189,39 @@
      "why": [
       "documentFilename",
       "extractDocumentLinks"
+     ]
+    }
+   ],
+   "usedBy": [],
+   "tables": {
+    "read": [],
+    "write": []
+   },
+   "external": [
+    "vitest"
+   ],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
+   "path": "frontend/__tests__/harvest-match.test.ts",
+   "name": "harvest-match.test.ts",
+   "area": "frontend · unit tests",
+   "plane": "test",
+   "lines": 124,
+   "bytes": 5243,
+   "sha256": "269243db682fcf64",
+   "description": "THE BOILERPLATE CASE IS THE REASON THIS FILE EXISTS.",
+   "exports": [],
+   "uses": [
+    {
+     "path": "frontend/lib/harvest/match.ts",
+     "why": [
+      "filenameSimilarity",
+      "judgeDocument",
+      "normaliseFilename",
+      "sizesAgree",
+      "strongest"
      ]
     }
    ],
@@ -62232,6 +62288,12 @@
      ]
     },
     {
+     "path": "frontend/lib/harvest/judge.ts",
+     "why": [
+      "sqlBypass"
+     ]
+    },
+    {
      "path": "frontend/lib/ingest/ingest-topic-files.ts",
      "why": [
       "sql"
@@ -68526,11 +68588,123 @@
    ],
    "tables": {
     "read": [],
-    "write": []
+    "write": [
+     "scout_finding_documents"
+    ]
    },
    "external": [
     "node:crypto"
    ],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
+   "path": "frontend/lib/harvest/judge.ts",
+   "name": "judge.ts",
+   "area": "frontend · lib",
+   "plane": "03 Domain",
+   "lines": 219,
+   "bytes": 10219,
+   "sha256": "274d8a58f08c1a89",
+   "description": "ASK THE DOCUMENTS, THEN ANNOTATE THE CALL.",
+   "exports": [
+    "DocumentEvidence",
+    "EvidenceEntry",
+    "JudgeResult",
+    "OwnerKind",
+    "judgeFindingByDocuments",
+    "readDocumentEvidence"
+   ],
+   "uses": [
+    {
+     "path": "frontend/lib/db.ts",
+     "why": [
+      "sqlBypass"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/match.ts",
+     "why": [
+      "CandidateDoc",
+      "DocMatch",
+      "judgeDocument",
+      "strongest"
+     ]
+    },
+    {
+     "path": "frontend/lib/jsonb.ts",
+     "why": [
+      "coerceJsonb"
+     ]
+    }
+   ],
+   "usedBy": [
+    {
+     "path": "frontend/scripts/drive-document-harvest.mts",
+     "why": [
+      "judgeFindingByDocuments"
+     ]
+    }
+   ],
+   "tables": {
+    "read": [],
+    "write": [
+     "scout_findings"
+    ]
+   },
+   "external": [],
+   "unresolved": [],
+   "parseError": null
+  },
+  {
+   "path": "frontend/lib/harvest/match.ts",
+   "name": "match.ts",
+   "area": "frontend · lib",
+   "plane": "03 Domain",
+   "lines": 172,
+   "bytes": 7712,
+   "sha256": "10e6537dba525ce4",
+   "description": "IS THIS THE SAME OPPORTUNITY WE ALREADY HAVE — JUDGED BY ITS DOCUMENTS?",
+   "exports": [
+    "CandidateDoc",
+    "DocMatch",
+    "DocVerdict",
+    "IDENTIFYING_LIMIT",
+    "NAME_SIMILARITY",
+    "SIZE_TOLERANCE",
+    "filenameSimilarity",
+    "judgeDocument",
+    "normaliseFilename",
+    "sizesAgree",
+    "strongest"
+   ],
+   "uses": [],
+   "usedBy": [
+    {
+     "path": "frontend/__tests__/harvest-match.test.ts",
+     "why": [
+      "filenameSimilarity",
+      "judgeDocument",
+      "normaliseFilename",
+      "sizesAgree",
+      "strongest"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/judge.ts",
+     "why": [
+      "CandidateDoc",
+      "DocMatch",
+      "judgeDocument",
+      "strongest"
+     ]
+    }
+   ],
+   "tables": {
+    "read": [],
+    "write": []
+   },
+   "external": [],
    "unresolved": [],
    "parseError": null
   },
@@ -70296,6 +70470,12 @@
     },
     {
      "path": "frontend/lib/documents/starter.ts",
+     "why": [
+      "coerceJsonb"
+     ]
+    },
+    {
+     "path": "frontend/lib/harvest/judge.ts",
      "why": [
       "coerceJsonb"
      ]
@@ -97238,9 +97418,9 @@
    "name": "drive-document-harvest.mts",
    "area": "frontend · harnesses",
    "plane": "harness",
-   "lines": 167,
-   "bytes": 9846,
-   "sha256": "c39e1404578e56c0",
+   "lines": 223,
+   "bytes": 13557,
+   "sha256": "55d22f0c515d1fca",
    "description": "THE SAME SOLICITATION, ON TWO SITES, UNDER TWO NAMES — CAN THE PRODUCT TELL?",
    "exports": [],
    "uses": [
@@ -97261,12 +97441,19 @@
      "why": [
       "harvestFinding"
      ]
+    },
+    {
+     "path": "frontend/lib/harvest/judge.ts",
+     "why": [
+      "judgeFindingByDocuments"
+     ]
     }
    ],
    "usedBy": [],
    "tables": {
     "read": [],
     "write": [
+     "scout_finding_documents",
      "scout_findings"
     ]
    },
@@ -132092,6 +132279,14 @@
     "frontend/lib/sbir-ingest.ts"
    ]
   },
+  "scout_finding_documents": {
+   "read": [],
+   "write": [
+    "db/migrations/255_scout_harvested_documents.sql",
+    "frontend/lib/harvest/harvest.ts",
+    "frontend/scripts/drive-document-harvest.mts"
+   ]
+  },
   "scout_findings": {
    "read": [
     "frontend/scripts/probe-customer-finish.mts",
@@ -132101,6 +132296,8 @@
    "write": [
     "db/migrations/118_scout_crawl_and_schedules.sql",
     "db/migrations/175_scout_candidate_classification.sql",
+    "db/migrations/256_scout_document_evidence.sql",
+    "frontend/lib/harvest/judge.ts",
     "frontend/lib/scout/candidates.ts",
     "frontend/scripts/drive-document-harvest.mts",
     "frontend/scripts/drive-full-journey.mts",

@@ -31,12 +31,12 @@
 
 | | |
 |---|---:|
-| files | **2371** |
-| total lines | 455,770 |
-| dependency edges (file → file) | 4,747 |
-| distinct tables touched | 139 |
+| files | **2375** |
+| total lines | 456,392 |
+| dependency edges (file → file) | 4,752 |
+| distinct tables touched | 140 |
 | files with no header of their own | 555 |
-| files with no edge either way | 655 |
+| files with no edge either way | 656 |
 | files with an UNRESOLVED import | 0 |
 | files the parser could not read | 0 |
 
@@ -46,14 +46,14 @@
 |---|---:|---:|---:|---:|
 | 01 UI | 364 | 78,769 | 881 | 375 |
 | 02 API | 293 | 44,837 | 1449 | 45 |
-| 03 Domain | 416 | 88,152 | 1006 | 2487 |
-| 04 Data | 3 | 330 | 3 | 588 |
+| 03 Domain | 418 | 88,543 | 1009 | 2490 |
+| 04 Data | 3 | 330 | 3 | 590 |
 | 05 Events | 4 | 1,618 | 4 | 292 |
 | 06 Engine | 104 | 25,270 | 162 | 330 |
 | 07 Agents | 61 | 21,809 | 121 | 221 |
-| migration | 257 | 46,802 | 0 | 0 |
-| harness | 459 | 80,025 | 418 | 82 |
-| test | 397 | 57,629 | 697 | 0 |
+| migration | 258 | 46,853 | 0 | 0 |
+| harness | 459 | 80,081 | 419 | 82 |
+| test | 398 | 57,753 | 698 | 0 |
 | config | 12 | 746 | 6 | 327 |
 | other | 1 | 9,783 | 0 | 0 |
 
@@ -61,11 +61,11 @@
 
 | area | files | lines |
 |---|---:|---:|
-| frontend · lib | 345 | 72,602 |
-| frontend · harnesses | 332 | 64,298 |
+| frontend · lib | 347 | 72,993 |
+| frontend · harnesses | 332 | 64,354 |
 | frontend · api routes | 292 | 44,488 |
-| db · migrations | 257 | 46,802 |
-| frontend · unit tests | 257 | 36,075 |
+| db · migrations | 258 | 46,853 |
+| frontend · unit tests | 258 | 36,199 |
 | frontend · components | 188 | 47,141 |
 | pipeline | 166 | 47,246 |
 | pipeline · tests | 118 | 18,167 |
@@ -87,14 +87,14 @@ before a refactor, and the reason each dependent is there is in the JSON.
 
 | file | used by | plane | what it is |
 |---|---:|---|---|
-| `frontend/lib/db.ts` | 488 | 04 Data | — |
+| `frontend/lib/db.ts` | 489 | 04 Data | — |
 | `frontend/auth.ts` | 325 | config | NextAuth v5 configuration — full Node-runtime version. |
 | `frontend/lib/rbac.ts` | 298 | 03 Domain | Role-based access control helpers — the single source of truth for role hierarchy checks. Middleware and API r |
 | `frontend/lib/events.ts` | 244 | 05 Events | Structured event emitter for the RFP Pipeline platform. |
 | `frontend/lib/types/canvas-document.ts` | 237 | 03 Domain | Canvas Document types — the unified content model for all proposal artifacts. Every document (Word, slides, PD |
 | `frontend/lib/validation.ts` | 111 | 03 Domain | Shared zod primitives. Imported by API route schemas + tool input schemas so there's one canonical definition  |
 | `pipeline/src/workflows/base.py` | 69 | 06 Engine | Module: Workflow Base Classes (base.py) ====================================================================== |
-| `frontend/lib/jsonb.ts` | 50 | 04 Data | coerceJsonb — read a jsonb column safely regardless of how it was written. |
+| `frontend/lib/jsonb.ts` | 51 | 04 Data | coerceJsonb — read a jsonb column safely regardless of how it was written. |
 | `frontend/lib/rls.ts` | 50 | 04 Data | — |
 | `frontend/lib/toast.tsx` | 47 | 03 Domain | — |
 | `frontend/lib/tools/base.ts` | 44 | 03 Domain | Tool interface — the canonical dual-use construct. |
@@ -188,18 +188,18 @@ files is one whose invariants live in the application rather than in the schema.
 | `pipeline_schedules` | 10 | 2 |
 | `process_instance_transitions` | 11 | 1 |
 | `opportunity_bridge` | 12 | 0 |
+| `scout_findings` | 9 | 3 |
 | `library_seed_jobs` | 11 | 1 |
 | `procedural_memories` | 8 | 3 |
 | `source_diffs` | 7 | 4 |
 | `source_regions` | 5 | 6 |
 | `platform_agent_config` | 4 | 7 |
 | `automation_framework` | 6 | 5 |
-| `project_clins` | 4 | 7 |
 
-_139 tables in total — `--table <name>` lists the files for any one of them._
+_140 tables in total — `--table <name>` lists the files for any one of them._
 
-Every name above is a real table: the extraction is joined against the 139 tables in
-`docs/SCHEMA_MAP.md`, which is itself generated from the live database. **267 extracted names were rejected** as CTEs, subquery aliases or prose that
+Every name above is a real table: the extraction is joined against the 140 tables in
+`docs/SCHEMA_MAP.md`, which is itself generated from the live database. **266 extracted names were rejected** as CTEs, subquery aliases or prose that
 survived the filter — a number worth watching, because a large one means this extractor has
 drifted and is a finding about the TOOL. (The first run reported 486 "tables" against a
 schema of 139, by reading every Python docstring as a SQL body.)
@@ -217,7 +217,7 @@ exists, just nowhere near the code.)
 
 | file | used by | lines |
 |---|---:|---:|
-| `frontend/lib/db.ts` | 488 | 281 |
+| `frontend/lib/db.ts` | 489 | 281 |
 | `frontend/lib/rls.ts` | 50 | 23 |
 | `frontend/lib/toast.tsx` | 47 | 95 |
 | `frontend/components/ui/time-ago.tsx` | 26 | 155 |
@@ -243,7 +243,7 @@ exists, just nowhere near the code.)
 | `frontend/components/portal/pipeline-cards.tsx` | 3 | 613 |
 | `frontend/components/portal/section-compliance-chip.tsx` | 3 | 113 |
 
-**655 files have no edge in either direction.** Most are configuration, migrations
+**656 files have no edge in either direction.** Most are configuration, migrations
 and standalone harnesses, which legitimately import nothing and are imported by nothing —
 a file being here is a question, not a verdict.
 
@@ -252,7 +252,7 @@ a file being here is a question, not a verdict.
 Every file, by area. `→` is what it uses, `←` is who uses it; the counts link to the JSON,
 which carries the per-edge reasons in full.
 
-### db · migrations · 257 file(s)
+### db · migrations · 258 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
@@ -511,6 +511,7 @@ which carries the per-edge reasons in full.
 | `db/migrations/253_doc_tag_slugs.sql` | 56 | 0 | 0 | 253 · A `doc` tag a person can read ── WHAT A CUSTOMER SAW ──────────────────────────────────────────────────────────────────────── The library shelf  |
 | `db/migrations/254_govtech_app_can_login.sql` | 73 | 0 | 0 | 254 · `govtech_app` can LOGIN — the half of the RLS cutover that lived only in a runbook ── WHAT THIS FIXES ────────────────────────────────────────── |
 | `db/migrations/255_scout_harvested_documents.sql` | 110 | 0 | 0 | 255 · The documents a scout finding actually carries ── WHAT IS MISSING TODAY ───────────────────────────────────────────────────────────────────── A  |
+| `db/migrations/256_scout_document_evidence.sql` | 51 | 0 | 0 | 256 · What the DOCUMENTS said about a finding's classification ── ANNOTATE THE EXISTING CALL, DO NOT ADD A STATE ───────────────────────────────────── |
 | `db/migrations/migrate.mjs` | 280 | 0 | 0 | Lightweight migration runner for production startup. Uses the postgres.js driver already bundled in the Next.js standalone image. No psql or shell dep |
 | `db/migrations/run.sh` | 248 | 0 | 0 | GovWin — Database Migration & Seed Runner --------------------------------------------------------------------------- Runs all SQL migrations in order |
 
@@ -1301,7 +1302,7 @@ which carries the per-edge reasons in full.
 | `frontend/scripts/drive-curate-baa.mts` | 251 | 3 | 0 | drive-curate-baa — do the rfp_admin's actual job on a real BAA, and produce the OPP cards. |
 | `frontend/scripts/drive-curated-ranking.mts` | 166 | 3 | 0 | drive-curated-ranking — an admin marks a passage, and a tenant's lens finds the opportunity. |
 | `frontend/scripts/drive-descent-timeout.mts` | 239 | 0 | 0 | — |
-| `frontend/scripts/drive-document-harvest.mts` | 167 | 3 | 0 | THE SAME SOLICITATION, ON TWO SITES, UNDER TWO NAMES — CAN THE PRODUCT TELL? |
+| `frontend/scripts/drive-document-harvest.mts` | 223 | 4 | 0 | THE SAME SOLICITATION, ON TWO SITES, UNDER TWO NAMES — CAN THE PRODUCT TELL? |
 | `frontend/scripts/drive-dormant-surface.mjs` | 274 | 0 | 0 | — |
 | `frontend/scripts/drive-email-spine.mts` | 266 | 2 | 0 | The email spine, driven end to end against the emulator — send → ledger → webhook → suppression. |
 | `frontend/scripts/drive-end-to-end.mjs` | 449 | 0 | 0 | The whole arc, on one artifact: a government PDF nobody wrote for us → a file on disk you could submit. Ingest · curate · push · discover · buy · prov |
@@ -1547,7 +1548,7 @@ which carries the per-edge reasons in full.
 | `frontend/scripts/verify-write-contract.mjs` | 287 | 0 | 0 | Lens 5 — the WRITE surface. Does every POST/PATCH/PUT/DELETE refuse bad input in the SOP shape? |
 | `frontend/scripts/write-ui-docs.mjs` | 279 | 0 | 0 | — |
 
-### frontend · lib · 345 file(s)
+### frontend · lib · 347 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
@@ -1601,7 +1602,7 @@ which carries the per-edge reasons in full.
 | `frontend/lib/content-canvas.ts` | 335 | 1 | 6 | Content Studio ⇄ Canvas bridge (pure, IO-free, unit-testable). |
 | `frontend/lib/crypto.ts` | 68 | 0 | 0 | AES-256-GCM for stored third-party API keys — the WRITER half of a cross-language pair. |
 | `frontend/lib/curation/republish.ts` | 217 | 4 | 19 | Mid-window propagation — the missing half of "edit the master after push". |
-| `frontend/lib/db.ts` | 281 | 2 | 488 | — |
+| `frontend/lib/db.ts` | 281 | 2 | 489 | — |
 | `frontend/lib/documents/atomize-on-export.ts` | 92 | 5 | 1 | Atomize-on-download for standalone tenant documents (template bridge Phase 2, docs/TEMPLATE_BRIDGE_DESIGN.md). |
 | `frontend/lib/documents/duplicate-past-proposal.ts` | 75 | 3 | 1 | #18 branch-and-promote — the DUPLICATE leg. |
 | `frontend/lib/documents/lock-document.ts` | 34 | 1 | 1 | #18 branch-and-promote — the PROMOTE leg. |
@@ -1637,6 +1638,8 @@ which carries the per-edge reasons in full.
 | `frontend/lib/harvest/extract-links.ts` | 196 | 0 | 3 | WHICH LINKS ON THIS PAGE ARE THE SOLICITATION'S DOCUMENTS? |
 | `frontend/lib/harvest/fetch.ts` | 198 | 0 | 1 | THE ONE PLACE HARVESTING REACHES THE OUTSIDE WORLD. |
 | `frontend/lib/harvest/harvest.ts` | 201 | 4 | 1 | HARVEST THE DOCUMENTS BEHIND A SCOUT FINDING. |
+| `frontend/lib/harvest/judge.ts` | 219 | 3 | 1 | ASK THE DOCUMENTS, THEN ANNOTATE THE CALL. |
+| `frontend/lib/harvest/match.ts` | 172 | 0 | 2 | IS THIS THE SAME OPPORTUNITY WE ALREADY HAVE — JUDGED BY ITS DOCUMENTS? |
 | `frontend/lib/hooks/use-container-scale.ts` | 36 | 0 | 1 | — |
 | `frontend/lib/hooks/use-tool.ts` | 60 | 0 | 5 | — |
 | `frontend/lib/humanize.ts` | 50 | 0 | 3 | Turn a system identifier into something a person reads. A zero-import leaf. |
@@ -1659,7 +1662,7 @@ which carries the per-edge reasons in full.
 | `frontend/lib/ingest/source-text-cap.ts` | 95 | 0 | 7 | How much of a solicitation we read, and saying so when it is not all of it. |
 | `frontend/lib/ingest/stage-skeleton.ts` | 280 | 7 | 3 | Ingest Studio — STAGE and LAND (the split that gives the matrix a gate). |
 | `frontend/lib/intake.ts` | 157 | 2 | 4 | RFP intake staging (greenfield-adjacent; the head of the RFP river). Stages a found/uploaded opportunity NOTICE into the review queue: creates an oppo |
-| `frontend/lib/jsonb.ts` | 26 | 0 | 50 | coerceJsonb — read a jsonb column safely regardless of how it was written. |
+| `frontend/lib/jsonb.ts` | 26 | 0 | 51 | coerceJsonb — read a jsonb column safely regardless of how it was written. |
 | `frontend/lib/library/artifact-canvas.ts` | 96 | 2 | 8 | Pure builders that turn our house content into native-format CanvasDocuments — doc (letter), sheet (spreadsheet), etc. IO-free so they're unit-testabl |
 | `frontend/lib/library/corpus-verbatim.ts` | 108 | 1 | 4 | Whose words are these? (LIB-HYGIENE) |
 | `frontend/lib/library/dsip-deconstruct.ts` | 340 | 0 | 3 | DSIP full-proposal deconstruct — the deterministic volume segmenter. |
@@ -2002,7 +2005,7 @@ which carries the per-edge reasons in full.
 | `frontend/app/portal/[tenantSlug]/vaults/page.tsx` | 24 | 4 | 0 | — |
 | `frontend/app/portal/page.tsx` | 155 | 6 | 0 | — |
 
-### frontend · unit tests · 257 file(s)
+### frontend · unit tests · 258 file(s)
 
 | file | lines | → | ← | what it is |
 |---|---:|---:|---:|---|
@@ -2096,6 +2099,7 @@ which carries the per-edge reasons in full.
 | `frontend/__tests__/guardrail-templates.test.ts` | 124 | 1 | 0 | Portal guardrail-templates API (the config-templates capability): auth gate, GET list shape, POST validation (name required, config validated against  |
 | `frontend/__tests__/guide-coverage-state.test.ts` | 149 | 1 | 0 | THE STATE MACHINE THE LOOP RUNS ON, AND THE ONE TRANSITION NOBODY WOULD NOTICE. |
 | `frontend/__tests__/harvest-extract-links.test.ts` | 158 | 1 | 0 | THE EXTRACTOR'S JOB IS PRECISION, AND THIS TESTS FOR THE NOISE. |
+| `frontend/__tests__/harvest-match.test.ts` | 124 | 1 | 0 | THE BOILERPLATE CASE IS THE REASON THIS FILE EXISTS. |
 | `frontend/__tests__/hitl-role-hierarchy.test.ts` | 29 | 1 | 0 | HITL P2 — the role-hierarchy expectations the ToDo visibility/completion logic depends on (lib/tasks/tasks.ts). Pure (no DB); the live cross-tenant/es |
 | `frontend/__tests__/house-docs.test.ts` | 41 | 1 | 0 | — |
 | `frontend/__tests__/ingest-assessment.test.ts` | 64 | 1 | 0 | Ingest-assessment reader (#12) — lib/ingest/assessment.ts. |

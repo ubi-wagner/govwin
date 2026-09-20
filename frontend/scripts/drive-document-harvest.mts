@@ -28,6 +28,7 @@
 import { sqlBypass } from '@/lib/db';
 import { harvestFinding } from '@/lib/harvest/harvest';
 import { extractDocumentLinks } from '@/lib/harvest/extract-links';
+import { judgeFindingByDocuments } from '@/lib/harvest/judge';
 
 let ok = true;
 const A = (label: string, cond: boolean, detail = '') => {
@@ -146,6 +147,61 @@ try {
     SELECT count(*)::int AS n FROM scout_finding_documents WHERE finding_id = ${govFinding}::uuid`;
   A('and the row count is UNCHANGED — an upsert, not an accumulation',
     (after[0]?.n ?? 0) === 3, `${after[0]?.n} row(s) after two harvests`);
+
+  // ── 6 · the judgement — annotate the call, never invent a state ───────────────────────────
+  phase('6 · what the documents say about the classification');
+
+  const judged = await judgeFindingByDocuments(aggFinding);
+  A('the aggregator finding was judged by its documents', judged.ok, judged.error ?? judged.evidence.verdict);
+  A('and the evidence names a counterpart FINDING, since the gov page is not yet curated',
+    judged.evidence.matches.some((m) => m.ownerKind === 'finding' && m.verdict === 'certain'),
+    judged.evidence.matches.map((m) => `${m.ownerKind}:${m.verdict}`).join(' '));
+  A('the finding row now carries the evidence',
+    (await sqlBypass<Array<{ v: string | null }>>`
+      SELECT document_evidence->>'verdict' AS v FROM scout_findings WHERE id = ${aggFinding}::uuid`
+    )[0]?.v === 'certain');
+
+  // A finding with nothing harvested must say "nothing to ask", not "no match" — recording a
+  // verdict for a check that never ran is the same lie as a green test that never executed.
+  const unharvested = await seed('https://www.example.gov/opportunities/AF251-D001', 'never harvested');
+  const noDocs = await judgeFindingByDocuments(unharvested);
+  A('a finding with no harvested documents is refused, not judged',
+    !noDocs.ok && noDocs.code === 'NOT_HARVESTED', `${noDocs.code}`);
+  A('…and its evidence column stays NULL — never checked is not the same as nothing found',
+    (await sqlBypass<Array<{ v: unknown }>>`
+      SELECT document_evidence AS v FROM scout_findings WHERE id = ${unharvested}::uuid`
+    )[0]?.v === null);
+
+  // ── 7 · THE BOILERPLATE GUARD, against the real corpus ────────────────────────────────────
+  phase('7 · the umbrella BAA — an exact hash that identifies nothing');
+
+  const [boiler] = await sqlBypass<Array<{ hash: string; name: string; sols: number; size: string | null }>>`
+    SELECT content_hash AS hash, min(original_filename) AS name,
+           count(DISTINCT solicitation_id)::int AS sols, min(file_size)::text AS size
+      FROM solicitation_documents WHERE content_hash IS NOT NULL
+     GROUP BY content_hash HAVING count(DISTINCT solicitation_id) > 1
+     ORDER BY 3 DESC LIMIT 1`;
+
+  if (!boiler) {
+    A('a shared attachment exists to test the guard against — UNMEASURED', false,
+      'no hash on this box spans two solicitations, so the guard is untested here');
+  } else {
+    const shim = await seed('https://www.example.gov/opportunities/AF251-D001', 'boilerplate probe');
+    await sqlBypass`
+      INSERT INTO scout_finding_documents
+        (finding_id, page_url, document_url, original_filename, file_size, content_hash, harvest_driver)
+      VALUES (${shim}::uuid, 'https://www.example.gov/x', 'https://www.example.gov/x/baa.pdf',
+              ${boiler.name}, ${boiler.size ? Number(boiler.size) : null}, ${boiler.hash}, 'fixture')`;
+    const b = await judgeFindingByDocuments(shim);
+    A(`the shared attachment is found — "${boiler.name.slice(0, 40)}" spans ${boiler.sols} solicitations`,
+      b.ok && b.evidence.matches.length > 0, `${b.evidence.matches.length} match(es)`);
+    A('its verdict is BOILERPLATE, not certain — an exact hash under many opportunities identifies none',
+      b.evidence.verdict === 'boilerplate', b.evidence.verdict);
+    A('and it did NOT move the classification',
+      b.reclassifiedTo === undefined
+      && (await sqlBypass<Array<{ c: string }>>`
+           SELECT classification AS c FROM scout_findings WHERE id = ${shim}::uuid`)[0]?.c === 'unknown');
+  }
 
   phase('verdict');
   console.log(`  MUTATED: ${made.length} throwaway finding(s) + their harvested rows, removed below.`);
